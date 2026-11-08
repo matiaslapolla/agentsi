@@ -1,0 +1,47 @@
+{
+  "id": "S001",
+  "type": "story",
+  "slug": "ver-las-stories-en-la-web",
+  "title": "Ver las stories en la web",
+  "as_a": "dueño de la agencia",
+  "i_want": "leer cada story como una página clara, con sus criterios y su sesión",
+  "so_that": "poder aprobarla sin abrir el JSON",
+  "criteria": [
+    {
+      "given": "un producto con Stories mode prendido y una story pendiente",
+      "when": "abro /p/agentsi/stories/S001",
+      "then": "veo la oración de la story y cada criterio con dado, cuando y entonces",
+      "test": "apps/web/lib/stories.test.ts",
+      "checks": "La página arma la oración de la story y lista los criterios en orden."
+    },
+    {
+      "given": "una story con aprobación pendiente",
+      "when": "toco Aprobar",
+      "then": "la story queda aprobada y el cambio se commitea en el workspace",
+      "test": "apps/web/lib/stories-write.test.ts",
+      "checks": "La acción aprueba la story en el archivo y deja un commit."
+    },
+    {
+      "given": "una story que no me convence",
+      "when": "pido cambios con una nota",
+      "then": "la nota queda guardada y la web me dice qué comando reescribe la story",
+      "test": "apps/web/lib/stories-write.test.ts",
+      "checks": "La nota de cambios queda en el archivo y la aprobación pasa a cambios pedidos."
+    }
+  ],
+  "owner_role": "dev",
+  "objective": "o1",
+  "sources": [
+    { "type": "path", "ref": "docs/specs/agentsi-stories.md" },
+    { "type": "commit", "ref": "a19d5be3c0ffee00" }
+  ],
+  "status": "not_implemented",
+  "approval": "pending",
+  "changes_note": null,
+  "proposed_by": "pm",
+  "minutes": "2026-10-20-1800-stories",
+  "session": null,
+  "results": [],
+  "created_at": "2026-10-21T12:00:00.000Z",
+  "updated_at": "2026-10-21T12:00:00.000Z"
+}

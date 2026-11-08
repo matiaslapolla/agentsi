@@ -1,0 +1,7 @@
+{
+  "name": "agentsi",
+  "version": "0.2.0",
+  "description": "Agency of role agents (PM, social, dev, QA, scout) you open inside any product with /agentsi: front desk, meetings with cited minutes, call audio, memory you can audit.",
+  "license": "MIT",
+  "author": { "name": "AgentSI contributors" }
+}

@@ -1,0 +1,190 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rcurate
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect --memory-only --json
+exit: 0
+--- stdout
+{
+  "entry": {
+    "id": "r-<STAMP>",
+    "product": "alpha",
+    "created_at": "<NOW>",
+    "trigger": "manual",
+    "signals": [
+      {
+        "agent": "pm",
+        "kind": "first_check_failure",
+        "ref": "rf-01",
+        "detail": "Priority 1 cites no north star"
+      },
+      {
+        "agent": "qa",
+        "kind": "sin_datos",
+        "ref": "rf-01",
+        "detail": "2 \"sin datos\""
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-01",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "pm",
+        "kind": "first_check_failure",
+        "ref": "rf-02",
+        "detail": "Priority 2: objective \"o9\" must be one of the brief ids (o1, o2)"
+      },
+      {
+        "agent": "pm",
+        "kind": "invented_source",
+        "ref": "rf-02",
+        "detail": "docs/imaginary.md"
+      },
+      {
+        "agent": "qa",
+        "kind": "sin_datos",
+        "ref": "rf-02",
+        "detail": "3 \"sin datos\""
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-02",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "pm",
+        "kind": "error",
+        "ref": "rf-03",
+        "detail": "claude timed out after 360s"
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-03",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "qa",
+        "kind": "sin_datos",
+        "ref": "rf-05",
+        "detail": "2 \"sin datos\""
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-05",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "dev",
+        "kind": "mark_accepted",
+        "ref": "rf-01",
+        "detail": "#0 Cortar el build"
+      },
+      {
+        "agent": "dev",
+        "kind": "mark_rejected",
+        "ref": "rf-02",
+        "detail": "#0 Citar el spec"
+      },
+      {
+        "agent": "pm",
+        "kind": "mark_changed",
+        "ref": "rf-02",
+        "detail": "#1 Ordenar el plan"
+      },
+      {
+        "agent": "pm",
+        "kind": "decision_rejected",
+        "ref": "rf-02",
+        "detail": "Borrar el importador"
+      },
+      {
+        "agent": "qa",
+        "kind": "mark_accepted",
+        "ref": "rf-03",
+        "detail": "#0 Probar el borde"
+      }
+    ],
+    "memory": [
+      {
+        "agent": "dev",
+        "added": [
+          "m-<NEW>"
+        ],
+        "retired": [
+          "m-k002"
+        ],
+        "helpful": [
+          "m-k001"
+        ],
+        "harmful": [
+          "m-k006"
+        ],
+        "dropped": [
+          "add \"Una lección sin evidencia.\": cites no signal",
+          "add \"El build usa pnpm.\": duplicates an item",
+          "add: empty text",
+          "retire m-k003: no active item",
+          "retire m-k001: no reason",
+          "helpful m-zzzz: no active item"
+        ],
+        "diff": "--- a/alpha/memory/dev\n+++ b/alpha/memory/dev\n@@ -1,3 +1,3 @@\n+- [m-<NEW>] Confirmar que un archivo existe antes de citarlo.\n - [m-k001] El build usa pnpm.\n - [m-k006] Citar solo lo que se leyó.\n-- [m-k002] Hay una nota vieja sobre npm.\n"
+      },
+      {
+        "agent": "pm",
+        "added": [
+          "m-<NEW>"
+        ],
+        "retired": [],
+        "helpful": [],
+        "harmful": [
+          "m-k004"
+        ],
+        "dropped": [],
+        "diff": "--- a/alpha/memory/pm\n+++ b/alpha/memory/pm\n@@ -1 +1,2 @@\n+- [m-<NEW>] Marcar el objetivo de cada prioridad.\n - [m-k004] El dueño lee las actas los lunes.\n"
+      },
+      {
+        "agent": "qa",
+        "added": [],
+        "retired": [],
+        "helpful": [],
+        "harmful": [],
+        "dropped": [],
+        "diff": ""
+      }
+    ],
+    "proposal": null,
+    "consumed": [
+      "rf-01",
+      "rf-02",
+      "rf-03",
+      "rf-04",
+      "rf-05"
+    ],
+    "status": "applied",
+    "commit": null,
+    "cost_usd": 0.375
+  },
+  "candidates": []
+}
+
+--- stderr
+reflect dev: dropped add "Una lección sin evidencia.": cites no signal
+reflect dev: dropped add "El build usa pnpm.": duplicates an item
+reflect dev: dropped add: empty text
+reflect dev: dropped retire m-k003: no active item
+reflect dev: dropped retire m-k001: no reason
+reflect dev: dropped helpful m-zzzz: no active item
+

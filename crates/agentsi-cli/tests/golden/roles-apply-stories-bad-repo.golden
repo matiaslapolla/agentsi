@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+La etapa no es válida:
+  - stories.json repo must be an existing absolute path to a directory, got "relative/path".
+

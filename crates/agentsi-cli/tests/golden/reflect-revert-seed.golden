@@ -1,0 +1,28 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect revert r-seed
+exit: 0
+--- stdout
+Reversión r-<STAMP> de r-seed en alpha
+  dev: 0 nuevos, 1 retirados, 0 útiles, 1 dañinos, 1 restaurados
+    --- a/alpha/memory/dev
+    +++ b/alpha/memory/dev
+    @@ -1,3 +1,3 @@
+     - [m-k001] El build usa pnpm.
+    -- [m-k006] Citar solo lo que se leyó.
+    +- [m-k003] Una nota retirada.
+     - [m-k002] Hay una nota vieja sobre npm.
+
+--- stderr
+
+## reflect revert r-seed
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reflect: Reflection "r-seed" is already reverted.
+

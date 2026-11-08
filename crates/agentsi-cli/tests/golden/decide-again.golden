@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+Decision 1 rejected (alpha-001).
+
+--- stderr
+

@@ -1,0 +1,34 @@
+exit: 1
+--- stdout
+Usage: agentsi <command> [options]
+
+  up        Start Postgres and apply migrations
+  doctor    Check the tools that AgentSI needs
+  migrate   Apply pending SQL migrations
+  data      Move data of an old data root into the database
+  backup    Dump the database and copy the registry into the backups folder of the data root
+  whoami    Detect the product of a directory
+  desk      Open the front desk: product, index, status and pending decisions as one JSON object
+  index     Update the knowledge base index
+  status    Product state, pending decisions and last minutes
+  snapshot  Markdown context for a meeting
+  check     Run the pass/fail check on a minutes file
+  audit     Health of the product's config, meetings, marks and memory (deterministic)
+  meet      Run a meeting
+  ask       Ask one role one question
+  decide    Approve or reject a pending decision
+  decision  Record a pending decision outside a meeting
+  story     Stories mode: propose, approve, run and review stories
+  mark      Mark priorities of a minutes file, or walk through everything pending
+  archive   Hide a minutes file, a pending decision or a story from the lists and counts; nothing is deleted
+  restore   Bring an archived minutes file, decision or story back to the lists
+  roles     Roster of the product (validate: check it; apply: install a staged brief and roster)
+  reset     Return an agent (or the whole product) to the global roles; --all drops brief, overlays, specialists and custom roles
+  reflect   Curate each agent's memory, then propose one prompt change gated by replay (revert: undo one)
+  render    Render the audio of a meeting
+  voice     Turn voice mode on or off for the current Claude Code session
+  web       Start the web app
+  mcp       Run the MCP server on stdio
+
+--- stderr
+

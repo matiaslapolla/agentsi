@@ -1,0 +1,12 @@
+{
+  "name": "agentsi",
+  "description": "Marketplace for AgentSI, the role-agent agency for Claude Code.",
+  "owner": { "name": "AgentSI contributors" },
+  "plugins": [
+    {
+      "name": "agentsi",
+      "source": "./plugin",
+      "description": "Agency of role agents (PM, social, dev, QA, scout) you open inside any product with /agentsi: front desk, meetings with cited minutes, call audio, memory you can audit."
+    }
+  ]
+}

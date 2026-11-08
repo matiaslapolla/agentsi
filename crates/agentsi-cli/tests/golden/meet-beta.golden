@@ -1,0 +1,854 @@
+## meet --product beta --question=gitrepo-is-it-ready --roles pm,dev
+exit: 1
+--- stdout
+Minutes: <STAMP>-gitrepo-is-it-ready
+Status: invalid (repaired)
+  check failure: No priority cites a north star declared in the brief (docs/missing.md).
+Top priorities:
+  1. Publicar (dev)
+Cost: $0.0400 in <SECONDS>s
+Web: http://127.0.0.1:3361/p/beta/m/<STAMP>-gitrepo-is-it-ready
+Call: http://127.0.0.1:3361/p/beta/m/<STAMP>-gitrepo-is-it-ready/call
+
+--- stderr
+[index] index started
+code graph: no reindex of <WORK>/repos/beta: no graph here
+[index] done
+[role] pm started
+[role] dev started
+[role] pm finished in <SECONDS>s, $0.0100, input 560 tokens
+[role] dev finished in <SECONDS>s, $0.0100, input 288 tokens
+[synthesis] synthesis started
+[synthesis] synthesis finished in <SECONDS>s, $0.0100, input 136 tokens
+[check] 1 failures: No priority cites a north star declared in the brief (docs/missing.md).
+[synthesis] synthesis-repair started (repair)
+[synthesis] synthesis-repair finished in <SECONDS>s, $0.0100, input 448 tokens
+[check] 1 failures: No priority cites a north star declared in the brief (docs/missing.md).
+
+## @meeting-rows
+exit: 0
+--- stdout
+{
+  "counts": {
+    "decisions": 8,
+    "documents": 13,
+    "meeting_log": 6,
+    "memory": 5,
+    "minutes": 7,
+    "priorities": 8,
+    "snapshots": 2,
+    "usage": 4
+  },
+  "decisions": [],
+  "documents": [
+    {
+      "body": "# Minutes <STAMP>-gitrepo-is-it-ready\n\n- Product: beta\n- Date: <NOW>\n- Question: gitrepo-is-it-ready\n- Status: invalid (repaired)\n\n## Priorities\n\n- #0 [ ] **Publicar** (dev) [b1]\n   - Why: Está listo.\n   - Source: commit `<HASH>`\n   - Source: path `docs/specs/api.md`\n\n## Decisions to confirm\n\n_None._\n\n## Roles\n\n### pm (claude-sonnet-fake)\n\nBeta sigue.\n\n### dev (claude-sonnet-fake)\n\nListo.\n\n## Repaired failures\n\n- No priority cites a north star declared in the brief (docs/missing.md).\n\n## Check failures\n\n- No priority cites a north star declared in the brief (docs/missing.md).\n",
+      "kind": "minutes",
+      "ref": "<STAMP>-gitrepo-is-it-ready",
+      "title": "gitrepo-is-it-ready"
+    }
+  ],
+  "meeting_log": [
+    {
+      "entry": {
+        "agents": {
+          "dev": {
+            "cost_usd": 0.01,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "model": "claude-sonnet-fake",
+            "priorities": 1,
+            "prompt_hash": "4e67fd43d699aabb17d81327f8d3fc9eab80ed75a97b66a1e7799ede76f87cc3",
+            "sin_datos": 0,
+            "sources": 2,
+            "unresolved_sources": [
+              {
+                "ref": "abcdef0",
+                "type": "commit"
+              }
+            ]
+          },
+          "pm": {
+            "cost_usd": 0.01,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "model": "claude-sonnet-fake",
+            "priorities": 0,
+            "prompt_hash": "fd7fe4fb38579c092fe7cdcea6258c2d09096de871b36cac0492736da7a05d9a",
+            "sin_datos": 0,
+            "sources": 0,
+            "unresolved_sources": []
+          }
+        },
+        "brief_hash": "2d0b7bd37c910a788a6ce0c70cb0956efde0f5d0ab0abead6385fd461bb53719",
+        "created_at": "<NOW>",
+        "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+        "question": "gitrepo-is-it-ready",
+        "scope": null,
+        "synthesis": {
+          "cost_usd": 0.02,
+          "final_check": {
+            "failures": [
+              "No priority cites a north star declared in the brief (docs/missing.md)."
+            ],
+            "passed": false
+          },
+          "first_check": {
+            "failures": [
+              "No priority cites a north star declared in the brief (docs/missing.md)."
+            ],
+            "passed": false
+          },
+          "invented_sources": [],
+          "repaired": true
+        },
+        "total_cost_usd": 0.04
+      },
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "product": "beta"
+    }
+  ],
+  "memory": [],
+  "minutes": [
+    {
+      "created_at": "<NOW>",
+      "data": {
+        "check": {
+          "failures": [
+            "No priority cites a north star declared in the brief (docs/missing.md)."
+          ],
+          "first_failures": [
+            "No priority cites a north star declared in the brief (docs/missing.md)."
+          ],
+          "passed": false,
+          "repaired": true
+        },
+        "created_at": "<NOW>",
+        "decisions": [],
+        "disagreements": [],
+        "id": "<STAMP>-gitrepo-is-it-ready",
+        "priorities": [
+          {
+            "is_new": false,
+            "mark": null,
+            "objective": "b1",
+            "owner_role": "dev",
+            "sources": [
+              {
+                "ref": "<HASH>",
+                "type": "commit"
+              },
+              {
+                "ref": "docs/specs/api.md",
+                "type": "path"
+              }
+            ],
+            "title": "Publicar",
+            "why": "Está listo."
+          }
+        ],
+        "product": "beta",
+        "question": "gitrepo-is-it-ready",
+        "roles": {
+          "dev": {
+            "answer": "Listo.",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "claude-sonnet-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "<HASH>",
+                    "type": "commit"
+                  },
+                  {
+                    "ref": "abcdef0",
+                    "type": "commit"
+                  }
+                ],
+                "title": "Publicar",
+                "why": "Está listo."
+              }
+            ]
+          },
+          "pm": {
+            "answer": "Beta sigue.",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "claude-sonnet-fake",
+            "priorities": []
+          }
+        },
+        "scope": null,
+        "script": [
+          {
+            "role": "pm",
+            "text": "Beta está lista."
+          }
+        ],
+        "status": "invalid"
+      },
+      "id": "<STAMP>-gitrepo-is-it-ready",
+      "product": "beta",
+      "question": "gitrepo-is-it-ready",
+      "scope": null,
+      "status": "invalid",
+      "usage": [
+        {
+          "cache_read": 210,
+          "cache_write": 280,
+          "cost_usd": 0.01,
+          "duration_ms": 1700,
+          "input_tokens": 70,
+          "model": "claude-sonnet-fake",
+          "output_tokens": 140,
+          "role": "pm"
+        },
+        {
+          "cache_read": 108,
+          "cache_write": 144,
+          "cost_usd": 0.01,
+          "duration_ms": 1360,
+          "input_tokens": 36,
+          "model": "claude-sonnet-fake",
+          "output_tokens": 72,
+          "role": "dev"
+        },
+        {
+          "cache_read": 51,
+          "cache_write": 68,
+          "cost_usd": 0.01,
+          "duration_ms": 1170,
+          "input_tokens": 17,
+          "model": "claude-opus-fake",
+          "output_tokens": 34,
+          "role": "synthesis"
+        },
+        {
+          "cache_read": 168,
+          "cache_write": 224,
+          "cost_usd": 0.01,
+          "duration_ms": 1560,
+          "input_tokens": 56,
+          "model": "claude-opus-fake",
+          "output_tokens": 112,
+          "role": "synthesis-repair"
+        }
+      ]
+    }
+  ],
+  "priorities": [
+    {
+      "idx": 0,
+      "is_new": false,
+      "mark": null,
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "objective": "b1",
+      "owner_role": "dev",
+      "sources": [
+        {
+          "ref": "<HASH>",
+          "type": "commit"
+        },
+        {
+          "ref": "docs/specs/api.md",
+          "type": "path"
+        }
+      ],
+      "title": "Publicar",
+      "why": "Está listo."
+    }
+  ],
+  "snapshots": [
+    {
+      "body": "# Snapshot: Beta\n\n- Product: beta (planned)\n- Active roles: pm, dev, scout\n- Paths: <WORK>/repos/beta\n\n## North star and guidelines\n\n### CLAUDE.md\n\n# Beta guidelines\n\n- Keep each change small.\n- Write the test first.\n\n### README.md\n\n# Beta\n\nA second made-up product. It has one git repo and a few docs.\n\n## Stories\n\n- S001 Filter mail — not_implemented, approval approved, session ready\n- S002 Star mail — not_implemented, approval pending, session none\n- T003 Drop the old cache — not_implemented, approval approved, session none\n- S004 Mark mail as read — not_implemented, approval approved, session none\n- S005 Pin mail — not_implemented, approval approved, session failed\n- S006 Snooze mail — not_implemented, approval approved, session work\n- S007 Archive mail — not_implemented, approval changes_requested, session none\n\nImplemented: 1. Discarded: 0.\n\n## Open issues\n\n- #9 Fix the typo in the README\n- #7 Add a health route\n\n## Last minutes, priorities and marks\n\n### beta-001 — Is Beta ready?\n\n- #0 [x] Write the docs\n\n## Pending decisions\n\n- [8] Publish the docs → Push the docs\n\n## Commits, last 14 days\n\n2 commits\n\n- 5e79613 2099-01-01 docs: write the launch plan\n- db41f71 2099-01-01 feat: first route\n\n## Journal tail\n\n# Journal\n\n- Session 1: wrote the API spec.\n- Session 2: wrote the launch plan.\n\n## Docs index\n\n- docs/ideas/widget.md — A widget idea\n- docs/specs/api.md — The API spec\n- docs/plans/launch.md — Launch plan\n- CLAUDE.md — Beta guidelines\n- README.md — Beta\n",
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "product": "beta"
+    }
+  ],
+  "usage": [
+    {
+      "cache_read": 108,
+      "cache_write": 144,
+      "cost_usd": 0.01,
+      "duration_ms": 1360,
+      "input_tokens": 36,
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "model": "claude-sonnet-fake",
+      "output_tokens": 72,
+      "role": "dev"
+    },
+    {
+      "cache_read": 210,
+      "cache_write": 280,
+      "cost_usd": 0.01,
+      "duration_ms": 1700,
+      "input_tokens": 70,
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "model": "claude-sonnet-fake",
+      "output_tokens": 140,
+      "role": "pm"
+    },
+    {
+      "cache_read": 51,
+      "cache_write": 68,
+      "cost_usd": 0.01,
+      "duration_ms": 1170,
+      "input_tokens": 17,
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "model": "claude-opus-fake",
+      "output_tokens": 34,
+      "role": "synthesis"
+    },
+    {
+      "cache_read": 168,
+      "cache_write": 224,
+      "cost_usd": 0.01,
+      "duration_ms": 1560,
+      "input_tokens": 56,
+      "minutes_id": "<STAMP>-gitrepo-is-it-ready",
+      "model": "claude-opus-fake",
+      "output_tokens": 112,
+      "role": "synthesis-repair"
+    }
+  ]
+}
+
+--- stderr
+
+## @claude-calls
+exit: 0
+--- stdout
+=== dev
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/beta
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You are the developer of a made-up product.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep,Glob
+arg: --allowedTools
+arg: Read,Grep,Glob
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="dreaming"><what>Second product</what><audience>Testers</audience></product>
+<objectives>
+<objective id="b1" due="2026-13-40" signal="Live">Launch</objective>
+</objectives>
+<north_stars><path>docs/missing.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="extra">Not in the roster.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Beta
+
+- Product: beta (planned)
+- Active roles: pm, dev, scout
+- Paths: <WORK>/repos/beta
+
+## North star and guidelines
+
+### CLAUDE.md
+
+# Beta guidelines
+
+- Keep each change small.
+- Write the test first.
+
+### README.md
+
+# Beta
+
+A second made-up product. It has one git repo and a few docs.
+
+## Stories
+
+- S001 Filter mail — not_implemented, approval approved, session ready
+- S002 Star mail — not_implemented, approval pending, session none
+- T003 Drop the old cache — not_implemented, approval approved, session none
+- S004 Mark mail as read — not_implemented, approval approved, session none
+- S005 Pin mail — not_implemented, approval approved, session failed
+- S006 Snooze mail — not_implemented, approval approved, session work
+- S007 Archive mail — not_implemented, approval changes_requested, session none
+
+Implemented: 1. Discarded: 0.
+
+## Open issues
+
+- #9 Fix the typo in the README
+- #7 Add a health route
+
+## Last minutes, priorities and marks
+
+### beta-001 — Is Beta ready?
+
+- #0 [x] Write the docs
+
+## Pending decisions
+
+- [8] Publish the docs → Push the docs
+
+## Commits, last 14 days
+
+2 commits
+
+- <HASH> <DATE> docs: write the launch plan
+- <HASH> <DATE> feat: first route
+
+## Journal tail
+
+# Journal
+
+- Session 1: wrote the API spec.
+- Session 2: wrote the launch plan.
+
+## Docs index
+
+- docs/ideas/widget.md — A widget idea
+- docs/specs/api.md — The API spec
+- docs/plans/launch.md — Launch plan
+- CLAUDE.md — Beta guidelines
+- README.md — Beta
+
+
+# Your memory about this product
+_Empty: you have not met on this product yet._
+
+# Question
+gitrepo-is-it-ready
+
+# Instructions
+- You are the dev of the agency. Working directory: <WORK>/repos/beta (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== pm
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/beta
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep
+arg: --allowedTools
+arg: Read,Grep
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="dreaming"><what>Second product</what><audience>Testers</audience></product>
+<objectives>
+<objective id="b1" due="2026-13-40" signal="Live">Launch</objective>
+</objectives>
+<north_stars><path>docs/missing.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="extra">Not in the roster.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Beta
+
+- Product: beta (planned)
+- Active roles: pm, dev, scout
+- Paths: <WORK>/repos/beta
+
+## North star and guidelines
+
+### CLAUDE.md
+
+# Beta guidelines
+
+- Keep each change small.
+- Write the test first.
+
+### README.md
+
+# Beta
+
+A second made-up product. It has one git repo and a few docs.
+
+## Stories
+
+- S001 Filter mail — not_implemented, approval approved, session ready
+- S002 Star mail — not_implemented, approval pending, session none
+- T003 Drop the old cache — not_implemented, approval approved, session none
+- S004 Mark mail as read — not_implemented, approval approved, session none
+- S005 Pin mail — not_implemented, approval approved, session failed
+- S006 Snooze mail — not_implemented, approval approved, session work
+- S007 Archive mail — not_implemented, approval changes_requested, session none
+
+Implemented: 1. Discarded: 0.
+
+## Open issues
+
+- #9 Fix the typo in the README
+- #7 Add a health route
+
+## Last minutes, priorities and marks
+
+### beta-001 — Is Beta ready?
+
+- #0 [x] Write the docs
+
+## Pending decisions
+
+- [8] Publish the docs → Push the docs
+
+## Commits, last 14 days
+
+2 commits
+
+- <HASH> <DATE> docs: write the launch plan
+- <HASH> <DATE> feat: first route
+
+## Journal tail
+
+# Journal
+
+- Session 1: wrote the API spec.
+- Session 2: wrote the launch plan.
+
+## Docs index
+
+- docs/ideas/widget.md — A widget idea
+- docs/specs/api.md — The API spec
+- docs/plans/launch.md — Launch plan
+- CLAUDE.md — Beta guidelines
+- README.md — Beta
+
+
+# Your memory about this product
+_Empty: you have not met on this product yet._
+
+# Question
+gitrepo-is-it-ready
+
+# Instructions
+- You are the pm of the agency. Working directory: <WORK>/repos/beta (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== synthesis-repair
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/repos/beta
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+
+Now you write the minutes of the meeting from the agent answers.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}},"owner_role":{"type":"string"},"objective":{"type":"string","enum":["b1"]}},"required":["title","why","sources","owner_role","objective"]}},"disagreements":{"type":"array","items":{"type":"object","properties":{"topic":{"type":"string"},"positions":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"view":{"type":"string"}},"required":["role","view"]}}},"required":["topic","positions"]}},"decisions":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"why":{"type":"string"},"action":{"type":"string"},"priorities":{"type":"array","items":{"type":"integer"}}},"required":["text","why"]}},"script":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"text":{"type":"string"}},"required":["role","text"]}}},"required":["priorities","disagreements","decisions","script"]}
+stdin:
+# Question
+gitrepo-is-it-ready
+
+# Agent answers
+## pm
+
+{"answer":"Beta sigue.","priorities":[],"concerns":[]}
+
+## dev
+
+{"answer":"Listo.","priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"80db04af1de62e8788c59e8f999e41200be92331"},{"type":"commit","ref":"abcdef0"}]}],"concerns":[]}
+
+# Brief of the product
+<brief>
+<product stage="dreaming"><what>Second product</what><audience>Testers</audience></product>
+<objectives>
+<objective id="b1" due="2026-13-40" signal="Live">Launch</objective>
+</objectives>
+<north_stars><path>docs/missing.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="extra">Not in the roster.</agent>
+</roles>
+</brief>
+
+# Snapshot (compact)
+# Snapshot: Beta
+
+- Product: beta (planned)
+- Active roles: pm, dev, scout
+- Paths: <WORK>/repos/beta
+
+
+## North star and guidelines
+
+### CLAUDE.md
+
+# Beta guidelines
+
+- Keep each change small.
+- Write the test first.
+
+### README.md
+
+# Beta
+
+A second made-up product. It has one git repo and a few docs.
+
+
+## Stories
+
+- S001 Filter mail — not_implemented, approval approved, session ready
+- S002 Star mail — not_implemented, approval pending, session none
+- T003 Drop the old cache — not_implemented, approval approved, session none
+- S004 Mark mail as read — not_implemented, approval approved, session none
+- S005 Pin mail — not_implemented, approval approved, session failed
+- S006 Snooze mail — not_implemented, approval approved, session work
+- S007 Archive mail — not_implemented, approval changes_requested, session none
+
+Implemented: 1. Discarded: 0.
+
+
+## Last minutes, priorities and marks
+
+### beta-001 — Is Beta ready?
+
+- #0 [x] Write the docs
+
+
+## Pending decisions
+
+- [8] Publish the docs → Push the docs
+
+
+## Commits, last 14 days
+
+2 commits
+
+- <HASH> <DATE> docs: write the launch plan
+- <HASH> <DATE> feat: first route
+
+
+## Docs index
+
+- docs/ideas/widget.md — A widget idea
+- docs/specs/api.md — The API spec
+- docs/plans/launch.md — Launch plan
+- CLAUDE.md — Beta guidelines
+- README.md — Beta
+
+
+# Instructions
+- Rank at most 5 priorities. Each cites at least one source, copied verbatim (type and ref) from the agent answers or the snapshot. Never invent a source.
+- "objective" is the id of the brief objective the priority serves: one of b1.
+- At least one priority cites a declared north star as a path source (docs/missing.md). Cite only those as north stars.
+- Keep everything under <out_of_scope> out of the priorities.
+- "owner_role" is the id of the agent that proposed the priority most strongly, exactly as it heads its answer.
+- "disagreements": only real conflicts between agents; an empty array when there are none. Each position's "role" is an agent id.
+- "decisions": things that need the approval of Ada before anything changes. Each with its reason and an "action": what an agent would do after the approval, in one sentence. Each also lists in "priorities" the indexes (starting at 0, in the order of your "priorities") of the priorities it covers; an empty array when it covers none. Approving the decision marks those priorities accepted.
+- "script": a team call in Spanish, written to be spoken, in ASD-STE100 Simplified Technical English style applied to Spanish: one topic in each sentence, at most 20 words in a sentence, the active voice with a named agent, simple verb forms, the condition first, one name for each thing. No slogans, metaphors, filler or fragments for effect. The pm opens by stating the question. Each agent that answered speaks its own view in 2 to 4 sentences, in first person. Refer to commits and files by what they are, never read hashes or paths aloud. Name a story by its title, never by its id. Add a short back-and-forth where agents disagree. The pm closes with the ranked priorities and the decisions Ada must take. Total about 2 to 4 minutes of speech. No markdown, no emojis. The "role" of each segment is the id of one of the agents that answered, or pm.
+- Everything in Spanish except identifiers, paths and code.
+
+# Repair
+Your previous output failed these checks. Fix them and return the full corrected output.
+
+Failures:
+- No priority cites a north star declared in the brief (docs/missing.md).
+
+Previous output:
+{"priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"80db04af1de62e8788c59e8f999e41200be92331"},{"type":"path","ref":"docs/specs/api.md"}],"owner_role":"dev","objective":"b1"}],"disagreements":[],"decisions":[],"script":[{"role":"pm","text":"Beta está lista."}]}
+=== synthesis
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/repos/beta
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+
+Now you write the minutes of the meeting from the agent answers.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}},"owner_role":{"type":"string"},"objective":{"type":"string","enum":["b1"]}},"required":["title","why","sources","owner_role","objective"]}},"disagreements":{"type":"array","items":{"type":"object","properties":{"topic":{"type":"string"},"positions":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"view":{"type":"string"}},"required":["role","view"]}}},"required":["topic","positions"]}},"decisions":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"why":{"type":"string"},"action":{"type":"string"},"priorities":{"type":"array","items":{"type":"integer"}}},"required":["text","why"]}},"script":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"text":{"type":"string"}},"required":["role","text"]}}},"required":["priorities","disagreements","decisions","script"]}
+stdin:
+# Question
+gitrepo-is-it-ready
+
+# Agent answers
+## pm
+
+{"answer":"Beta sigue.","priorities":[],"concerns":[]}
+
+## dev
+
+{"answer":"Listo.","priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"80db04af1de62e8788c59e8f999e41200be92331"},{"type":"commit","ref":"abcdef0"}]}],"concerns":[]}
+
+# Brief of the product
+<brief>
+<product stage="dreaming"><what>Second product</what><audience>Testers</audience></product>
+<objectives>
+<objective id="b1" due="2026-13-40" signal="Live">Launch</objective>
+</objectives>
+<north_stars><path>docs/missing.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="extra">Not in the roster.</agent>
+</roles>
+</brief>
+
+# Snapshot (compact)
+# Snapshot: Beta
+
+- Product: beta (planned)
+- Active roles: pm, dev, scout
+- Paths: <WORK>/repos/beta
+
+
+## North star and guidelines
+
+### CLAUDE.md
+
+# Beta guidelines
+
+- Keep each change small.
+- Write the test first.
+
+### README.md
+
+# Beta
+
+A second made-up product. It has one git repo and a few docs.
+
+
+## Stories
+
+- S001 Filter mail — not_implemented, approval approved, session ready
+- S002 Star mail — not_implemented, approval pending, session none
+- T003 Drop the old cache — not_implemented, approval approved, session none
+- S004 Mark mail as read — not_implemented, approval approved, session none
+- S005 Pin mail — not_implemented, approval approved, session failed
+- S006 Snooze mail — not_implemented, approval approved, session work
+- S007 Archive mail — not_implemented, approval changes_requested, session none
+
+Implemented: 1. Discarded: 0.
+
+
+## Last minutes, priorities and marks
+
+### beta-001 — Is Beta ready?
+
+- #0 [x] Write the docs
+
+
+## Pending decisions
+
+- [8] Publish the docs → Push the docs
+
+
+## Commits, last 14 days
+
+2 commits
+
+- <HASH> <DATE> docs: write the launch plan
+- <HASH> <DATE> feat: first route
+
+
+## Docs index
+
+- docs/ideas/widget.md — A widget idea
+- docs/specs/api.md — The API spec
+- docs/plans/launch.md — Launch plan
+- CLAUDE.md — Beta guidelines
+- README.md — Beta
+
+
+# Instructions
+- Rank at most 5 priorities. Each cites at least one source, copied verbatim (type and ref) from the agent answers or the snapshot. Never invent a source.
+- "objective" is the id of the brief objective the priority serves: one of b1.
+- At least one priority cites a declared north star as a path source (docs/missing.md). Cite only those as north stars.
+- Keep everything under <out_of_scope> out of the priorities.
+- "owner_role" is the id of the agent that proposed the priority most strongly, exactly as it heads its answer.
+- "disagreements": only real conflicts between agents; an empty array when there are none. Each position's "role" is an agent id.
+- "decisions": things that need the approval of Ada before anything changes. Each with its reason and an "action": what an agent would do after the approval, in one sentence. Each also lists in "priorities" the indexes (starting at 0, in the order of your "priorities") of the priorities it covers; an empty array when it covers none. Approving the decision marks those priorities accepted.
+- "script": a team call in Spanish, written to be spoken, in ASD-STE100 Simplified Technical English style applied to Spanish: one topic in each sentence, at most 20 words in a sentence, the active voice with a named agent, simple verb forms, the condition first, one name for each thing. No slogans, metaphors, filler or fragments for effect. The pm opens by stating the question. Each agent that answered speaks its own view in 2 to 4 sentences, in first person. Refer to commits and files by what they are, never read hashes or paths aloud. Name a story by its title, never by its id. Add a short back-and-forth where agents disagree. The pm closes with the ranked priorities and the decisions Ada must take. Total about 2 to 4 minutes of speech. No markdown, no emojis. The "role" of each segment is the id of one of the agents that answered, or pm.
+- Everything in Spanish except identifiers, paths and code.
+
+--- stderr
+

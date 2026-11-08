@@ -1,0 +1,75 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi >/dev/null 2>&1 || exit 0; agentsi hook pre-tool-use"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi-core >/dev/null 2>&1 || exit 0; agentsi-core hook UserPromptSubmit 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi-core >/dev/null 2>&1 || exit 0; agentsi-core hook Stop 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi-core >/dev/null 2>&1 || exit 0; agentsi-core hook SessionStart 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi-core >/dev/null 2>&1 || exit 0; agentsi-core hook Notification 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi-core >/dev/null 2>&1 || exit 0; agentsi-core hook PermissionRequest 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v agentsi-core >/dev/null 2>&1 || exit 0; agentsi-core hook PostToolUse 2>/dev/null; exit 0"
+          }
+        ]
+      }
+    ]
+  }
+}

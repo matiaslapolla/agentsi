@@ -1,0 +1,13 @@
+exit: 1
+--- stdout
+{
+  "passed": false,
+  "failures": [
+    "No priorities.",
+    "No priority cites a north star declared in the brief (docs/vision.md).",
+    "Call script is empty."
+  ]
+}
+
+--- stderr
+

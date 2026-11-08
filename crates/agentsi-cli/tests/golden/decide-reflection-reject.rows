@@ -1,0 +1,221 @@
+{
+  "counts": {
+    "meeting_log": 5,
+    "minutes": 6,
+    "priorities": 7,
+    "snapshots": 1,
+    "usage": 0
+  },
+  "decisions": [
+    {
+      "action": "Rename the folders",
+      "decided_at": "2026-10-02T08:00:00.000Z",
+      "id": 1,
+      "kind": "minutes",
+      "minutes_id": "alpha-001",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "approved",
+      "text": "Adopt the new naming",
+      "why": "Names drift."
+    },
+    {
+      "action": "Remove the export flag",
+      "decided_at": null,
+      "id": 2,
+      "kind": "minutes",
+      "minutes_id": "alpha-002",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Drop the legacy export",
+      "why": "Nobody uses it."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "id": 3,
+      "kind": "minutes",
+      "minutes_id": "alpha-002",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Move the demo date",
+      "why": "The build is late."
+    },
+    {
+      "action": "Write LICENSE",
+      "decided_at": null,
+      "id": 4,
+      "kind": "product",
+      "minutes_id": null,
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Pick a license",
+      "why": "The repo goes public."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "id": 5,
+      "kind": "minutes",
+      "minutes_id": "alpha-003",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Rename the module",
+      "why": "The name is wrong."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "id": 6,
+      "kind": "minutes",
+      "minutes_id": "alpha-002",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "An archived idea",
+      "why": "Old."
+    },
+    {
+      "action": "Approve the change",
+      "decided_at": "<NOW>",
+      "id": 7,
+      "kind": "reflection",
+      "minutes_id": null,
+      "product": "alpha",
+      "reflection_id": "r-1",
+      "status": "rejected",
+      "text": "Retire the old prompt of dev",
+      "why": "Dev was rejected 3 times."
+    },
+    {
+      "action": "Push the docs",
+      "decided_at": null,
+      "id": 8,
+      "kind": "minutes",
+      "minutes_id": "beta-001",
+      "product": "beta",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Publish the docs",
+      "why": "Docs are ready."
+    }
+  ],
+  "memory": [
+    {
+      "agent": "dev",
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "m-0003",
+      "kind": "fact",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "alpha-001",
+      "text": "The build uses pnpm."
+    },
+    {
+      "agent": "dev",
+      "created_at": "2026-10-01T11:00:00.000Z",
+      "harmful": 1,
+      "helpful": 0,
+      "id": "m-0004",
+      "kind": "fact",
+      "position": 1,
+      "product": "alpha",
+      "retired_at": "2026-10-09T10:00:00.000Z",
+      "retired_why": "Replaced by pnpm.",
+      "source": "alpha-001",
+      "text": "An old note about npm."
+    },
+    {
+      "agent": "dev",
+      "created_at": "2026-10-15T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "m-0005",
+      "kind": "lesson",
+      "position": 2,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "alpha-001",
+      "text": "Never cite a path that does not exist."
+    },
+    {
+      "agent": "pm",
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "m-0001",
+      "kind": "fact",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "alpha-001",
+      "text": "The owner reads the minutes on Monday."
+    },
+    {
+      "agent": "pm",
+      "created_at": "2026-10-08T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 2,
+      "id": "m-0002",
+      "kind": "lesson",
+      "position": 1,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "alpha-001",
+      "text": "Keep each priority to one sentence."
+    }
+  ],
+  "overlays": [
+    {
+      "agent": "qa",
+      "body": "---\nmodel: haiku\n---\nYou are the QA of Alpha.",
+      "product": "alpha"
+    },
+    {
+      "agent": "ghost",
+      "body": "---\nextends: nobody\n---\nA lost overlay.",
+      "product": "beta"
+    }
+  ],
+  "reflections": [
+    {
+      "entry": {
+        "consumed": [
+          "alpha-001"
+        ],
+        "created_at": "2026-10-05T09:00:00.000Z",
+        "id": "r-1",
+        "proposal": {
+          "agent": "dev",
+          "status": "rejected"
+        },
+        "status": "applied"
+      },
+      "id": "r-1",
+      "position": 0,
+      "product": "alpha"
+    },
+    {
+      "entry": {
+        "created_at": "2026-10-06T09:00:00.000Z",
+        "id": "r-2",
+        "reverts": "r-1",
+        "status": "applied"
+      },
+      "id": "r-2",
+      "position": 1,
+      "product": "alpha"
+    }
+  ]
+}

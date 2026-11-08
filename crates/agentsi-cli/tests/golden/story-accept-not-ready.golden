@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: Story S006 has no story session in state ready.
+

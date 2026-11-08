@@ -1,0 +1,27 @@
+{
+  "name": "@agentsi/core",
+  "version": "0.2.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./brief": "./src/brief.ts",
+    "./paths": "./src/paths.ts",
+    "./reflections": "./src/reflections.ts",
+    "./story": "./src/story.ts",
+    "./story-write": "./src/story-write.ts",
+    "./test-db": "./src/test-db.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p .",
+    "test": "node --import tsx --test \"src/**/*.test.ts\""
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.14",
+    "@types/pg": "^8.11.0"
+  }
+}

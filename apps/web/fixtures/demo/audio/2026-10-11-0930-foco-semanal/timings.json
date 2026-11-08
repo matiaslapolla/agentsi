@@ -1,0 +1,100 @@
+[
+  {
+    "idx": 0,
+    "role": "pm",
+    "text": "Buenos días. La pregunta de hoy es qué hacemos esta semana para llegar al primer consultorio pagando.",
+    "start": 0.6,
+    "end": 6.91
+  },
+  {
+    "idx": 1,
+    "role": "dev",
+    "text": "Primero lo que me preocupa: el webhook de pagos no es idempotente. Si el proveedor repite una notificación, la suscripción se acredita dos veces.",
+    "start": 7.36,
+    "end": 16.42
+  },
+  {
+    "idx": 2,
+    "role": "pm",
+    "text": "Eso entra como primera prioridad. ¿Cuánto cuesta arreglarlo?",
+    "start": 16.87,
+    "end": 20.62
+  },
+  {
+    "idx": 3,
+    "role": "dev",
+    "text": "Un día, con un índice único sobre el identificador del pago. Lo demás del cobro depende de eso.",
+    "start": 21.07,
+    "end": 27.01
+  },
+  {
+    "idx": 4,
+    "role": "qa",
+    "text": "Yo sumo un problema en la entrada del embudo. El alta de paciente devuelve un error 500 en Safari si la fecha de nacimiento viene vacía.",
+    "start": 27.46,
+    "end": 35.96
+  },
+  {
+    "idx": 5,
+    "role": "pm",
+    "text": "Entonces el formulario también va antes del cobro. Social, ¿qué ves del lado de la audiencia?",
+    "start": 36.41,
+    "end": 42.22
+  },
+  {
+    "idx": 6,
+    "role": "social",
+    "text": "Hay material para un clip corto de una recepcionista dando un turno con el celular. A los consultorios les llega eso más que una captura.",
+    "start": 42.67,
+    "end": 51.23
+  },
+  {
+    "idx": 7,
+    "role": "scout",
+    "text": "Y del lado del mercado, dos competidores cobran por profesional activo y regalan el primer mes. Ninguno cobra la seña del turno por adelantado.",
+    "start": 51.68,
+    "end": 60.62
+  },
+  {
+    "idx": 8,
+    "role": "pm",
+    "text": "Ese es el hueco. Pero hay un desacuerdo: ¿recordatorios antes o después del cobro?",
+    "start": 61.07,
+    "end": 66.19
+  },
+  {
+    "idx": 9,
+    "role": "scout",
+    "text": "Antes. Bajan el ausentismo, y eso vende.",
+    "start": 66.64,
+    "end": 69.14
+  },
+  {
+    "idx": 10,
+    "role": "dev",
+    "text": "Yo prefiero no mezclarlos. Recordatorios y suscripción tocan el mismo modelo de turnos.",
+    "start": 69.59,
+    "end": 75.03
+  },
+  {
+    "idx": 11,
+    "role": "pm",
+    "text": "Me quedo con después. Ningún consultorio lo pidió. Propongo congelar los recordatorios hasta que haya un consultorio pagando.",
+    "start": 75.48,
+    "end": 83.29
+  },
+  {
+    "idx": 12,
+    "role": "qa",
+    "text": "Con esa decisión, pido una pasada completa en Safari sobre alta, agenda y cobro antes del piloto.",
+    "start": 83.74,
+    "end": 89.8
+  },
+  {
+    "idx": 13,
+    "role": "pm",
+    "text": "Anotado. Quedan cuatro prioridades y tres decisiones para que confirmes. Gracias a todos.",
+    "start": 90.25,
+    "end": 95.81
+  }
+]

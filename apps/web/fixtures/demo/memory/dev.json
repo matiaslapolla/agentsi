@@ -1,0 +1,39 @@
+{
+  "agent": "dev",
+  "product": "_demo",
+  "items": [
+    {
+      "id": "m-a1c4",
+      "text": "El webhook de pagos vive en `app/api/webhooks/pagos`.",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 0,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    },
+    {
+      "id": "m-b27e",
+      "text": "Las migraciones de turnos no tienen rollback: revisar antes de tocar el schema.",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 0,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    },
+    {
+      "id": "m-c93d",
+      "text": "Recordatorios y suscripción comparten el modelo de turnos.",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 0,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    }
+  ]
+}

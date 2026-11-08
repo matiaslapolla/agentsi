@@ -1,0 +1,11 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi roles [agent] [--json] [--product <id>]
+       agentsi roles validate [--json] [--product <id>]
+       agentsi roles apply <staging-dir> [--yes] [--register --product <id> --name <n> --path <abs>]
+Usage: agentsi roles [agent] [--json] [--product <id>]
+       agentsi roles validate [--json] [--product <id>]
+       agentsi roles apply <staging-dir> [--yes] [--register --product <id> --name <n> --path <abs>]
+

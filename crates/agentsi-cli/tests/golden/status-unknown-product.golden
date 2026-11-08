@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi status: Unknown product "nope"
+

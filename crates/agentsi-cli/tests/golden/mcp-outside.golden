@@ -1,0 +1,298 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "capabilities": {
+      "tools": {
+        "listChanged": true
+      }
+    },
+    "protocolVersion": "2025-06-18",
+    "serverInfo": {
+      "name": "agentsi",
+      "version": "0.2.0"
+    }
+  }
+}
+
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "tools": [
+      {
+        "description": "Full-text search over the product's docs, journal, commits, issues and minutes. Returns ranked hits (kind, ref, title, snippet); read one with get_doc. Query in the language of the documents.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "description": "Only this kind. memory is searched only when named.",
+              "enum": [
+                "doc",
+                "journal",
+                "commit",
+                "issue",
+                "minutes",
+                "memory"
+              ],
+              "type": "string"
+            },
+            "limit": {
+              "default": 5,
+              "description": "Max hits (default 5).",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            },
+            "query": {
+              "description": "Terms. Quotes for phrases, 'or' for alternatives, '-' to exclude.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "name": "search"
+      },
+      {
+        "description": "Read one indexed item by kind and ref from a search hit. Bodies over 12000 chars are cut; use section or offset for the rest.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "description": "Kind, as in the search hit.",
+              "enum": [
+                "doc",
+                "journal",
+                "commit",
+                "issue",
+                "minutes",
+                "memory"
+              ],
+              "type": "string"
+            },
+            "offset": {
+              "description": "Character offset to start reading from.",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            },
+            "ref": {
+              "description": "Ref, as in the search hit. A commit hash prefix works.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "section": {
+              "description": "Markdown heading text (case-insensitive): return only that section.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ref"
+          ],
+          "type": "object"
+        },
+        "name": "get_doc"
+      },
+      {
+        "description": "List recent meeting minutes: id, status, date, question and the owner's marks on the priorities. Read one with get_doc kind=minutes.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "include_archived": {
+              "default": false,
+              "description": "Also list archived minutes, marked as archived (default false).",
+              "type": "boolean"
+            },
+            "limit": {
+              "default": 5,
+              "description": "Max minutes (default 5).",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "list_minutes"
+      },
+      {
+        "description": "List decisions waiting for the owner's approval, grouped by minutes. Never act on a pending decision.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "limit": {
+              "default": 10,
+              "description": "Max decisions (default 10).",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "pending_decisions"
+      },
+      {
+        "description": "Read what one role learned about this product (active memory items, newest first, with ids). Read it before answering in that role.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            },
+            "role": {
+              "description": "Agent id: pm, social, dev, qa, scout or a specialist such as dev.backend.",
+              "pattern": "^[a-z0-9_.-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        "name": "role_memory"
+      }
+    ]
+  }
+}
+
+{
+  "id": 3,
+  "jsonrpc": "2.0",
+  "result": {}
+}
+
+{
+  "id": 4,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "No product matches <WORK>/outside. Pass \"product\" explicitly. Products: alpha, beta, gamma",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+
+{
+  "id": 5,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "minutes alpha-002:\n  #2 Drop the legacy export\n     why: Nobody uses it.\n     action: Remove the export flag\n(4 more not shown; raise limit)",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 6,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "Unknown product \"nope\". Products: alpha, beta, gamma",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+
+{
+  "id": 7,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool get_doc: Invalid enum value. Expected 'doc' | 'journal' | 'commit' | 'issue' | 'minutes' | 'memory', received 'nonsense' at kind",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+
+{
+  "id": 8,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "MCP error -32602: Tool nope not found",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+
+{
+  "id": 9,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "MCP error -32602: Input validation error: Invalid arguments for tool search: Number must be less than or equal to 50 at limit",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+
+{
+  "error": {
+    "code": -32601,
+    "message": "Method not found"
+  },
+  "id": 10,
+  "jsonrpc": "2.0"
+}

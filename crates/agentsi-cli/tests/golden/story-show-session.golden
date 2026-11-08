@@ -1,0 +1,48 @@
+exit: 0
+--- stdout
+# S005 Pin mail
+
+<!-- Rendered from the story JSON in the database. -->
+
+- Type: story
+- Owner: dev
+- Status: not_implemented
+- Approval: approved
+- Proposed by: pm
+
+**As a** a reader
+
+**I want** to pin mail
+
+**So that** the inbox stays calm
+
+## Criteria
+
+### 1
+
+- **Given** a mailbox with 1 mails
+- **When** the user opens the list
+- **Then** the list shows 1 rows
+- Test: `test/list-1.test.sh`
+- Checks: The list shows 1 rows.
+
+### 2
+
+- **Given** a mailbox with 2 mails
+- **When** the user opens the list
+- **Then** the list shows 2 rows
+- Test: `test/list-2.test.sh`
+- Checks: The list shows 2 rows.
+
+## Session
+
+- State: failed
+- Branch: `story/S005-pin-mail`
+- Attempts: 2
+- Stopped: budget, cap USD 2.00 for each session.
+- Failure: The criterion tests fail:
+not ok 1 - pin
+
+
+--- stderr
+

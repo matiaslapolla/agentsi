@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi archive: No minutes nope for alpha.
+

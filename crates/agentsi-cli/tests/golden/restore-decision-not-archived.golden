@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi restore: Decision 2 is not archived.
+

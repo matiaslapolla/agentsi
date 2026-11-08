@@ -1,0 +1,13 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi mark <minutes-id> <idx> accepted|changed|rejected [--new]
+       agentsi mark --set <minutes-id>:<idx>:<mark>[:new] [--set ...]
+       agentsi mark --pending [--json] [--product <id>]
+       agentsi mark [--product <id>]   (wizard, needs a terminal)
+Usage: agentsi mark <minutes-id> <idx> accepted|changed|rejected [--new]
+       agentsi mark --set <minutes-id>:<idx>:<mark>[:new] [--set ...]
+       agentsi mark --pending [--json] [--product <id>]
+       agentsi mark [--product <id>]   (wizard, needs a terminal)
+

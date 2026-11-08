@@ -1,0 +1,9 @@
+exit: 0
+--- stdout
+Roster de beta:
+  pm     pm   global  opus  esfuerzo high
+  dev    dev  global  sonnet
+  scout  ERROR Unknown role "scout" (no <WORK>/root/plugin/agents/scout.md)
+
+--- stderr
+

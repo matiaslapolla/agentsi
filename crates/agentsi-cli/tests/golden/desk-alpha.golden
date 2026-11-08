@@ -1,0 +1,81 @@
+exit: 0
+--- stdout
+{
+  "product": "alpha",
+  "name": "Alpha",
+  "scope": null,
+  "roles": [
+    "pm",
+    "dev",
+    "qa"
+  ],
+  "paths": [
+    "<WORK>/repos/alpha"
+  ],
+  "owner": {
+    "name": "Ada",
+    "language": "Spanish"
+  },
+  "index": {
+    "ok": true,
+    "summary": "alpha: 0 repos (0 unchanged), 0 docs, 0 commits, 0 issues, 4 minutes, 2 memory, <SECONDS>s"
+  },
+  "status": {
+    "ok": true,
+    "markdown": "# Alpha — AgentSI status\n\n- Roles: pm, dev, qa · status active\n- Index: 0 docs, 0 commits, 0 open issues, indexed never\n- Last commit: none indexed\n- Pending decisions: 5\n- Minutes: 4 total\n\n## Pending decisions\n\n- [2] Drop the legacy export (alpha-002)\n- [3] Move the demo date (alpha-002)\n- [4] Pick a license\n- [5] Rename the module (alpha-003)\n- [7] Retire the old prompt of dev\n\n## Last minutes\n\n- alpha-003 — Should Alpha split the module? — invalid — no priorities\n- alpha-002 — What blocks the beta? — valid — 2 unmarked\n- alpha-001 — What should Alpha do first? — valid — 1 changed, 1 accepted, 1 rejected\n"
+  },
+  "pending_decisions": [
+    {
+      "kind": "decision",
+      "id": 2,
+      "minutes_id": "alpha-002",
+      "text": "Drop the legacy export",
+      "why": "Nobody uses it.",
+      "action": "Remove the export flag",
+      "priorities": [
+        0
+      ]
+    },
+    {
+      "kind": "decision",
+      "id": 3,
+      "minutes_id": "alpha-002",
+      "text": "Move the demo date",
+      "why": "The build is late.",
+      "action": null,
+      "priorities": [
+        1
+      ]
+    },
+    {
+      "kind": "decision",
+      "id": 4,
+      "minutes_id": null,
+      "text": "Pick a license",
+      "why": "The repo goes public.",
+      "action": "Write LICENSE",
+      "priorities": []
+    },
+    {
+      "kind": "decision",
+      "id": 5,
+      "minutes_id": "alpha-003",
+      "text": "Rename the module",
+      "why": "The name is wrong.",
+      "action": null,
+      "priorities": []
+    },
+    {
+      "kind": "decision",
+      "id": 7,
+      "minutes_id": null,
+      "text": "Retire the old prompt of dev",
+      "why": "Dev was rejected 3 times.",
+      "action": "Approve the change",
+      "priorities": []
+    }
+  ]
+}
+
+--- stderr
+

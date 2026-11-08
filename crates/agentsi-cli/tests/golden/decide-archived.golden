@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+Decision 6 is archived. Run agentsi restore 6 first, then decide.
+

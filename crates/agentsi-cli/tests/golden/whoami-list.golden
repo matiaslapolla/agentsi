@@ -1,0 +1,8 @@
+exit: 0
+--- stdout
+alpha  Alpha  active  <WORK>/repos/alpha
+beta  Beta  planned  <WORK>/repos/beta
+gamma  Gamma  active  <WORK>/repos/gamma  (archived)
+
+--- stderr
+

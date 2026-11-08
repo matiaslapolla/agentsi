@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi archive: Bad minutes id "a..b".
+

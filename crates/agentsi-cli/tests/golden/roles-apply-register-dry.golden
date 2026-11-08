@@ -1,0 +1,14 @@
+exit: 0
+--- stdout
+Se registra y se configura delta.
+
+Roster: (ninguno) -> pm, dev
+  agregados: pm, dev
+
+Base de datos (brief y overlays):
+  nuevo  delta/brief.json
+
+Simulacro: no se escribió nada. Repetí con --yes para aplicar.
+
+--- stderr
+

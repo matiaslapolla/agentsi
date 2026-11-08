@@ -1,0 +1,670 @@
+[
+ {
+  "model": "whisper-base",
+  "provider": "cuda",
+  "load_s": 1.3896272929996485,
+  "rows": [
+   {
+    "id": 1,
+    "audio_s": 10.643375,
+    "time_s": 0.15165783499833196,
+    "wer": 0.06666666666666667,
+    "ref": "Alright, so I accepted the permissions, so use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there.",
+    "hyp": "All right, so I accepted the permissions. So use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there."
+   },
+   {
+    "id": 2,
+    "audio_s": 10.093375,
+    "time_s": 0.1661397499992745,
+    "wer": 0.0625,
+    "ref": "Fantastic, alright, so I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining.",
+    "hyp": "Fantastic. All right. So I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining."
+   },
+   {
+    "id": 3,
+    "audio_s": 7.271375,
+    "time_s": 0.1155950499996834,
+    "wer": 0.0,
+    "ref": "Sure, approve 114 and commit the next upgrade and I think that leads us to a clean repository state.",
+    "hyp": "Sure, approve 114 and commit the next upgrade, and I think that leads us to a clean repository state."
+   },
+   {
+    "id": 4,
+    "audio_s": 12.596,
+    "time_s": 0.19713009200131637,
+    "wer": 0.05263157894736842,
+    "ref": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute.",
+    "hyp": "All right, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode, and all of that into one minute into one minute."
+   },
+   {
+    "id": 5,
+    "audio_s": 5.844625,
+    "time_s": 0.10981837199869915,
+    "wer": 0.0,
+    "ref": "Maybe if you switch the Active GitHub account you can check if everything was pushed and deployed.",
+    "hyp": "Maybe if you switch the active GitHub account you can check if everything was pushed and deployed."
+   },
+   {
+    "id": 6,
+    "audio_s": 10.037375,
+    "time_s": 0.14867710700127645,
+    "wer": 0.0,
+    "ref": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured.",
+    "hyp": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here or how is it configured?"
+   },
+   {
+    "id": 7,
+    "audio_s": 5.9286875,
+    "time_s": 0.11144186700039427,
+    "wer": 0.0,
+    "ref": "So, spin up agency session and tell me what was the last thing that was pushed on this repository.",
+    "hyp": "So spin up agency session and tell me what was the last thing that was pushed on this repository."
+   },
+   {
+    "id": 8,
+    "audio_s": 9.812625,
+    "time_s": 0.14896518900059164,
+    "wer": 0.08333333333333333,
+    "ref": "Alright, go ahead and implement everything that's missing to shift entirely from studio from sorry from audio files and local files to database data.",
+    "hyp": "All right, go ahead and implement everything that's missing to shift entirely from studio, from sorry, from audio files and local files to database data."
+   },
+   {
+    "id": 9,
+    "audio_s": 8.102,
+    "time_s": 0.1330701759980002,
+    "wer": 0.1,
+    "ref": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it.",
+    "hyp": "All right, accept T026 and merge it, update my database, import the data to the database, and I think that's it."
+   },
+   {
+    "id": 10,
+    "audio_s": 8.457375,
+    "time_s": 0.13932391100024688,
+    "wer": 0.08695652173913043,
+    "ref": "Alright, so I need you to start the repository and the database here locally, so I want to review stuff about the PR272.",
+    "hyp": "All right, so I need you to start the repository and the database here locally. So I want to review stuff about the PR272."
+   },
+   {
+    "id": 11,
+    "audio_s": 9.5993125,
+    "time_s": 0.161825252998824,
+    "wer": 0.06666666666666667,
+    "ref": "Alright, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated.",
+    "hyp": "All right, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated."
+   },
+   {
+    "id": 12,
+    "audio_s": 10.41,
+    "time_s": 0.21441359700111207,
+    "wer": 0.1111111111111111,
+    "ref": "Alright, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the gitignore file so we have only one repository for this.",
+    "hyp": "All right, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the get-ignore file, so we have only one repository for this."
+   },
+   {
+    "id": 13,
+    "audio_s": 3.532,
+    "time_s": 0.09678898000129266,
+    "wer": 0.0,
+    "ref": "All right, fix what's fixable and commit and push everything.",
+    "hyp": "All right, fix what's fixable and commit and push everything."
+   },
+   {
+    "id": 14,
+    "audio_s": 6.069375,
+    "time_s": 0.127386251999269,
+    "wer": 0.05,
+    "ref": "See how useful is Herdr on our setup? I mean for all the projects I have and the agency project.",
+    "hyp": "See how useful is herder on our setup. I mean for all the projects I have and the agency project."
+   },
+   {
+    "id": 15,
+    "audio_s": 4.488,
+    "time_s": 0.11092931199891609,
+    "wer": 0.15384615384615385,
+    "ref": "Alright, go ahead. I accept S24 and go with the steps you said.",
+    "hyp": "All right, go ahead. I accept S24 and go with the steps you said."
+   },
+   {
+    "id": 16,
+    "audio_s": 7.454625,
+    "time_s": 0.13019700999939232,
+    "wer": 0.0,
+    "ref": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied.",
+    "hyp": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied."
+   },
+   {
+    "id": 17,
+    "audio_s": 3.208,
+    "time_s": 0.0911403430000064,
+    "wer": 0.0,
+    "ref": "Sure, so write a story for agency and start the work.",
+    "hyp": "Sure, so write a story for agency and start the work."
+   },
+   {
+    "id": 18,
+    "audio_s": 10.1126875,
+    "time_s": 0.1691272400021262,
+    "wer": 0.12903225806451613,
+    "ref": "How hard would it be to build a CLI command here in AgentSI that allows me to have an audio response in the terminal when spinning up AgentSI on a repository.",
+    "hyp": "How hard would it be to build a CLI command here in Agent C that allows me to have an audio response in the terminal when spinning up Agent C on a repository?"
+   },
+   {
+    "id": 19,
+    "audio_s": 12.6386875,
+    "time_s": 0.20365693100029603,
+    "wer": 0.0,
+    "ref": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working.",
+    "hyp": "what happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working."
+   },
+   {
+    "id": 20,
+    "audio_s": 11.860625,
+    "time_s": 0.2225738300003286,
+    "wer": 0.05,
+    "ref": "Alright Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged, and you will have to change the GitHub account, the GitHub active account to check everything.",
+    "hyp": "All right, Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged. And you will have to change the GitHub account, the GitHub active account to check everything."
+   }
+  ]
+ },
+ {
+  "model": "whisper-large-v3-turbo",
+  "provider": "cuda",
+  "load_s": 3.033487018001324,
+  "rows": [
+   {
+    "id": 1,
+    "audio_s": 10.643375,
+    "time_s": 3.913904578999791,
+    "wer": 0.06666666666666667,
+    "ref": "Alright, so I accepted the permissions, so use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there.",
+    "hyp": "All right, so I accepted the permissions. So use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there."
+   },
+   {
+    "id": 2,
+    "audio_s": 10.093375,
+    "time_s": 4.434238069999992,
+    "wer": 0.0625,
+    "ref": "Fantastic, alright, so I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining.",
+    "hyp": "Fantastic, all right. So I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining."
+   },
+   {
+    "id": 3,
+    "audio_s": 7.271375,
+    "time_s": 3.991876616000809,
+    "wer": 0.0,
+    "ref": "Sure, approve 114 and commit the next upgrade and I think that leads us to a clean repository state.",
+    "hyp": "Sure, approve 114 and commit the next upgrade. And I think that leads us to a clean repository state."
+   },
+   {
+    "id": 4,
+    "audio_s": 12.596,
+    "time_s": 6.484571822998987,
+    "wer": 0.05263157894736842,
+    "ref": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute.",
+    "hyp": "All right, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute."
+   },
+   {
+    "id": 5,
+    "audio_s": 5.844625,
+    "time_s": 22.413182109001355,
+    "wer": 0.0,
+    "ref": "Maybe if you switch the Active GitHub account you can check if everything was pushed and deployed.",
+    "hyp": "Maybe if you switch the active GitHub account you can check if everything was pushed and deployed."
+   },
+   {
+    "id": 6,
+    "audio_s": 10.037375,
+    "time_s": 20.529819988998497,
+    "wer": 0.0,
+    "ref": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured.",
+    "hyp": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured?"
+   },
+   {
+    "id": 7,
+    "audio_s": 5.9286875,
+    "time_s": 10.539840867000748,
+    "wer": 0.0,
+    "ref": "So, spin up agency session and tell me what was the last thing that was pushed on this repository.",
+    "hyp": "So spin up agency session and tell me what was the last thing that was pushed on this repository."
+   },
+   {
+    "id": 8,
+    "audio_s": 9.812625,
+    "time_s": 8.042436702002306,
+    "wer": 0.08333333333333333,
+    "ref": "Alright, go ahead and implement everything that's missing to shift entirely from studio from sorry from audio files and local files to database data.",
+    "hyp": "All right, go ahead and implement everything that's missing to shift entirely from studio from sorry from audio files and local files to database data."
+   },
+   {
+    "id": 9,
+    "audio_s": 8.102,
+    "time_s": 5.041930880997825,
+    "wer": 0.0,
+    "ref": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it.",
+    "hyp": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it."
+   },
+   {
+    "id": 10,
+    "audio_s": 8.457375,
+    "time_s": 4.134257567999157,
+    "wer": 0.0,
+    "ref": "Alright, so I need you to start the repository and the database here locally, so I want to review stuff about the PR272.",
+    "hyp": "Alright, so I need you to start the repository and the database here locally, so I want to review stuff about the PR272."
+   },
+   {
+    "id": 11,
+    "audio_s": 9.5993125,
+    "time_s": 4.239206332997128,
+    "wer": 0.06666666666666667,
+    "ref": "Alright, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated.",
+    "hyp": "All right, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated."
+   },
+   {
+    "id": 12,
+    "audio_s": 10.41,
+    "time_s": 4.796372638000321,
+    "wer": 0.05555555555555555,
+    "ref": "Alright, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the gitignore file so we have only one repository for this.",
+    "hyp": "All right, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the gitignore file so we have only one repository for this."
+   },
+   {
+    "id": 13,
+    "audio_s": 3.532,
+    "time_s": 4.2397526879976795,
+    "wer": 0.0,
+    "ref": "All right, fix what's fixable and commit and push everything.",
+    "hyp": "All right, fix what's fixable and commit and push everything."
+   },
+   {
+    "id": 14,
+    "audio_s": 6.069375,
+    "time_s": 3.835751752998476,
+    "wer": 0.05,
+    "ref": "See how useful is Herdr on our setup? I mean for all the projects I have and the agency project.",
+    "hyp": "See how useful is Herder on our setup. I mean for all the projects I have and the agency project."
+   },
+   {
+    "id": 15,
+    "audio_s": 4.488,
+    "time_s": 3.810234730000957,
+    "wer": 0.15384615384615385,
+    "ref": "Alright, go ahead. I accept S24 and go with the steps you said.",
+    "hyp": "All right, go ahead. I accept S24 and go with the steps you said."
+   },
+   {
+    "id": 16,
+    "audio_s": 7.454625,
+    "time_s": 4.589753110998572,
+    "wer": 0.0,
+    "ref": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied.",
+    "hyp": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied."
+   },
+   {
+    "id": 17,
+    "audio_s": 3.208,
+    "time_s": 3.6675939499982633,
+    "wer": 0.0,
+    "ref": "Sure, so write a story for agency and start the work.",
+    "hyp": "Sure, so write a story for agency and start the work."
+   },
+   {
+    "id": 18,
+    "audio_s": 10.1126875,
+    "time_s": 4.691360466000333,
+    "wer": 0.12903225806451613,
+    "ref": "How hard would it be to build a CLI command here in AgentSI that allows me to have an audio response in the terminal when spinning up AgentSI on a repository.",
+    "hyp": "How hard would it be to build a CLI command here in Agent C that allows me to have an audio response in the terminal when spinning up Agent C on a repository."
+   },
+   {
+    "id": 19,
+    "audio_s": 12.6386875,
+    "time_s": 3.9338226590007253,
+    "wer": 0.0,
+    "ref": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working.",
+    "hyp": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working."
+   },
+   {
+    "id": 20,
+    "audio_s": 11.860625,
+    "time_s": 4.2227693060012825,
+    "wer": 0.05,
+    "ref": "Alright Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged, and you will have to change the GitHub account, the GitHub active account to check everything.",
+    "hyp": "All right, Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged. And you will have to change the GitHub account, the GitHub active account to check everything."
+   }
+  ]
+ },
+ {
+  "model": "parakeet-v2",
+  "provider": "cuda",
+  "load_s": 2.8031242260003637,
+  "rows": [
+   {
+    "id": 1,
+    "audio_s": 10.643375,
+    "time_s": 5.231017702000827,
+    "wer": 0.0,
+    "ref": "Alright, so I accepted the permissions, so use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there.",
+    "hyp": "Alright, so I accepted the permissions. So use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there."
+   },
+   {
+    "id": 2,
+    "audio_s": 10.093375,
+    "time_s": 9.970296761999634,
+    "wer": 0.0625,
+    "ref": "Fantastic, alright, so I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining.",
+    "hyp": "Fantastic, all right. So I need you to tell me what was the last stuff we worked on, and if there are open decisions or stories or specs or whatever there is remaining."
+   },
+   {
+    "id": 3,
+    "audio_s": 7.271375,
+    "time_s": 2.996245469999849,
+    "wer": 0.0,
+    "ref": "Sure, approve 114 and commit the next upgrade and I think that leads us to a clean repository state.",
+    "hyp": "Sure, approve 114 and commit the next upgrade, and I think that leads us to a clean repository state."
+   },
+   {
+    "id": 4,
+    "audio_s": 12.596,
+    "time_s": 4.02023102000021,
+    "wer": 0.0,
+    "ref": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute.",
+    "hyp": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute."
+   },
+   {
+    "id": 5,
+    "audio_s": 5.844625,
+    "time_s": 1.17672965300153,
+    "wer": 0.0,
+    "ref": "Maybe if you switch the Active GitHub account you can check if everything was pushed and deployed.",
+    "hyp": "Maybe if you switch the active GitHub account you can check if everything was pushed and deployed."
+   },
+   {
+    "id": 6,
+    "audio_s": 10.037375,
+    "time_s": 2.835067482999875,
+    "wer": 0.0,
+    "ref": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured.",
+    "hyp": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured?"
+   },
+   {
+    "id": 7,
+    "audio_s": 5.9286875,
+    "time_s": 1.729416713998944,
+    "wer": 0.0,
+    "ref": "So, spin up agency session and tell me what was the last thing that was pushed on this repository.",
+    "hyp": "So, spin up agency session and tell me what was the last thing that was pushed on this repository."
+   },
+   {
+    "id": 8,
+    "audio_s": 9.812625,
+    "time_s": 1.8756031900011294,
+    "wer": 0.041666666666666664,
+    "ref": "Alright, go ahead and implement everything that's missing to shift entirely from studio from sorry from audio files and local files to database data.",
+    "hyp": "Alright, go ahead and implement everything that's missing to shift entirely from studio from Sari from audio files and local files to database data."
+   },
+   {
+    "id": 9,
+    "audio_s": 8.102,
+    "time_s": 0.7550912709994009,
+    "wer": 0.0,
+    "ref": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it.",
+    "hyp": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it."
+   },
+   {
+    "id": 10,
+    "audio_s": 8.457375,
+    "time_s": 0.769099755998468,
+    "wer": 0.08695652173913043,
+    "ref": "Alright, so I need you to start the repository and the database here locally, so I want to review stuff about the PR272.",
+    "hyp": "Alright, so I need you to start the repository and the database here locally. So I want to review stuff about the PR 272."
+   },
+   {
+    "id": 11,
+    "audio_s": 9.5993125,
+    "time_s": 0.7588656109983276,
+    "wer": 0.0,
+    "ref": "Alright, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated.",
+    "hyp": "Alright, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated."
+   },
+   {
+    "id": 12,
+    "audio_s": 10.41,
+    "time_s": 0.7991986719971464,
+    "wer": 0.027777777777777776,
+    "ref": "Alright, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the gitignore file so we have only one repository for this.",
+    "hyp": "Alright, so I want you to spin up a story to let's merge these two repositories into the code 1 and add the data to the gitignore file so we have only one repository for this."
+   },
+   {
+    "id": 13,
+    "audio_s": 3.532,
+    "time_s": 0.2943189430006896,
+    "wer": 0.0,
+    "ref": "All right, fix what's fixable and commit and push everything.",
+    "hyp": "All right, fix what's fixable and commit and push everything."
+   },
+   {
+    "id": 14,
+    "audio_s": 6.069375,
+    "time_s": 0.5374800909994519,
+    "wer": 0.05,
+    "ref": "See how useful is Herdr on our setup? I mean for all the projects I have and the agency project.",
+    "hyp": "See how useful is Herder on our setup. I mean for all the projects I have and the agency project."
+   },
+   {
+    "id": 15,
+    "audio_s": 4.488,
+    "time_s": 0.44292769599996973,
+    "wer": 0.23076923076923078,
+    "ref": "Alright, go ahead. I accept S24 and go with the steps you said.",
+    "hyp": "Alright, go ahead. I accept S twenty-four and go with the steps you said."
+   },
+   {
+    "id": 16,
+    "audio_s": 7.454625,
+    "time_s": 0.5273842770002375,
+    "wer": 0.0,
+    "ref": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied.",
+    "hyp": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied."
+   },
+   {
+    "id": 17,
+    "audio_s": 3.208,
+    "time_s": 0.24167120399943087,
+    "wer": 0.0,
+    "ref": "Sure, so write a story for agency and start the work.",
+    "hyp": "Sure, so write a story for agency and start the work."
+   },
+   {
+    "id": 18,
+    "audio_s": 10.1126875,
+    "time_s": 0.4848395770022762,
+    "wer": 0.12903225806451613,
+    "ref": "How hard would it be to build a CLI command here in AgentSI that allows me to have an audio response in the terminal when spinning up AgentSI on a repository.",
+    "hyp": "How hard would it be to build a CLI command here in Agent C that allows me to have an audio response in the terminal when spinning up Agent C on a repository?"
+   },
+   {
+    "id": 19,
+    "audio_s": 12.6386875,
+    "time_s": 0.703168177002226,
+    "wer": 0.0,
+    "ref": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working.",
+    "hyp": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working."
+   },
+   {
+    "id": 20,
+    "audio_s": 11.860625,
+    "time_s": 0.5748688629973913,
+    "wer": 0.0,
+    "ref": "Alright Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged, and you will have to change the GitHub account, the GitHub active account to check everything.",
+    "hyp": "Alright, Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged. And you will have to change the GitHub account, the GitHub active account to check everything."
+   }
+  ]
+ },
+ {
+  "model": "parakeet-v3",
+  "provider": "cuda",
+  "load_s": 3.0313580380025087,
+  "rows": [
+   {
+    "id": 1,
+    "audio_s": 10.643375,
+    "time_s": 0.6156280840004911,
+    "wer": 0.0,
+    "ref": "Alright, so I accepted the permissions, so use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there.",
+    "hyp": "Alright, so I accepted the permissions. So use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there."
+   },
+   {
+    "id": 2,
+    "audio_s": 10.093375,
+    "time_s": 0.5210096650007472,
+    "wer": 0.0,
+    "ref": "Fantastic, alright, so I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining.",
+    "hyp": "Fantastic, alright. So I need you to tell me what was the last stuff we worked on, and if there are open decisions or stories or specs or whatever there is remaining."
+   },
+   {
+    "id": 3,
+    "audio_s": 7.271375,
+    "time_s": 0.4050733699987177,
+    "wer": 0.0,
+    "ref": "Sure, approve 114 and commit the next upgrade and I think that leads us to a clean repository state.",
+    "hyp": "Sure, approve 114 and commit the next upgrade, and I think that leads us to a clean repository state."
+   },
+   {
+    "id": 4,
+    "audio_s": 12.596,
+    "time_s": 0.5558186630005366,
+    "wer": 0.0,
+    "ref": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute.",
+    "hyp": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode, and all of that into one minute into one minute."
+   },
+   {
+    "id": 5,
+    "audio_s": 5.844625,
+    "time_s": 0.31051523399946745,
+    "wer": 0.0,
+    "ref": "Maybe if you switch the Active GitHub account you can check if everything was pushed and deployed.",
+    "hyp": "Maybe if you switch the active GitHub account, you can check if everything was pushed and deployed."
+   },
+   {
+    "id": 6,
+    "audio_s": 10.037375,
+    "time_s": 0.42531440099992324,
+    "wer": 0.0,
+    "ref": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured.",
+    "hyp": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured?"
+   },
+   {
+    "id": 7,
+    "audio_s": 5.9286875,
+    "time_s": 0.30085894700096105,
+    "wer": 0.0,
+    "ref": "So, spin up agency session and tell me what was the last thing that was pushed on this repository.",
+    "hyp": "So, spin up agency session and tell me what was the last thing that was pushed on this repository."
+   },
+   {
+    "id": 8,
+    "audio_s": 9.812625,
+    "time_s": 0.4504757979993883,
+    "wer": 0.041666666666666664,
+    "ref": "Alright, go ahead and implement everything that's missing to shift entirely from studio from sorry from audio files and local files to database data.",
+    "hyp": "Alright, go ahead and implement everything that's missing to shift entirely from Studio from Sari from Audio Files and Local Files to database data."
+   },
+   {
+    "id": 9,
+    "audio_s": 8.102,
+    "time_s": 0.36738884300211794,
+    "wer": 0.0,
+    "ref": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it.",
+    "hyp": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it."
+   },
+   {
+    "id": 10,
+    "audio_s": 8.457375,
+    "time_s": 0.37612934700155165,
+    "wer": 0.0,
+    "ref": "Alright, so I need you to start the repository and the database here locally, so I want to review stuff about the PR272.",
+    "hyp": "Alright, so I need you to start the repository and the database here locally. So I want to review stuff about the PR272."
+   },
+   {
+    "id": 11,
+    "audio_s": 9.5993125,
+    "time_s": 0.4132316289978917,
+    "wer": 0.0,
+    "ref": "Alright, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated.",
+    "hyp": "Alright, so I see you said some test files still spec the story files on disk, and when migrating to a database. So maybe those test files should be updated."
+   },
+   {
+    "id": 12,
+    "audio_s": 10.41,
+    "time_s": 0.4513578170008259,
+    "wer": 0.0,
+    "ref": "Alright, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the gitignore file so we have only one repository for this.",
+    "hyp": "Alright, so I want you to spin up a story to let's merge these two repositories into the code one, and add the data to the gitignore file, so we have only one repository for this."
+   },
+   {
+    "id": 13,
+    "audio_s": 3.532,
+    "time_s": 0.22276155999861658,
+    "wer": 0.2,
+    "ref": "All right, fix what's fixable and commit and push everything.",
+    "hyp": "Alright, fix what's fixable and commit and push everything."
+   },
+   {
+    "id": 14,
+    "audio_s": 6.069375,
+    "time_s": 0.30306898500202806,
+    "wer": 0.05,
+    "ref": "See how useful is Herdr on our setup? I mean for all the projects I have and the agency project.",
+    "hyp": "See how useful is Herder on our setup? I mean for all the projects I have and the agency project."
+   },
+   {
+    "id": 15,
+    "audio_s": 4.488,
+    "time_s": 0.246822687000531,
+    "wer": 0.0,
+    "ref": "Alright, go ahead. I accept S24 and go with the steps you said.",
+    "hyp": "Alright, go ahead. I accept S24 and go with the steps you said."
+   },
+   {
+    "id": 16,
+    "audio_s": 7.454625,
+    "time_s": 0.35367324899925734,
+    "wer": 0.0,
+    "ref": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied.",
+    "hyp": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied."
+   },
+   {
+    "id": 17,
+    "audio_s": 3.208,
+    "time_s": 0.20293492899872945,
+    "wer": 0.0,
+    "ref": "Sure, so write a story for agency and start the work.",
+    "hyp": "Sure, so write a story for agency and start the work."
+   },
+   {
+    "id": 18,
+    "audio_s": 10.1126875,
+    "time_s": 0.4381069280025258,
+    "wer": 0.12903225806451613,
+    "ref": "How hard would it be to build a CLI command here in AgentSI that allows me to have an audio response in the terminal when spinning up AgentSI on a repository.",
+    "hyp": "How hard would it be to build a CLI command here in Agent C that allows me to have an audio response in the terminal when spinning up agent C on a repository?"
+   },
+   {
+    "id": 19,
+    "audio_s": 12.6386875,
+    "time_s": 0.5565799950018118,
+    "wer": 0.0,
+    "ref": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working.",
+    "hyp": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR, for what's the requirements for having the WhatsApp multi-agent multi-number working."
+   },
+   {
+    "id": 20,
+    "audio_s": 11.860625,
+    "time_s": 0.5469905950012617,
+    "wer": 0.0,
+    "ref": "Alright Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged, and you will have to change the GitHub account, the GitHub active account to check everything.",
+    "hyp": "Alright, Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged, and you will have to change the GitHub account, the GitHub Active Account to check everything."
+   }
+  ]
+ }
+]

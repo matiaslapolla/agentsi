@@ -1,0 +1,18 @@
+[package]
+name = "gpui-terminal"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Throwaway prototype for open test 3 of docs/ideas/agentsi-desktop.md: a Claude Code session in a libghostty-vt pane in GPUI."
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.11" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["wayland", "x11", "font-kit"] }
+ghostty-vt = "=0.8.0"
+libc = "0.2"
+async-channel = "2"
+
+[patch.crates-io]
+ghostty-vt-sys = { path = "vendor/ghostty-vt-sys" }
+
+[workspace]

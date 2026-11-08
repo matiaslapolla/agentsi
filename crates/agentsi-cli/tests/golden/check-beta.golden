@@ -1,0 +1,12 @@
+exit: 1
+--- stdout
+{
+  "passed": false,
+  "failures": [
+    "Priority #0: path source \"/etc/hostname\" does not resolve.",
+    "No priority cites a north star declared in the brief (docs/missing.md)."
+  ]
+}
+
+--- stderr
+

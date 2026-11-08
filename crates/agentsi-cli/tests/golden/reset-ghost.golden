@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reset: Agent "ghost" is not in the roster of alpha and has no data to reset.
+

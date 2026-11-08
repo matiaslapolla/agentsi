@@ -1,0 +1,20 @@
+exit: 0
+--- stdout
+# Beta — AgentSI status
+
+- Roles: pm, dev, scout · status planned
+- Index: 3 docs, 2 commits, 2 open issues, indexed never
+- Last commit: <DATE> docs: write the launch plan
+- Pending decisions: 1
+- Minutes: 1 total
+
+## Pending decisions
+
+- [8] Publish the docs (beta-001)
+
+## Last minutes
+
+- beta-001 — Is Beta ready? — valid — 1 accepted
+
+--- stderr
+

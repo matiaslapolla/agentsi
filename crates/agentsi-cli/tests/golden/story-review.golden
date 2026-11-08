@@ -1,0 +1,28 @@
+## @story-branch
+exit: 0
+--- stdout
+
+--- stderr
+
+## story review S001
+exit: 0
+--- stdout
+S001 Filter mail
+Session: ready, attempt 1, branch story/S001-filter-mail
+Worktree: <WORK>/repos/beta/.worktrees/S001-filter-mail
+Tests commit: bb569c76d6956a20abcc452e9b38f5150f596237
+Final commit: e5d9a17965178ea2d505acff2ae7fb725ad3e840
+Checks: the criterion tests failed before the work, no test file changed, the tests pass and each gate command passes.
+Log: story_logs beta/S001
+
+src/filter.sh       | 1 +
+ test/list-1.test.sh | 1 +
+ test/list-2.test.sh | 1 +
+ 3 files changed, 3 insertions(+)
+
+Diff: git -C <WORK>/repos/beta diff 80db04af1de62e8788c59e8f999e41200be92331..story/S001-filter-mail
+Merge: agentsi story accept S001
+Discard: agentsi story reject S001
+
+--- stderr
+

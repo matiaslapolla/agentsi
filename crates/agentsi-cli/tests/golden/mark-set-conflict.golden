@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi mark: Priority alpha-001#0 is already marked accepted
+

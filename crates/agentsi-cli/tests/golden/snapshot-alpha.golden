@@ -1,0 +1,60 @@
+exit: 0
+--- stdout
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+## Open issues
+
+_None indexed._
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+## Commits, last 14 days
+
+## Journal tail
+
+_No journal._
+
+## Docs index
+
+--- stderr
+

@@ -1,0 +1,15 @@
+exit: 1
+--- stdout
+{
+  "passed": false,
+  "failures": [
+    "Priority #1 \"Cut the build time\" has no source.",
+    "Priority #2 \"Write the launch note\" objective is missing and must be one of the brief ids: o1, o2.",
+    "Priority #2 \"Write the launch note\" has no source.",
+    "Role \"qa\" has no answer.",
+    "Call script is empty."
+  ]
+}
+
+--- stderr
+

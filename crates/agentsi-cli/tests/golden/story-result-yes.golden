@@ -1,0 +1,28 @@
+## story result S004 merged_changed --commit 80db04af1de62e8788c59e8f999e41200be92331
+exit: 0
+--- stdout
+Story S004 is implemented, with the result merged_changed at 80db04af1de62e8788c59e8f999e41200be92331.
+
+--- stderr
+
+## story list
+exit: 0
+--- stdout
+S001  not_implemented  approved           ready   dev  Filter mail
+S002  not_implemented  pending            -       dev  Star mail
+T003  not_implemented  approved           -       dev  Drop the old cache
+S004  implemented      approved           -       dev  Mark mail as read
+S005  not_implemented  approved           failed  dev  Pin mail
+S006  not_implemented  approved           work    dev  Snooze mail
+S007  not_implemented  changes_requested  -       dev  Archive mail
+S008  implemented      approved           -       dev  Sort by sender
+
+--- stderr
+
+## story result S004 merged_unchanged --commit 80db04af1de62e8788c59e8f999e41200be92331
+exit: 0
+--- stdout
+Story S004 is implemented, with the result merged_unchanged at 80db04af1de62e8788c59e8f999e41200be92331.
+
+--- stderr
+

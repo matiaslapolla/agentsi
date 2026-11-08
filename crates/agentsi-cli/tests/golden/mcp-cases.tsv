@@ -1,0 +1,6 @@
+# name	cwd	requests file (in mcp/)
+# These run after the cases of cases.tsv, so the index holds what `index` and `desk` wrote.
+# Each file is one MCP session on stdio. The answers come back sorted by id.
+mcp-alpha	alpha	alpha.jsonl
+mcp-beta	beta	beta.jsonl
+mcp-outside	outside	outside.jsonl

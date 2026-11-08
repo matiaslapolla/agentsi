@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+Marked alpha-001 #0 rejected.
+
+--- stderr
+

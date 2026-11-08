@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "product": {
+    "what": "Mail sorter",
+    "audience": "Busy people",
+    "stage": "dreaming"
+  },
+  "objectives": [
+    {
+      "id": "o1",
+      "text": "Ship the importer",
+      "signal": "Importer runs",
+      "due": "2020-01-01"
+    },
+    {
+      "id": "o2",
+      "text": "Cut the build time",
+      "signal": "Build under 3 min",
+      "due": "2099-12-31"
+    }
+  ],
+  "north_stars": [
+    "docs/vision.md"
+  ],
+  "sources_of_truth": [],
+  "out_of_scope": [],
+  "roles": {
+    "pm": "Keeps the plan.",
+    "dev": "Builds it.",
+    "qa": "Breaks it."
+  },
+  "updated_at": "2026-10-01T10:00:00.000Z"
+}

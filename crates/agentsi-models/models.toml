@@ -1,0 +1,108 @@
+# The model catalog. Each file is pinned: Hugging Face repo, commit, size and SHA-256.
+# `sha256` of a large file is the `lfs.oid` of the Hugging Face tree API (`/api/models/<repo>/tree/<revision>`).
+# A small file has no `lfs.oid`, so its hash comes from a download at the pinned revision.
+# `name` is the file name on disk. `path` is the path in the repo, when it differs.
+
+[[model]]
+id = "kokoro"
+name = "Kokoro 82M v1.0"
+kind = "speech-out"
+license = "Apache-2.0"
+description = "Text to speech. The two files that packages/voice uses today."
+repo = "speaches-ai/Kokoro-82M-v1.0-ONNX"
+revision = "dc196c76d64fed9203906231372bcb98135815df"
+
+[[model.file]]
+name = "kokoro-v1.0.onnx"
+path = "model.onnx"
+size = 325532387
+sha256 = "7d5df8ecf7d4b1878015a32686053fd0eebe2bc377234608764cc0ef3636a6c5"
+
+[[model.file]]
+name = "voices-v1.0.bin"
+path = "voices.bin"
+size = 28214398
+sha256 = "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d"
+
+[[model]]
+id = "parakeet-tdt-v3-int8"
+name = "Parakeet TDT 0.6B v3, int8"
+kind = "speech-in"
+license = "CC-BY-4.0"
+description = "Speech to text, 25 European languages. ONNX, int8 encoder."
+repo = "istupakov/parakeet-tdt-0.6b-v3-onnx"
+revision = "8f23f0c03c8761650bdb5b40aaf3e40d2c15f1ce"
+
+[[model.file]]
+name = "encoder-model.int8.onnx"
+size = 652183999
+sha256 = "6139d2fa7e1b086097b277c7149725edbab89cc7c7ae64b23c741be4055aff09"
+
+[[model.file]]
+name = "decoder_joint-model.int8.onnx"
+size = 18202004
+sha256 = "eea7483ee3d1a30375daedc8ed83e3960c91b098812127a0d99d1c8977667a70"
+
+[[model.file]]
+name = "nemo128.onnx"
+size = 139764
+sha256 = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f"
+
+[[model.file]]
+name = "vocab.txt"
+size = 93939
+sha256 = "d58544679ea4bc6ac563d1f545eb7d474bd6cfa467f0a6e2c1dc1c7d37e3c35d"
+
+[[model.file]]
+name = "config.json"
+size = 97
+sha256 = "666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466"
+
+[[model]]
+id = "parakeet-tdt-v2-int8"
+name = "Parakeet TDT 0.6B v2, int8"
+kind = "speech-in"
+license = "CC-BY-4.0"
+description = "Speech to text, English only. ONNX, int8 encoder."
+repo = "istupakov/parakeet-tdt-0.6b-v2-onnx"
+revision = "0bbb45a3365852604aef28b538a8f066f4ccaa85"
+
+[[model.file]]
+name = "encoder-model.int8.onnx"
+size = 652184014
+sha256 = "3e0581fda6ab843888b51e56d7ee78b6d5bc3237ec113af1f732d1d5286aa155"
+
+[[model.file]]
+name = "decoder_joint-model.int8.onnx"
+size = 8998286
+sha256 = "a449f49acd68979d418651dd2dcb737cc0f1bf0225e009e29ee326354edbf7d3"
+
+[[model.file]]
+name = "nemo128.onnx"
+size = 139764
+sha256 = "a9fde1486ebfcc08f328d75ad4610c67835fea58c73ba57e3209a6f6cf019e9f"
+
+[[model.file]]
+name = "vocab.txt"
+size = 9384
+sha256 = "ec182b70dd42113aff6c5372c75cac58c952443eb22322f57bbd7f53977d497d"
+
+[[model.file]]
+name = "config.json"
+size = 97
+sha256 = "666903c76b9798caf2c210afd4f6cd60b08a8dbf9800ec8d7a3bc0d2148ac466"
+
+[[model]]
+id = "silero-vad-v5"
+name = "Silero VAD v5"
+kind = "speech-in"
+license = "MIT"
+description = "Voice detector. Marks each 32 ms of audio as speech or no speech. Toggle dictation uses it to cut the speech at the pauses."
+repo = "onnx-community/silero-vad"
+revision = "e71cae966052b992a7eca6b17738916ce0eca4ec"
+
+[[model.file]]
+name = "silero-vad.onnx"
+path = "onnx/model.onnx"
+size = 2243022
+sha256 = "a4a068cd6cf1ea8355b84327595838ca748ec29a25bc91fc82e6c299ccdc5808"

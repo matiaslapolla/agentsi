@@ -1,0 +1,64 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rpass
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect
+exit: 0
+--- stdout
+Reflexión r-<STAMP> en alpha
+  señales: 16 (pm 6, qa 4, dev 6)
+  dev: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  pm: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  qa: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+
+Propuestas de prompt:
+  dev (unresolved_source en 4 reuniones, 4 casos, 2 held-out): propuesta
+  qa (sin_datos en 3 reuniones, 4 casos, 2 held-out): queda para la próxima reflexión (otro agente tuvo la propuesta)
+
+dev → workspace/alpha/agents/dev.md: decisión pendiente #9
+  causa: dev citó docs/missing.md en rf-02 y rf-05 sin abrirlo.
+  efecto esperado: Menos fuentes sin resolver.
+    --- a/workspace/alpha/agents/dev.md
+    +++ b/workspace/alpha/agents/dev.md
+    @@ -0,0 +1,4 @@
+    +---
+    +extends: dev
+    +---
+    +Antes de citar un archivo, abrilo y confirmá que existe.
+  Replay sobre 2 casos held-out (antes → después):
+  - rf-01: check falla, sin resolver 1, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500 → check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500
+  - rf-03 (baseline re-corrido): check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500 → check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500
+  Totales: check al primer intento 50% → 100%, sin resolver por caso 0.50 → 0.00, inventadas 0 → 0, objetivos faltantes 0 → 0, sin datos 0 → 0, costo $1.000 → $1.000.
+  costo de propuesta y replay: $2.500 de $15
+  Aprobar: agentsi decide 9 approve (o reject).
+
+--- stderr
+
+## @sql-reflect-stale
+exit: 0
+--- stdout
+
+--- stderr
+
+## decide 9 approve
+exit: 1
+--- stdout
+
+--- stderr
+Decision 9 not applied: the target changed since the proposal, so it is now stale.
+
+## decide 9 approve
+exit: 1
+--- stdout
+
+--- stderr
+Decision 9 not applied: the target changed since the proposal, so it is now stale.
+

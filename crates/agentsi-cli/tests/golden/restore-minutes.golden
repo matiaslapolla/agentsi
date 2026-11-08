@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+Restored alpha-004.
+
+--- stderr
+

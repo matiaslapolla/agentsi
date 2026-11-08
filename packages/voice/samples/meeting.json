@@ -1,0 +1,7 @@
+[
+  {"role": "pm", "text": "Welcome, let's start the meeting. Today's question is what Acme should prioritize this week. I will ask each of you for your view."},
+  {"role": "dev", "text": "From the code side, the most urgent task is to finish the booking flow. An open bug in the schedule sync breaks the teachers' calendar."},
+  {"role": "social", "text": "I see a chance on social media. Short videos of live classes get the best reach, and we have not posted one this week."},
+  {"role": "qa", "text": "Before we launch anything, we need tests for card payments. Today nothing covers that path, and it is where a failure hurts most."},
+  {"role": "scout", "text": "Looking at the market, two competitors just released discounted yearly plans. We should review our prices before the gap shows."}
+]

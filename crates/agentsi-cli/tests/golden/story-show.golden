@@ -1,0 +1,46 @@
+exit: 0
+--- stdout
+# S007 Archive mail
+
+<!-- Rendered from the story JSON in the database. -->
+
+- Type: story
+- Owner: dev
+- Status: not_implemented
+- Approval: changes_requested
+- Changes requested: Use the inbox words.
+- Proposed by: owner in minutes beta-001
+- Objective: b1
+
+**As a** a reader
+
+**I want** to archive mail
+
+**So that** the inbox stays calm
+
+## Criteria
+
+### 1
+
+- **Given** a mailbox with 1 mails
+- **When** the user opens the list
+- **Then** the list shows 1 rows
+- Test: `test/list-1.test.sh`
+- Checks: The list shows 1 rows.
+
+### 2
+
+- **Given** a mailbox with 2 mails
+- **When** the user opens the list
+- **Then** the list shows 2 rows
+- Test: `test/list-2.test.sh`
+- Checks: The list shows 2 rows.
+
+## Sources
+
+- path `docs/plans/launch.md`
+- story `S002`
+
+
+--- stderr
+

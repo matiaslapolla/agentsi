@@ -1,0 +1,67 @@
+## reset --all --yes
+exit: 0
+--- stdout
+Se resetea alpha a los roles globales.
+  elimina  alpha/brief.json
+  elimina  alpha/agents/qa.md
+  roster   pm, dev, qa -> pm, dev
+Reseteado y commiteado.
+
+--- stderr
+
+## roles
+exit: 0
+--- stdout
+Roster de alpha:
+  pm   pm   global  opus  esfuerzo high
+  dev  dev  global  sonnet
+
+--- stderr
+
+## roles validate
+exit: 0
+--- stdout
+alpha: el roster es válido (2 agentes).
+
+--- stderr
+
+## @registry
+exit: 0
+--- stdout
+{
+  "owner": { "name": "Ada", "language": "Spanish" },
+  "products": [
+    { "id": "alpha", "name": "Alpha", "paths": ["<WORK>/repos/alpha"], "status": "active", "roles": ["pm", "dev"] },
+    { "id": "beta", "name": "Beta", "paths": ["<WORK>/repos/beta"], "status": "planned", "roles": ["pm", "dev", "scout"], "stories": { "repo": "<WORK>/repos/beta", "test": "sh test/run.sh {files}", "gate": ["sh test/gate.sh"], "budget_usd": 2 } },
+    { "id": "gamma", "name": "Gamma", "paths": ["<WORK>/repos/gamma"], "status": "active", "roles": ["pm"] }
+  ]
+}
+
+--- stderr
+
+## @commits
+exit: 0
+--- stdout
+reset(alpha): all
+chore: the registry
+
+--- stderr
+
+## @tree
+exit: 0
+--- stdout
+repos/alpha/CLAUDE.md
+repos/alpha/docs/vision.md
+repos/beta/.claude/JOURNAL.md
+repos/beta/CLAUDE.md
+repos/beta/README.md
+repos/beta/docs/ideas/widget.md
+repos/beta/docs/plans/launch.md
+repos/beta/docs/specs/api.md
+repos/beta/notes.txt
+root/agentsi.config.json
+root/plugin/agents/dev.md
+root/plugin/agents/pm.md
+
+--- stderr
+

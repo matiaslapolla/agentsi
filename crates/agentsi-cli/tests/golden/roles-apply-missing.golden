@@ -1,0 +1,8 @@
+exit: 1
+--- stdout
+
+--- stderr
+La etapa no es válida:
+  - Stage has no brief.json.
+  - Stage has no roster.json.
+

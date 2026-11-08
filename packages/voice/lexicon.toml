@@ -1,0 +1,18 @@
+# Spoken form of written words (single words, case-insensitive). Audio only.
+# The section is the language prefix of `lang` in voices.toml.
+[en]
+agentsi = "agent S I"
+ci = "C I"
+qa = "Q A"
+pr = "P R"
+
+[es]
+agentsi = "ei yent es ai"
+softmax = "sóftmax"
+token = "tóquen"
+tokens = "tóquens"
+api = "a pe i"
+ui = "u i"
+ci = "si ai"
+qa = "kiu ei"
+pr = "pul rikuest"

@@ -1,0 +1,52 @@
+[
+  {
+    "role": "pm",
+    "model": "claude-sonnet-4-5",
+    "input_tokens": 18420,
+    "output_tokens": 3105,
+    "cache_read": 41200,
+    "cache_write": 9800,
+    "cost_usd": 0.1231,
+    "duration_ms": 41200
+  },
+  {
+    "role": "dev",
+    "model": "claude-sonnet-4-5",
+    "input_tokens": 15210,
+    "output_tokens": 1840,
+    "cache_read": 36100,
+    "cache_write": 7200,
+    "cost_usd": 0.0944,
+    "duration_ms": 30800
+  },
+  {
+    "role": "social",
+    "model": "claude-haiku-4-5",
+    "input_tokens": 9120,
+    "output_tokens": 920,
+    "cache_read": 22400,
+    "cache_write": 4100,
+    "cost_usd": 0.0212,
+    "duration_ms": 12400
+  },
+  {
+    "role": "qa",
+    "model": "claude-haiku-4-5",
+    "input_tokens": 8870,
+    "output_tokens": 1010,
+    "cache_read": 21900,
+    "cache_write": 3900,
+    "cost_usd": 0.0208,
+    "duration_ms": 13100
+  },
+  {
+    "role": "scout",
+    "model": "claude-haiku-4-5",
+    "input_tokens": 9540,
+    "output_tokens": 1180,
+    "cache_read": 23100,
+    "cache_write": 4300,
+    "cost_usd": 0.0231,
+    "duration_ms": 14900
+  }
+]

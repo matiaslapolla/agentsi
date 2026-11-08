@@ -1,0 +1,675 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rpass
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect
+exit: 0
+--- stdout
+Reflexión r-<STAMP> en alpha
+  señales: 16 (pm 6, qa 4, dev 6)
+  dev: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  pm: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  qa: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+
+Propuestas de prompt:
+  dev (unresolved_source en 4 reuniones, 4 casos, 2 held-out): propuesta
+  qa (sin_datos en 3 reuniones, 4 casos, 2 held-out): queda para la próxima reflexión (otro agente tuvo la propuesta)
+
+dev → workspace/alpha/agents/dev.md: decisión pendiente #9
+  causa: dev citó docs/missing.md en rf-02 y rf-05 sin abrirlo.
+  efecto esperado: Menos fuentes sin resolver.
+    --- a/workspace/alpha/agents/dev.md
+    +++ b/workspace/alpha/agents/dev.md
+    @@ -0,0 +1,4 @@
+    +---
+    +extends: dev
+    +---
+    +Antes de citar un archivo, abrilo y confirmá que existe.
+  Replay sobre 2 casos held-out (antes → después):
+  - rf-01: check falla, sin resolver 1, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500 → check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500
+  - rf-03 (baseline re-corrido): check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500 → check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500
+  Totales: check al primer intento 50% → 100%, sin resolver por caso 0.50 → 0.00, inventadas 0 → 0, objetivos faltantes 0 → 0, sin datos 0 → 0, costo $1.000 → $1.000.
+  costo de propuesta y replay: $2.500 de $15
+  Aprobar: agentsi decide 9 approve (o reject).
+
+--- stderr
+
+## @claude-calls
+exit: 0
+--- stdout
+=== curate-dev
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You curate the memory of one AgentSI agent. Memory is a list of items with ids; you never rewrite it.
+Return deltas only: `add` new items, `retire` items by id with a reason, mark ids `helpful` or `harmful`.
+Propose only deltas backed by the listed signals. Every add cites in `evidence` at least one signal ref exactly as listed.
+Learn from failures as well as successes: an accepted mark shows what to keep doing, a failure or a rejection shows what to avoid.
+Retire items that are stale, duplicated or contradicted by the signals. Status snapshots (pending work, dates of today) do not belong in memory.
+At most 5 adds and 10 retires. Write new item texts in the language of the existing items, one short sentence each.
+Empty arrays are a valid answer.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=
+arg: --effort
+arg: low
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["add","retire","helpful","harmful"],"properties":{"add":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","kind","evidence"],"properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["fact","lesson"]},"evidence":{"type":"array","items":{"type":"string"}}}}},"retire":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","why"],"properties":{"id":{"type":"string"},"why":{"type":"string"}}}},"helpful":{"type":"array","items":{"type":"string"}},"harmful":{"type":"array","items":{"type":"string"}}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent>dev</agent>
+<items>
+[m-k001] (fact, helpful 2, harmful 0) El build usa pnpm.
+[m-k002] (fact, helpful 0, harmful 1) Hay una nota vieja sobre npm.
+[m-k006] (lesson, helpful 0, harmful 0) Citar solo lo que se leyó.
+</items>
+<signals>
+- ref rf-01 · unresolved_source · docs/missing.md
+- ref rf-02 · unresolved_source · docs/missing.md
+- ref rf-03 · unresolved_source · docs/missing.md
+- ref rf-05 · unresolved_source · docs/missing.md
+- ref rf-01 · mark_accepted · #0 Cortar el build
+- ref rf-02 · mark_rejected · #0 Citar el spec
+</signals>
+=== curate-pm
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You curate the memory of one AgentSI agent. Memory is a list of items with ids; you never rewrite it.
+Return deltas only: `add` new items, `retire` items by id with a reason, mark ids `helpful` or `harmful`.
+Propose only deltas backed by the listed signals. Every add cites in `evidence` at least one signal ref exactly as listed.
+Learn from failures as well as successes: an accepted mark shows what to keep doing, a failure or a rejection shows what to avoid.
+Retire items that are stale, duplicated or contradicted by the signals. Status snapshots (pending work, dates of today) do not belong in memory.
+At most 5 adds and 10 retires. Write new item texts in the language of the existing items, one short sentence each.
+Empty arrays are a valid answer.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=
+arg: --effort
+arg: low
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["add","retire","helpful","harmful"],"properties":{"add":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","kind","evidence"],"properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["fact","lesson"]},"evidence":{"type":"array","items":{"type":"string"}}}}},"retire":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","why"],"properties":{"id":{"type":"string"},"why":{"type":"string"}}}},"helpful":{"type":"array","items":{"type":"string"}},"harmful":{"type":"array","items":{"type":"string"}}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent>pm</agent>
+<items>
+[m-k004] (fact, helpful 1, harmful 0) El dueño lee las actas los lunes.
+</items>
+<signals>
+- ref rf-01 · first_check_failure · Priority 1 cites no north star
+- ref rf-02 · first_check_failure · Priority 2: objective "o9" must be one of the brief ids (o1, o2)
+- ref rf-02 · invented_source · docs/imaginary.md
+- ref rf-03 · error · claude timed out after 360s
+- ref rf-02 · mark_changed · #1 Ordenar el plan
+- ref rf-02 · decision_rejected · Borrar el importador
+</signals>
+=== curate-qa
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You curate the memory of one AgentSI agent. Memory is a list of items with ids; you never rewrite it.
+Return deltas only: `add` new items, `retire` items by id with a reason, mark ids `helpful` or `harmful`.
+Propose only deltas backed by the listed signals. Every add cites in `evidence` at least one signal ref exactly as listed.
+Learn from failures as well as successes: an accepted mark shows what to keep doing, a failure or a rejection shows what to avoid.
+Retire items that are stale, duplicated or contradicted by the signals. Status snapshots (pending work, dates of today) do not belong in memory.
+At most 5 adds and 10 retires. Write new item texts in the language of the existing items, one short sentence each.
+Empty arrays are a valid answer.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=
+arg: --effort
+arg: low
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["add","retire","helpful","harmful"],"properties":{"add":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","kind","evidence"],"properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["fact","lesson"]},"evidence":{"type":"array","items":{"type":"string"}}}}},"retire":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","why"],"properties":{"id":{"type":"string"},"why":{"type":"string"}}}},"helpful":{"type":"array","items":{"type":"string"}},"harmful":{"type":"array","items":{"type":"string"}}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent>qa</agent>
+<items>
+[m-k005] (lesson, helpful 0, harmful 0) Probar el camino vacío.
+</items>
+<signals>
+- ref rf-01 · sin_datos · 2 "sin datos"
+- ref rf-02 · sin_datos · 3 "sin datos"
+- ref rf-05 · sin_datos · 2 "sin datos"
+- ref rf-03 · mark_accepted · #0 Probar el borde
+</signals>
+=== dev
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You are the developer of a made-up product.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep,Glob
+arg: --allowedTools
+arg: Read,Grep,Glob
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot of rf-03
+
+## Docs index
+- docs/vision.md
+
+# Your memory about this product
+- [m-k001] El build usa pnpm.
+- [m-k006] Citar solo lo que se leyó.
+- [m-k002] Hay una nota vieja sobre npm.
+
+# Question
+Pregunta de rf-03: ¿qué sigue?
+
+# Instructions
+- You are the dev of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== dev
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You are the developer of a made-up product.
+
+## This product
+
+Antes de citar un archivo, abrilo y confirmá que existe.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep,Glob
+arg: --allowedTools
+arg: Read,Grep,Glob
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot of rf-01
+
+## Docs index
+- docs/vision.md
+
+# Your memory about this product
+- [m-k001] El build usa pnpm.
+- [m-k006] Citar solo lo que se leyó.
+- [m-k002] Hay una nota vieja sobre npm.
+
+# Question
+Pregunta de rf-01: ¿qué sigue?
+
+# Instructions
+- You are the dev of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== dev
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You are the developer of a made-up product.
+
+## This product
+
+Antes de citar un archivo, abrilo y confirmá que existe.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep,Glob
+arg: --allowedTools
+arg: Read,Grep,Glob
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot of rf-03
+
+## Docs index
+- docs/vision.md
+
+# Your memory about this product
+- [m-k001] El build usa pnpm.
+- [m-k006] Citar solo lo que se leyó.
+- [m-k002] Hay una nota vieja sobre npm.
+
+# Question
+Pregunta de rf-03: ¿qué sigue?
+
+# Instructions
+- You are the dev of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== propose
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You improve the prompt of one AgentSI agent from the traces of its past meetings.
+Read the traces: the agent's answers, the check failures, the sources that did not resolve, the invented sources and the marks of Ada. Find the one cause behind the repeated failure and change the instructions to remove it.
+Change one thing. Keep the role's voice, its language and every rule that is not the cause.
+The check is a floor, not a goal. Never weaken a rule about sources or about writing "[no data]" when data is missing. Never tell the agent to cite a file it did not read, or a doc only to pass a check.
+Return in `new_overlay_body` the complete new body of the product overlay: the text appended to the global role under "## This product". At most 4000 characters.
+You may start it with a frontmatter block that changes only model or effort.
+`rationale`: the cause you found, citing minutes ids. `expected_effect`: which replay metric should improve (first-pass check, unresolved sources, invented sources, missing objectives) and why. Write both in Spanish: Ada reads them before approving.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["new_overlay_body","rationale","expected_effect"],"properties":{"new_overlay_body":{"type":"string"},"rationale":{"type":"string"},"expected_effect":{"type":"string"}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent id="dev" role="dev" target="workspace/alpha/agents/dev.md"/>
+<trigger>unresolved_source in 4 meetings</trigger>
+<effective_prompt>
+You are the developer of a made-up product.
+</effective_prompt>
+<editable>
+(empty: a new overlay)
+</editable>
+<traces>
+<case minutes="rf-02">
+<question>Pregunta de rf-02: ¿qué sigue?</question>
+<answer>{"answer":"Respuesta de dev en rf-02.","priorities":[],"concerns":[]}</answer>
+<check_failures>
+- Priority 2: objective "o9" must be one of the brief ids (o1, o2)
+</check_failures>
+<unresolved_sources>path docs/missing.md</unresolved_sources>
+<invented_sources>path docs/imaginary.md</invented_sources>
+<marks>
+- #0 "Citar el spec" (owner dev): rejected
+- #1 "Ordenar el plan" (owner pm): changed
+</marks>
+</case>
+<case minutes="rf-05">
+<question>Pregunta de rf-05: ¿qué sigue?</question>
+<answer>{"answer":"Respuesta de dev en rf-05.","priorities":[],"concerns":[]}</answer>
+<check_failures>
+(none)
+</check_failures>
+<unresolved_sources>path docs/missing.md</unresolved_sources>
+<invented_sources>(none)</invented_sources>
+<marks>
+(none)
+</marks>
+</case>
+</traces>
+<earlier_proposals>
+(none)
+</earlier_proposals>
+=== synthesis
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+
+Now you write the minutes of the meeting from the agent answers.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}},"owner_role":{"type":"string"},"objective":{"type":"string","enum":["o1","o2"]}},"required":["title","why","sources","owner_role","objective"]}},"disagreements":{"type":"array","items":{"type":"object","properties":{"topic":{"type":"string"},"positions":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"view":{"type":"string"}},"required":["role","view"]}}},"required":["topic","positions"]}},"decisions":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"why":{"type":"string"},"action":{"type":"string"},"priorities":{"type":"array","items":{"type":"integer"}}},"required":["text","why"]}},"script":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"text":{"type":"string"}},"required":["role","text"]}}},"required":["priorities","disagreements","decisions","script"]}
+stdin:
+# Question
+Pregunta de rf-01: ¿qué sigue?
+
+# Agent answers
+## pm
+
+{"answer":"Respuesta de pm en rf-01.","priorities":[],"concerns":[]}
+
+## qa
+
+{"answer":"Respuesta de qa en rf-01.","priorities":[],"concerns":[]}
+
+## dev
+
+{"answer":"Citar la visión antes de opinar.","priorities":[{"title":"Citar la visión","why":"Es la fuente.","sources":[{"type":"path","ref":"docs/vision.md"}]}],"concerns":[]}
+
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot (compact)
+# Snapshot of rf-01
+
+
+## Docs index
+- docs/vision.md
+
+# Instructions
+- Rank at most 5 priorities. Each cites at least one source, copied verbatim (type and ref) from the agent answers or the snapshot. Never invent a source.
+- "objective" is the id of the brief objective the priority serves: one of o1, o2.
+- At least one priority cites a declared north star as a path source (docs/vision.md). Cite only those as north stars.
+- Keep everything under <out_of_scope> out of the priorities.
+- "owner_role" is the id of the agent that proposed the priority most strongly, exactly as it heads its answer.
+- "disagreements": only real conflicts between agents; an empty array when there are none. Each position's "role" is an agent id.
+- "decisions": things that need the approval of Ada before anything changes. Each with its reason and an "action": what an agent would do after the approval, in one sentence. Each also lists in "priorities" the indexes (starting at 0, in the order of your "priorities") of the priorities it covers; an empty array when it covers none. Approving the decision marks those priorities accepted.
+- "script": a team call in Spanish, written to be spoken, in ASD-STE100 Simplified Technical English style applied to Spanish: one topic in each sentence, at most 20 words in a sentence, the active voice with a named agent, simple verb forms, the condition first, one name for each thing. No slogans, metaphors, filler or fragments for effect. The pm opens by stating the question. Each agent that answered speaks its own view in 2 to 4 sentences, in first person. Refer to commits and files by what they are, never read hashes or paths aloud. Name a story by its title, never by its id. Add a short back-and-forth where agents disagree. The pm closes with the ranked priorities and the decisions Ada must take. Total about 2 to 4 minutes of speech. No markdown, no emojis. The "role" of each segment is the id of one of the agents that answered, or pm.
+- Everything in Spanish except identifiers, paths and code.
+=== synthesis
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+
+Now you write the minutes of the meeting from the agent answers.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}},"owner_role":{"type":"string"},"objective":{"type":"string","enum":["o1","o2"]}},"required":["title","why","sources","owner_role","objective"]}},"disagreements":{"type":"array","items":{"type":"object","properties":{"topic":{"type":"string"},"positions":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"view":{"type":"string"}},"required":["role","view"]}}},"required":["topic","positions"]}},"decisions":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"why":{"type":"string"},"action":{"type":"string"},"priorities":{"type":"array","items":{"type":"integer"}}},"required":["text","why"]}},"script":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"text":{"type":"string"}},"required":["role","text"]}}},"required":["priorities","disagreements","decisions","script"]}
+stdin:
+# Question
+Pregunta de rf-03: ¿qué sigue?
+
+# Agent answers
+## pm
+
+{"answer":"Respuesta de pm en rf-03.","priorities":[],"concerns":[]}
+
+## qa
+
+{"answer":"Respuesta de qa en rf-03.","priorities":[],"concerns":[]}
+
+## dev
+
+{"answer":"Citar la visión antes de opinar.","priorities":[{"title":"Citar la visión","why":"Es la fuente.","sources":[{"type":"path","ref":"docs/vision.md"}]}],"concerns":[]}
+
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot (compact)
+# Snapshot of rf-03
+
+
+## Docs index
+- docs/vision.md
+
+# Instructions
+- Rank at most 5 priorities. Each cites at least one source, copied verbatim (type and ref) from the agent answers or the snapshot. Never invent a source.
+- "objective" is the id of the brief objective the priority serves: one of o1, o2.
+- At least one priority cites a declared north star as a path source (docs/vision.md). Cite only those as north stars.
+- Keep everything under <out_of_scope> out of the priorities.
+- "owner_role" is the id of the agent that proposed the priority most strongly, exactly as it heads its answer.
+- "disagreements": only real conflicts between agents; an empty array when there are none. Each position's "role" is an agent id.
+- "decisions": things that need the approval of Ada before anything changes. Each with its reason and an "action": what an agent would do after the approval, in one sentence. Each also lists in "priorities" the indexes (starting at 0, in the order of your "priorities") of the priorities it covers; an empty array when it covers none. Approving the decision marks those priorities accepted.
+- "script": a team call in Spanish, written to be spoken, in ASD-STE100 Simplified Technical English style applied to Spanish: one topic in each sentence, at most 20 words in a sentence, the active voice with a named agent, simple verb forms, the condition first, one name for each thing. No slogans, metaphors, filler or fragments for effect. The pm opens by stating the question. Each agent that answered speaks its own view in 2 to 4 sentences, in first person. Refer to commits and files by what they are, never read hashes or paths aloud. Name a story by its title, never by its id. Add a short back-and-forth where agents disagree. The pm closes with the ranked priorities and the decisions Ada must take. Total about 2 to 4 minutes of speech. No markdown, no emojis. The "role" of each segment is the id of one of the agents that answered, or pm.
+- Everything in Spanish except identifiers, paths and code.
+
+--- stderr
+

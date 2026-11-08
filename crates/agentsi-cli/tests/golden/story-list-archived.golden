@@ -1,0 +1,21 @@
+## archive T003 --product beta
+exit: 0
+--- stdout
+Archived story T003.
+
+--- stderr
+
+## story list --show-archived --product beta
+exit: 0
+--- stdout
+S001  not_implemented  approved           ready   dev  Filter mail
+S002  not_implemented  pending            -       dev  Star mail
+T003  not_implemented  approved           -       dev  [archived] Drop the old cache
+S004  not_implemented  approved           -       dev  Mark mail as read
+S005  not_implemented  approved           failed  dev  Pin mail
+S006  not_implemented  approved           work    dev  Snooze mail
+S007  not_implemented  changes_requested  -       dev  Archive mail
+S008  implemented      approved           -       dev  Sort by sender
+
+--- stderr
+

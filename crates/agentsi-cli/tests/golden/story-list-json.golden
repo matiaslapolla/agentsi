@@ -1,0 +1,366 @@
+exit: 0
+--- stdout
+{
+  "product": "beta",
+  "stories": [
+    {
+      "id": "S001",
+      "as_a": "a reader",
+      "slug": "filter-mail",
+      "type": "story",
+      "title": "Filter mail",
+      "i_want": "to filter mail",
+      "status": "not_implemented",
+      "minutes": null,
+      "results": [],
+      "session": {
+        "log": "story_logs beta/S001",
+        "pid": null,
+        "base": "80db04af1de62e8788c59e8f999e41200be92331",
+        "state": "ready",
+        "branch": "story/S001-filter-mail",
+        "failure": null,
+        "attempts": 1,
+        "worktree": "<WORK>/repos/beta/.worktrees/S001-filter-mail",
+        "started_at": "2026-10-13T10:00:00.000Z",
+        "final_commit": "e5d9a17965178ea2d505acff2ae7fb725ad3e840",
+        "tests_commit": "bb569c76d6956a20abcc452e9b38f5150f596237"
+      },
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "approved",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    },
+    {
+      "id": "S002",
+      "as_a": "a reader",
+      "slug": "star-mail",
+      "type": "story",
+      "title": "Star mail",
+      "i_want": "to star mail",
+      "status": "not_implemented",
+      "minutes": null,
+      "results": [],
+      "session": null,
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "pending",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    },
+    {
+      "id": "T003",
+      "as_a": null,
+      "slug": "drop-the-old-cache",
+      "type": "task",
+      "title": "Drop the old cache",
+      "i_want": "to drop the old cache",
+      "status": "not_implemented",
+      "minutes": null,
+      "results": [],
+      "session": null,
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "approved",
+      "criteria": [
+        {
+          "test": null,
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": null,
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    },
+    {
+      "id": "S004",
+      "as_a": "a reader",
+      "slug": "mark-mail-as-read",
+      "type": "story",
+      "title": "Mark mail as read",
+      "i_want": "to mark mail as read",
+      "status": "not_implemented",
+      "minutes": null,
+      "results": [],
+      "session": null,
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "approved",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    },
+    {
+      "id": "S005",
+      "as_a": "a reader",
+      "slug": "pin-mail",
+      "type": "story",
+      "title": "Pin mail",
+      "i_want": "to pin mail",
+      "status": "not_implemented",
+      "minutes": null,
+      "results": [],
+      "session": {
+        "log": "story_logs beta/S005",
+        "pid": null,
+        "base": "80db04af1de62e8788c59e8f999e41200be92331",
+        "stop": {
+          "reason": "budget",
+          "cap_usd": 2
+        },
+        "state": "failed",
+        "branch": "story/S005-pin-mail",
+        "failure": "The criterion tests fail:\nnot ok 1 - pin",
+        "attempts": 2,
+        "worktree": "<WORK>/repos/beta/.worktrees/S005-pin-mail",
+        "started_at": "2026-10-13T10:00:00.000Z",
+        "final_commit": null,
+        "tests_commit": null
+      },
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "approved",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    },
+    {
+      "id": "S006",
+      "as_a": "a reader",
+      "slug": "snooze-mail",
+      "type": "story",
+      "title": "Snooze mail",
+      "i_want": "to snooze mail",
+      "status": "not_implemented",
+      "minutes": null,
+      "results": [],
+      "session": {
+        "log": "story_logs beta/S006",
+        "pid": null,
+        "base": "80db04af1de62e8788c59e8f999e41200be92331",
+        "state": "work",
+        "branch": "story/S006-snooze-mail",
+        "failure": null,
+        "attempts": 1,
+        "worktree": "<WORK>/repos/beta/.worktrees/S006-snooze-mail",
+        "started_at": "2026-10-13T10:00:00.000Z",
+        "final_commit": null,
+        "tests_commit": null
+      },
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "approved",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    },
+    {
+      "id": "S007",
+      "as_a": "a reader",
+      "slug": "archive-mail",
+      "type": "story",
+      "title": "Archive mail",
+      "i_want": "to archive mail",
+      "status": "not_implemented",
+      "minutes": "beta-001",
+      "results": [],
+      "session": null,
+      "so_that": "the inbox stays calm",
+      "sources": [
+        {
+          "ref": "docs/plans/launch.md",
+          "type": "path"
+        },
+        {
+          "ref": "S002",
+          "type": "story"
+        }
+      ],
+      "approval": "changes_requested",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": "b1",
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "owner",
+      "changes_note": "Use the inbox words."
+    },
+    {
+      "id": "S008",
+      "as_a": "a reader",
+      "slug": "sort-by-sender",
+      "type": "story",
+      "title": "Sort by sender",
+      "i_want": "to sort by sender",
+      "status": "implemented",
+      "minutes": null,
+      "results": [
+        {
+          "at": "2026-10-14T10:00:00.000Z",
+          "commit": null,
+          "result": "discarded"
+        },
+        {
+          "at": "2026-10-15T10:00:00.000Z",
+          "commit": "80db04af1de62e8788c59e8f999e41200be92331",
+          "result": "merged_unchanged"
+        }
+      ],
+      "session": null,
+      "so_that": "the inbox stays calm",
+      "sources": [],
+      "approval": "approved",
+      "criteria": [
+        {
+          "test": "test/list-1.test.sh",
+          "then": "the list shows 1 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 1 mails",
+          "checks": "The list shows 1 rows."
+        },
+        {
+          "test": "test/list-2.test.sh",
+          "then": "the list shows 2 rows",
+          "when": "the user opens the list",
+          "given": "a mailbox with 2 mails",
+          "checks": "The list shows 2 rows."
+        }
+      ],
+      "objective": null,
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "owner_role": "dev",
+      "updated_at": "2026-10-12T10:00:00.000Z",
+      "proposed_by": "pm",
+      "changes_note": null
+    }
+  ]
+}
+
+--- stderr
+

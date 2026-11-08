@@ -1,0 +1,121 @@
+exit: 0
+--- stdout
+{
+  "product": "beta",
+  "generated_at": "<NOW>",
+  "config": {
+    "valid": false,
+    "failures": [
+      "Agent \"scout\": Unknown role \"scout\" (no <WORK>/root/plugin/agents/scout.md)",
+      "Overlay \"ghost.md\" belongs to an agent that is not in the roster.",
+      "Overlay \"ghost.md\" extends \"nobody\", which is not a global role.",
+      "Brief: product.stage \"dreaming\" is not one of idea, building, launched, growing, maintenance.",
+      "Brief: Objective \"b1\" has an invalid due date \"2026-13-40\" (expected YYYY-MM-DD).",
+      "Brief: north_stars path \"docs/missing.md\" does not exist under a product path.",
+      "Brief: roles has no entry for roster agent \"dev\".",
+      "Brief: roles has no entry for roster agent \"scout\".",
+      "Brief: roles entry \"extra\" is not in the roster."
+    ],
+    "overdue_objectives": []
+  },
+  "meetings": {
+    "count": 1,
+    "first_pass_rate": 1,
+    "repair_rate": 0,
+    "synthesis_cost_share": 0.2,
+    "invented_sources": 0,
+    "agents": [
+      {
+        "agent": "pm",
+        "meetings": 1,
+        "answers": 1,
+        "errors": 0,
+        "timeouts": 0,
+        "unresolved_sources_per_meeting": 0,
+        "sin_datos_per_meeting": 0,
+        "mean_cost_usd": 0.2
+      },
+      {
+        "agent": "dev",
+        "meetings": 0,
+        "answers": 0,
+        "errors": 0,
+        "timeouts": 0,
+        "unresolved_sources_per_meeting": 0,
+        "sin_datos_per_meeting": 0,
+        "mean_cost_usd": 0
+      },
+      {
+        "agent": "scout",
+        "meetings": 0,
+        "answers": 0,
+        "errors": 0,
+        "timeouts": 0,
+        "unresolved_sources_per_meeting": 0,
+        "sin_datos_per_meeting": 0,
+        "mean_cost_usd": 0
+      }
+    ]
+  },
+  "repairs": {
+    "baseline": {
+      "minutes": [
+        "beta-001"
+      ],
+      "repaired": 0,
+      "per_meeting": 0
+    },
+    "since": {
+      "minutes": [],
+      "repaired": 0,
+      "per_meeting": null
+    }
+  },
+  "last_repairs": null,
+  "marks": {
+    "pm": {
+      "accepted": 1,
+      "changed": 0,
+      "rejected": 0,
+      "unmarked": 0
+    }
+  },
+  "memory": [
+    {
+      "agent": "dev",
+      "active": 0,
+      "retired": 0,
+      "lessons": 0,
+      "never_helpful": 0,
+      "chars": 0,
+      "max_chars": 6000
+    },
+    {
+      "agent": "pm",
+      "active": 0,
+      "retired": 0,
+      "lessons": 0,
+      "never_helpful": 0,
+      "chars": 0,
+      "max_chars": 6000
+    },
+    {
+      "agent": "scout",
+      "active": 0,
+      "retired": 0,
+      "lessons": 0,
+      "never_helpful": 0,
+      "chars": 0,
+      "max_chars": 6000
+    }
+  ],
+  "reflections": {
+    "last": null,
+    "pending_proposals": 0,
+    "reverted": 0
+  },
+  "ready_to_reflect": []
+}
+
+--- stderr
+

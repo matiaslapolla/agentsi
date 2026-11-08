@@ -1,0 +1,16 @@
+exit: 1
+--- stdout
+{
+  "passed": false,
+  "failures": [
+    "Priority #0: commit source \"abc1234\" does not resolve.",
+    "Priority #1 \"Plan the beta\" has no source.",
+    "Decision #1 \"Move the demo date\" links priority index 9, which does not exist (0 to 1).",
+    "No priority cites a north star declared in the brief (docs/vision.md).",
+    "Role \"qa\" has no answer.",
+    "Call script is empty."
+  ]
+}
+
+--- stderr
+

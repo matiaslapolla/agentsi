@@ -1,0 +1,14 @@
+## archive T003
+exit: 0
+--- stdout
+Archived story T003.
+
+--- stderr
+
+## story run T003
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: Story T003 is archived. Run agentsi restore T003 first.
+

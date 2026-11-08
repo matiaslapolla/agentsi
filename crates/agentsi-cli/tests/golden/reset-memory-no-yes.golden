@@ -1,0 +1,9 @@
+exit: 1
+--- stdout
+Se resetea pm en alpha al rol global.
+  elimina  alpha/memory/pm.json
+
+--- stderr
+
+No hay terminal para confirmar: repetí con --yes.
+

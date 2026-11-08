@@ -1,0 +1,126 @@
+## ask --role qa --question=ask-is-it-safe
+exit: 0
+--- stdout
+QA dice: bien.
+
+--- stderr
+
+[qa · claude-haiku-fake · 1.9s · in 760 (fresh 95, cache read 285, cache write 380) · out 190 · $0.0313]
+
+## @claude-calls
+exit: 0
+--- stdout
+=== ask-qa
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You are the QA of Alpha.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=Read,Grep,Glob
+arg: --allowedTools
+arg: Read,Grep,Glob
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+## Open issues
+
+_None indexed._
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+## Commits, last 14 days
+
+## Journal tail
+
+_No journal._
+
+## Docs index
+
+
+# Your memory about this product
+_Empty: you have not met on this product yet._
+
+# Question
+ask-is-it-safe
+
+# Instructions
+- You are the qa of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Cite sources inline: commit hashes, issue numbers or repo-relative paths. Plain text, no JSON.
+
+--- stderr
+

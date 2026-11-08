@@ -1,0 +1,21 @@
+name: agentsi
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: agentsi-postgres
+    environment:
+      POSTGRES_USER: agentsi
+      POSTGRES_PASSWORD: agentsi
+      POSTGRES_DB: agentsi
+    ports:
+      - "127.0.0.1:5561:5432"
+    volumes:
+      - agentsi-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agentsi"]
+      interval: 2s
+      retries: 30
+    restart: unless-stopped
+volumes:
+  agentsi-pg:
+    name: agentsi-pg

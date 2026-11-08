@@ -1,0 +1,41 @@
+exit: 0
+--- stdout
+{
+  "product": "beta",
+  "name": "Beta",
+  "scope": null,
+  "roles": [
+    "pm",
+    "dev",
+    "scout"
+  ],
+  "paths": [
+    "<WORK>/repos/beta"
+  ],
+  "owner": {
+    "name": "Ada",
+    "language": "Spanish"
+  },
+  "index": {
+    "ok": true,
+    "summary": "beta: 1 repos (1 unchanged), 0 docs, 0 commits, 0 issues, 1 minutes, 0 memory, <SECONDS>s"
+  },
+  "status": {
+    "ok": true,
+    "markdown": "# Beta — AgentSI status\n\n- Roles: pm, dev, scout · status planned\n- Index: 5 docs, 3 commits, 2 open issues, indexed <N> min ago\n- Last commit: <DATE> minutes(beta-001): add the minutes\n- Pending decisions: 1\n- Minutes: 1 total\n\n## Pending decisions\n\n- [8] Publish the docs (beta-001)\n\n## Last minutes\n\n- beta-001 — Is Beta ready? — valid — 1 accepted\n"
+  },
+  "pending_decisions": [
+    {
+      "kind": "decision",
+      "id": 8,
+      "minutes_id": "beta-001",
+      "text": "Publish the docs",
+      "why": "Docs are ready.",
+      "action": "Push the docs",
+      "priorities": []
+    }
+  ]
+}
+
+--- stderr
+

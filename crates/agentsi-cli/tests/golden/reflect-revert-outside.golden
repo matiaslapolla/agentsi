@@ -1,0 +1,8 @@
+exit: 2
+--- stdout
+
+--- stderr
+No product matches <WORK>/outside. Pass --product <id>.
+Usage: agentsi reflect [--memory-only] [--json] [--product <id>]
+       agentsi reflect revert <reflection-id> [--json] [--product <id>]
+

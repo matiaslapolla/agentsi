@@ -1,0 +1,93 @@
+whisper-base                   1 wer=0.07 t=0.15s  All right, so I accepted the permissions. So use the CLI and attempt t
+whisper-base                   2 wer=0.06 t=0.17s  Fantastic. All right. So I need you to tell me what was the last stuff
+whisper-base                   3 wer=0.00 t=0.12s  Sure, approve 114 and commit the next upgrade, and I think that leads
+whisper-base                   4 wer=0.05 t=0.20s  All right, fantastic. So let's spin up an agency meeting about what wa
+whisper-base                   5 wer=0.00 t=0.11s  Maybe if you switch the active GitHub account you can check if everyth
+whisper-base                   6 wer=0.00 t=0.15s  Good, I have a question. So the locations feature, which is a new feat
+whisper-base                   7 wer=0.00 t=0.11s  So spin up agency session and tell me what was the last thing that was
+whisper-base                   8 wer=0.08 t=0.15s  All right, go ahead and implement everything that's missing to shift e
+whisper-base                   9 wer=0.10 t=0.13s  All right, accept T026 and merge it, update my database, import the da
+whisper-base                  10 wer=0.09 t=0.14s  All right, so I need you to start the repository and the database here
+whisper-base                  11 wer=0.07 t=0.16s  All right, so I see you said some test files still spec the story file
+whisper-base                  12 wer=0.11 t=0.21s  All right, so I want you to spin up a story to let's merge these two r
+whisper-base                  13 wer=0.00 t=0.10s  All right, fix what's fixable and commit and push everything.
+whisper-base                  14 wer=0.05 t=0.13s  See how useful is herder on our setup. I mean for all the projects I h
+whisper-base                  15 wer=0.15 t=0.11s  All right, go ahead. I accept S24 and go with the steps you said.
+whisper-base                  16 wer=0.00 t=0.13s  Sure, fix that document and review the production database and see if
+whisper-base                  17 wer=0.00 t=0.09s  Sure, so write a story for agency and start the work.
+whisper-base                  18 wer=0.13 t=0.17s  How hard would it be to build a CLI command here in Agent C that allow
+whisper-base                  19 wer=0.00 t=0.20s  what happens if we close those PRs before merging? I mean I want to di
+whisper-base                  20 wer=0.05 t=0.22s  All right, Claude, so I need you to tell me what were the last things
+[0;93m2026-11-02 17:11:27.100978626 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 453 Memcpy nodes are added to the graph main_graph for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+[0;93m2026-11-02 17:11:28.615365851 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 89 Memcpy nodes are added to the graph no_past for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+[0;93m2026-11-02 17:11:28.626516419 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 80 Memcpy nodes are added to the graph with_past for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+whisper-large-v3-turbo         1 wer=0.07 t=3.91s  All right, so I accepted the permissions. So use the CLI and attempt t
+whisper-large-v3-turbo         2 wer=0.06 t=4.43s  Fantastic, all right. So I need you to tell me what was the last stuff
+whisper-large-v3-turbo         3 wer=0.00 t=3.99s  Sure, approve 114 and commit the next upgrade. And I think that leads
+whisper-large-v3-turbo         4 wer=0.05 t=6.48s  All right, fantastic. So let's spin up an agency meeting about what wa
+whisper-large-v3-turbo         5 wer=0.00 t=22.41s  Maybe if you switch the active GitHub account you can check if everyth
+whisper-large-v3-turbo         6 wer=0.00 t=20.53s  Good, I have a question. So the locations feature, which is a new feat
+whisper-large-v3-turbo         7 wer=0.00 t=10.54s  So spin up agency session and tell me what was the last thing that was
+whisper-large-v3-turbo         8 wer=0.08 t=8.04s  All right, go ahead and implement everything that's missing to shift e
+whisper-large-v3-turbo         9 wer=0.00 t=5.04s  Alright, accept T026 and merge it, update my database, import the data
+whisper-large-v3-turbo        10 wer=0.00 t=4.13s  Alright, so I need you to start the repository and the database here l
+whisper-large-v3-turbo        11 wer=0.07 t=4.24s  All right, so I see you said some test files still spec the story file
+whisper-large-v3-turbo        12 wer=0.06 t=4.80s  All right, so I want you to spin up a story to let's merge these two r
+whisper-large-v3-turbo        13 wer=0.00 t=4.24s  All right, fix what's fixable and commit and push everything.
+whisper-large-v3-turbo        14 wer=0.05 t=3.84s  See how useful is Herder on our setup. I mean for all the projects I h
+whisper-large-v3-turbo        15 wer=0.15 t=3.81s  All right, go ahead. I accept S24 and go with the steps you said.
+whisper-large-v3-turbo        16 wer=0.00 t=4.59s  Sure, fix that document and review the production database and see if
+whisper-large-v3-turbo        17 wer=0.00 t=3.67s  Sure, so write a story for agency and start the work.
+whisper-large-v3-turbo        18 wer=0.13 t=4.69s  How hard would it be to build a CLI command here in Agent C that allow
+whisper-large-v3-turbo        19 wer=0.00 t=3.93s  What happens if we close those PRs before merging? I mean I want to di
+whisper-large-v3-turbo        20 wer=0.05 t=4.22s  All right, Claude, so I need you to tell me what were the last things
+[0;93m2026-11-02 17:13:46.570521665 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 742 Memcpy nodes are added to the graph main_graph for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+[0;93m2026-11-02 17:13:48.242056967 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 21 Memcpy nodes are added to the graph main_graph for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+parakeet-v2                    1 wer=0.00 t=5.23s  Alright, so I accepted the permissions. So use the CLI and attempt to
+parakeet-v2                    2 wer=0.06 t=9.97s  Fantastic, all right. So I need you to tell me what was the last stuff
+parakeet-v2                    3 wer=0.00 t=3.00s  Sure, approve 114 and commit the next upgrade, and I think that leads
+parakeet-v2                    4 wer=0.00 t=4.02s  Alright, fantastic. So let's spin up an agency meeting about what was
+parakeet-v2                    5 wer=0.00 t=1.18s  Maybe if you switch the active GitHub account you can check if everyth
+parakeet-v2                    6 wer=0.00 t=2.84s  Good, I have a question. So the locations feature, which is a new feat
+parakeet-v2                    7 wer=0.00 t=1.73s  So, spin up agency session and tell me what was the last thing that wa
+parakeet-v2                    8 wer=0.04 t=1.88s  Alright, go ahead and implement everything that's missing to shift ent
+parakeet-v2                    9 wer=0.00 t=0.76s  Alright, accept T026 and merge it, update my database, import the data
+parakeet-v2                   10 wer=0.09 t=0.77s  Alright, so I need you to start the repository and the database here l
+parakeet-v2                   11 wer=0.00 t=0.76s  Alright, so I see you said some test files still spec the story files
+parakeet-v2                   12 wer=0.03 t=0.80s  Alright, so I want you to spin up a story to let's merge these two rep
+parakeet-v2                   13 wer=0.00 t=0.29s  All right, fix what's fixable and commit and push everything.
+parakeet-v2                   14 wer=0.05 t=0.54s  See how useful is Herder on our setup. I mean for all the projects I h
+parakeet-v2                   15 wer=0.23 t=0.44s  Alright, go ahead. I accept S twenty-four and go with the steps you sa
+parakeet-v2                   16 wer=0.00 t=0.53s  Sure, fix that document and review the production database and see if
+parakeet-v2                   17 wer=0.00 t=0.24s  Sure, so write a story for agency and start the work.
+parakeet-v2                   18 wer=0.13 t=0.48s  How hard would it be to build a CLI command here in Agent C that allow
+parakeet-v2                   19 wer=0.00 t=0.70s  What happens if we close those PRs before merging? I mean I want to di
+parakeet-v2                   20 wer=0.00 t=0.57s  Alright, Claude, so I need you to tell me what were the last things we
+[0;93m2026-11-02 17:14:26.685950466 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 742 Memcpy nodes are added to the graph main_graph for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+[0;93m2026-11-02 17:14:28.288096373 [W:onnxruntime:, transformer_memcpy.cc:111 ApplyImpl] 21 Memcpy nodes are added to the graph main_graph for CUDAExecutionProvider. It might have negative impact on performance (including unable to run CUDA graph). Set session_options.log_severity_level=1 to see the detail logs before this message.[m
+parakeet-v3                    1 wer=0.00 t=0.62s  Alright, so I accepted the permissions. So use the CLI and attempt to
+parakeet-v3                    2 wer=0.00 t=0.52s  Fantastic, alright. So I need you to tell me what was the last stuff w
+parakeet-v3                    3 wer=0.00 t=0.41s  Sure, approve 114 and commit the next upgrade, and I think that leads
+parakeet-v3                    4 wer=0.00 t=0.56s  Alright, fantastic. So let's spin up an agency meeting about what was
+parakeet-v3                    5 wer=0.00 t=0.31s  Maybe if you switch the active GitHub account, you can check if everyt
+parakeet-v3                    6 wer=0.00 t=0.43s  Good, I have a question. So the locations feature, which is a new feat
+parakeet-v3                    7 wer=0.00 t=0.30s  So, spin up agency session and tell me what was the last thing that wa
+parakeet-v3                    8 wer=0.04 t=0.45s  Alright, go ahead and implement everything that's missing to shift ent
+parakeet-v3                    9 wer=0.00 t=0.37s  Alright, accept T026 and merge it, update my database, import the data
+parakeet-v3                   10 wer=0.00 t=0.38s  Alright, so I need you to start the repository and the database here l
+parakeet-v3                   11 wer=0.00 t=0.41s  Alright, so I see you said some test files still spec the story files
+parakeet-v3                   12 wer=0.00 t=0.45s  Alright, so I want you to spin up a story to let's merge these two rep
+parakeet-v3                   13 wer=0.20 t=0.22s  Alright, fix what's fixable and commit and push everything.
+parakeet-v3                   14 wer=0.05 t=0.30s  See how useful is Herder on our setup? I mean for all the projects I h
+parakeet-v3                   15 wer=0.00 t=0.25s  Alright, go ahead. I accept S24 and go with the steps you said.
+parakeet-v3                   16 wer=0.00 t=0.35s  Sure, fix that document and review the production database and see if
+parakeet-v3                   17 wer=0.00 t=0.20s  Sure, so write a story for agency and start the work.
+parakeet-v3                   18 wer=0.13 t=0.44s  How hard would it be to build a CLI command here in Agent C that allow
+parakeet-v3                   19 wer=0.00 t=0.56s  What happens if we close those PRs before merging? I mean I want to di
+parakeet-v3                   20 wer=0.00 t=0.55s  Alright, Claude, so I need you to tell me what were the last things we
+
+model                        provider  load s  WER % s/sentence    RTF
+whisper-base                 cuda         1.4    5.4       0.15   0.02
+whisper-large-v3-turbo       cuda         3.0    4.2       6.58   0.78
+parakeet-v2                  cuda         2.8    2.8       1.84   0.22
+parakeet-v3                  cuda         3.0    1.6       0.40   0.05

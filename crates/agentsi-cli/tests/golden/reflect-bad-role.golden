@@ -1,0 +1,25 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @sql-reflect-badrole
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rcurate
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect --memory-only
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reflect: Invalid agent id "Dev Lead"
+

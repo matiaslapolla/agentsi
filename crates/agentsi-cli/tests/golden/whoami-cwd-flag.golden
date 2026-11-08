@@ -1,0 +1,22 @@
+exit: 0
+--- stdout
+{
+  "product": "beta",
+  "name": "Beta",
+  "scope": null,
+  "roles": [
+    "pm",
+    "dev",
+    "scout"
+  ],
+  "paths": [
+    "<WORK>/repos/beta"
+  ],
+  "owner": {
+    "name": "Ada",
+    "language": "Spanish"
+  }
+}
+
+--- stderr
+

@@ -1,0 +1,2 @@
+# The files hold the exact output of a command, with its blank lines. Keep them as they are.
+*.golden -whitespace -text

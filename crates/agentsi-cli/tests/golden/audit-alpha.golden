@@ -1,0 +1,38 @@
+exit: 0
+--- stdout
+Auditoría de alpha
+
+Configuración
+  roster válido
+  objetivo vencido: o1 (2020-01-01) Ship the importer
+
+Reuniones (últimas 4)
+  check a la primera: 50% · reparadas: 50% · síntesis: 15% del costo · fuentes inventadas: 1
+  pm: 4/4 respuestas, 0 errores (0 timeouts), 0 fuentes sin resolver y 0 "sin datos" por reunión, costo medio 0.20 USD
+  dev: 4/4 respuestas, 0 errores (0 timeouts), 1 fuentes sin resolver y 0.50 "sin datos" por reunión, costo medio 0.20 USD
+  qa: 2/4 respuestas, 2 errores (2 timeouts), 0 fuentes sin resolver y 0 "sin datos" por reunión, costo medio 0.20 USD
+  rondas de reparación de las últimas 4 reuniones:
+    alpha-001: 0
+    alpha-002: 1
+    alpha-003: 1
+    alpha-004: 0
+  rondas de reparación por reunión, de las actas: primeras 2: 0.50 · después (2): 0
+
+Marcas por agente
+  pm: 2 aceptadas, 0 cambiadas, 0 rechazadas, 1 sin marcar
+  dev: 0 aceptadas, 0 cambiadas, 1 rechazadas, 1 sin marcar
+  qa: 0 aceptadas, 1 cambiadas, 0 rechazadas, 0 sin marcar
+
+Memoria
+  dev: 2 activos, 1 retirados, 1 lecciones, 0 nunca útiles, 81/6000 caracteres
+  pm: 2 activos, 0 retirados, 1 lecciones, 0 nunca útiles, 96/6000 caracteres
+  qa: 0 activos, 0 retirados, 0 lecciones, 0 nunca útiles, 0/6000 caracteres
+
+Reflexiones
+  última: r-1 (2026-10-05T09:00:00.000Z) · propuestas pendientes: 1 · revertidas: 1
+
+Listo para reflexionar
+  dev: 3 reuniones con fuentes que no resuelven
+
+--- stderr
+

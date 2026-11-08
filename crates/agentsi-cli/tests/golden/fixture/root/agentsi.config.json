@@ -1,0 +1,8 @@
+{
+  "owner": { "name": "Ada", "language": "Spanish" },
+  "products": [
+    { "id": "alpha", "name": "Alpha", "paths": ["{{WORK}}/repos/alpha"], "status": "active", "roles": ["pm", "dev", "qa"] },
+    { "id": "beta", "name": "Beta", "paths": ["{{WORK}}/repos/beta"], "status": "planned", "roles": ["pm", "dev", "scout"], "stories": { "repo": "{{WORK}}/repos/beta", "test": "sh test/run.sh {files}", "gate": ["sh test/gate.sh"], "budget_usd": 2 } },
+    { "id": "gamma", "name": "Gamma", "paths": ["{{WORK}}/repos/gamma"], "status": "active", "roles": ["pm"] }
+  ]
+}

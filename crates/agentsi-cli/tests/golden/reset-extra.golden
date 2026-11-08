@@ -1,0 +1,9 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reset <agent> [--memory] [--yes] [--product <id>]
+       agentsi reset --all [--memory] [--yes] [--product <id>]
+Usage: agentsi reset <agent> [--memory] [--yes] [--product <id>]
+       agentsi reset --all [--memory] [--yes] [--product <id>]
+

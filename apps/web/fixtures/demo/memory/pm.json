@@ -1,0 +1,61 @@
+{
+  "agent": "pm",
+  "product": "_demo",
+  "items": [
+    {
+      "id": "m-d41f",
+      "text": "El primer consultorio pagando es la meta del trimestre (ver `PRODUCT.md`).",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 0,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    },
+    {
+      "id": "m-e5a0",
+      "text": "El equipo prefiere cobrar antes que sumar módulos.",
+      "kind": "fact",
+      "helpful": 2,
+      "harmful": 0,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    },
+    {
+      "id": "m-f60b",
+      "text": "Cada vez que el alcance crece sin un cliente que lo pida, la semana siguiente se pierde en retrabajo.",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 0,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    },
+    {
+      "id": "m-0a7c",
+      "text": "Los recordatorios por WhatsApp se postergan hasta tener un consultorio piloto.",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 1,
+      "source": "migration",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": null,
+      "retired_why": null
+    },
+    {
+      "id": "m-1d8e",
+      "text": "El mes gratis alcanza como oferta de entrada.",
+      "kind": "fact",
+      "helpful": 0,
+      "harmful": 0,
+      "source": "2026-10-11-0930-foco-semanal",
+      "created_at": "2026-10-11T00:00:00.000Z",
+      "retired_at": "2026-10-12T00:00:00.000Z",
+      "retired_why": "no se pudo verificar con ningún consultorio"
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+#!/bin/sh
+# A fake `claude` for the golden cases of `meet` and `ask`. It writes each call to
+# claude-calls/ of the work folder, and replays a recorded reply of replies/.
+#
+# The first word of the question names the scenario, a folder of replies/. A key
+# is the agent id, `synthesis`, `synthesis-repair`, `ask-<agent>`, `curate-<agent>`
+# or `propose`. A key with no file in the scenario falls back to the scenario `happy`.
+#
+# The file claude-scenario of the work folder names the scenario of a reflection,
+# because its calls have no question. A reflection calls one key many times at once,
+# so each call is recorded under its key and a checksum of its system and its prompt.
+#
+# `order` of a scenario lists the agents. Each agent waits for the agents before
+# it, so the runs end in one order, and the usage rows have one order.
+here=$(cd "$(dirname "$0")/.." && pwd)
+calls="$here/claude-calls"
+mkdir -p "$calls"
+prompt=$(cat)
+
+format=json
+structured=no
+previous=
+system=
+for arg in "$@"; do
+  [ "$previous" = --output-format ] && format=$arg
+  [ "$previous" = --system-prompt ] && system=$arg
+  [ "$arg" = --json-schema ] && structured=yes
+  previous=$arg
+done
+
+role=$(printf '%s\n' "$prompt" | sed -n 's/^- You are the \([a-z.-]*\) of the agency.*/\1/p' | head -n 1)
+question=$(printf '%s\n' "$prompt" | sed -n '/^# Question$/{n;p;q;}')
+scenario=$(printf '%s\n' "$question" | sed 's/^[^a-z]*\([a-z]*\).*/\1/')
+if [ -z "$role" ]; then
+  key=synthesis
+  case "$prompt" in *"# Repair"*) key=synthesis-repair ;; esac
+elif [ "$structured" = no ]; then
+  key="ask-$role"
+else
+  key=$role
+fi
+curated=$(printf '%s\n' "$prompt" | sed -n 's/^<agent>\(.*\)<\/agent>$/\1/p' | head -n 1)
+[ -n "$curated" ] && key="curate-$curated"
+case "$prompt" in *"<effective_prompt>"*) key=propose ;; esac
+
+record=$key
+if [ -f "$here/claude-scenario" ]; then
+  scenario=$(cat "$here/claude-scenario")
+  sum=$(printf '%s\n%s' "$system" "$prompt" | sed "s#$here#<WORK>#g" | cksum | cut -d ' ' -f 1)
+  record="$key-$sum"
+fi
+
+{
+  printf 'DISABLE_PROMPT_CACHING=%s\n' "${DISABLE_PROMPT_CACHING:-}"
+  printf 'cwd=%s\n' "$PWD"
+  for arg in "$@"; do printf 'arg: %s\n' "$arg"; done
+  printf 'stdin:\n%s\n' "$prompt"
+} >"$calls/$record.txt"
+
+order=happy
+[ -f "$here/replies/$scenario/order" ] && order=$scenario
+for other in $(cat "$here/replies/$order/order"); do
+  [ "$other" = "$role" ] && break
+  case "$key" in synthesis* | ask-* | curate-* | propose) break ;; esac
+  n=0
+  while [ ! -e "$calls/$other.done" ] && [ "$n" -lt 400 ]; do
+    sleep 0.05
+    n=$((n + 1))
+  done
+  sleep 0.3
+done
+
+dir="$here/replies/$scenario"
+if [ -f "$dir/$key.stderr" ]; then
+  cat "$dir/$key.stderr" >&2
+  : >"$calls/$key.done"
+  exit 3
+fi
+[ -f "$dir/$key.jsonl" ] || dir="$here/replies/happy"
+if [ ! -f "$dir/$key.jsonl" ]; then
+  echo "no reply for $key in $scenario" >&2
+  : >"$calls/$key.done"
+  exit 4
+fi
+head=$(git -C "$PWD" rev-parse HEAD 2>/dev/null)
+if [ "$format" = stream-json ]; then
+  sed "s/{{HEAD}}/$head/g" "$dir/$key.jsonl"
+else
+  tail -n 1 "$dir/$key.jsonl" | sed "s/{{HEAD}}/$head/g"
+fi
+: >"$calls/$key.done"

@@ -1,0 +1,22 @@
+exit: 0
+--- stdout
+{
+  "product": "alpha",
+  "name": "Alpha",
+  "scope": null,
+  "roles": [
+    "pm",
+    "dev",
+    "qa"
+  ],
+  "paths": [
+    "<WORK>/repos/alpha"
+  ],
+  "owner": {
+    "name": "Ada",
+    "language": "Spanish"
+  }
+}
+
+--- stderr
+

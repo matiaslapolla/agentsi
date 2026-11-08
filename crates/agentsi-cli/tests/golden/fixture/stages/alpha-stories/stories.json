@@ -1,0 +1,1 @@
+{"test": "pnpm test {files}", "gate": ["pnpm lint", "pnpm test"], "repo": "{{WORK}}/repos/alpha", "budget_usd": 2.0}

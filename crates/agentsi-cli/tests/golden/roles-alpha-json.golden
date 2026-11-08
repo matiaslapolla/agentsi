@@ -1,0 +1,34 @@
+exit: 0
+--- stdout
+{
+  "product": "alpha",
+  "roster": [
+    {
+      "id": "pm",
+      "role": "pm",
+      "source": "global",
+      "model": "opus",
+      "effort": "high",
+      "error": null
+    },
+    {
+      "id": "dev",
+      "role": "dev",
+      "source": "global",
+      "model": "sonnet",
+      "effort": null,
+      "error": null
+    },
+    {
+      "id": "qa",
+      "role": "qa",
+      "source": "custom",
+      "model": "haiku",
+      "effort": null,
+      "error": null
+    }
+  ]
+}
+
+--- stderr
+

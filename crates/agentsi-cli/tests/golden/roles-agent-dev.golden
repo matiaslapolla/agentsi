@@ -1,0 +1,8 @@
+exit: 0
+--- stdout
+# dev (rol dev, global, sonnet)
+
+You are the developer of a made-up product.
+
+--- stderr
+

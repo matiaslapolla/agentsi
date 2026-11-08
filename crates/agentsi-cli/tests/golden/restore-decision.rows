@@ -1,0 +1,459 @@
+{
+  "archive_records": [
+    {
+      "kind": "minutes",
+      "product": "alpha",
+      "ref": "alpha-004"
+    },
+    {
+      "kind": "product",
+      "product": "gamma",
+      "ref": ""
+    }
+  ],
+  "decisions": [
+    {
+      "action": "Rename the folders",
+      "decided_at": "2026-10-02T08:00:00.000Z",
+      "id": 1,
+      "kind": "minutes",
+      "minutes_id": "alpha-001",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "approved",
+      "text": "Adopt the new naming",
+      "why": "Names drift."
+    },
+    {
+      "action": "Remove the export flag",
+      "decided_at": null,
+      "id": 2,
+      "kind": "minutes",
+      "minutes_id": "alpha-002",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Drop the legacy export",
+      "why": "Nobody uses it."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "id": 3,
+      "kind": "minutes",
+      "minutes_id": "alpha-002",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Move the demo date",
+      "why": "The build is late."
+    },
+    {
+      "action": "Write LICENSE",
+      "decided_at": null,
+      "id": 4,
+      "kind": "product",
+      "minutes_id": null,
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Pick a license",
+      "why": "The repo goes public."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "id": 5,
+      "kind": "minutes",
+      "minutes_id": "alpha-003",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Rename the module",
+      "why": "The name is wrong."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "id": 6,
+      "kind": "minutes",
+      "minutes_id": "alpha-002",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "An archived idea",
+      "why": "Old."
+    },
+    {
+      "action": "Approve the change",
+      "decided_at": null,
+      "id": 7,
+      "kind": "reflection",
+      "minutes_id": null,
+      "product": "alpha",
+      "reflection_id": "r-1",
+      "status": "pending",
+      "text": "Retire the old prompt of dev",
+      "why": "Dev was rejected 3 times."
+    },
+    {
+      "action": "Push the docs",
+      "decided_at": null,
+      "id": 8,
+      "kind": "minutes",
+      "minutes_id": "beta-001",
+      "product": "beta",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Publish the docs",
+      "why": "Docs are ready."
+    }
+  ],
+  "minutes": [
+    {
+      "data": null,
+      "id": "alpha-000"
+    },
+    {
+      "data": {
+        "check": {
+          "failures": [],
+          "passed": true,
+          "repaired": false
+        },
+        "created_at": "2026-10-01T10:00:00.000Z",
+        "decisions": [
+          {
+            "action": "Rename the folders",
+            "decided_at": "2026-10-02T08:00:00.000Z",
+            "status": "approved",
+            "text": "Adopt the new naming",
+            "why": "Names drift."
+          }
+        ],
+        "disagreements": [],
+        "id": "alpha-001",
+        "priorities": [
+          {
+            "is_new": false,
+            "mark": "accepted",
+            "objective": "o1",
+            "owner_role": "pm",
+            "sources": [
+              {
+                "ref": "docs/vision.md",
+                "type": "path"
+              }
+            ],
+            "title": "Ship the importer",
+            "why": "Users wait for it."
+          },
+          {
+            "is_new": false,
+            "mark": "rejected",
+            "objective": "o2",
+            "owner_role": "dev",
+            "sources": [],
+            "title": "Cut the build time",
+            "why": "The build takes 9 minutes."
+          },
+          {
+            "is_new": true,
+            "mark": "changed",
+            "objective": null,
+            "owner_role": "qa",
+            "sources": [],
+            "title": "Write the launch note",
+            "why": "Nobody knows the date."
+          }
+        ],
+        "product": "alpha",
+        "question": "What should Alpha do first?",
+        "roles": {
+          "dev": {
+            "answer": "Dev answer for alpha-001",
+            "concerns": [
+              "Concern one"
+            ],
+            "memory_notes": [],
+            "model": "sonnet",
+            "priorities": []
+          },
+          "pm": {
+            "answer": "PM answer for alpha-001",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "opus",
+            "priorities": []
+          }
+        },
+        "scope": null,
+        "script": [],
+        "status": "valid"
+      },
+      "id": "alpha-001"
+    },
+    {
+      "data": {
+        "check": {
+          "failures": [],
+          "first_failures": [
+            "priority 1 has no source"
+          ],
+          "passed": true,
+          "repaired": true
+        },
+        "created_at": "2026-10-08T10:00:00.000Z",
+        "decisions": [
+          {
+            "action": "Remove the export flag",
+            "priorities": [
+              0
+            ],
+            "text": "Drop the legacy export",
+            "why": "Nobody uses it."
+          },
+          {
+            "priorities": [
+              1,
+              9
+            ],
+            "text": "Move the demo date",
+            "why": "The build is late."
+          }
+        ],
+        "disagreements": [],
+        "id": "alpha-002",
+        "priorities": [
+          {
+            "is_new": false,
+            "mark": null,
+            "objective": "o1",
+            "owner_role": "dev",
+            "sources": [
+              {
+                "ref": "abc1234",
+                "type": "commit"
+              }
+            ],
+            "title": "Fix the flaky test",
+            "why": "It fails one run in five."
+          },
+          {
+            "is_new": false,
+            "mark": null,
+            "objective": "o2",
+            "owner_role": "pm",
+            "sources": [],
+            "title": "Plan the beta",
+            "why": "The date is open."
+          }
+        ],
+        "product": "alpha",
+        "question": "What blocks the beta?",
+        "roles": {
+          "dev": {
+            "answer": "Dev answer for alpha-002",
+            "concerns": [
+              "Concern one"
+            ],
+            "memory_notes": [],
+            "model": "sonnet",
+            "priorities": []
+          },
+          "pm": {
+            "answer": "PM answer for alpha-002",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "opus",
+            "priorities": []
+          }
+        },
+        "scope": null,
+        "script": [],
+        "status": "valid"
+      },
+      "id": "alpha-002"
+    },
+    {
+      "data": {
+        "check": {
+          "failures": [
+            "no priorities"
+          ],
+          "passed": false,
+          "repaired": false
+        },
+        "created_at": "2026-10-15T10:00:00.000Z",
+        "decisions": [],
+        "disagreements": [],
+        "id": "alpha-003",
+        "priorities": [],
+        "product": "alpha",
+        "question": "Should Alpha split the module?",
+        "roles": {
+          "dev": {
+            "answer": "Dev answer for alpha-003",
+            "concerns": [
+              "Concern one"
+            ],
+            "memory_notes": [],
+            "model": "sonnet",
+            "priorities": []
+          },
+          "pm": {
+            "answer": "PM answer for alpha-003",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "opus",
+            "priorities": []
+          }
+        },
+        "scope": null,
+        "script": [],
+        "status": "invalid"
+      },
+      "id": "alpha-003"
+    },
+    {
+      "data": {
+        "check": {
+          "failures": [],
+          "passed": true,
+          "repaired": false
+        },
+        "created_at": "2026-10-20T10:00:00.000Z",
+        "decisions": [],
+        "disagreements": [],
+        "id": "alpha-004",
+        "priorities": [
+          {
+            "is_new": false,
+            "mark": "accepted",
+            "objective": null,
+            "owner_role": "pm",
+            "sources": [],
+            "title": "Old priority",
+            "why": "Old."
+          }
+        ],
+        "product": "alpha",
+        "question": "An archived meeting",
+        "roles": {
+          "dev": {
+            "answer": "Dev answer for alpha-004",
+            "concerns": [
+              "Concern one"
+            ],
+            "memory_notes": [],
+            "model": "sonnet",
+            "priorities": []
+          },
+          "pm": {
+            "answer": "PM answer for alpha-004",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "opus",
+            "priorities": []
+          }
+        },
+        "scope": null,
+        "script": [],
+        "status": "valid"
+      },
+      "id": "alpha-004"
+    },
+    {
+      "data": {
+        "check": {
+          "failures": [],
+          "passed": true,
+          "repaired": false
+        },
+        "created_at": "2026-10-10T10:00:00.000Z",
+        "decisions": [],
+        "disagreements": [],
+        "id": "beta-001",
+        "priorities": [
+          {
+            "is_new": false,
+            "mark": "accepted",
+            "objective": null,
+            "owner_role": "pm",
+            "sources": [],
+            "title": "Write the docs",
+            "why": "Docs are thin."
+          }
+        ],
+        "product": "beta",
+        "question": "Is Beta ready?",
+        "roles": {
+          "dev": {
+            "answer": "Dev answer for beta-001",
+            "concerns": [
+              "Concern one"
+            ],
+            "memory_notes": [],
+            "model": "sonnet",
+            "priorities": []
+          },
+          "pm": {
+            "answer": "PM answer for beta-001",
+            "concerns": [],
+            "memory_notes": [],
+            "model": "opus",
+            "priorities": []
+          }
+        },
+        "scope": null,
+        "script": [],
+        "status": "valid"
+      },
+      "id": "beta-001"
+    }
+  ],
+  "priorities": [
+    {
+      "idx": 0,
+      "is_new": false,
+      "mark": "accepted",
+      "minutes_id": "alpha-001"
+    },
+    {
+      "idx": 1,
+      "is_new": false,
+      "mark": "rejected",
+      "minutes_id": "alpha-001"
+    },
+    {
+      "idx": 2,
+      "is_new": true,
+      "mark": "changed",
+      "minutes_id": "alpha-001"
+    },
+    {
+      "idx": 0,
+      "is_new": false,
+      "mark": null,
+      "minutes_id": "alpha-002"
+    },
+    {
+      "idx": 1,
+      "is_new": false,
+      "mark": null,
+      "minutes_id": "alpha-002"
+    },
+    {
+      "idx": 0,
+      "is_new": false,
+      "mark": "accepted",
+      "minutes_id": "alpha-004"
+    },
+    {
+      "idx": 0,
+      "is_new": false,
+      "mark": "accepted",
+      "minutes_id": "beta-001"
+    }
+  ]
+}

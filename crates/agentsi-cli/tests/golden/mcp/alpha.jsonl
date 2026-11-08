@@ -1,0 +1,35 @@
+{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "golden", "version": "1"}}}
+{"jsonrpc": "2.0", "method": "notifications/initialized"}
+{"jsonrpc": "2.0", "id": 2, "method": "tools/list"}
+{"jsonrpc": "2.0", "id": 3, "method": "ping"}
+{"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "importer"}}}
+{"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "alpha"}}}
+{"jsonrpc": "2.0", "id": 6, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "mail", "limit": 1}}}
+{"jsonrpc": "2.0", "id": 7, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "build time"}}}
+{"jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "pnpm", "kind": "memory"}}}
+{"jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "pnpm"}}}
+{"jsonrpc": "2.0", "id": 10, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "importer zzqq"}}}
+{"jsonrpc": "2.0", "id": 11, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "zzqq"}}}
+{"jsonrpc": "2.0", "id": 12, "method": "tools/call", "params": {"name": "search", "arguments": {"query": "\"launch note\" -naming"}}}
+{"jsonrpc": "2.0", "id": 13, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "doc", "ref": "docs/vision.md"}}}
+{"jsonrpc": "2.0", "id": 14, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "minutes", "ref": "alpha-001"}}}
+{"jsonrpc": "2.0", "id": 15, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "minutes", "ref": "alpha-001", "section": "Roles"}}}
+{"jsonrpc": "2.0", "id": 16, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "minutes", "ref": "alpha-001", "section": "decisions"}}}
+{"jsonrpc": "2.0", "id": 17, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "minutes", "ref": "alpha-001", "section": "nothing here"}}}
+{"jsonrpc": "2.0", "id": 18, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "minutes", "ref": "alpha-002", "offset": 40}}}
+{"jsonrpc": "2.0", "id": 19, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "memory", "ref": "pm"}}}
+{"jsonrpc": "2.0", "id": 20, "method": "tools/call", "params": {"name": "get_doc", "arguments": {"kind": "doc", "ref": "docs/missing.md"}}}
+{"jsonrpc": "2.0", "id": 21, "method": "tools/call", "params": {"name": "list_minutes", "arguments": {}}}
+{"jsonrpc": "2.0", "id": 22, "method": "tools/call", "params": {"name": "list_minutes", "arguments": {"include_archived": true}}}
+{"jsonrpc": "2.0", "id": 23, "method": "tools/call", "params": {"name": "list_minutes", "arguments": {"limit": 1}}}
+{"jsonrpc": "2.0", "id": 24, "method": "tools/call", "params": {"name": "pending_decisions", "arguments": {}}}
+{"jsonrpc": "2.0", "id": 25, "method": "tools/call", "params": {"name": "pending_decisions", "arguments": {"limit": 2}}}
+{"jsonrpc": "2.0", "id": 26, "method": "tools/call", "params": {"name": "role_memory", "arguments": {"role": "pm"}}}
+{"jsonrpc": "2.0", "id": 27, "method": "tools/call", "params": {"name": "role_memory", "arguments": {"role": "dev"}}}
+{"jsonrpc": "2.0", "id": 28, "method": "tools/call", "params": {"name": "role_memory", "arguments": {"role": "qa"}}}
+{"jsonrpc": "2.0", "id": 29, "method": "tools/call", "params": {"name": "role_memory", "arguments": {"role": "x_y"}}}
+{"jsonrpc": "2.0", "id": 30, "method": "tools/call", "params": {"name": "role_memory", "arguments": {"role": "Dev"}}}
+{"jsonrpc": "2.0", "id": 31, "method": "tools/call", "params": {"name": "role_memory", "arguments": {"role": "bad role!"}}}
+{"jsonrpc": "2.0", "id": 32, "method": "tools/call", "params": {"name": "search", "arguments": {"product": "beta", "query": "route"}}}
+{"jsonrpc": "2.0", "id": 33, "method": "tools/call", "params": {"name": "search", "arguments": {"product": "nope", "query": "route"}}}
+{"jsonrpc": "2.0", "id": 34, "method": "resources/list"}

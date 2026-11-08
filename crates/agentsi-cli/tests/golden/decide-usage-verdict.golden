@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi decide <decision-id> approve|reject
+Usage: agentsi decide <decision-id> approve|reject
+

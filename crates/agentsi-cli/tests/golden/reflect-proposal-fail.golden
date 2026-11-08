@@ -1,0 +1,28 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rbadcall
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect
+exit: 0
+--- stdout
+Reflexión r-<STAMP> en alpha
+  señales: 16 (pm 6, qa 4, dev 6)
+  dev: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  pm: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  qa: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+
+Propuestas de prompt:
+  dev (unresolved_source en 4 reuniones, 4 casos, 2 held-out): la propuesta falló — claude exited 3 without JSON: la propuesta falló
+  qa (sin_datos en 3 reuniones, 4 casos, 2 held-out): queda para la próxima reflexión (otro agente tuvo la propuesta)
+
+--- stderr
+reflect dev: proposal failed: claude exited 3 without JSON: la propuesta falló
+

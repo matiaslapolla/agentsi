@@ -1,0 +1,233 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rcurate
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect --memory-only
+exit: 0
+--- stdout
+Reflexión r-<STAMP> en alpha
+  señales: 16 (pm 6, qa 4, dev 6)
+  dev: 1 nuevos, 1 retirados, 1 útiles, 1 dañinos
+    --- a/alpha/memory/dev
+    +++ b/alpha/memory/dev
+    @@ -1,3 +1,3 @@
+    +- [m-<NEW>] Confirmar que un archivo existe antes de citarlo.
+     - [m-k001] El build usa pnpm.
+     - [m-k006] Citar solo lo que se leyó.
+    -- [m-k002] Hay una nota vieja sobre npm.
+    descartado: add "Una lección sin evidencia.": cites no signal
+    descartado: add "El build usa pnpm.": duplicates an item
+    descartado: add: empty text
+    descartado: retire m-k003: no active item
+    descartado: retire m-k001: no reason
+    descartado: helpful m-zzzz: no active item
+  pm: 1 nuevos, 0 retirados, 0 útiles, 1 dañinos
+    --- a/alpha/memory/pm
+    +++ b/alpha/memory/pm
+    @@ -1 +1,2 @@
+    +- [m-<NEW>] Marcar el objetivo de cada prioridad.
+     - [m-k004] El dueño lee las actas los lunes.
+  qa: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+
+--- stderr
+reflect dev: dropped add "Una lección sin evidencia.": cites no signal
+reflect dev: dropped add "El build usa pnpm.": duplicates an item
+reflect dev: dropped add: empty text
+reflect dev: dropped retire m-k003: no active item
+reflect dev: dropped retire m-k001: no reason
+reflect dev: dropped helpful m-zzzz: no active item
+
+## @claude-calls
+exit: 0
+--- stdout
+=== curate-dev
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You curate the memory of one AgentSI agent. Memory is a list of items with ids; you never rewrite it.
+Return deltas only: `add` new items, `retire` items by id with a reason, mark ids `helpful` or `harmful`.
+Propose only deltas backed by the listed signals. Every add cites in `evidence` at least one signal ref exactly as listed.
+Learn from failures as well as successes: an accepted mark shows what to keep doing, a failure or a rejection shows what to avoid.
+Retire items that are stale, duplicated or contradicted by the signals. Status snapshots (pending work, dates of today) do not belong in memory.
+At most 5 adds and 10 retires. Write new item texts in the language of the existing items, one short sentence each.
+Empty arrays are a valid answer.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=
+arg: --effort
+arg: low
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["add","retire","helpful","harmful"],"properties":{"add":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","kind","evidence"],"properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["fact","lesson"]},"evidence":{"type":"array","items":{"type":"string"}}}}},"retire":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","why"],"properties":{"id":{"type":"string"},"why":{"type":"string"}}}},"helpful":{"type":"array","items":{"type":"string"}},"harmful":{"type":"array","items":{"type":"string"}}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent>dev</agent>
+<items>
+[m-k001] (fact, helpful 2, harmful 0) El build usa pnpm.
+[m-k002] (fact, helpful 0, harmful 1) Hay una nota vieja sobre npm.
+[m-k006] (lesson, helpful 0, harmful 0) Citar solo lo que se leyó.
+</items>
+<signals>
+- ref rf-01 · unresolved_source · docs/missing.md
+- ref rf-02 · unresolved_source · docs/missing.md
+- ref rf-03 · unresolved_source · docs/missing.md
+- ref rf-05 · unresolved_source · docs/missing.md
+- ref rf-01 · mark_accepted · #0 Cortar el build
+- ref rf-02 · mark_rejected · #0 Citar el spec
+</signals>
+=== curate-pm
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You curate the memory of one AgentSI agent. Memory is a list of items with ids; you never rewrite it.
+Return deltas only: `add` new items, `retire` items by id with a reason, mark ids `helpful` or `harmful`.
+Propose only deltas backed by the listed signals. Every add cites in `evidence` at least one signal ref exactly as listed.
+Learn from failures as well as successes: an accepted mark shows what to keep doing, a failure or a rejection shows what to avoid.
+Retire items that are stale, duplicated or contradicted by the signals. Status snapshots (pending work, dates of today) do not belong in memory.
+At most 5 adds and 10 retires. Write new item texts in the language of the existing items, one short sentence each.
+Empty arrays are a valid answer.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=
+arg: --effort
+arg: low
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["add","retire","helpful","harmful"],"properties":{"add":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","kind","evidence"],"properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["fact","lesson"]},"evidence":{"type":"array","items":{"type":"string"}}}}},"retire":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","why"],"properties":{"id":{"type":"string"},"why":{"type":"string"}}}},"helpful":{"type":"array","items":{"type":"string"}},"harmful":{"type":"array","items":{"type":"string"}}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent>pm</agent>
+<items>
+[m-k004] (fact, helpful 1, harmful 0) El dueño lee las actas los lunes.
+</items>
+<signals>
+- ref rf-01 · first_check_failure · Priority 1 cites no north star
+- ref rf-02 · first_check_failure · Priority 2: objective "o9" must be one of the brief ids (o1, o2)
+- ref rf-02 · invented_source · docs/imaginary.md
+- ref rf-03 · error · claude timed out after 360s
+- ref rf-02 · mark_changed · #1 Ordenar el plan
+- ref rf-02 · decision_rejected · Borrar el importador
+</signals>
+=== curate-qa
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/root
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You curate the memory of one AgentSI agent. Memory is a list of items with ids; you never rewrite it.
+Return deltas only: `add` new items, `retire` items by id with a reason, mark ids `helpful` or `harmful`.
+Propose only deltas backed by the listed signals. Every add cites in `evidence` at least one signal ref exactly as listed.
+Learn from failures as well as successes: an accepted mark shows what to keep doing, a failure or a rejection shows what to avoid.
+Retire items that are stale, duplicated or contradicted by the signals. Status snapshots (pending work, dates of today) do not belong in memory.
+At most 5 adds and 10 retires. Write new item texts in the language of the existing items, one short sentence each.
+Empty arrays are a valid answer.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=
+arg: --effort
+arg: low
+arg: --json-schema
+arg: {"type":"object","additionalProperties":false,"required":["add","retire","helpful","harmful"],"properties":{"add":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["text","kind","evidence"],"properties":{"text":{"type":"string"},"kind":{"type":"string","enum":["fact","lesson"]},"evidence":{"type":"array","items":{"type":"string"}}}}},"retire":{"type":"array","items":{"type":"object","additionalProperties":false,"required":["id","why"],"properties":{"id":{"type":"string"},"why":{"type":"string"}}}},"helpful":{"type":"array","items":{"type":"string"}},"harmful":{"type":"array","items":{"type":"string"}}}}
+stdin:
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+<agent>qa</agent>
+<items>
+[m-k005] (lesson, helpful 0, harmful 0) Probar el camino vacío.
+</items>
+<signals>
+- ref rf-01 · sin_datos · 2 "sin datos"
+- ref rf-02 · sin_datos · 3 "sin datos"
+- ref rf-05 · sin_datos · 2 "sin datos"
+- ref rf-03 · mark_accepted · #0 Probar el borde
+</signals>
+
+--- stderr
+

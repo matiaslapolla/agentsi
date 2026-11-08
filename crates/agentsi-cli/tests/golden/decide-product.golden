@@ -1,0 +1,7 @@
+exit: 0
+--- stdout
+Decision 4 approved.
+Action: Write LICENSE
+
+--- stderr
+

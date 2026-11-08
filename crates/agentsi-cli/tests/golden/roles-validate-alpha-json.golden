@@ -1,0 +1,10 @@
+exit: 0
+--- stdout
+{
+  "product": "alpha",
+  "valid": true,
+  "failures": []
+}
+
+--- stderr
+

@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi archive [minutes-id|decision-id|story-id] [--product <id>]  (without an id: the whole product)
+Usage: agentsi archive [minutes-id|decision-id|story-id] [--product <id>]  (without an id: the whole product)
+

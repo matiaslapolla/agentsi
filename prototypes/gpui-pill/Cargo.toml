@@ -1,0 +1,12 @@
+[package]
+name = "gpui-pill"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Throwaway prototype for open test 1 of docs/ideas/agentsi-desktop.md: the voice pill as a GPUI layer-shell overlay."
+
+[dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.11" }
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["wayland", "x11", "font-kit"] }
+
+[workspace]

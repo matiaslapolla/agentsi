@@ -1,0 +1,19 @@
+# AgentSI pill, as a systemd user service. The pill speaks the replies of voice mode and records
+# the dictation. It needs the graphical session (Wayland display) and the audio server.
+# packaging/install.sh copies this file to ~/.config/systemd/user/ and replaces @BINDIR@.
+# It enables the service only with --enable. By hand: systemctl --user enable --now agentsi-pill
+[Unit]
+Description=AgentSI pill (speech out and dictation)
+Documentation=https://github.com/matiaslapolla/agentsi
+Wants=agentsi-core.service
+After=agentsi-core.service graphical-session.target
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=@BINDIR@/agentsi-pill
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=graphical-session.target

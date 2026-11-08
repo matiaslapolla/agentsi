@@ -1,0 +1,26 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @sql-reflect-no-proposal
+exit: 0
+--- stdout
+
+--- stderr
+
+## decide 30 approve
+exit: 1
+--- stdout
+
+--- stderr
+agentsi decide: Decision 30 rejected: Reflection "r-gone" has no proposal in alpha. It can never be applied.
+
+## decide 31 reject
+exit: 1
+--- stdout
+
+--- stderr
+agentsi decide: Decision 31 rejected: Reflection "r-seed" has no proposal in alpha. It can never be applied.
+

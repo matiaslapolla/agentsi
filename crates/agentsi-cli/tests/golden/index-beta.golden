@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+beta: 1 repos (0 unchanged), 6 docs, 3 commits, 0 issues, 1 minutes, 0 memory, <SECONDS>s
+
+--- stderr
+

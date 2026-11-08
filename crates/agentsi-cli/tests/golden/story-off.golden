@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: Stories mode is off for alpha: add a stories block to agentsi.config.json
+

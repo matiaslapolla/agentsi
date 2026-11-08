@@ -1,0 +1,11 @@
+exit: 1
+--- stdout
+Se resetea qa en alpha al rol global.
+  elimina  alpha/agents/qa.md
+  edita    alpha/brief.json
+  roster   pm, dev, qa -> pm, dev
+
+--- stderr
+
+No hay terminal para confirmar: repetí con --yes.
+

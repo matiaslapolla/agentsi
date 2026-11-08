@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+La etapa no es válida:
+  - The stories block of alpha needs a test command with {files}.
+

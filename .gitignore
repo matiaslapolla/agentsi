@@ -1,0 +1,15 @@
+dist/
+.env
+.env.*
+!.env.example
+.next/
+.next-guide/
+.next-smoke/
+node_modules/
+.worktrees/
+workspace/*/audio/
+workspace/*/.lock
+.claude/
+/voice/
+/data/
+/target/

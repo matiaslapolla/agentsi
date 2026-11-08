@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi archive: Story S001 has a story session running; wait for it to finish before archiving.
+

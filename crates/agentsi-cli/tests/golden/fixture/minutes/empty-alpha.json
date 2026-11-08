@@ -1,0 +1,45 @@
+{
+ "id": "m-ok",
+ "product": "alpha",
+ "scope": null,
+ "question": "Q",
+ "created_at": "2026-10-01T10:00:00.000Z",
+ "roles": {
+  "pm": {
+   "model": "opus",
+   "answer": "A",
+   "priorities": [],
+   "concerns": [],
+   "memory_notes": []
+  },
+  "dev": {
+   "model": "sonnet",
+   "answer": "B",
+   "priorities": [],
+   "concerns": [],
+   "memory_notes": []
+  },
+  "qa": {
+   "model": "haiku",
+   "answer": "C",
+   "priorities": [],
+   "concerns": [],
+   "memory_notes": []
+  }
+ },
+ "priorities": [],
+ "disagreements": [],
+ "decisions": [],
+ "script": [
+  {
+   "role": "pm",
+   "text": "   "
+  }
+ ],
+ "check": {
+  "passed": false,
+  "failures": [],
+  "repaired": false
+ },
+ "status": "invalid"
+}

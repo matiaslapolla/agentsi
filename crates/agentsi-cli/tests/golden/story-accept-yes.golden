@@ -1,0 +1,72 @@
+## @story-branch
+exit: 0
+--- stdout
+
+--- stderr
+
+## story accept S001
+exit: 0
+--- stdout
+Story S001 merged into the main branch as d1322e45567beac0e30f5eb76094ed0c7d250251 (merged_unchanged).
+
+--- stderr
+
+## story list
+exit: 0
+--- stdout
+S001  implemented      approved           ready   dev  Filter mail
+S002  not_implemented  pending            -       dev  Star mail
+T003  not_implemented  approved           -       dev  Drop the old cache
+S004  not_implemented  approved           -       dev  Mark mail as read
+S005  not_implemented  approved           failed  dev  Pin mail
+S006  not_implemented  approved           work    dev  Snooze mail
+S007  not_implemented  changes_requested  -       dev  Archive mail
+S008  implemented      approved           -       dev  Sort by sender
+
+--- stderr
+
+## story review S001
+exit: 0
+--- stdout
+S001 Filter mail
+Session: ready, attempt 1, branch story/S001-filter-mail
+Worktree: <WORK>/repos/beta/.worktrees/S001-filter-mail
+Tests commit: bb569c76d6956a20abcc452e9b38f5150f596237
+Final commit: e5d9a17965178ea2d505acff2ae7fb725ad3e840
+Checks: the criterion tests failed before the work, no test file changed, the tests pass and each gate command passes.
+Log: story_logs beta/S001
+
+Diff: git -C <WORK>/repos/beta diff 80db04af1de62e8788c59e8f999e41200be92331..story/S001-filter-mail
+Merge: agentsi story accept S001
+Discard: agentsi story reject S001
+
+--- stderr
+
+## story accept S001
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: Story S001 is implemented.
+
+## @tree
+exit: 0
+--- stdout
+repos/alpha/CLAUDE.md
+repos/alpha/docs/vision.md
+repos/beta/.claude/JOURNAL.md
+repos/beta/CLAUDE.md
+repos/beta/README.md
+repos/beta/docs/ideas/widget.md
+repos/beta/docs/plans/launch.md
+repos/beta/docs/specs/api.md
+repos/beta/notes.txt
+repos/beta/src/filter.sh
+repos/beta/test/list-1.test.sh
+repos/beta/test/list-2.test.sh
+root/agentsi.config.json
+root/plugin/agents/dev.md
+root/plugin/agents/pm.md
+
+--- stderr
+

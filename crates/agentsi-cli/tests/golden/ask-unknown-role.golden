@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi ask: Unknown role "nope" (no <WORK>/root/plugin/agents/nope.md)
+

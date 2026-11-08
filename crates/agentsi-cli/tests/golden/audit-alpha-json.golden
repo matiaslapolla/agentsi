@@ -1,0 +1,160 @@
+exit: 0
+--- stdout
+{
+  "product": "alpha",
+  "generated_at": "<NOW>",
+  "config": {
+    "valid": true,
+    "failures": [],
+    "overdue_objectives": [
+      {
+        "id": "o1",
+        "due": "2020-01-01",
+        "text": "Ship the importer"
+      }
+    ]
+  },
+  "meetings": {
+    "count": 4,
+    "first_pass_rate": 0.5,
+    "repair_rate": 0.5,
+    "synthesis_cost_share": 0.15384615384615388,
+    "invented_sources": 1,
+    "agents": [
+      {
+        "agent": "pm",
+        "meetings": 4,
+        "answers": 4,
+        "errors": 0,
+        "timeouts": 0,
+        "unresolved_sources_per_meeting": 0,
+        "sin_datos_per_meeting": 0,
+        "mean_cost_usd": 0.2
+      },
+      {
+        "agent": "dev",
+        "meetings": 4,
+        "answers": 4,
+        "errors": 0,
+        "timeouts": 0,
+        "unresolved_sources_per_meeting": 1,
+        "sin_datos_per_meeting": 0.5,
+        "mean_cost_usd": 0.2
+      },
+      {
+        "agent": "qa",
+        "meetings": 4,
+        "answers": 2,
+        "errors": 2,
+        "timeouts": 2,
+        "unresolved_sources_per_meeting": 0,
+        "sin_datos_per_meeting": 0,
+        "mean_cost_usd": 0.2
+      }
+    ]
+  },
+  "repairs": {
+    "baseline": {
+      "minutes": [
+        "alpha-001",
+        "alpha-002"
+      ],
+      "repaired": 1,
+      "per_meeting": 0.5
+    },
+    "since": {
+      "minutes": [
+        "alpha-003",
+        "alpha-004"
+      ],
+      "repaired": 0,
+      "per_meeting": 0
+    }
+  },
+  "last_repairs": [
+    {
+      "minutes_id": "alpha-001",
+      "rounds": 0
+    },
+    {
+      "minutes_id": "alpha-002",
+      "rounds": 1
+    },
+    {
+      "minutes_id": "alpha-003",
+      "rounds": 1
+    },
+    {
+      "minutes_id": "alpha-004",
+      "rounds": 0
+    }
+  ],
+  "marks": {
+    "pm": {
+      "accepted": 2,
+      "changed": 0,
+      "rejected": 0,
+      "unmarked": 1
+    },
+    "dev": {
+      "accepted": 0,
+      "changed": 0,
+      "rejected": 1,
+      "unmarked": 1
+    },
+    "qa": {
+      "accepted": 0,
+      "changed": 1,
+      "rejected": 0,
+      "unmarked": 0
+    }
+  },
+  "memory": [
+    {
+      "agent": "dev",
+      "active": 2,
+      "retired": 1,
+      "lessons": 1,
+      "never_helpful": 0,
+      "chars": 81,
+      "max_chars": 6000
+    },
+    {
+      "agent": "pm",
+      "active": 2,
+      "retired": 0,
+      "lessons": 1,
+      "never_helpful": 0,
+      "chars": 96,
+      "max_chars": 6000
+    },
+    {
+      "agent": "qa",
+      "active": 0,
+      "retired": 0,
+      "lessons": 0,
+      "never_helpful": 0,
+      "chars": 0,
+      "max_chars": 6000
+    }
+  ],
+  "reflections": {
+    "last": {
+      "id": "r-1",
+      "created_at": "2026-10-05T09:00:00.000Z"
+    },
+    "pending_proposals": 1,
+    "reverted": 1
+  },
+  "ready_to_reflect": [
+    {
+      "agent": "dev",
+      "reason": "failure_class",
+      "failure_class": "unresolved_source",
+      "count": 3
+    }
+  ]
+}
+
+--- stderr
+

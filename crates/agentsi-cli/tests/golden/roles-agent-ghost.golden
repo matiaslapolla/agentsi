@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi roles: Unknown role "ghost" (no <WORK>/root/plugin/agents/ghost.md)
+

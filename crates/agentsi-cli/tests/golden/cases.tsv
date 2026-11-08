@@ -1,0 +1,264 @@
+# name	cwd	arguments (shell words)
+# An arguments column of `-` means no arguments.
+# cwd is a folder of the fixture: alpha, beta, or outside (a folder of no product).
+# Cases of `index` and `desk` come after the shared cases: they write into the index of Postgres.
+# A step is separated from the next by ` ;; `. A step that starts with `@` is a harness step (see support.rs).
+# A fourth column `fresh` runs the case on a new work folder and a new database, because it writes.
+# A `rows` flag in the fifth column of a `fresh` case also compares the rows that the case leaves in `minutes`, `priorities`, `decisions` and `archive_records` with `<case>.rows`.
+help	outside	help
+help-flag	outside	--help
+help-none	outside	-
+unknown-command	outside	bogus
+whoami-alpha	alpha	whoami
+whoami-beta	beta	whoami
+whoami-cwd-flag	outside	whoami --cwd {WORK}/repos/beta/docs
+whoami-outside	outside	whoami
+whoami-list	outside	whoami --list
+whoami-home	outside	whoami --home
+status-alpha	alpha	status
+status-beta-flag	outside	status --product beta
+status-unknown-product	outside	status --product nope
+status-outside	outside	status
+snapshot-alpha	alpha	snapshot
+snapshot-beta	beta	snapshot
+snapshot-flag	outside	snapshot --product beta
+snapshot-outside	outside	snapshot
+audit-alpha	alpha	audit
+audit-alpha-json	alpha	audit --json
+audit-beta	beta	audit
+audit-beta-json	outside	audit --json --product beta
+audit-outside	outside	audit
+roles-alpha	alpha	roles
+roles-alpha-json	alpha	roles --json
+roles-beta	beta	roles
+roles-beta-json	outside	roles --json --product beta
+roles-agent-dev	alpha	roles dev
+roles-agent-pm-json	alpha	roles pm --json
+roles-agent-qa	alpha	roles qa
+roles-agent-ghost	alpha	roles ghost
+roles-agent-specialist	alpha	roles dev.api
+roles-agent-invalid	alpha	roles Bad
+roles-too-many	alpha	roles pm dev
+roles-outside	outside	roles
+roles-unknown-product	outside	roles --product nope
+roles-validate-alpha	alpha	roles validate
+roles-validate-alpha-json	alpha	roles validate --json
+roles-validate-beta	beta	roles validate
+roles-validate-beta-json	outside	roles validate --json --product beta
+roles-apply-dry	alpha	roles apply {WORK}/stages/alpha-ok
+roles-apply-same	alpha	roles apply {WORK}/stages/alpha-same
+roles-apply-bad	alpha	roles apply {WORK}/stages/alpha-bad
+roles-apply-stories-dry	alpha	roles apply {WORK}/stages/alpha-stories
+roles-apply-stories-unknown-key	alpha	roles apply {WORK}/stages/alpha-stories-bad
+roles-apply-stories-bad-repo	alpha	roles apply {WORK}/stages/alpha-stories-bad2
+roles-apply-stories-bad-budget	alpha	roles apply {WORK}/stages/alpha-stories-bad3
+roles-apply-missing	alpha	roles apply {WORK}/stages/nope
+roles-apply-usage	alpha	roles apply
+roles-apply-register-flags	outside	roles apply {WORK}/stages/delta --register
+roles-apply-register-dry	outside	roles apply {WORK}/stages/delta --register --product delta --name Delta --path {WORK}/repos/alpha
+roles-apply-register-bad-id	outside	roles apply {WORK}/stages/delta --register --product Delta --name Delta --path {WORK}/repos/alpha
+roles-apply-register-bad-path	outside	roles apply {WORK}/stages/delta --register --product delta --name Delta --path relative
+roles-apply-register-existing	outside	roles apply {WORK}/stages/alpha-same --register --product alpha --name Alpha --path {WORK}/repos/alpha
+reset-qa-no-yes	alpha	reset qa
+reset-all-no-yes	alpha	reset --all
+reset-memory-no-yes	alpha	reset pm --memory
+reset-dev-noop	alpha	reset dev
+reset-ghost	alpha	reset ghost
+reset-usage	alpha	reset
+reset-usage-both	alpha	reset qa --all
+reset-extra	alpha	reset qa dev
+reset-outside	outside	reset qa
+mark-pending-alpha	alpha	mark --pending
+mark-pending-json-alpha	alpha	mark --pending --json
+mark-pending-beta	beta	mark --pending
+mark-pending-none	outside	mark --pending --product gamma
+mark-pending-outside	outside	mark --pending
+mark-no-terminal	alpha	mark
+mark-json-alone	alpha	mark --json
+mark-set-bad-spec	alpha	mark --set alpha-002:0:maybe
+mark-bad-index	alpha	mark alpha-002 x accepted
+decide-usage	alpha	decide x approve
+decide-usage-verdict	alpha	decide 2 maybe
+decision-usage	alpha	decision add --text only
+decision-usage-sub	alpha	decision remove
+archive-usage	alpha	archive a b
+archive-outside	outside	archive
+index-beta	beta	index
+index-beta-again	beta	index
+index-beta-force	beta	index --force
+index-alpha-flag	outside	index --product alpha
+index-all	outside	index --all
+index-unknown-product	outside	index --product nope
+index-outside	outside	index
+desk-alpha	alpha	desk
+desk-alpha-flag	outside	desk --product alpha
+desk-outside	outside	desk
+desk-beta	beta	desk
+roles-apply-yes	alpha	roles apply {WORK}/stages/alpha-ok --yes ;; roles ;; roles dev.api ;; roles validate --json ;; @registry ;; @commits ;; @tree	fresh
+roles-apply-again	alpha	roles apply {WORK}/stages/alpha-ok --yes ;; roles apply {WORK}/stages/alpha-ok ;; @commits	fresh
+roles-apply-register-yes	outside	roles apply {WORK}/stages/delta --register --product delta --name Delta --path {WORK}/repos/alpha --yes ;; whoami --list ;; roles --product delta ;; @registry ;; @commits ;; @tree	fresh
+roles-apply-stories-yes	alpha	roles apply {WORK}/stages/alpha-stories --yes ;; @registry ;; @commits ;; @tree	fresh
+reset-qa-yes	alpha	reset qa --yes ;; roles ;; audit --json ;; @registry ;; @commits ;; @tree	fresh
+reset-all-yes	alpha	reset --all --yes ;; roles ;; roles validate ;; @registry ;; @commits ;; @tree	fresh
+reset-all-memory-yes	alpha	reset --all --memory --yes ;; audit --json ;; @registry	fresh
+reset-memory-yes	alpha	reset pm --memory --yes ;; audit --json ;; @commits	fresh
+reset-dev-overlay	alpha	roles apply {WORK}/stages/alpha-dev-overlay --yes ;; roles dev --json ;; reset dev --yes ;; roles dev --json ;; @registry ;; @commits	fresh
+reset-specialist	alpha	roles apply {WORK}/stages/alpha-ok --yes ;; reset dev.api --yes ;; roles ;; @registry ;; @commits	fresh
+mark-single	alpha	mark alpha-002 0 accepted	fresh	rows
+mark-single-new	alpha	mark alpha-002 1 changed --new	fresh	rows
+mark-overwrite	alpha	mark alpha-001 0 rejected	fresh	rows
+mark-set-two	alpha	mark --set alpha-002:0:accepted --set alpha-002:1:rejected:new	fresh	rows
+mark-set-one	alpha	mark --set alpha-002:1:changed	fresh	rows
+mark-set-same-again	alpha	mark --set alpha-001:0:accepted	fresh	rows
+mark-set-conflict	alpha	mark --set alpha-001:0:rejected	fresh	rows
+mark-set-half-bad	alpha	mark --set alpha-002:0:accepted --set alpha-002:9:accepted	fresh	rows
+mark-set-repeat	alpha	mark --set alpha-002:0:accepted --set alpha-002:0:rejected	fresh	rows
+mark-unknown-minutes	alpha	mark nope 0 accepted	fresh	rows
+mark-no-such-priority	alpha	mark alpha-002 5 accepted	fresh	rows
+decide-approve	alpha	decide 2 approve	fresh	rows
+decide-reject	alpha	decide 3 reject	fresh	rows
+decide-product	alpha	decide 4 approve	fresh	rows
+decide-minutes-without-json-decision	alpha	decide 5 reject	fresh	rows
+decide-again	alpha	decide 1 reject	fresh	rows
+decide-archived	alpha	decide 6 approve	fresh	rows
+decide-unknown	alpha	decide 99 approve	fresh	rows
+decision-add	alpha	decision add --text "Rename the CLI" --why "The name is taken" --action "Run the rename script"	fresh	rows
+decision-add-flag	outside	decision add --text "  Pick a date  " --why "The launch is near" --product beta	fresh	rows
+decision-add-unknown-product	outside	decision add --text t --why w --product nope	fresh	rows
+archive-minutes	alpha	archive alpha-002	fresh	rows
+archive-minutes-again	alpha	archive alpha-004	fresh	rows
+archive-minutes-unknown	alpha	archive nope	fresh	rows
+archive-minutes-no-body	alpha	archive alpha-000	fresh	rows
+archive-minutes-bad-id	alpha	archive a..b	fresh	rows
+restore-minutes	alpha	restore alpha-004	fresh	rows
+restore-minutes-not-archived	alpha	restore alpha-001	fresh	rows
+archive-decision	alpha	archive 2	fresh	rows
+archive-decision-zero	alpha	archive 0	fresh	rows
+restore-decision	alpha	restore 6	fresh	rows
+restore-decision-not-archived	alpha	restore 2	fresh	rows
+archive-story	alpha	archive S004	fresh	rows
+archive-story-running	alpha	archive S001	fresh	rows
+archive-story-unknown	alpha	archive S099	fresh	rows
+restore-story-not-archived	alpha	restore S004	fresh	rows
+archive-product	alpha	archive	fresh	rows
+restore-product	outside	restore --product gamma	fresh	rows
+restore-product-not-archived	alpha	restore	fresh	rows
+story-missing	beta	story
+story-unknown	beta	story bogus
+story-off	alpha	story list
+story-outside	outside	story list
+story-list	beta	story list
+story-list-json	beta	story list --json
+story-list-archived	outside	archive T003 --product beta ;; story list --show-archived --product beta	fresh
+story-list-extra	beta	story list S001
+story-show	beta	story show S007
+story-show-session	beta	story show S005
+story-show-results	beta	story show S008 --product beta
+story-show-json	beta	story show S001 --json
+story-show-unknown	beta	story show S099
+story-show-bad-id	beta	story show nope
+story-show-usage	beta	story show
+story-approve-usage	beta	story approve
+story-approve-approved	beta	story approve S004
+story-discard-session	beta	story discard S006
+story-changes-usage	beta	story changes S002
+story-changes-session	beta	story changes S006 Smaller
+story-new-usage	beta	story new
+story-new-type	beta	story new Search --type epic
+story-new-minutes	beta	story new Search --minutes beta-404
+story-suggest-usage	beta	story suggest now
+story-run-pending	beta	story run S002
+story-run-archived	beta	archive T003 ;; story run T003	fresh
+story-run-session	beta	story run S006
+story-run-usage	beta	story run
+story-run-not-ignored	beta	story run S004
+story-review	beta	@story-branch ;; story review S001	fresh
+story-review-failed	beta	story review S005
+story-review-running	beta	story review S006
+story-review-none	beta	story review S002
+story-accept-not-ready	beta	story accept S006
+story-reject-none	beta	story reject S002
+story-result-usage	beta	story result S004 merged --commit abcd
+story-result-no-commit	beta	story result S004 merged_changed
+story-result-bad-hash	beta	story result S004 merged_changed --commit xyz
+story-result-unknown-commit	beta	story result S004 merged_changed --commit abcd1234
+story-result-active	beta	story result S006 merged_changed --commit {BETA_MAIN}
+story-exec-not-queued	beta	story _exec S002
+story-approve-yes	beta	story approve S002 ;; story list ;; story show S002	fresh
+story-discard-yes	beta	story discard S002 ;; story list ;; story show S002	fresh
+story-accept-yes	beta	@story-branch ;; story accept S001 ;; story list ;; story review S001 ;; story accept S001 ;; @tree	fresh
+story-reject-yes	beta	story reject S005 ;; story reject S006 ;; story list ;; story review S006 ;; story run S005	fresh
+story-result-yes	beta	story result S004 merged_changed --commit {BETA_MAIN} ;; story list ;; story result S004 merged_unchanged --commit {BETA_MAIN}	fresh
+check-ok-alpha	outside	check {WORK}/minutes/ok-alpha.json
+check-ok-roles	outside	check {WORK}/minutes/ok-alpha.json --roles pm,dev
+check-no-roles	outside	check {WORK}/minutes/failures-alpha.json --roles=,
+check-failures	outside	check {WORK}/minutes/failures-alpha.json
+check-empty	outside	check {WORK}/minutes/empty-alpha.json
+check-beta	outside	check {WORK}/minutes/beta-north.json --roles pm,dev
+check-stored-alpha-001	outside	check {WORK}/minutes/stored-alpha-001.json
+check-stored-alpha-002	outside	check {WORK}/minutes/stored-alpha-002.json
+check-stored-beta-001	outside	check {WORK}/minutes/stored-beta-001.json
+check-unknown-product	outside	check {WORK}/minutes/unknown-product.json
+check-no-file	outside	check {WORK}/minutes/none.json
+check-no-args	outside	check
+meet-no-question	alpha	meet
+meet-outside	outside	meet --question=x
+meet-unknown-product	outside	meet --product nope --question=x
+meet-archived	outside	meet --product gamma --question=x
+meet-unknown-role	alpha	meet --question=x --roles nope
+meet-specialist	alpha	meet --question=x --roles dev.api
+meet-beta-roster	beta	meet --question=x
+ask-no-role	alpha	ask --question=x
+ask-no-question	alpha	ask --role dev
+ask-outside	outside	ask --role dev --question=x
+ask-unknown-role	alpha	ask --role nope --question=x
+ask-specialist	alpha	ask --role dev.api --question=x
+ask-dev	alpha	ask --role dev --question=ask-what-is-slow ;; @claude-calls	fresh
+ask-overlay	alpha	ask --role qa --question=ask-is-it-safe ;; @claude-calls	fresh
+ask-beta	beta	ask --product beta --role dev --question=ask-is-it-ready ;; @claude-calls	fresh
+ask-fail	alpha	ask --role dev --question=askfail-why	fresh
+ask-empty	alpha	ask --role dev --question=askempty-why	fresh
+meet-happy	alpha	meet --question=happy-¿qué-sigue-después? ;; @meeting-rows ;; @claude-calls	fresh
+meet-repair	alpha	meet --question=repair-what-now ;; @meeting-rows ;; @claude-calls	fresh
+meet-bad-repair	alpha	meet --question=badrepair-what-now ;; @meeting-rows	fresh
+meet-fail-role	alpha	meet --question=failrole-what-now ;; @meeting-rows	fresh
+meet-no-synthesis	alpha	meet --question=nosynth-what-now ;; @meeting-rows	fresh
+meet-no-output	alpha	meet --question=noanswer-what-now ;; @meeting-rows	fresh
+meet-roles	alpha	meet --question=two-attend --roles=dev,qa ;; @meeting-rows ;; @claude-calls	fresh
+meet-beta	beta	meet --product beta --question=gitrepo-is-it-ready --roles pm,dev ;; @meeting-rows ;; @claude-calls	fresh
+meet-no-brief	alpha	reset --all --yes ;; meet --question=nobrief-what-now --roles pm,dev ;; @meeting-rows ;; @claude-calls	fresh
+reflect-extra	alpha	reflect extra
+reflect-revert-no-id	alpha	reflect revert
+reflect-revert-two	alpha	reflect revert a b
+reflect-outside	outside	reflect
+reflect-revert-outside	outside	reflect revert r-x
+reflect-unknown-product	outside	reflect --product nope
+reflect-revert-unknown	alpha	reflect revert r-nope
+reflect-revert-of-a-revert	alpha	reflect revert r-2
+reflect-curate	alpha	@sql-reflect ;; @scenario-rcurate ;; reflect --memory-only ;; @claude-calls	fresh	reflect-rows
+reflect-curate-json	alpha	@sql-reflect ;; @scenario-rcurate ;; reflect --memory-only --json	fresh	reflect-rows
+reflect-again	alpha	@sql-reflect ;; @scenario-rcurate ;; reflect --memory-only ;; reflect --memory-only	fresh	reflect-rows
+reflect-revert	alpha	@sql-reflect ;; @scenario-rcurate ;; @reflect-rows ;; reflect --memory-only ;; reflect revert {LAST_REFLECTION} ;; @reflect-rows ;; reflect revert {LAST_REFLECTION}	fresh	reflect-rows
+reflect-revert-json	alpha	@sql-reflect ;; @scenario-rcurate ;; reflect --memory-only ;; reflect revert {LAST_REFLECTION} --json	fresh	reflect-rows
+reflect-revert-seed	alpha	@sql-reflect ;; reflect revert r-seed ;; reflect revert r-seed	fresh	reflect-rows
+reflect-pass	alpha	@sql-reflect ;; @scenario-rpass ;; reflect ;; @claude-calls	fresh	reflect-rows
+reflect-pass-json	alpha	@sql-reflect ;; @scenario-rpass ;; reflect --json	fresh	reflect-rows
+reflect-approve	alpha	@sql-reflect ;; @scenario-rpass ;; reflect ;; decide 9 approve ;; decide 9 approve ;; decide 9 reject	fresh	reflect-rows
+reflect-reject	alpha	@sql-reflect ;; @scenario-rpass ;; reflect ;; decide 9 reject ;; decide 9 approve	fresh	reflect-rows
+reflect-stale	alpha	@sql-reflect ;; @scenario-rpass ;; reflect ;; @sql-reflect-stale ;; decide 9 approve ;; decide 9 approve	fresh	reflect-rows
+reflect-worse	alpha	@sql-reflect ;; @scenario-rworse ;; reflect	fresh	reflect-rows
+reflect-invalid	alpha	@sql-reflect ;; @scenario-rinvalid ;; reflect	fresh	reflect-rows
+reflect-empty-body	alpha	@sql-reflect ;; @scenario-rempty ;; reflect --json	fresh	reflect-rows
+reflect-few	alpha	@sql-reflect ;; @sql-reflect-few ;; @scenario-rpass ;; reflect	fresh	reflect-rows
+reflect-fail	alpha	@sql-reflect ;; @scenario-rfail ;; reflect	fresh	reflect-rows
+reflect-proposal-fail	alpha	@sql-reflect ;; @scenario-rbadcall ;; reflect	fresh	reflect-rows
+reflect-global	alpha	@sql-reflect ;; @sql-reflect-shared ;; @scenario-rglobal ;; reflect ;; decide 9 approve ;; @commits ;; @tree	fresh	reflect-rows
+decide-reflection-reject	alpha	decide 7 reject	fresh	reflect-rows
+reflect-bad-role	alpha	@sql-reflect ;; @sql-reflect-badrole ;; @scenario-rcurate ;; reflect --memory-only	fresh	reflect-rows
+reflect-no-proposal	alpha	@sql-reflect ;; @sql-reflect-no-proposal ;; decide 30 approve ;; decide 31 reject	fresh	reflect-rows
+reflect-commit-fail	alpha	@sql-reflect ;; @sql-reflect-shared ;; @scenario-rglobal ;; reflect ;; @git-hook-fail ;; decide 9 approve ;; @commits	fresh	reflect-rows
+render-missing	alpha	render
+render-bad-id	alpha	render "a b"
+render-unknown	alpha	render nope-001
+render-empty-script	alpha	render alpha-001
+render-no-body	alpha	render alpha-000

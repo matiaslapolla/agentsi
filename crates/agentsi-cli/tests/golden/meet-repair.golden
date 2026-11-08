@@ -1,0 +1,1231 @@
+## meet --question=repair-what-now
+exit: 0
+--- stdout
+Minutes: <STAMP>-repair-what-now
+Status: valid (repaired)
+Top priorities:
+  1. Ordenar el importador (pm)
+  2. Cortar el build (dev)
+Cost: $0.4050 in <SECONDS>s
+Web: http://127.0.0.1:3361/p/alpha/m/<STAMP>-repair-what-now
+Call: http://127.0.0.1:3361/p/alpha/m/<STAMP>-repair-what-now/call
+
+--- stderr
+[index] index started
+[index] done
+[role] pm started
+[role] dev started
+[role] qa started
+[role] pm finished in <SECONDS>s, $0.0125, input 560 tokens
+[role] dev finished in <SECONDS>s, $0.2500, input 288 tokens
+[role] qa finished in <SECONDS>s, $0.0300, input 376 tokens
+[synthesis] synthesis started
+[synthesis] synthesis finished in <SECONDS>s, $0.0500, input 136 tokens
+[check] 7 failures: Priority #0 "Sin fuente" has no source. | Priority #1 "Fuente rota" objective "o9" must be one of the brief ids: o1, o2. | Priority #1: path source "docs/nope.md" does not resolve. | Priority #2 "Sin objetivo" objective is missing and must be one of the brief ids: o1, o2. | Decision #0 "Link roto" links priority index 5, which does not exist (0 to 2). | No priority cites a north star declared in the brief (docs/vision.md). | Call script names story S001 by its id: say its title "Sort mail".
+[synthesis] synthesis-repair started (repair)
+[synthesis] synthesis-repair finished in <SECONDS>s, $0.0625, input 448 tokens
+[check] passed
+
+## @meeting-rows
+exit: 0
+--- stdout
+{
+  "counts": {
+    "decisions": 10,
+    "documents": 15,
+    "meeting_log": 6,
+    "memory": 7,
+    "minutes": 7,
+    "priorities": 9,
+    "snapshots": 2,
+    "usage": 5
+  },
+  "decisions": [
+    {
+      "action": "Mover el importador arriba.",
+      "decided_at": null,
+      "kind": "minutes",
+      "minutes_id": "<STAMP>-repair-what-now",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Aprobar el orden",
+      "why": "Hace falta foco."
+    },
+    {
+      "action": null,
+      "decided_at": null,
+      "kind": "minutes",
+      "minutes_id": "<STAMP>-repair-what-now",
+      "product": "alpha",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Revisar la fecha",
+      "why": "Sigue abierta."
+    }
+  ],
+  "documents": [
+    {
+      "body": "- [m-0005] Never cite a path that does not exist.\n- [m-0003] The build uses pnpm.",
+      "kind": "memory",
+      "ref": "dev",
+      "title": "Memory: dev"
+    },
+    {
+      "body": "- [<MEMORY-ID>] La demo es en mayo.\n- [m-0002] Keep each priority to one sentence.\n- [m-0001] The owner reads the minutes on Monday.",
+      "kind": "memory",
+      "ref": "pm",
+      "title": "Memory: pm"
+    },
+    {
+      "body": "- [<MEMORY-ID>] El importador no tiene tests.",
+      "kind": "memory",
+      "ref": "qa",
+      "title": "Memory: qa"
+    },
+    {
+      "body": "# Minutes <STAMP>-repair-what-now\n\n- Product: alpha\n- Date: <NOW>\n- Question: repair-what-now\n- Status: valid (repaired)\n\n## Priorities\n\n- #0 [ ] **Ordenar el importador** (pm) [o1]\n   - Why: El objetivo o1 lo pide.\n   - Source: path `docs/vision.md`\n   - Source: url `https://example.com/made-up`\n- #1 [ ] **Cortar el build** (dev) [o2]\n   - Why: Tarda 9 minutos.\n   - Source: path `docs/vision.md:1`\n   - Source: story `S001`\n\n## Disagreements\n\n- **Orden**\n  - pm: Planificar.\n  - dev: Cortar el build.\n\n## Decisions to confirm\n\n- [pending] Aprobar el orden — Hace falta foco. → Mover el importador arriba. (priorities: 0)\n- [pending] Revisar la fecha — Sigue abierta.\n\n## Roles\n\n### pm (claude-opus-fake)\n\nPlanificar primero: la agencia necesita un orden claro.\n\n- Concern: La fecha sigue abierta.\n\n### qa (claude-haiku-fake)\n\nSin riesgos nuevos 😀: el importador pasa.\n\n### dev (claude-sonnet-fake)\n\n[no data] sobre el build. Sin datos de CI.\n\n- Concern: sin datos de costos\n- Concern: Riesgo: el importador falla.\n\n## Repaired failures\n\n- Priority #0 \"Sin fuente\" has no source.\n- Priority #1 \"Fuente rota\" objective \"o9\" must be one of the brief ids: o1, o2.\n- Priority #1: path source \"docs/nope.md\" does not resolve.\n- Priority #2 \"Sin objetivo\" objective is missing and must be one of the brief ids: o1, o2.\n- Decision #0 \"Link roto\" links priority index 5, which does not exist (0 to 2).\n- No priority cites a north star declared in the brief (docs/vision.md).\n- Call script names story S001 by its id: say its title \"Sort mail\".\n",
+      "kind": "minutes",
+      "ref": "<STAMP>-repair-what-now",
+      "title": "repair-what-now"
+    }
+  ],
+  "meeting_log": [
+    {
+      "entry": {
+        "agents": {
+          "dev": {
+            "cost_usd": 0.25,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "53874c97773edcf755812cb7fcb8fe921ff4d5e563ca504666a4d30e5a66a28d",
+            "model": "claude-sonnet-fake",
+            "priorities": 2,
+            "prompt_hash": "4e67fd43d699aabb17d81327f8d3fc9eab80ed75a97b66a1e7799ede76f87cc3",
+            "sin_datos": 3,
+            "sources": 8,
+            "unresolved_sources": [
+              {
+                "ref": "deadbee",
+                "type": "commit"
+              },
+              {
+                "ref": "docs/missing.md",
+                "type": "path"
+              },
+              {
+                "ref": "8",
+                "type": "issue"
+              },
+              {
+                "ref": "not a url",
+                "type": "url"
+              },
+              {
+                "ref": "S999",
+                "type": "story"
+              }
+            ]
+          },
+          "pm": {
+            "cost_usd": 0.0125,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "9c61787d12b9f6da88fb0ed1cf80fbc2f3781ea3e559c096e9467d8dc7cc5780",
+            "model": "claude-opus-fake",
+            "priorities": 1,
+            "prompt_hash": "fd7fe4fb38579c092fe7cdcea6258c2d09096de871b36cac0492736da7a05d9a",
+            "sin_datos": 0,
+            "sources": 1,
+            "unresolved_sources": []
+          },
+          "qa": {
+            "cost_usd": 0.03,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "model": "claude-haiku-fake",
+            "priorities": 1,
+            "prompt_hash": "f4da8c82f4973d79f77041f0fc435431ec3fd7b206c9537dcb8ae2ef0964c672",
+            "sin_datos": 0,
+            "sources": 1,
+            "unresolved_sources": []
+          }
+        },
+        "brief_hash": "e0e235d05620db5cdbcdc72529462d5b40ec3e968b7000a6f9f320a3b4f4a985",
+        "created_at": "<NOW>",
+        "minutes_id": "<STAMP>-repair-what-now",
+        "question": "repair-what-now",
+        "scope": null,
+        "synthesis": {
+          "cost_usd": 0.1125,
+          "final_check": {
+            "failures": [],
+            "passed": true
+          },
+          "first_check": {
+            "failures": [
+              "Priority #0 \"Sin fuente\" has no source.",
+              "Priority #1 \"Fuente rota\" objective \"o9\" must be one of the brief ids: o1, o2.",
+              "Priority #1: path source \"docs/nope.md\" does not resolve.",
+              "Priority #2 \"Sin objetivo\" objective is missing and must be one of the brief ids: o1, o2.",
+              "Decision #0 \"Link roto\" links priority index 5, which does not exist (0 to 2).",
+              "No priority cites a north star declared in the brief (docs/vision.md).",
+              "Call script names story S001 by its id: say its title \"Sort mail\"."
+            ],
+            "passed": false
+          },
+          "invented_sources": [
+            {
+              "ref": "https://example.com/made-up",
+              "type": "url"
+            },
+            {
+              "ref": "docs/vision.md:1",
+              "type": "path"
+            }
+          ],
+          "repaired": true
+        },
+        "total_cost_usd": 0.405
+      },
+      "minutes_id": "<STAMP>-repair-what-now",
+      "product": "alpha"
+    }
+  ],
+  "memory": [
+    {
+      "agent": "pm",
+      "created_at": "<NOW>",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "<MEMORY-ID>",
+      "kind": "fact",
+      "position": 2,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "<STAMP>-repair-what-now",
+      "text": "La demo es en mayo."
+    },
+    {
+      "agent": "qa",
+      "created_at": "<NOW>",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "<MEMORY-ID>",
+      "kind": "fact",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "<STAMP>-repair-what-now",
+      "text": "El importador no tiene tests."
+    }
+  ],
+  "minutes": [
+    {
+      "created_at": "<NOW>",
+      "data": {
+        "check": {
+          "failures": [],
+          "first_failures": [
+            "Priority #0 \"Sin fuente\" has no source.",
+            "Priority #1 \"Fuente rota\" objective \"o9\" must be one of the brief ids: o1, o2.",
+            "Priority #1: path source \"docs/nope.md\" does not resolve.",
+            "Priority #2 \"Sin objetivo\" objective is missing and must be one of the brief ids: o1, o2.",
+            "Decision #0 \"Link roto\" links priority index 5, which does not exist (0 to 2).",
+            "No priority cites a north star declared in the brief (docs/vision.md).",
+            "Call script names story S001 by its id: say its title \"Sort mail\"."
+          ],
+          "passed": true,
+          "repaired": true
+        },
+        "created_at": "<NOW>",
+        "decisions": [
+          {
+            "action": "Mover el importador arriba.",
+            "priorities": [
+              0
+            ],
+            "text": "Aprobar el orden",
+            "why": "Hace falta foco."
+          },
+          {
+            "priorities": [],
+            "text": "Revisar la fecha",
+            "why": "Sigue abierta."
+          }
+        ],
+        "disagreements": [
+          {
+            "positions": [
+              {
+                "role": "pm",
+                "view": "Planificar."
+              },
+              {
+                "role": "dev",
+                "view": "Cortar el build."
+              }
+            ],
+            "topic": "Orden"
+          }
+        ],
+        "id": "<STAMP>-repair-what-now",
+        "priorities": [
+          {
+            "is_new": false,
+            "mark": null,
+            "objective": "o1",
+            "owner_role": "pm",
+            "sources": [
+              {
+                "ref": "docs/vision.md",
+                "type": "path"
+              },
+              {
+                "ref": "https://example.com/made-up",
+                "type": "url"
+              }
+            ],
+            "title": "Ordenar el importador",
+            "why": "El objetivo o1 lo pide."
+          },
+          {
+            "is_new": false,
+            "mark": null,
+            "objective": "o2",
+            "owner_role": "dev",
+            "sources": [
+              {
+                "ref": "docs/vision.md:1",
+                "type": "path"
+              },
+              {
+                "ref": "S001",
+                "type": "story"
+              }
+            ],
+            "title": "Cortar el build",
+            "why": "Tarda 9 minutos."
+          }
+        ],
+        "product": "alpha",
+        "question": "repair-what-now",
+        "roles": {
+          "dev": {
+            "answer": "[no data] sobre el build. Sin datos de CI.",
+            "concerns": [
+              "sin datos de costos",
+              "Riesgo: el importador falla."
+            ],
+            "memory_notes": [],
+            "model": "claude-sonnet-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "deadbee",
+                    "type": "commit"
+                  },
+                  {
+                    "ref": "docs/missing.md",
+                    "type": "path"
+                  }
+                ],
+                "title": "Cortar el build",
+                "why": "Tarda 9 minutos."
+              },
+              {
+                "sources": [
+                  {
+                    "ref": "7",
+                    "type": "issue"
+                  },
+                  {
+                    "ref": "8",
+                    "type": "issue"
+                  },
+                  {
+                    "ref": "https://example.com/build",
+                    "type": "url"
+                  },
+                  {
+                    "ref": "not a url",
+                    "type": "url"
+                  },
+                  {
+                    "ref": "S001",
+                    "type": "story"
+                  },
+                  {
+                    "ref": "S999",
+                    "type": "story"
+                  }
+                ],
+                "title": "Cerrar el issue",
+                "why": "Bloquea el importador."
+              }
+            ]
+          },
+          "pm": {
+            "answer": "Planificar primero: la agencia necesita un orden claro.",
+            "concerns": [
+              "La fecha sigue abierta."
+            ],
+            "memory_notes": [
+              "The owner reads the minutes on Monday.",
+              "  La demo   es en mayo. "
+            ],
+            "model": "claude-opus-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "docs/vision.md",
+                    "type": "path"
+                  }
+                ],
+                "title": "Ordenar el importador",
+                "why": "El objetivo o1 lo pide."
+              }
+            ]
+          },
+          "qa": {
+            "answer": "Sin riesgos nuevos 😀: el importador pasa.",
+            "concerns": [],
+            "memory_notes": [
+              "El importador no tiene tests."
+            ],
+            "model": "claude-haiku-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "CLAUDE.md",
+                    "type": "path"
+                  }
+                ],
+                "title": "Probar el importador",
+                "why": "Nadie lo probó."
+              }
+            ]
+          }
+        },
+        "scope": null,
+        "script": [
+          {
+            "role": "pm",
+            "text": "La pregunta es qué sigue."
+          },
+          {
+            "role": "dev",
+            "text": "Yo corto el build primero."
+          },
+          {
+            "role": "pm",
+            "text": "Ada decide el orden."
+          }
+        ],
+        "status": "valid"
+      },
+      "id": "<STAMP>-repair-what-now",
+      "product": "alpha",
+      "question": "repair-what-now",
+      "scope": null,
+      "status": "valid",
+      "usage": [
+        {
+          "cache_read": 210,
+          "cache_write": 280,
+          "cost_usd": 0.0125,
+          "duration_ms": 1700,
+          "input_tokens": 70,
+          "model": "claude-opus-fake",
+          "output_tokens": 140,
+          "role": "pm"
+        },
+        {
+          "cache_read": 108,
+          "cache_write": 144,
+          "cost_usd": 0.25,
+          "duration_ms": 1360,
+          "input_tokens": 36,
+          "model": "claude-sonnet-fake",
+          "output_tokens": 72,
+          "role": "dev"
+        },
+        {
+          "cache_read": 141,
+          "cache_write": 188,
+          "cost_usd": 0.03,
+          "duration_ms": 1470,
+          "input_tokens": 47,
+          "model": "claude-haiku-fake",
+          "output_tokens": 94,
+          "role": "qa"
+        },
+        {
+          "cache_read": 51,
+          "cache_write": 68,
+          "cost_usd": 0.05,
+          "duration_ms": 1170,
+          "input_tokens": 17,
+          "model": "claude-opus-fake",
+          "output_tokens": 34,
+          "role": "synthesis"
+        },
+        {
+          "cache_read": 168,
+          "cache_write": 224,
+          "cost_usd": 0.0625,
+          "duration_ms": 1560,
+          "input_tokens": 56,
+          "model": "claude-opus-fake",
+          "output_tokens": 112,
+          "role": "synthesis-repair"
+        }
+      ]
+    }
+  ],
+  "priorities": [
+    {
+      "idx": 0,
+      "is_new": false,
+      "mark": null,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "objective": "o1",
+      "owner_role": "pm",
+      "sources": [
+        {
+          "ref": "docs/vision.md",
+          "type": "path"
+        },
+        {
+          "ref": "https://example.com/made-up",
+          "type": "url"
+        }
+      ],
+      "title": "Ordenar el importador",
+      "why": "El objetivo o1 lo pide."
+    },
+    {
+      "idx": 1,
+      "is_new": false,
+      "mark": null,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "objective": "o2",
+      "owner_role": "dev",
+      "sources": [
+        {
+          "ref": "docs/vision.md:1",
+          "type": "path"
+        },
+        {
+          "ref": "S001",
+          "type": "story"
+        }
+      ],
+      "title": "Cortar el build",
+      "why": "Tarda 9 minutos."
+    }
+  ],
+  "snapshots": [
+    {
+      "body": "# Snapshot: Alpha\n\n- Product: alpha (active)\n- Active roles: pm, dev, qa\n- Paths: <WORK>/repos/alpha\n\n## North star and guidelines\n\n### docs/vision.md (declared in the brief)\n\n# Vision\n\nAlpha helps people sort their mail.\n\n## Stories\n\n- S001 Sort mail — not_implemented, approval approved, session work\n- S004 Tag mail — not_implemented, approval pending, session none\n\nImplemented: 1. Discarded: 1.\n\n## Open issues\n\n_None indexed._\n\n## Last minutes, priorities and marks\n\n### alpha-004 — An archived meeting\n\n- #0 [x] Old priority\n\n### alpha-003 — Should Alpha split the module?\n\n\n### alpha-002 — What blocks the beta?\n\n- #0 [ ] Fix the flaky test\n- #1 [ ] Plan the beta\n\n## Pending decisions\n\n- [2] Drop the legacy export → Remove the export flag\n- [3] Move the demo date\n- [4] Pick a license → Write LICENSE\n- [5] Rename the module\n- [6] An archived idea\n- [7] Retire the old prompt of dev → Approve the change\n\n## Commits, last 14 days\n\n## Journal tail\n\n_No journal._\n\n## Docs index\n",
+      "minutes_id": "<STAMP>-repair-what-now",
+      "product": "alpha"
+    }
+  ],
+  "usage": [
+    {
+      "cache_read": 108,
+      "cache_write": 144,
+      "cost_usd": 0.25,
+      "duration_ms": 1360,
+      "input_tokens": 36,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "model": "claude-sonnet-fake",
+      "output_tokens": 72,
+      "role": "dev"
+    },
+    {
+      "cache_read": 210,
+      "cache_write": 280,
+      "cost_usd": 0.0125,
+      "duration_ms": 1700,
+      "input_tokens": 70,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "model": "claude-opus-fake",
+      "output_tokens": 140,
+      "role": "pm"
+    },
+    {
+      "cache_read": 141,
+      "cache_write": 188,
+      "cost_usd": 0.03,
+      "duration_ms": 1470,
+      "input_tokens": 47,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "model": "claude-haiku-fake",
+      "output_tokens": 94,
+      "role": "qa"
+    },
+    {
+      "cache_read": 51,
+      "cache_write": 68,
+      "cost_usd": 0.05,
+      "duration_ms": 1170,
+      "input_tokens": 17,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "model": "claude-opus-fake",
+      "output_tokens": 34,
+      "role": "synthesis"
+    },
+    {
+      "cache_read": 168,
+      "cache_write": 224,
+      "cost_usd": 0.0625,
+      "duration_ms": 1560,
+      "input_tokens": 56,
+      "minutes_id": "<STAMP>-repair-what-now",
+      "model": "claude-opus-fake",
+      "output_tokens": 112,
+      "role": "synthesis-repair"
+    }
+  ]
+}
+
+--- stderr
+
+## @claude-calls
+exit: 0
+--- stdout
+=== dev
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You are the developer of a made-up product.
+arg: --no-session-persistence
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep,Glob
+arg: --mcp-config
+arg: {"mcpServers":{"codegraph":{"type":"stdio","command":"codebase-memory-mcp","args":["--tool-profile=analysis"]}}}
+arg: --allowedTools
+arg: Read,Grep,Glob,mcp__codegraph__search_graph,mcp__codegraph__query_graph,mcp__codegraph__trace_path,mcp__codegraph__get_code_snippet,mcp__codegraph__get_file_outline,mcp__codegraph__get_graph_schema,mcp__codegraph__compare_graphs,mcp__codegraph__get_architecture,mcp__codegraph__search_code,mcp__codegraph__list_projects,mcp__codegraph__index_status,mcp__codegraph__check_index_coverage,mcp__codegraph__detect_changes
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+## Open issues
+
+_None indexed._
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+## Commits, last 14 days
+
+## Journal tail
+
+_No journal._
+
+## Docs index
+
+
+# Your memory about this product
+- [m-0005] Never cite a path that does not exist.
+- [m-0003] The build uses pnpm.
+
+# Question
+repair-what-now
+
+# Instructions
+- You are the dev of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- The code graph tools (mcp__codegraph__*, projects: alpha-graph) find symbols, callers and call paths fast. Read the file to confirm before you cite it.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== pm
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+arg: --no-session-persistence
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep
+arg: --mcp-config
+arg: {"mcpServers":{"codegraph":{"type":"stdio","command":"codebase-memory-mcp","args":["--tool-profile=analysis"]}}}
+arg: --allowedTools
+arg: Read,Grep,mcp__codegraph__search_graph,mcp__codegraph__query_graph,mcp__codegraph__trace_path,mcp__codegraph__get_code_snippet,mcp__codegraph__get_file_outline,mcp__codegraph__get_graph_schema,mcp__codegraph__compare_graphs,mcp__codegraph__get_architecture,mcp__codegraph__search_code,mcp__codegraph__list_projects,mcp__codegraph__index_status,mcp__codegraph__check_index_coverage,mcp__codegraph__detect_changes
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+## Open issues
+
+_None indexed._
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+## Commits, last 14 days
+
+## Journal tail
+
+_No journal._
+
+## Docs index
+
+
+# Your memory about this product
+- [m-0002] Keep each priority to one sentence.
+- [m-0001] The owner reads the minutes on Monday.
+
+# Question
+repair-what-now
+
+# Instructions
+- You are the pm of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- The code graph tools (mcp__codegraph__*, projects: alpha-graph) find symbols, callers and call paths fast. Read the file to confirm before you cite it.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== qa
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: haiku
+arg: --system-prompt
+arg: You are the QA of Alpha.
+arg: --no-session-persistence
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.1
+arg: --tools=Read,Grep,Glob
+arg: --mcp-config
+arg: {"mcpServers":{"codegraph":{"type":"stdio","command":"codebase-memory-mcp","args":["--tool-profile=analysis"]}}}
+arg: --allowedTools
+arg: Read,Grep,Glob,mcp__codegraph__search_graph,mcp__codegraph__query_graph,mcp__codegraph__trace_path,mcp__codegraph__get_code_snippet,mcp__codegraph__get_file_outline,mcp__codegraph__get_graph_schema,mcp__codegraph__compare_graphs,mcp__codegraph__get_architecture,mcp__codegraph__search_code,mcp__codegraph__list_projects,mcp__codegraph__index_status,mcp__codegraph__check_index_coverage,mcp__codegraph__detect_changes
+arg: --json-schema
+arg: {"type":"object","properties":{"answer":{"type":"string"},"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}}},"required":["title","why","sources"]}},"concerns":{"type":"array","items":{"type":"string"}},"memory_notes":{"type":"array","items":{"type":"string"}}},"required":["answer","priorities","concerns","memory_notes"]}
+stdin:
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+## Open issues
+
+_None indexed._
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+## Commits, last 14 days
+
+## Journal tail
+
+_No journal._
+
+## Docs index
+
+
+# Your memory about this product
+_Empty: you have not met on this product yet._
+
+# Question
+repair-what-now
+
+# Instructions
+- You are the qa of the agency. Working directory: <WORK>/repos/alpha (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- The code graph tools (mcp__codegraph__*, projects: alpha-graph) find symbols, callers and call paths fast. Read the file to confirm before you cite it.
+- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL) or story (an id from the Stories section of the snapshot). Cite file paths relative to the working directory.
+- Cite the north stars declared in the <brief> (<north_stars>) where they support a priority. Keep everything under <out_of_scope> out of your priorities.
+- "answer" is your view in at most 150 words. "concerns": at most 3 risks you see. "memory_notes": only facts about this product still true next week (a goal, a constraint, a decision, a recurring risk), not opinions about today; usually empty.
+=== synthesis-repair
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+
+Now you write the minutes of the meeting from the agent answers.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}},"owner_role":{"type":"string"},"objective":{"type":"string","enum":["o1","o2"]}},"required":["title","why","sources","owner_role","objective"]}},"disagreements":{"type":"array","items":{"type":"object","properties":{"topic":{"type":"string"},"positions":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"view":{"type":"string"}},"required":["role","view"]}}},"required":["topic","positions"]}},"decisions":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"why":{"type":"string"},"action":{"type":"string"},"priorities":{"type":"array","items":{"type":"integer"}}},"required":["text","why"]}},"script":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"text":{"type":"string"}},"required":["role","text"]}}},"required":["priorities","disagreements","decisions","script"]}
+stdin:
+# Question
+repair-what-now
+
+# Agent answers
+## pm
+
+{"answer":"Planificar primero: la agencia necesita un orden claro.","priorities":[{"title":"Ordenar el importador","why":"El objetivo o1 lo pide.","sources":[{"type":"path","ref":"docs/vision.md"}]}],"concerns":["La fecha sigue abierta."]}
+
+## dev
+
+{"answer":"[no data] sobre el build. Sin datos de CI.","priorities":[{"title":"Cortar el build","why":"Tarda 9 minutos.","sources":[{"type":"commit","ref":"deadbee"},{"type":"path","ref":"docs/missing.md"}]},{"title":"Cerrar el issue","why":"Bloquea el importador.","sources":[{"type":"issue","ref":"7"},{"type":"issue","ref":"8"},{"type":"url","ref":"https://example.com/build"},{"type":"url","ref":"not a url"},{"type":"story","ref":"S001"},{"type":"story","ref":"S999"}]}],"concerns":["sin datos de costos","Riesgo: el importador falla."]}
+
+## qa
+
+{"answer":"Sin riesgos nuevos 😀: el importador pasa.","priorities":[{"title":"Probar el importador","why":"Nadie lo probó.","sources":[{"type":"path","ref":"CLAUDE.md"}]}],"concerns":[]}
+
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot (compact)
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+
+## Commits, last 14 days
+
+
+## Docs index
+
+
+# Instructions
+- Rank at most 5 priorities. Each cites at least one source, copied verbatim (type and ref) from the agent answers or the snapshot. Never invent a source.
+- "objective" is the id of the brief objective the priority serves: one of o1, o2.
+- At least one priority cites a declared north star as a path source (docs/vision.md). Cite only those as north stars.
+- Keep everything under <out_of_scope> out of the priorities.
+- "owner_role" is the id of the agent that proposed the priority most strongly, exactly as it heads its answer.
+- "disagreements": only real conflicts between agents; an empty array when there are none. Each position's "role" is an agent id.
+- "decisions": things that need the approval of Ada before anything changes. Each with its reason and an "action": what an agent would do after the approval, in one sentence. Each also lists in "priorities" the indexes (starting at 0, in the order of your "priorities") of the priorities it covers; an empty array when it covers none. Approving the decision marks those priorities accepted.
+- "script": a team call in Spanish, written to be spoken, in ASD-STE100 Simplified Technical English style applied to Spanish: one topic in each sentence, at most 20 words in a sentence, the active voice with a named agent, simple verb forms, the condition first, one name for each thing. No slogans, metaphors, filler or fragments for effect. The pm opens by stating the question. Each agent that answered speaks its own view in 2 to 4 sentences, in first person. Refer to commits and files by what they are, never read hashes or paths aloud. Name a story by its title, never by its id. Add a short back-and-forth where agents disagree. The pm closes with the ranked priorities and the decisions Ada must take. Total about 2 to 4 minutes of speech. No markdown, no emojis. The "role" of each segment is the id of one of the agents that answered, or pm.
+- Everything in Spanish except identifiers, paths and code.
+
+# Repair
+Your previous output failed these checks. Fix them and return the full corrected output.
+
+Failures:
+- Priority #0 "Sin fuente" has no source.
+- Priority #1 "Fuente rota" objective "o9" must be one of the brief ids: o1, o2.
+- Priority #1: path source "docs/nope.md" does not resolve.
+- Priority #2 "Sin objetivo" objective is missing and must be one of the brief ids: o1, o2.
+- Decision #0 "Link roto" links priority index 5, which does not exist (0 to 2).
+- No priority cites a north star declared in the brief (docs/vision.md).
+- Call script names story S001 by its id: say its title "Sort mail".
+
+Previous output:
+{"priorities":[{"title":"Sin fuente","why":"W","sources":[],"owner_role":"pm","objective":"o1"},{"title":"Fuente rota","why":"W","sources":[{"type":"path","ref":"docs/nope.md"}],"owner_role":"dev","objective":"o9"},{"title":"Sin objetivo","why":"W","sources":[{"type":"path","ref":"CLAUDE.md"}],"owner_role":"dev"}],"disagreements":[],"decisions":[{"text":"Link roto","why":"W","priorities":[5]}],"script":[{"role":"pm","text":"Hacemos S001 primero."}]}
+=== synthesis
+DISABLE_PROMPT_CACHING=1
+cwd=<WORK>/repos/alpha
+arg: -p
+arg: --model
+arg: opus
+arg: --system-prompt
+arg: You are the PM of a made-up product.
+
+Now you write the minutes of the meeting from the agent answers.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=
+arg: --effort
+arg: high
+arg: --json-schema
+arg: {"type":"object","properties":{"priorities":{"type":"array","items":{"type":"object","properties":{"title":{"type":"string"},"why":{"type":"string"},"sources":{"type":"array","items":{"type":"object","properties":{"type":{"type":"string","enum":["commit","issue","path","url","story"]},"ref":{"type":"string"}},"required":["type","ref"]}},"owner_role":{"type":"string"},"objective":{"type":"string","enum":["o1","o2"]}},"required":["title","why","sources","owner_role","objective"]}},"disagreements":{"type":"array","items":{"type":"object","properties":{"topic":{"type":"string"},"positions":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"view":{"type":"string"}},"required":["role","view"]}}},"required":["topic","positions"]}},"decisions":{"type":"array","items":{"type":"object","properties":{"text":{"type":"string"},"why":{"type":"string"},"action":{"type":"string"},"priorities":{"type":"array","items":{"type":"integer"}}},"required":["text","why"]}},"script":{"type":"array","items":{"type":"object","properties":{"role":{"type":"string"},"text":{"type":"string"}},"required":["role","text"]}}},"required":["priorities","disagreements","decisions","script"]}
+stdin:
+# Question
+repair-what-now
+
+# Agent answers
+## pm
+
+{"answer":"Planificar primero: la agencia necesita un orden claro.","priorities":[{"title":"Ordenar el importador","why":"El objetivo o1 lo pide.","sources":[{"type":"path","ref":"docs/vision.md"}]}],"concerns":["La fecha sigue abierta."]}
+
+## dev
+
+{"answer":"[no data] sobre el build. Sin datos de CI.","priorities":[{"title":"Cortar el build","why":"Tarda 9 minutos.","sources":[{"type":"commit","ref":"deadbee"},{"type":"path","ref":"docs/missing.md"}]},{"title":"Cerrar el issue","why":"Bloquea el importador.","sources":[{"type":"issue","ref":"7"},{"type":"issue","ref":"8"},{"type":"url","ref":"https://example.com/build"},{"type":"url","ref":"not a url"},{"type":"story","ref":"S001"},{"type":"story","ref":"S999"}]}],"concerns":["sin datos de costos","Riesgo: el importador falla."]}
+
+## qa
+
+{"answer":"Sin riesgos nuevos 😀: el importador pasa.","priorities":[{"title":"Probar el importador","why":"Nadie lo probó.","sources":[{"type":"path","ref":"CLAUDE.md"}]}],"concerns":[]}
+
+# Brief of the product
+<brief>
+<product stage="building"><what>Mail sorter</what><audience>Busy people</audience></product>
+<objectives>
+<objective id="o1" due="2020-01-01" signal="Importer runs">Ship the importer</objective>
+<objective id="o2" due="2099-12-31" signal="Build under 3 min">Cut the build time</objective>
+</objectives>
+<north_stars><path>docs/vision.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="dev">Builds it.</agent>
+<agent id="qa">Breaks it.</agent>
+</roles>
+</brief>
+
+# Snapshot (compact)
+# Snapshot: Alpha
+
+- Product: alpha (active)
+- Active roles: pm, dev, qa
+- Paths: <WORK>/repos/alpha
+
+
+## North star and guidelines
+
+### docs/vision.md (declared in the brief)
+
+# Vision
+
+Alpha helps people sort their mail.
+
+
+## Stories
+
+- S001 Sort mail — not_implemented, approval approved, session work
+- S004 Tag mail — not_implemented, approval pending, session none
+
+Implemented: 1. Discarded: 1.
+
+
+## Last minutes, priorities and marks
+
+### alpha-004 — An archived meeting
+
+- #0 [x] Old priority
+
+### alpha-003 — Should Alpha split the module?
+
+
+### alpha-002 — What blocks the beta?
+
+- #0 [ ] Fix the flaky test
+- #1 [ ] Plan the beta
+
+
+## Pending decisions
+
+- [2] Drop the legacy export → Remove the export flag
+- [3] Move the demo date
+- [4] Pick a license → Write LICENSE
+- [5] Rename the module
+- [6] An archived idea
+- [7] Retire the old prompt of dev → Approve the change
+
+
+## Commits, last 14 days
+
+
+## Docs index
+
+
+# Instructions
+- Rank at most 5 priorities. Each cites at least one source, copied verbatim (type and ref) from the agent answers or the snapshot. Never invent a source.
+- "objective" is the id of the brief objective the priority serves: one of o1, o2.
+- At least one priority cites a declared north star as a path source (docs/vision.md). Cite only those as north stars.
+- Keep everything under <out_of_scope> out of the priorities.
+- "owner_role" is the id of the agent that proposed the priority most strongly, exactly as it heads its answer.
+- "disagreements": only real conflicts between agents; an empty array when there are none. Each position's "role" is an agent id.
+- "decisions": things that need the approval of Ada before anything changes. Each with its reason and an "action": what an agent would do after the approval, in one sentence. Each also lists in "priorities" the indexes (starting at 0, in the order of your "priorities") of the priorities it covers; an empty array when it covers none. Approving the decision marks those priorities accepted.
+- "script": a team call in Spanish, written to be spoken, in ASD-STE100 Simplified Technical English style applied to Spanish: one topic in each sentence, at most 20 words in a sentence, the active voice with a named agent, simple verb forms, the condition first, one name for each thing. No slogans, metaphors, filler or fragments for effect. The pm opens by stating the question. Each agent that answered speaks its own view in 2 to 4 sentences, in first person. Refer to commits and files by what they are, never read hashes or paths aloud. Name a story by its title, never by its id. Add a short back-and-forth where agents disagree. The pm closes with the ranked priorities and the decisions Ada must take. Total about 2 to 4 minutes of speech. No markdown, no emojis. The "role" of each segment is the id of one of the agents that answered, or pm.
+- Everything in Spanish except identifiers, paths and code.
+
+--- stderr
+

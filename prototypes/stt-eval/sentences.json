@@ -1,0 +1,82 @@
+[
+  {
+    "id": 1,
+    "text": "Alright, so I accepted the permissions, so use the CLI and attempt to redeploy or push an empty commit with my correct GitHub account and see what's the problem there."
+  },
+  {
+    "id": 2,
+    "text": "Fantastic, alright, so I need you to tell me what was the last stuff we worked on and if there are open decisions or stories or specs or whatever there is remaining."
+  },
+  {
+    "id": 3,
+    "text": "Sure, approve 114 and commit the next upgrade and I think that leads us to a clean repository state."
+  },
+  {
+    "id": 4,
+    "text": "Alright, fantastic. So let's spin up an agency meeting about what was done on these last seven units plus the unifying of the repositories and the voice mode and all of that into one minute into one minute."
+  },
+  {
+    "id": 5,
+    "text": "Maybe if you switch the Active GitHub account you can check if everything was pushed and deployed."
+  },
+  {
+    "id": 6,
+    "text": "Good, I have a question. So the locations feature, which is a new feature or recent feature, is enabled through organization here, or how is it configured."
+  },
+  {
+    "id": 7,
+    "text": "So, spin up agency session and tell me what was the last thing that was pushed on this repository."
+  },
+  {
+    "id": 8,
+    "text": "Alright, go ahead and implement everything that's missing to shift entirely from studio from sorry from audio files and local files to database data."
+  },
+  {
+    "id": 9,
+    "text": "Alright, accept T026 and merge it, update my database, import the data to the database, and I think that's it."
+  },
+  {
+    "id": 10,
+    "text": "Alright, so I need you to start the repository and the database here locally, so I want to review stuff about the PR272."
+  },
+  {
+    "id": 11,
+    "text": "Alright, so I see you said some test files still spec the story files on disk and when migrating to a database. So maybe those test files should be updated."
+  },
+  {
+    "id": 12,
+    "text": "Alright, so I want you to spin up a story to let's merge these two repositories into the code one and add the data to the gitignore file so we have only one repository for this."
+  },
+  {
+    "id": 13,
+    "text": "All right, fix what's fixable and commit and push everything."
+  },
+  {
+    "id": 14,
+    "text": "See how useful is Herdr on our setup? I mean for all the projects I have and the agency project."
+  },
+  {
+    "id": 15,
+    "text": "Alright, go ahead. I accept S24 and go with the steps you said."
+  },
+  {
+    "id": 16,
+    "text": "Sure, fix that document and review the production database and see if the migration is applied or needs to be applied."
+  },
+  {
+    "id": 17,
+    "text": "Sure, so write a story for agency and start the work."
+  },
+  {
+    "id": 18,
+    "text": "How hard would it be to build a CLI command here in AgentSI that allows me to have an audio response in the terminal when spinning up AgentSI on a repository."
+  },
+  {
+    "id": 19,
+    "text": "What happens if we close those PRs before merging? I mean I want to discard them and also inspect the branch of the PR for what's the requirements for having the WhatsApp multi-agent multi-number working."
+  },
+  {
+    "id": 20,
+    "text": "Alright Claude, so I need you to tell me what were the last things we worked on here and what PRs are there merged, and you will have to change the GitHub account, the GitHub active account to check everything."
+  }
+]

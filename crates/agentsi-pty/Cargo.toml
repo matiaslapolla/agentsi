@@ -1,0 +1,11 @@
+[package]
+name = "agentsi-pty"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Own PTY code"
+
+[dependencies]
+libc.workspace = true

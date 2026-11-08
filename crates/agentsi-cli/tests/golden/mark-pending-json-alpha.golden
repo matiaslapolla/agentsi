@@ -1,0 +1,81 @@
+exit: 0
+--- stdout
+[
+  {
+    "kind": "priority",
+    "minutes_id": "alpha-002",
+    "idx": 0,
+    "title": "Fix the flaky test",
+    "why": "It fails one run in five.",
+    "owner_role": "dev",
+    "objective": "o1",
+    "sources": [
+      {
+        "ref": "abc1234",
+        "type": "commit"
+      }
+    ]
+  },
+  {
+    "kind": "priority",
+    "minutes_id": "alpha-002",
+    "idx": 1,
+    "title": "Plan the beta",
+    "why": "The date is open.",
+    "owner_role": "pm",
+    "objective": "o2",
+    "sources": []
+  },
+  {
+    "kind": "decision",
+    "id": 2,
+    "minutes_id": "alpha-002",
+    "text": "Drop the legacy export",
+    "why": "Nobody uses it.",
+    "action": "Remove the export flag",
+    "priorities": [
+      0
+    ]
+  },
+  {
+    "kind": "decision",
+    "id": 3,
+    "minutes_id": "alpha-002",
+    "text": "Move the demo date",
+    "why": "The build is late.",
+    "action": null,
+    "priorities": [
+      1
+    ]
+  },
+  {
+    "kind": "decision",
+    "id": 4,
+    "minutes_id": null,
+    "text": "Pick a license",
+    "why": "The repo goes public.",
+    "action": "Write LICENSE",
+    "priorities": []
+  },
+  {
+    "kind": "decision",
+    "id": 5,
+    "minutes_id": "alpha-003",
+    "text": "Rename the module",
+    "why": "The name is wrong.",
+    "action": null,
+    "priorities": []
+  },
+  {
+    "kind": "decision",
+    "id": 7,
+    "minutes_id": null,
+    "text": "Retire the old prompt of dev",
+    "why": "Dev was rejected 3 times.",
+    "action": "Approve the change",
+    "priorities": []
+  }
+]
+
+--- stderr
+

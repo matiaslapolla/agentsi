@@ -1,0 +1,72 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @sql-reflect-shared
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rglobal
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect
+exit: 0
+--- stdout
+Reflexión r-<STAMP> en alpha
+  señales: 16 (pm 6, qa 4, dev 6)
+  dev: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  pm: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+  qa: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+
+Propuestas de prompt:
+  dev (unresolved_source en 4 reuniones, 4 casos, 2 held-out): propuesta
+  qa (sin_datos en 3 reuniones, 4 casos, 2 held-out): queda para la próxima reflexión (otro agente tuvo la propuesta)
+
+dev → plugin/agents/dev.md: decisión pendiente #9
+  causa: La misma lección vale en alpha y beta.
+  efecto esperado: Menos fuentes sin resolver.
+    --- a/plugin/agents/dev.md
+    +++ b/plugin/agents/dev.md
+    @@ -5,3 +5,5 @@ model: sonnet
+     tools: Read, Grep, Glob
+     ---
+     You are the developer of a made-up product.
+    +
+    +Open a file before you cite it.
+  Replay sobre 2 casos held-out (antes → después):
+  - rf-01: check falla, sin resolver 1, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500 → check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500
+  - rf-03 (baseline re-corrido): check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500 → check ok, sin resolver 0, inventadas 0, objetivos faltantes 0, sin datos 0, costo $0.500
+  Totales: check al primer intento 50% → 100%, sin resolver por caso 0.50 → 0.00, inventadas 0 → 0, objetivos faltantes 0 → 0, sin datos 0 → 0, costo $1.000 → $1.000.
+  costo de propuesta y replay: $2.500 de $15
+  Aprobar: agentsi decide 9 approve (o reject).
+
+--- stderr
+
+## @git-hook-fail
+exit: 0
+--- stdout
+
+--- stderr
+
+## decide 9 approve
+exit: 0
+--- stdout
+Decision 9 approved.
+
+--- stderr
+Commit skipped: the hook says no
+
+## @commits
+exit: 0
+--- stdout
+chore: the registry
+
+--- stderr
+

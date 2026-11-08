@@ -1,0 +1,406 @@
+## meet --question=nosynth-what-now
+exit: 1
+--- stdout
+Minutes: <STAMP>-nosynth-what-now
+Status: invalid
+  check failure: No priorities.
+  check failure: No priority cites a north star declared in the brief (docs/vision.md).
+  check failure: Call script is empty.
+Top priorities:
+Cost: $0.2925 in <SECONDS>s
+Web: http://127.0.0.1:3361/p/alpha/m/<STAMP>-nosynth-what-now
+Call: http://127.0.0.1:3361/p/alpha/m/<STAMP>-nosynth-what-now/call
+
+--- stderr
+[index] index started
+[index] done
+[role] pm started
+[role] dev started
+[role] qa started
+[role] pm finished in <SECONDS>s, $0.0125, input 560 tokens
+[role] dev finished in <SECONDS>s, $0.2500, input 288 tokens
+[role] qa finished in <SECONDS>s, $0.0300, input 376 tokens
+[synthesis] synthesis started
+[synthesis] synthesis FAILED after <SECONDS>s: claude error (error_during_execution): overloaded
+[check] 3 failures: No priorities. | No priority cites a north star declared in the brief (docs/vision.md). | Call script is empty.
+
+## @meeting-rows
+exit: 0
+--- stdout
+{
+  "counts": {
+    "decisions": 8,
+    "documents": 15,
+    "meeting_log": 6,
+    "memory": 7,
+    "minutes": 7,
+    "priorities": 7,
+    "snapshots": 2,
+    "usage": 3
+  },
+  "decisions": [],
+  "documents": [
+    {
+      "body": "- [m-0005] Never cite a path that does not exist.\n- [m-0003] The build uses pnpm.",
+      "kind": "memory",
+      "ref": "dev",
+      "title": "Memory: dev"
+    },
+    {
+      "body": "- [<MEMORY-ID>] La demo es en mayo.\n- [m-0002] Keep each priority to one sentence.\n- [m-0001] The owner reads the minutes on Monday.",
+      "kind": "memory",
+      "ref": "pm",
+      "title": "Memory: pm"
+    },
+    {
+      "body": "- [<MEMORY-ID>] El importador no tiene tests.",
+      "kind": "memory",
+      "ref": "qa",
+      "title": "Memory: qa"
+    },
+    {
+      "body": "# Minutes <STAMP>-nosynth-what-now\n\n- Product: alpha\n- Date: <NOW>\n- Question: nosynth-what-now\n- Status: invalid\n\n## Priorities\n\n_None._\n\n## Decisions to confirm\n\n_None._\n\n## Roles\n\n### pm (claude-opus-fake)\n\nPlanificar primero: la agencia necesita un orden claro.\n\n- Concern: La fecha sigue abierta.\n\n### qa (claude-haiku-fake)\n\nSin riesgos nuevos 😀: el importador pasa.\n\n### dev (claude-sonnet-fake)\n\n[no data] sobre el build. Sin datos de CI.\n\n- Concern: sin datos de costos\n- Concern: Riesgo: el importador falla.\n\n## Check failures\n\n- No priorities.\n- No priority cites a north star declared in the brief (docs/vision.md).\n- Call script is empty.\n",
+      "kind": "minutes",
+      "ref": "<STAMP>-nosynth-what-now",
+      "title": "nosynth-what-now"
+    }
+  ],
+  "meeting_log": [
+    {
+      "entry": {
+        "agents": {
+          "dev": {
+            "cost_usd": 0.25,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "53874c97773edcf755812cb7fcb8fe921ff4d5e563ca504666a4d30e5a66a28d",
+            "model": "claude-sonnet-fake",
+            "priorities": 2,
+            "prompt_hash": "4e67fd43d699aabb17d81327f8d3fc9eab80ed75a97b66a1e7799ede76f87cc3",
+            "sin_datos": 3,
+            "sources": 8,
+            "unresolved_sources": [
+              {
+                "ref": "deadbee",
+                "type": "commit"
+              },
+              {
+                "ref": "docs/missing.md",
+                "type": "path"
+              },
+              {
+                "ref": "8",
+                "type": "issue"
+              },
+              {
+                "ref": "not a url",
+                "type": "url"
+              },
+              {
+                "ref": "S999",
+                "type": "story"
+              }
+            ]
+          },
+          "pm": {
+            "cost_usd": 0.0125,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "9c61787d12b9f6da88fb0ed1cf80fbc2f3781ea3e559c096e9467d8dc7cc5780",
+            "model": "claude-opus-fake",
+            "priorities": 1,
+            "prompt_hash": "fd7fe4fb38579c092fe7cdcea6258c2d09096de871b36cac0492736da7a05d9a",
+            "sin_datos": 0,
+            "sources": 1,
+            "unresolved_sources": []
+          },
+          "qa": {
+            "cost_usd": 0.03,
+            "duration_ms": 0,
+            "error": null,
+            "memory_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "model": "claude-haiku-fake",
+            "priorities": 1,
+            "prompt_hash": "f4da8c82f4973d79f77041f0fc435431ec3fd7b206c9537dcb8ae2ef0964c672",
+            "sin_datos": 0,
+            "sources": 1,
+            "unresolved_sources": []
+          }
+        },
+        "brief_hash": "e0e235d05620db5cdbcdc72529462d5b40ec3e968b7000a6f9f320a3b4f4a985",
+        "created_at": "<NOW>",
+        "minutes_id": "<STAMP>-nosynth-what-now",
+        "question": "nosynth-what-now",
+        "scope": null,
+        "synthesis": {
+          "cost_usd": 0,
+          "final_check": {
+            "failures": [
+              "No priorities.",
+              "No priority cites a north star declared in the brief (docs/vision.md).",
+              "Call script is empty."
+            ],
+            "passed": false
+          },
+          "first_check": {
+            "failures": [
+              "No priorities.",
+              "No priority cites a north star declared in the brief (docs/vision.md).",
+              "Call script is empty."
+            ],
+            "passed": false
+          },
+          "invented_sources": [],
+          "repaired": false
+        },
+        "total_cost_usd": 0.2925
+      },
+      "minutes_id": "<STAMP>-nosynth-what-now",
+      "product": "alpha"
+    }
+  ],
+  "memory": [
+    {
+      "agent": "pm",
+      "created_at": "<NOW>",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "<MEMORY-ID>",
+      "kind": "fact",
+      "position": 2,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "<STAMP>-nosynth-what-now",
+      "text": "La demo es en mayo."
+    },
+    {
+      "agent": "qa",
+      "created_at": "<NOW>",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "<MEMORY-ID>",
+      "kind": "fact",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "<STAMP>-nosynth-what-now",
+      "text": "El importador no tiene tests."
+    }
+  ],
+  "minutes": [
+    {
+      "created_at": "<NOW>",
+      "data": {
+        "check": {
+          "failures": [
+            "No priorities.",
+            "No priority cites a north star declared in the brief (docs/vision.md).",
+            "Call script is empty."
+          ],
+          "first_failures": [
+            "No priorities.",
+            "No priority cites a north star declared in the brief (docs/vision.md).",
+            "Call script is empty."
+          ],
+          "passed": false,
+          "repaired": false
+        },
+        "created_at": "<NOW>",
+        "decisions": [],
+        "disagreements": [],
+        "id": "<STAMP>-nosynth-what-now",
+        "priorities": [],
+        "product": "alpha",
+        "question": "nosynth-what-now",
+        "roles": {
+          "dev": {
+            "answer": "[no data] sobre el build. Sin datos de CI.",
+            "concerns": [
+              "sin datos de costos",
+              "Riesgo: el importador falla."
+            ],
+            "memory_notes": [],
+            "model": "claude-sonnet-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "deadbee",
+                    "type": "commit"
+                  },
+                  {
+                    "ref": "docs/missing.md",
+                    "type": "path"
+                  }
+                ],
+                "title": "Cortar el build",
+                "why": "Tarda 9 minutos."
+              },
+              {
+                "sources": [
+                  {
+                    "ref": "7",
+                    "type": "issue"
+                  },
+                  {
+                    "ref": "8",
+                    "type": "issue"
+                  },
+                  {
+                    "ref": "https://example.com/build",
+                    "type": "url"
+                  },
+                  {
+                    "ref": "not a url",
+                    "type": "url"
+                  },
+                  {
+                    "ref": "S001",
+                    "type": "story"
+                  },
+                  {
+                    "ref": "S999",
+                    "type": "story"
+                  }
+                ],
+                "title": "Cerrar el issue",
+                "why": "Bloquea el importador."
+              }
+            ]
+          },
+          "pm": {
+            "answer": "Planificar primero: la agencia necesita un orden claro.",
+            "concerns": [
+              "La fecha sigue abierta."
+            ],
+            "memory_notes": [
+              "The owner reads the minutes on Monday.",
+              "  La demo   es en mayo. "
+            ],
+            "model": "claude-opus-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "docs/vision.md",
+                    "type": "path"
+                  }
+                ],
+                "title": "Ordenar el importador",
+                "why": "El objetivo o1 lo pide."
+              }
+            ]
+          },
+          "qa": {
+            "answer": "Sin riesgos nuevos 😀: el importador pasa.",
+            "concerns": [],
+            "memory_notes": [
+              "El importador no tiene tests."
+            ],
+            "model": "claude-haiku-fake",
+            "priorities": [
+              {
+                "sources": [
+                  {
+                    "ref": "CLAUDE.md",
+                    "type": "path"
+                  }
+                ],
+                "title": "Probar el importador",
+                "why": "Nadie lo probó."
+              }
+            ]
+          }
+        },
+        "scope": null,
+        "script": [],
+        "status": "invalid"
+      },
+      "id": "<STAMP>-nosynth-what-now",
+      "product": "alpha",
+      "question": "nosynth-what-now",
+      "scope": null,
+      "status": "invalid",
+      "usage": [
+        {
+          "cache_read": 210,
+          "cache_write": 280,
+          "cost_usd": 0.0125,
+          "duration_ms": 1700,
+          "input_tokens": 70,
+          "model": "claude-opus-fake",
+          "output_tokens": 140,
+          "role": "pm"
+        },
+        {
+          "cache_read": 108,
+          "cache_write": 144,
+          "cost_usd": 0.25,
+          "duration_ms": 1360,
+          "input_tokens": 36,
+          "model": "claude-sonnet-fake",
+          "output_tokens": 72,
+          "role": "dev"
+        },
+        {
+          "cache_read": 141,
+          "cache_write": 188,
+          "cost_usd": 0.03,
+          "duration_ms": 1470,
+          "input_tokens": 47,
+          "model": "claude-haiku-fake",
+          "output_tokens": 94,
+          "role": "qa"
+        }
+      ]
+    }
+  ],
+  "priorities": [],
+  "snapshots": [
+    {
+      "body": "# Snapshot: Alpha\n\n- Product: alpha (active)\n- Active roles: pm, dev, qa\n- Paths: <WORK>/repos/alpha\n\n## North star and guidelines\n\n### docs/vision.md (declared in the brief)\n\n# Vision\n\nAlpha helps people sort their mail.\n\n## Stories\n\n- S001 Sort mail — not_implemented, approval approved, session work\n- S004 Tag mail — not_implemented, approval pending, session none\n\nImplemented: 1. Discarded: 1.\n\n## Open issues\n\n_None indexed._\n\n## Last minutes, priorities and marks\n\n### alpha-004 — An archived meeting\n\n- #0 [x] Old priority\n\n### alpha-003 — Should Alpha split the module?\n\n\n### alpha-002 — What blocks the beta?\n\n- #0 [ ] Fix the flaky test\n- #1 [ ] Plan the beta\n\n## Pending decisions\n\n- [2] Drop the legacy export → Remove the export flag\n- [3] Move the demo date\n- [4] Pick a license → Write LICENSE\n- [5] Rename the module\n- [6] An archived idea\n- [7] Retire the old prompt of dev → Approve the change\n\n## Commits, last 14 days\n\n## Journal tail\n\n_No journal._\n\n## Docs index\n",
+      "minutes_id": "<STAMP>-nosynth-what-now",
+      "product": "alpha"
+    }
+  ],
+  "usage": [
+    {
+      "cache_read": 108,
+      "cache_write": 144,
+      "cost_usd": 0.25,
+      "duration_ms": 1360,
+      "input_tokens": 36,
+      "minutes_id": "<STAMP>-nosynth-what-now",
+      "model": "claude-sonnet-fake",
+      "output_tokens": 72,
+      "role": "dev"
+    },
+    {
+      "cache_read": 210,
+      "cache_write": 280,
+      "cost_usd": 0.0125,
+      "duration_ms": 1700,
+      "input_tokens": 70,
+      "minutes_id": "<STAMP>-nosynth-what-now",
+      "model": "claude-opus-fake",
+      "output_tokens": 140,
+      "role": "pm"
+    },
+    {
+      "cache_read": 141,
+      "cache_write": 188,
+      "cost_usd": 0.03,
+      "duration_ms": 1470,
+      "input_tokens": 47,
+      "minutes_id": "<STAMP>-nosynth-what-now",
+      "model": "claude-haiku-fake",
+      "output_tokens": 94,
+      "role": "qa"
+    }
+  ]
+}
+
+--- stderr
+

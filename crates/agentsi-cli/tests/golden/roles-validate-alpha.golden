@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+alpha: el roster es válido (3 agentes).
+
+--- stderr
+

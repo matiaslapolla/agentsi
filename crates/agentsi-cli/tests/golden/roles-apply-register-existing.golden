@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+La etapa no es válida:
+  - Product "alpha" is already registered.
+

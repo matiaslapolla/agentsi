@@ -1,0 +1,9 @@
+exit: 0
+--- stdout
+Roster de alpha:
+  pm   pm   global  opus  esfuerzo high
+  dev  dev  global  sonnet
+  qa   qa   custom  haiku
+
+--- stderr
+

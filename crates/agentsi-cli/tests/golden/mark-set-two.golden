@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+Marked 2 priorities.
+
+--- stderr
+

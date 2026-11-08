@@ -1,0 +1,10 @@
+{
+  "name": "@agentsi/cli",
+  "version": "0.2.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "bin": { "agentsi": "bin/agentsi.mjs" },
+  "scripts": { "typecheck": "tsc -p .", "test": "node --import tsx --test \"src/**/*.test.ts\" ../../plugin/hooks/push-guard.test.mjs" },
+  "dependencies": { "@agentsi/core": "workspace:*", "tsx": "^4.20.0" }
+}

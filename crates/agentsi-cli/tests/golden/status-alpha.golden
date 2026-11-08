@@ -1,0 +1,26 @@
+exit: 0
+--- stdout
+# Alpha — AgentSI status
+
+- Roles: pm, dev, qa · status active
+- Index: 0 docs, 0 commits, 0 open issues, indexed never
+- Last commit: none indexed
+- Pending decisions: 5
+- Minutes: 4 total
+
+## Pending decisions
+
+- [2] Drop the legacy export (alpha-002)
+- [3] Move the demo date (alpha-002)
+- [4] Pick a license
+- [5] Rename the module (alpha-003)
+- [7] Retire the old prompt of dev
+
+## Last minutes
+
+- alpha-003 — Should Alpha split the module? — invalid — no priorities
+- alpha-002 — What blocks the beta? — valid — 2 unmarked
+- alpha-001 — What should Alpha do first? — valid — 1 changed, 1 accepted, 1 rejected
+
+--- stderr
+

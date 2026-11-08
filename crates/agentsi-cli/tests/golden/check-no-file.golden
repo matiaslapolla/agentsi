@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi check: ENOENT: no such file or directory, open '<WORK>/minutes/none.json'
+

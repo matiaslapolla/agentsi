@@ -1,0 +1,14 @@
+[package]
+name = "ui-kit"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Throwaway prototype for P4: the AgentSI front desk on gpui-component, a GPUI component library."
+
+[dependencies]
+gpui-kit = "0.9.0"
+
+[profile.release]
+debug = false
+
+[workspace]

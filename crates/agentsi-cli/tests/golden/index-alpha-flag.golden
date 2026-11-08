@@ -1,0 +1,6 @@
+exit: 0
+--- stdout
+alpha: 0 repos (0 unchanged), 0 docs, 0 commits, 0 issues, 4 minutes, 2 memory, <SECONDS>s
+
+--- stderr
+

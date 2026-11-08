@@ -1,0 +1,44 @@
+exit: 0
+--- stdout
+# S008 Sort by sender
+
+<!-- Rendered from the story JSON in the database. -->
+
+- Type: story
+- Owner: dev
+- Status: implemented
+- Approval: approved
+- Proposed by: pm
+
+**As a** a reader
+
+**I want** to sort by sender
+
+**So that** the inbox stays calm
+
+## Criteria
+
+### 1
+
+- **Given** a mailbox with 1 mails
+- **When** the user opens the list
+- **Then** the list shows 1 rows
+- Test: `test/list-1.test.sh`
+- Checks: The list shows 1 rows.
+
+### 2
+
+- **Given** a mailbox with 2 mails
+- **When** the user opens the list
+- **Then** the list shows 2 rows
+- Test: `test/list-2.test.sh`
+- Checks: The list shows 2 rows.
+
+## Results
+
+- 2026-10-14T10:00:00.000Z: discarded
+- 2026-10-15T10:00:00.000Z: merged_unchanged (`80db04af1de62e8788c59e8f999e41200be92331`)
+
+
+--- stderr
+

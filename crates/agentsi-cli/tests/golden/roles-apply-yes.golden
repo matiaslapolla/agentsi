@@ -1,0 +1,121 @@
+## roles apply <WORK>/stages/alpha-ok --yes
+exit: 0
+--- stdout
+Se configura alpha.
+
+Roster: pm, dev, qa -> pm, dev, qa, dev.api
+  agregados: dev.api
+
+Base de datos (brief y overlays):
+  nuevo  alpha/agents/dev.api.md
+  cambiado  alpha/agents/qa.md
+    @@ -1,4 +1,5 @@
+     ---
+    -model: haiku
+    +model: sonnet
+     ---
+    -You are the QA of Alpha.
+    \ No newline at end of file
+    +You are the QA of Alpha.
+    +Break the importer first.
+    \ No newline at end of file
+  cambiado  alpha/brief.json
+    @@ -4,5 +4,5 @@
+         "what": "Mail sorter",
+         "audience": "Busy people",
+    -    "stage": "building"
+    +    "stage": "launched"
+       },
+       "objectives": [
+    @@ -28,5 +28,6 @@
+         "pm": "Keeps the plan.",
+         "dev": "Builds it.",
+    -    "qa": "Breaks it."
+    +    "qa": "Breaks it.",
+    +    "dev.api": "Builds the API."
+       },
+       "updated_at": "2026-10-01T10:00:00.000Z"
+
+Aplicado y commiteado.
+
+--- stderr
+Agent "dev.api": dropped tools not allowed in meetings: Bash
+
+## roles
+exit: 0
+--- stdout
+Roster de alpha:
+  pm       pm   global   opus  esfuerzo high
+  dev      dev  global   sonnet
+  qa       qa   custom   sonnet
+  dev.api  dev  overlay  sonnet
+
+--- stderr
+Agent "dev.api": dropped tools not allowed in meetings: Bash
+
+## roles dev.api
+exit: 0
+--- stdout
+# dev.api (rol dev, overlay, sonnet)
+
+You are the developer of a made-up product.
+
+## This product
+
+Prefer small endpoints.
+
+--- stderr
+Agent "dev.api": dropped tools not allowed in meetings: Bash
+
+## roles validate --json
+exit: 0
+--- stdout
+{
+  "product": "alpha",
+  "valid": true,
+  "failures": []
+}
+
+--- stderr
+Agent "dev.api": dropped tools not allowed in meetings: Bash
+
+## @registry
+exit: 0
+--- stdout
+{
+  "owner": { "name": "Ada", "language": "Spanish" },
+  "products": [
+    { "id": "alpha", "name": "Alpha", "paths": ["<WORK>/repos/alpha"], "status": "active", "roles": ["pm", "dev", "qa", "dev.api"] },
+    { "id": "beta", "name": "Beta", "paths": ["<WORK>/repos/beta"], "status": "planned", "roles": ["pm", "dev", "scout"], "stories": { "repo": "<WORK>/repos/beta", "test": "sh test/run.sh {files}", "gate": ["sh test/gate.sh"], "budget_usd": 2 } },
+    { "id": "gamma", "name": "Gamma", "paths": ["<WORK>/repos/gamma"], "status": "active", "roles": ["pm"] }
+  ]
+}
+
+--- stderr
+
+## @commits
+exit: 0
+--- stdout
+roles(alpha): set roster
+chore: the registry
+
+--- stderr
+
+## @tree
+exit: 0
+--- stdout
+repos/alpha/CLAUDE.md
+repos/alpha/docs/vision.md
+repos/beta/.claude/JOURNAL.md
+repos/beta/CLAUDE.md
+repos/beta/README.md
+repos/beta/docs/ideas/widget.md
+repos/beta/docs/plans/launch.md
+repos/beta/docs/specs/api.md
+repos/beta/notes.txt
+root/agentsi.config.json
+root/plugin/agents/dev.md
+root/plugin/agents/pm.md
+
+--- stderr
+

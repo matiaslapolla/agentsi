@@ -1,0 +1,9 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reflect [--memory-only] [--json] [--product <id>]
+       agentsi reflect revert <reflection-id> [--json] [--product <id>]
+Usage: agentsi reflect [--memory-only] [--json] [--product <id>]
+       agentsi reflect revert <reflection-id> [--json] [--product <id>]
+

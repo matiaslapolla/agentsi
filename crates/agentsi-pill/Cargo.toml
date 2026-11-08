@@ -1,0 +1,26 @@
+[package]
+name = "agentsi-pill"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Pill window and voice"
+
+[dependencies]
+agentsi-proto = { workspace = true }
+agentsi-ui = { workspace = true }
+agentsi-voice = { workspace = true, features = ["tts", "stt"] }
+cpal = { workspace = true }
+futures = { workspace = true }
+gpui = { workspace = true }
+gpui_platform = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+agentsi-core = { path = "../agentsi-core" }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }

@@ -1,0 +1,74 @@
+exit: 0
+--- stdout
+# Snapshot: Beta
+
+- Product: beta (planned)
+- Active roles: pm, dev, scout
+- Paths: <WORK>/repos/beta
+
+## North star and guidelines
+
+### CLAUDE.md
+
+# Beta guidelines
+
+- Keep each change small.
+- Write the test first.
+
+### README.md
+
+# Beta
+
+A second made-up product. It has one git repo and a few docs.
+
+## Stories
+
+- S001 Filter mail — not_implemented, approval approved, session ready
+- S002 Star mail — not_implemented, approval pending, session none
+- T003 Drop the old cache — not_implemented, approval approved, session none
+- S004 Mark mail as read — not_implemented, approval approved, session none
+- S005 Pin mail — not_implemented, approval approved, session failed
+- S006 Snooze mail — not_implemented, approval approved, session work
+- S007 Archive mail — not_implemented, approval changes_requested, session none
+
+Implemented: 1. Discarded: 0.
+
+## Open issues
+
+- #9 Fix the typo in the README
+- #7 Add a health route
+
+## Last minutes, priorities and marks
+
+### beta-001 — Is Beta ready?
+
+- #0 [x] Write the docs
+
+## Pending decisions
+
+- [8] Publish the docs → Push the docs
+
+## Commits, last 14 days
+
+2 commits
+
+- <HASH> <DATE> docs: write the launch plan
+- <HASH> <DATE> feat: first route
+
+## Journal tail
+
+# Journal
+
+- Session 1: wrote the API spec.
+- Session 2: wrote the launch plan.
+
+## Docs index
+
+- docs/ideas/widget.md — A widget idea
+- docs/specs/api.md — The API spec
+- docs/plans/launch.md — Launch plan
+- CLAUDE.md — Beta guidelines
+- README.md — Beta
+
+--- stderr
+

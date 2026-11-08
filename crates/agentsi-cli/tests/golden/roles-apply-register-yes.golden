@@ -1,0 +1,75 @@
+## roles apply <WORK>/stages/delta --register --product delta --name Delta --path <WORK>/repos/alpha --yes
+exit: 0
+--- stdout
+Se registra y se configura delta.
+
+Roster: (ninguno) -> pm, dev
+  agregados: pm, dev
+
+Base de datos (brief y overlays):
+  nuevo  delta/brief.json
+
+Aplicado y commiteado.
+
+--- stderr
+
+## whoami --list
+exit: 0
+--- stdout
+alpha  Alpha  active  <WORK>/repos/alpha
+beta  Beta  planned  <WORK>/repos/beta
+gamma  Gamma  active  <WORK>/repos/gamma  (archived)
+delta  Delta  active  <WORK>/repos/alpha
+
+--- stderr
+
+## roles --product delta
+exit: 0
+--- stdout
+Roster de delta:
+  pm   pm   global  opus  esfuerzo high
+  dev  dev  global  sonnet
+
+--- stderr
+
+## @registry
+exit: 0
+--- stdout
+{
+  "owner": { "name": "Ada", "language": "Spanish" },
+  "products": [
+    { "id": "alpha", "name": "Alpha", "paths": ["<WORK>/repos/alpha"], "status": "active", "roles": ["pm", "dev", "qa"] },
+    { "id": "beta", "name": "Beta", "paths": ["<WORK>/repos/beta"], "status": "planned", "roles": ["pm", "dev", "scout"], "stories": { "repo": "<WORK>/repos/beta", "test": "sh test/run.sh {files}", "gate": ["sh test/gate.sh"], "budget_usd": 2 } },
+    { "id": "gamma", "name": "Gamma", "paths": ["<WORK>/repos/gamma"], "status": "active", "roles": ["pm"] },
+    { "id": "delta", "name": "Delta", "paths": ["<WORK>/repos/alpha"], "status": "active", "roles": ["pm", "dev"] }
+  ]
+}
+
+--- stderr
+
+## @commits
+exit: 0
+--- stdout
+roles(delta): register and set roster
+chore: the registry
+
+--- stderr
+
+## @tree
+exit: 0
+--- stdout
+repos/alpha/CLAUDE.md
+repos/alpha/docs/vision.md
+repos/beta/.claude/JOURNAL.md
+repos/beta/CLAUDE.md
+repos/beta/README.md
+repos/beta/docs/ideas/widget.md
+repos/beta/docs/plans/launch.md
+repos/beta/docs/specs/api.md
+repos/beta/notes.txt
+root/agentsi.config.json
+root/plugin/agents/dev.md
+root/plugin/agents/pm.md
+
+--- stderr
+

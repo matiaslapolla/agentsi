@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi mark: Priority alpha-002#0 appears twice in one batch
+

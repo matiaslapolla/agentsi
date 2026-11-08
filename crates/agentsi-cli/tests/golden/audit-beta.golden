@@ -1,0 +1,38 @@
+exit: 0
+--- stdout
+Auditoría de beta
+
+Configuración
+  9 problema(s):
+    - Agent "scout": Unknown role "scout" (no <WORK>/root/plugin/agents/scout.md)
+    - Overlay "ghost.md" belongs to an agent that is not in the roster.
+    - Overlay "ghost.md" extends "nobody", which is not a global role.
+    - Brief: product.stage "dreaming" is not one of idea, building, launched, growing, maintenance.
+    - Brief: Objective "b1" has an invalid due date "2026-13-40" (expected YYYY-MM-DD).
+    - Brief: north_stars path "docs/missing.md" does not exist under a product path.
+    - Brief: roles has no entry for roster agent "dev".
+    - Brief: roles has no entry for roster agent "scout".
+    - Brief: roles entry "extra" is not in the roster.
+
+Reuniones (últimas 1)
+  check a la primera: 100% · reparadas: 0% · síntesis: 20% del costo · fuentes inventadas: 0
+  pm: 1/1 respuestas, 0 errores (0 timeouts), 0 fuentes sin resolver y 0 "sin datos" por reunión, costo medio 0.20 USD
+  rondas de reparación de las últimas 4 reuniones: [no data]
+  rondas de reparación por reunión, de las actas: primeras 1: 0 · después (0): —
+
+Marcas por agente
+  pm: 1 aceptadas, 0 cambiadas, 0 rechazadas, 0 sin marcar
+
+Memoria
+  dev: 0 activos, 0 retirados, 0 lecciones, 0 nunca útiles, 0/6000 caracteres
+  pm: 0 activos, 0 retirados, 0 lecciones, 0 nunca útiles, 0/6000 caracteres
+  scout: 0 activos, 0 retirados, 0 lecciones, 0 nunca útiles, 0/6000 caracteres
+
+Reflexiones
+  última: ninguna · propuestas pendientes: 0 · revertidas: 0
+
+Listo para reflexionar
+  no hay evidencia suficiente
+
+--- stderr
+

@@ -1,0 +1,10 @@
+exit: 2
+--- stdout
+
+--- stderr
+No product matches <WORK>/outside. Pass --product <id>.
+Usage: agentsi mark <minutes-id> <idx> accepted|changed|rejected [--new]
+       agentsi mark --set <minutes-id>:<idx>:<mark>[:new] [--set ...]
+       agentsi mark --pending [--json] [--product <id>]
+       agentsi mark [--product <id>]   (wizard, needs a terminal)
+

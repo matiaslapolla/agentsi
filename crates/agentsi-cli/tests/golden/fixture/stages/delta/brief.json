@@ -1,0 +1,24 @@
+{
+  "version": 1,
+  "product": {
+    "what": "A new thing",
+    "audience": "Everyone",
+    "stage": "idea"
+  },
+  "objectives": [
+    {
+      "id": "d1",
+      "text": "Start",
+      "signal": "Started",
+      "due": "2099-12-31"
+    }
+  ],
+  "north_stars": [],
+  "sources_of_truth": [],
+  "out_of_scope": [],
+  "roles": {
+    "pm": "Keeps the plan.",
+    "dev": "Builds it."
+  },
+  "updated_at": "2026-11-01T10:00:00.000Z"
+}

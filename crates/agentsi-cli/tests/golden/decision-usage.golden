@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi decision add --text "<text>" --why "<why>" [--action "<what to run once approved>"] [--product <id>]
+Usage: agentsi decision add --text "<text>" --why "<why>" [--action "<what to run once approved>"] [--product <id>]
+

@@ -1,0 +1,17 @@
+exit: 0
+--- stdout
+{
+  "id": "pm",
+  "role": "pm",
+  "source": "global",
+  "model": "opus",
+  "effort": "high",
+  "tools": [
+    "Read",
+    "Grep"
+  ],
+  "body": "You are the PM of a made-up product."
+}
+
+--- stderr
+

@@ -1,0 +1,169 @@
+{
+  "counts": {
+    "meeting_log": 6,
+    "minutes": 6,
+    "priorities": 6,
+    "snapshots": 4,
+    "usage": 0
+  },
+  "decisions": [
+    {
+      "action": "Push the docs",
+      "decided_at": null,
+      "id": 8,
+      "kind": "minutes",
+      "minutes_id": "beta-001",
+      "product": "beta",
+      "reflection_id": null,
+      "status": "pending",
+      "text": "Publish the docs",
+      "why": "Docs are ready."
+    }
+  ],
+  "memory": [
+    {
+      "agent": "dev",
+      "created_at": "2026-10-11T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 2,
+      "id": "m-k001",
+      "kind": "fact",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "rf-01",
+      "text": "El build usa pnpm."
+    },
+    {
+      "agent": "dev",
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "harmful": 1,
+      "helpful": 0,
+      "id": "m-k002",
+      "kind": "fact",
+      "position": 1,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "migration",
+      "text": "Hay una nota vieja sobre npm."
+    },
+    {
+      "agent": "dev",
+      "created_at": "2026-10-01T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "m-k003",
+      "kind": "fact",
+      "position": 2,
+      "product": "alpha",
+      "retired_at": "2026-10-05T09:00:00.000Z",
+      "retired_why": "stale",
+      "source": "migration",
+      "text": "Una nota retirada."
+    },
+    {
+      "agent": "dev",
+      "created_at": "2026-10-05T09:00:00.000Z",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "m-k006",
+      "kind": "lesson",
+      "position": 3,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "r-seed",
+      "text": "Citar solo lo que se leyó."
+    },
+    {
+      "agent": "pm",
+      "created_at": "2026-10-12T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 1,
+      "id": "m-k004",
+      "kind": "fact",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "rf-02",
+      "text": "El dueño lee las actas los lunes."
+    },
+    {
+      "agent": "qa",
+      "created_at": "2026-10-13T10:00:00.000Z",
+      "harmful": 0,
+      "helpful": 0,
+      "id": "m-k005",
+      "kind": "lesson",
+      "position": 0,
+      "product": "alpha",
+      "retired_at": null,
+      "retired_why": null,
+      "source": "rf-03",
+      "text": "Probar el camino vacío."
+    }
+  ],
+  "overlays": [
+    {
+      "agent": "qa",
+      "body": "---\nmodel: haiku\n---\nYou are the QA of Alpha.",
+      "product": "alpha"
+    },
+    {
+      "agent": "ghost",
+      "body": "---\nextends: nobody\n---\nA lost overlay.",
+      "product": "beta"
+    }
+  ],
+  "reflections": [
+    {
+      "entry": {
+        "commit": null,
+        "consumed": [
+          "rf-00",
+          "migration"
+        ],
+        "cost_usd": 0.125,
+        "created_at": "2026-10-05T09:00:00.000Z",
+        "id": "r-seed",
+        "memory": [
+          {
+            "added": [
+              "m-k006"
+            ],
+            "agent": "dev",
+            "diff": "--- a/alpha/memory/dev\n+++ b/alpha/memory/dev\n@@ -1 +1 @@\n-- [m-k003] Una nota retirada.\n+- [m-k006] Citar solo lo que se leyó.\n",
+            "dropped": [],
+            "harmful": [
+              "m-k002"
+            ],
+            "helpful": [
+              "m-k001"
+            ],
+            "retired": [
+              "m-k003"
+            ]
+          }
+        ],
+        "product": "alpha",
+        "proposal": null,
+        "signals": [
+          {
+            "agent": "dev",
+            "detail": "#0 Una marca vieja",
+            "kind": "mark_accepted",
+            "ref": "rf-00"
+          }
+        ],
+        "status": "applied",
+        "trigger": "manual"
+      },
+      "id": "r-seed",
+      "position": 0,
+      "product": "alpha"
+    }
+  ]
+}

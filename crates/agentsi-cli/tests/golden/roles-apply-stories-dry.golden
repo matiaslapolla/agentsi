@@ -1,0 +1,13 @@
+exit: 0
+--- stdout
+Se configura alpha.
+
+Roster: pm, dev, qa -> pm, dev, qa
+Stories: apagado -> test "pnpm test {files}", gate "pnpm lint", "pnpm test", repo <WORK>/repos/alpha
+
+Base de datos (brief y overlays): sin cambios.
+
+Simulacro: no se escribió nada. Repetí con --yes para aplicar.
+
+--- stderr
+

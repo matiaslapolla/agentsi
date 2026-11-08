@@ -1,0 +1,309 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rpass
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect --json
+exit: 0
+--- stdout
+{
+  "entry": {
+    "id": "r-<STAMP>",
+    "product": "alpha",
+    "created_at": "<NOW>",
+    "trigger": "manual",
+    "signals": [
+      {
+        "agent": "pm",
+        "kind": "first_check_failure",
+        "ref": "rf-01",
+        "detail": "Priority 1 cites no north star"
+      },
+      {
+        "agent": "qa",
+        "kind": "sin_datos",
+        "ref": "rf-01",
+        "detail": "2 \"sin datos\""
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-01",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "pm",
+        "kind": "first_check_failure",
+        "ref": "rf-02",
+        "detail": "Priority 2: objective \"o9\" must be one of the brief ids (o1, o2)"
+      },
+      {
+        "agent": "pm",
+        "kind": "invented_source",
+        "ref": "rf-02",
+        "detail": "docs/imaginary.md"
+      },
+      {
+        "agent": "qa",
+        "kind": "sin_datos",
+        "ref": "rf-02",
+        "detail": "3 \"sin datos\""
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-02",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "pm",
+        "kind": "error",
+        "ref": "rf-03",
+        "detail": "claude timed out after 360s"
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-03",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "qa",
+        "kind": "sin_datos",
+        "ref": "rf-05",
+        "detail": "2 \"sin datos\""
+      },
+      {
+        "agent": "dev",
+        "kind": "unresolved_source",
+        "ref": "rf-05",
+        "detail": "docs/missing.md"
+      },
+      {
+        "agent": "dev",
+        "kind": "mark_accepted",
+        "ref": "rf-01",
+        "detail": "#0 Cortar el build"
+      },
+      {
+        "agent": "dev",
+        "kind": "mark_rejected",
+        "ref": "rf-02",
+        "detail": "#0 Citar el spec"
+      },
+      {
+        "agent": "pm",
+        "kind": "mark_changed",
+        "ref": "rf-02",
+        "detail": "#1 Ordenar el plan"
+      },
+      {
+        "agent": "pm",
+        "kind": "decision_rejected",
+        "ref": "rf-02",
+        "detail": "Borrar el importador"
+      },
+      {
+        "agent": "qa",
+        "kind": "mark_accepted",
+        "ref": "rf-03",
+        "detail": "#0 Probar el borde"
+      }
+    ],
+    "memory": [
+      {
+        "agent": "dev",
+        "added": [],
+        "retired": [],
+        "helpful": [],
+        "harmful": [],
+        "dropped": [],
+        "diff": ""
+      },
+      {
+        "agent": "pm",
+        "added": [],
+        "retired": [],
+        "helpful": [],
+        "harmful": [],
+        "dropped": [],
+        "diff": ""
+      },
+      {
+        "agent": "qa",
+        "added": [],
+        "retired": [],
+        "helpful": [],
+        "harmful": [],
+        "dropped": [],
+        "diff": ""
+      }
+    ],
+    "proposal": {
+      "agent": "dev",
+      "target": "workspace/alpha/agents/dev.md",
+      "trigger": {
+        "reason": "failure_class",
+        "failure_class": "unresolved_source",
+        "count": 4
+      },
+      "shared_lesson": null,
+      "rationale": "dev citó docs/missing.md en rf-02 y rf-05 sin abrirlo.",
+      "expected_effect": "Menos fuentes sin resolver.",
+      "diff": "--- a/workspace/alpha/agents/dev.md\n+++ b/workspace/alpha/agents/dev.md\n@@ -0,0 +1,4 @@\n+---\n+extends: dev\n+---\n+Antes de citar un archivo, abrilo y confirmá que existe.\n",
+      "content": "---\nextends: dev\n---\nAntes de citar un archivo, abrilo y confirmá que existe.\n",
+      "body_hash": "6bc43fe6a42c3866768341930b6a358582ff94811db3eb0386423f38e5535978",
+      "target_hash": null,
+      "decision_id": 9,
+      "replay": {
+        "tuning": [
+          "rf-02",
+          "rf-05"
+        ],
+        "held_out": [
+          "rf-01",
+          "rf-03"
+        ],
+        "rows": [
+          {
+            "minutes_id": "rf-01",
+            "baseline": "stored",
+            "before": {
+              "first_pass": false,
+              "unresolved": 1,
+              "invented": 0,
+              "missing_objectives": 0,
+              "sin_datos": 0,
+              "cost_usd": 0.5
+            },
+            "after": {
+              "first_pass": true,
+              "unresolved": 0,
+              "invented": 0,
+              "missing_objectives": 0,
+              "sin_datos": 0,
+              "cost_usd": 0.5
+            }
+          },
+          {
+            "minutes_id": "rf-03",
+            "baseline": "rerun",
+            "before": {
+              "first_pass": true,
+              "unresolved": 0,
+              "invented": 0,
+              "missing_objectives": 0,
+              "sin_datos": 0,
+              "cost_usd": 0.5
+            },
+            "after": {
+              "first_pass": true,
+              "unresolved": 0,
+              "invented": 0,
+              "missing_objectives": 0,
+              "sin_datos": 0,
+              "cost_usd": 0.5
+            }
+          }
+        ],
+        "totals": {
+          "before": {
+            "cases": 2,
+            "first_pass_rate": 0.5,
+            "unresolved_per_case": 0.5,
+            "invented": 0,
+            "missing_objectives": 0,
+            "sin_datos": 0,
+            "cost_usd": 1
+          },
+          "after": {
+            "cases": 2,
+            "first_pass_rate": 1,
+            "unresolved_per_case": 0,
+            "invented": 0,
+            "missing_objectives": 0,
+            "sin_datos": 0,
+            "cost_usd": 1
+          }
+        },
+        "verdict": {
+          "passed": true,
+          "worse": [],
+          "better": [
+            "first_pass_rate",
+            "unresolved_per_case"
+          ]
+        },
+        "aborted": null,
+        "cost_rule": "cost counts as worse only above +25%; a lower cost is not an improvement (it is a budget constraint, not a goal)",
+        "cost_usd": 2.5,
+        "budget_usd": 15
+      },
+      "status": "pending"
+    },
+    "candidates": [
+      {
+        "agent": "dev",
+        "reason": "failure_class",
+        "failure_class": "unresolved_source",
+        "count": 4,
+        "cases": 4,
+        "held_out": 2,
+        "outcome": "proposed",
+        "note": null
+      },
+      {
+        "agent": "qa",
+        "reason": "failure_class",
+        "failure_class": "sin_datos",
+        "count": 3,
+        "cases": 4,
+        "held_out": 2,
+        "outcome": "deferred",
+        "note": null
+      }
+    ],
+    "consumed": [
+      "rf-01",
+      "rf-02",
+      "rf-03",
+      "rf-04",
+      "rf-05"
+    ],
+    "status": "applied",
+    "commit": null,
+    "cost_usd": 2.875
+  },
+  "candidates": [
+    {
+      "agent": "dev",
+      "reason": "failure_class",
+      "failure_class": "unresolved_source",
+      "count": 4,
+      "cases": 4,
+      "held_out": 2,
+      "outcome": "proposed",
+      "note": null
+    },
+    {
+      "agent": "qa",
+      "reason": "failure_class",
+      "failure_class": "sin_datos",
+      "count": 3,
+      "cases": 4,
+      "held_out": 2,
+      "outcome": "deferred",
+      "note": null
+    }
+  ]
+}
+
+--- stderr
+

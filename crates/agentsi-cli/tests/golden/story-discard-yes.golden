@@ -1,0 +1,61 @@
+## story discard S002
+exit: 0
+--- stdout
+Discarded S002 Star mail (story, owner dev, 2 criteria)
+
+--- stderr
+
+## story list
+exit: 0
+--- stdout
+S001  not_implemented  approved           ready   dev  Filter mail
+S002  discarded        pending            -       dev  Star mail
+T003  not_implemented  approved           -       dev  Drop the old cache
+S004  not_implemented  approved           -       dev  Mark mail as read
+S005  not_implemented  approved           failed  dev  Pin mail
+S006  not_implemented  approved           work    dev  Snooze mail
+S007  not_implemented  changes_requested  -       dev  Archive mail
+S008  implemented      approved           -       dev  Sort by sender
+
+--- stderr
+
+## story show S002
+exit: 0
+--- stdout
+# S002 Star mail
+
+<!-- Rendered from the story JSON in the database. -->
+
+- Type: story
+- Owner: dev
+- Status: discarded
+- Approval: pending
+- Proposed by: pm
+
+**As a** a reader
+
+**I want** to star mail
+
+**So that** the inbox stays calm
+
+## Criteria
+
+### 1
+
+- **Given** a mailbox with 1 mails
+- **When** the user opens the list
+- **Then** the list shows 1 rows
+- Test: `test/list-1.test.sh`
+- Checks: The list shows 1 rows.
+
+### 2
+
+- **Given** a mailbox with 2 mails
+- **When** the user opens the list
+- **Then** the list shows 2 rows
+- Test: `test/list-2.test.sh`
+- Checks: The list shows 2 rows.
+
+
+--- stderr
+

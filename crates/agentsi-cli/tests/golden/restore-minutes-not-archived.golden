@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi restore: Minutes alpha-001 is not archived.
+

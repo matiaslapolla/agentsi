@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reflect: Reflection "r-2" is a revert; it cannot be reverted.
+

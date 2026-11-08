@@ -1,0 +1,56 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+rust-version = "1.96"
+
+[workspace.dependencies]
+gpui = { package = "gpui-pre", version = "=0.3.11" }
+# Without the `wayland` feature the program has no window and prints nothing.
+gpui_platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["wayland", "x11", "font-kit"] }
+gpui-kit = "=0.9.0"
+agentsi-agency = { path = "crates/agentsi-agency" }
+agentsi-models = { path = "crates/agentsi-models" }
+agentsi-proto = { path = "crates/agentsi-proto" }
+agentsi-pty = { path = "crates/agentsi-pty" }
+agentsi-store = { path = "crates/agentsi-store" }
+agentsi-vt = { path = "crates/agentsi-vt" }
+agentsi-voice = { path = "crates/agentsi-voice", default-features = false }
+agentsi-ui = { path = "crates/agentsi-ui" }
+cpal = "0.18"
+futures = "0.3"
+libc = "0.2"
+# The container of the old `call.webm` files, which the Python package wrote with ffmpeg.
+matroska-demuxer = "=0.8.1"
+# The container of the new `call.opus` files.
+ogg = "=0.9.2"
+# libopus, built from its bundled source (needs cmake). It encodes new calls and decodes old and new ones.
+opusic-sys = "=0.7.7"
+# ONNX Runtime 1.31. `download-binaries` fetches the prebuilt MIT library at build time, so a fresh clone builds with no other step.
+ort = { version = "=2.0.0-rc.15", default-features = false, features = ["std", "download-binaries", "tls-rustls"] }
+postgres = "0.19"
+regex = "=1.13.1"
+rusqlite = { version = "0.40", features = ["bundled", "backup"] }
+schemars = "1"
+serde = { version = "1", features = ["derive"] }
+# preserve_order: the core answers with the keys in the order of the TypeScript output (the audit marks).
+serde_json = { version = "1", features = ["preserve_order"] }
+sha2 = "0.10"
+tempfile = "3"
+toml = "0.8"
+ureq = "3"
+tokio = { version = "1", features = ["rt", "net", "io-util", "sync", "time", "macros", "signal"] }
+
+[profile.release]
+debug = false
+
+# Full debug info made each app test binary about 800 MB, and parallel links filled the disk.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false

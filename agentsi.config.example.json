@@ -1,0 +1,6 @@
+{
+  "owner": { "name": "the owner", "language": "English" },
+  "products": [
+    { "id": "miapp", "name": "MiApp", "paths": ["/abs/path/to/miapp"], "status": "active", "roles": ["pm", "dev", "qa", "scout"], "stories": { "test": "node --import tsx --test {files}", "gate": ["pnpm typecheck", "pnpm lint"] } }
+  ]
+}

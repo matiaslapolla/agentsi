@@ -1,0 +1,13 @@
+# role -> engine:voice. Piper/Kokoro models and Chatterbox reference clips live in
+# TTS_MODELS_DIR (default ${XDG_DATA_HOME:-~/.local/share}/agentsi/models); the
+# Chatterbox runtime lives in CHATTERBOX_DIR. See VOICES.md in the repo root.
+# A voices.toml in the data root replaces this file.
+lang = "en-us"
+default = "kokoro:af_heart"
+
+[roles]
+pm = "kokoro:af_heart"
+dev = "kokoro:am_adam"
+social = "kokoro:af_sarah"
+qa = "kokoro:am_puck"
+scout = "kokoro:af_aoede"

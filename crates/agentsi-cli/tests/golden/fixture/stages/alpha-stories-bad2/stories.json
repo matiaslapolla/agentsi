@@ -1,0 +1,1 @@
+{"test": "pnpm test", "gate": ["a"], "repo": "relative/path"}

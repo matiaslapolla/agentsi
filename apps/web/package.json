@@ -1,0 +1,48 @@
+{
+  "name": "@agentsi/web",
+  "version": "0.2.0",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev -p 3361 -H 127.0.0.1",
+    "build": "next build",
+    "start": "next start -p 3361 -H 127.0.0.1",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "node --import tsx --test \"lib/**/*.test.ts\"",
+    "smoke": "tsx scripts/smoke.ts",
+    "smoke:demo": "tsx scripts/smoke.ts --demo --report ../../docs/reviews/web-smoke-demo.md",
+    "demo:seed": "tsx scripts/demo.ts seed",
+    "demo:clean": "tsx scripts/demo.ts clean"
+  },
+  "dependencies": {
+    "@agentsi/core": "workspace:*",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.55.0",
+    "next": "16.4.3",
+    "pg": "^8.23.1",
+    "radix-ui": "^1.8.1",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.3",
+    "@types/node": "^24.19.2",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "eslint": "10.12.0",
+    "eslint-config-next": "16.4.3",
+    "playwright-core": "1.64.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,22 @@
+[
+  {"id": 1, "text": "Muy bien, entonces aceptá los permisos y probá de nuevo el despliegue con la cuenta correcta de GitHub, a ver cuál es el problema."},
+  {"id": 2, "text": "Perfecto, necesito que me digas en qué trabajamos la última vez y si quedan decisiones abiertas o historias pendientes."},
+  {"id": 3, "text": "Dale, aprobá la propuesta y hacé el commit de la actualización, así queda el repositorio limpio."},
+  {"id": 4, "text": "Bien, armemos una reunión de la agencia sobre las últimas siete unidades y la unificación de los repositorios en una sola acta."},
+  {"id": 5, "text": "Quizás si cambiás la cuenta activa podés revisar si todo se subió y se desplegó."},
+  {"id": 6, "text": "Tengo una pregunta: la función de ubicaciones es nueva, ¿se activa desde la organización o se configura en cada producto?"},
+  {"id": 7, "text": "Abrí una sesión de la agencia y decime qué fue lo último que se publicó en este repositorio."},
+  {"id": 8, "text": "No me convence esa solución, preferiría que el núcleo guarde el estado y que la aplicación sólo lo muestre."},
+  {"id": 9, "text": "Corré las pruebas del panel de la terminal y mostrame cuáles fallan antes de tocar nada."},
+  {"id": 10, "text": "Qué buena idea, anotala en el documento de ideas y después la discutimos con el equipo."},
+  {"id": 11, "text": "Necesito que revises el formulario de configuración, porque el botón de guardar no hace nada cuando el campo está vacío."},
+  {"id": 12, "text": "Pasame un resumen corto de la decisión y de las dos alternativas que descartamos ayer."},
+  {"id": 13, "text": "El micrófono funciona bien, pero la transcripción se tarda demasiado cuando hay mucho ruido en la habitación."},
+  {"id": 14, "text": "Vamos a dejar la migración para la semana próxima, primero quiero terminar la pantalla de ajustes."},
+  {"id": 15, "text": "Creá una rama nueva para esta unidad y hacé commits chicos, uno por cada parte terminada."},
+  {"id": 16, "text": "Mostrame el estado de las historias y marcá las que ya tienen una revisión aprobada."},
+  {"id": 17, "text": "Por favor explicame con palabras simples por qué falló la descarga del modelo a la mitad."},
+  {"id": 18, "text": "Me gustaría escuchar la respuesta en voz alta mientras reviso el código en la otra pantalla."},
+  {"id": 19, "text": "Buenísimo, entonces cerramos esta sesión y mañana seguimos con la parte del vocabulario personalizado."},
+  {"id": 20, "text": "Antes de publicar, revisá que el archivo de licencias incluya el modelo de reconocimiento de voz."}
+]

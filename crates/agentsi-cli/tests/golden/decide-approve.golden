@@ -1,0 +1,7 @@
+exit: 0
+--- stdout
+Decision 2 approved (alpha-002).
+Action: Remove the export flag
+
+--- stderr
+

@@ -1,0 +1,8 @@
+# Copy to ~/.config/systemd/user/ with agentsi-backup.timer, then: systemctl --user enable --now agentsi-backup.timer
+[Unit]
+Description=AgentSI database backup (agentsi backup)
+
+[Service]
+Type=oneshot
+# A login shell finds node and docker the same way the terminal does.
+ExecStart=/usr/bin/env bash -lc 'agentsi backup'

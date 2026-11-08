@@ -1,0 +1,23 @@
+[
+  {
+    "idx": 0,
+    "role": "pm",
+    "text": "Welcome to the test meeting. Today we check the call.",
+    "start": 0.0,
+    "end": 3.059
+  },
+  {
+    "idx": 1,
+    "role": "dev",
+    "text": "The build is green, and the parser bug is fixed.",
+    "start": 3.409,
+    "end": 5.926
+  },
+  {
+    "idx": 2,
+    "role": "qa",
+    "text": "I ran the card tests twice. Both runs passed.",
+    "start": 6.276,
+    "end": 9.356
+  }
+]

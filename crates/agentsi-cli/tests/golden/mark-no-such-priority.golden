@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi mark: Minutes alpha-002 has no priority #5 (0..1)
+

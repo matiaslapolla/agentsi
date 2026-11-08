@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi meet: Product gamma is archived. Run agentsi restore --product gamma to bring it back.
+

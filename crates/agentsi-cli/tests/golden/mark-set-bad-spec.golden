@@ -1,0 +1,10 @@
+exit: 1
+--- stdout
+
+--- stderr
+Bad --set "alpha-002:0:maybe". Use <minutes-id>:<idx>:accepted|changed|rejected[:new]
+Usage: agentsi mark <minutes-id> <idx> accepted|changed|rejected [--new]
+       agentsi mark --set <minutes-id>:<idx>:<mark>[:new] [--set ...]
+       agentsi mark --pending [--json] [--product <id>]
+       agentsi mark [--product <id>]   (wizard, needs a terminal)
+

@@ -1,0 +1,14 @@
+exit: 0
+--- stdout
+S005 Pin mail
+Session: failed, attempt 2, branch story/S005-pin-mail
+Worktree: <WORK>/repos/beta/.worktrees/S005-pin-mail
+Stopped: budget, cap USD 2.00 for each session.
+The criterion tests fail:
+not ok 1 - pin
+Log: story_logs beta/S005
+
+Discard: agentsi story reject S005
+
+--- stderr
+

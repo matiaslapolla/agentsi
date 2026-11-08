@@ -1,0 +1,42 @@
+## story reject S005
+exit: 0
+--- stdout
+Story S005 discarded: worktree and branch removed. It can run again.
+
+--- stderr
+
+## story reject S006
+exit: 0
+--- stdout
+Story S006 discarded: worktree and branch removed. It can run again.
+
+--- stderr
+
+## story list
+exit: 0
+--- stdout
+S001  not_implemented  approved           ready  dev  Filter mail
+S002  not_implemented  pending            -      dev  Star mail
+T003  not_implemented  approved           -      dev  Drop the old cache
+S004  not_implemented  approved           -      dev  Mark mail as read
+S005  not_implemented  approved           -      dev  Pin mail
+S006  not_implemented  approved           -      dev  Snooze mail
+S007  not_implemented  changes_requested  -      dev  Archive mail
+S008  implemented      approved           -      dev  Sort by sender
+
+--- stderr
+
+## story review S006
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: Story S006 has no story session.
+
+## story run S005
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: .worktrees/ is not gitignored in <WORK>/repos/beta. Add it to the product's .gitignore before a story session.
+

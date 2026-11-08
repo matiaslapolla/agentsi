@@ -1,0 +1,9 @@
+exit: 0
+--- stdout
+1. Decision 8 · beta-001
+  Publish the docs
+  why: Docs are ready.
+  action: Push the docs
+
+--- stderr
+

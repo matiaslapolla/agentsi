@@ -1,0 +1,30 @@
+exit: 0
+--- stdout
+1. Priority alpha-002 #0 · owner dev · objective o1
+  Fix the flaky test
+  why: It fails one run in five.
+  sources: abc1234
+2. Priority alpha-002 #1 · owner pm · objective o2
+  Plan the beta
+  why: The date is open.
+3. Decision 2 · alpha-002
+  Drop the legacy export
+  why: Nobody uses it.
+  action: Remove the export flag
+4. Decision 3 · alpha-002
+  Move the demo date
+  why: The build is late.
+5. Decision 4 · product
+  Pick a license
+  why: The repo goes public.
+  action: Write LICENSE
+6. Decision 5 · alpha-003
+  Rename the module
+  why: The name is wrong.
+7. Decision 7 · product
+  Retire the old prompt of dev
+  why: Dev was rejected 3 times.
+  action: Approve the change
+
+--- stderr
+

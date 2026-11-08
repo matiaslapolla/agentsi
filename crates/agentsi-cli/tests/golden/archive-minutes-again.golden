@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi archive: Minutes alpha-004 is already archived.
+

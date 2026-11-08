@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: .worktrees/ is not gitignored in <WORK>/repos/beta. Add it to the product's .gitignore before a story session.
+

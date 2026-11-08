@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi ask: Specialist "dev.api" has no overlay in alpha
+

@@ -1,0 +1,31 @@
+[package]
+name = "agentsi-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Daemon"
+
+[dependencies]
+agentsi-agency = { workspace = true }
+agentsi-models = { workspace = true }
+agentsi-proto = { workspace = true }
+agentsi-pty = { workspace = true }
+agentsi-store = { workspace = true }
+agentsi-voice = { workspace = true, features = ["tts"] }
+agentsi-vt = { workspace = true }
+libc = { workspace = true }
+postgres = { workspace = true }
+rusqlite = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+# The speech-in model is not part of the core. Its test checks that it runs next to the voice.
+agentsi-voice = { workspace = true, features = ["tts", "stt"] }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+tokio = { workspace = true, features = ["rt-multi-thread"] }

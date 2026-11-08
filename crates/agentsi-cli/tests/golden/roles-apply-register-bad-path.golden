@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi roles: --path must be an existing absolute path, got "relative".
+

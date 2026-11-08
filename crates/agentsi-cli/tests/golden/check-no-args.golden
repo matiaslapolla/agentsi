@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+Missing <minutes.json>
+Usage: agentsi check <minutes.json> [--roles pm,dev]
+

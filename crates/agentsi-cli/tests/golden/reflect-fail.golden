@@ -1,0 +1,19 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rfail
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect
+exit: 1
+--- stdout
+
+--- stderr
+agentsi reflect: claude exited 3 without JSON: la curación falló
+

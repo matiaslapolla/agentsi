@@ -1,0 +1,48 @@
+{
+  "id": "T002",
+  "type": "task",
+  "slug": "ordenar-el-log-de-la-sesion",
+  "title": "Ordenar el log de la sesión",
+  "as_a": null,
+  "i_want": "que el log de cada sesión tenga una línea por paso",
+  "so_that": "un fallo se lea en segundos",
+  "criteria": [
+    {
+      "given": "una sesión que corrió los tests de QA",
+      "when": "el runner escribe el log",
+      "then": "cada paso tiene una línea con su hora",
+      "test": "packages/core/src/story-run.test.ts",
+      "checks": "El log tiene una línea por paso, con la hora."
+    },
+    {
+      "given": "una sesión que falló en los checks",
+      "when": "abro el log",
+      "then": "la última línea dice qué check falló",
+      "test": null,
+      "checks": "Revisión manual del log de una sesión fallida."
+    }
+  ],
+  "owner_role": "dev",
+  "objective": null,
+  "sources": [{ "type": "issue", "ref": "42" }],
+  "status": "not_implemented",
+  "approval": "approved",
+  "changes_note": null,
+  "proposed_by": "owner",
+  "minutes": null,
+  "session": {
+    "state": "failed",
+    "branch": "story/T002-ordenar-el-log-de-la-sesion",
+    "worktree": "/srv/demo/agentsi/.worktrees/T002-ordenar-el-log-de-la-sesion",
+    "base": "a19d5be",
+    "tests_commit": "b2c4d6e",
+    "final_commit": null,
+    "attempts": 2,
+    "failure": "pnpm lint: 2 errores en packages/core/src/story-run.ts",
+    "log": "workspace/agentsi/stories/T002.log",
+    "started_at": "2026-10-21T14:05:00.000Z"
+  },
+  "results": [],
+  "created_at": "2026-10-21T13:00:00.000Z",
+  "updated_at": "2026-10-21T14:40:00.000Z"
+}

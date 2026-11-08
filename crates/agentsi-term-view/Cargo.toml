@@ -1,0 +1,19 @@
+[package]
+name = "agentsi-term-view"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "GPUI terminal pane"
+
+[dependencies]
+agentsi-ui = { workspace = true }
+agentsi-vt = { path = "../agentsi-vt" }
+gpui-kit = { workspace = true }
+
+[dev-dependencies]
+agentsi-pty = { path = "../agentsi-pty" }
+futures = { workspace = true }
+# The GPUI test platform, for the tests of the pane view.
+gpui = { workspace = true, features = ["test-support"] }

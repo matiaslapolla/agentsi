@@ -1,0 +1,15 @@
+exit: 1
+--- stdout
+{
+  "passed": false,
+  "failures": [
+    "Priority #0 \"Write the docs\" objective is missing and must be one of the brief ids: b1.",
+    "Priority #0 \"Write the docs\" has no source.",
+    "No priority cites a north star declared in the brief (docs/missing.md).",
+    "Role \"scout\" has no answer.",
+    "Call script is empty."
+  ]
+}
+
+--- stderr
+

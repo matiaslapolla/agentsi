@@ -1,0 +1,54 @@
+exit: 0
+--- stdout
+{
+  "id": "S001",
+  "as_a": "a reader",
+  "slug": "filter-mail",
+  "type": "story",
+  "title": "Filter mail",
+  "i_want": "to filter mail",
+  "status": "not_implemented",
+  "minutes": null,
+  "results": [],
+  "session": {
+    "log": "story_logs beta/S001",
+    "pid": null,
+    "base": "80db04af1de62e8788c59e8f999e41200be92331",
+    "state": "ready",
+    "branch": "story/S001-filter-mail",
+    "failure": null,
+    "attempts": 1,
+    "worktree": "<WORK>/repos/beta/.worktrees/S001-filter-mail",
+    "started_at": "2026-10-13T10:00:00.000Z",
+    "final_commit": "e5d9a17965178ea2d505acff2ae7fb725ad3e840",
+    "tests_commit": "bb569c76d6956a20abcc452e9b38f5150f596237"
+  },
+  "so_that": "the inbox stays calm",
+  "sources": [],
+  "approval": "approved",
+  "criteria": [
+    {
+      "test": "test/list-1.test.sh",
+      "then": "the list shows 1 rows",
+      "when": "the user opens the list",
+      "given": "a mailbox with 1 mails",
+      "checks": "The list shows 1 rows."
+    },
+    {
+      "test": "test/list-2.test.sh",
+      "then": "the list shows 2 rows",
+      "when": "the user opens the list",
+      "given": "a mailbox with 2 mails",
+      "checks": "The list shows 2 rows."
+    }
+  ],
+  "objective": null,
+  "created_at": "2026-10-11T10:00:00.000Z",
+  "owner_role": "dev",
+  "updated_at": "2026-10-12T10:00:00.000Z",
+  "proposed_by": "pm",
+  "changes_note": null
+}
+
+--- stderr
+

@@ -1,0 +1,131 @@
+whisper-base                   1 wer=0.07 t=1.04s  All right, so I accepted the permissions. So use the CLI and attempt t
+whisper-base                   2 wer=0.06 t=1.00s  Fantastic. All right. So I need you to tell me what was the last stuff
+whisper-base                   3 wer=0.00 t=0.92s  Sure, approve 114 and commit the next upgrade, and I think that leads
+whisper-base                   4 wer=0.05 t=1.08s  All right, fantastic. So let's spin up an agency meeting about what wa
+whisper-base                   5 wer=0.00 t=0.84s  Maybe if you switch the active GitHub account you can check if everyth
+whisper-base                   6 wer=0.00 t=0.95s  Good, I have a question. So the locations feature, which is a new feat
+whisper-base                   7 wer=0.00 t=0.86s  So spin up agency session and tell me what was the last thing that was
+whisper-base                   8 wer=0.08 t=0.87s  All right, go ahead and implement everything that's missing to shift e
+whisper-base                   9 wer=0.10 t=0.94s  All right, accept T026 and merge it, update my database, import the da
+whisper-base                  10 wer=0.09 t=0.90s  All right, so I need you to start the repository and the database here
+whisper-base                  11 wer=0.07 t=0.94s  All right, so I see you said some test files still spec the story file
+whisper-base                  12 wer=0.11 t=1.06s  All right, so I want you to spin up a story to let's merge these two r
+whisper-base                  13 wer=0.00 t=0.69s  All right, fix what's fixable and commit and push everything.
+whisper-base                  14 wer=0.05 t=0.84s  See how useful is herder on our setup. I mean for all the projects I h
+whisper-base                  15 wer=0.15 t=0.70s  All right, go ahead. I accept S24 and go with the steps you said.
+whisper-base                  16 wer=0.00 t=0.82s  Sure, fix that document and review the production database and see if
+whisper-base                  17 wer=0.00 t=0.78s  Sure, so write a story for agency and start the work.
+whisper-base                  18 wer=0.13 t=0.98s  How hard would it be to build a CLI command here in Agent C that allow
+whisper-base                  19 wer=0.00 t=1.05s  what happens if we close those PRs before merging? I mean I want to di
+whisper-base                  20 wer=0.05 t=1.17s  All right, Claude, so I need you to tell me what were the last things
+Fetching 5 files:   0%|          | 0/5 [00:00<?, ?it/s]Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+Fetching 5 files:  40%|████      | 2/5 [00:00<00:00,  6.09it/s]Fetching 5 files:  80%|████████  | 4/5 [00:18<00:05,  5.41s/it]Fetching 5 files: 100%|██████████| 5/5 [00:31<00:00,  7.62s/it]Fetching 5 files: 100%|██████████| 5/5 [00:31<00:00,  6.28s/it]
+whisper-large-v3-turbo         1 wer=0.07 t=7.71s  All right, so I accepted the permissions. So use the CLI and attempt t
+whisper-large-v3-turbo         2 wer=0.06 t=7.78s  Fantastic, all right. So I need you to tell me what was the last stuff
+whisper-large-v3-turbo         3 wer=0.00 t=6.89s  Sure, approve 114 and commit the next upgrade. And I think that leads
+whisper-large-v3-turbo         4 wer=0.05 t=8.15s  All right, fantastic. So let's spin up an agency meeting about what wa
+whisper-large-v3-turbo         5 wer=0.00 t=6.99s  Maybe if you switch the active GitHub account you can check if everyth
+whisper-large-v3-turbo         6 wer=0.00 t=7.32s  Good, I have a question. So the locations feature, which is a new feat
+whisper-large-v3-turbo         7 wer=0.00 t=7.14s  So spin up agency session and tell me what was the last thing that was
+whisper-large-v3-turbo         8 wer=0.08 t=6.77s  All right, go ahead and implement everything that's missing to shift e
+whisper-large-v3-turbo         9 wer=0.00 t=7.90s  Alright, accept T026 and merge it, update my database, import the data
+whisper-large-v3-turbo        10 wer=0.00 t=7.15s  Alright, so I need you to start the repository and the database here l
+whisper-large-v3-turbo        11 wer=0.07 t=14.13s  All right, so I see you said some test files still spec the story file
+whisper-large-v3-turbo        12 wer=0.06 t=15.19s  All right, so I want you to spin up a story to let's merge these two r
+whisper-large-v3-turbo        13 wer=0.00 t=5.66s  All right, fix what's fixable and commit and push everything.
+whisper-large-v3-turbo        14 wer=0.05 t=5.67s  See how useful is Herder on our setup. I mean for all the projects I h
+whisper-large-v3-turbo        15 wer=0.15 t=6.44s  All right, go ahead. I accept S24 and go with the steps you said.
+whisper-large-v3-turbo        16 wer=0.00 t=6.56s  Sure, fix that document and review the production database and see if
+whisper-large-v3-turbo        17 wer=0.00 t=5.47s  Sure, so write a story for agency and start the work.
+whisper-large-v3-turbo        18 wer=0.13 t=6.83s  How hard would it be to build a CLI command here in Agent C that allow
+whisper-large-v3-turbo        19 wer=0.00 t=7.22s  What happens if we close those PRs before merging? I mean I want to di
+whisper-large-v3-turbo        20 wer=0.05 t=6.95s  All right, Claude, so I need you to tell me what were the last things
+parakeet-v2                    1 wer=0.00 t=0.42s  Alright, so I accepted the permissions. So use the CLI and attempt to
+parakeet-v2                    2 wer=0.06 t=0.45s  Fantastic, all right. So I need you to tell me what was the last stuff
+parakeet-v2                    3 wer=0.00 t=0.40s  Sure, approve 114 and commit the next upgrade, and I think that leads
+parakeet-v2                    4 wer=0.00 t=0.66s  Alright, fantastic. So let's spin up an agency meeting about what was
+parakeet-v2                    5 wer=0.00 t=0.37s  Maybe if you switch the active GitHub account you can check if everyth
+parakeet-v2                    6 wer=0.00 t=0.46s  Good, I have a question. So the locations feature, which is a new feat
+parakeet-v2                    7 wer=0.00 t=0.36s  So, spin up agency session and tell me what was the last thing that wa
+parakeet-v2                    8 wer=0.04 t=0.52s  Alright, go ahead and implement everything that's missing to shift ent
+parakeet-v2                    9 wer=0.00 t=0.47s  Alright, accept T026 and merge it, update my database, import the data
+parakeet-v2                   10 wer=0.09 t=0.47s  Alright, so I need you to start the repository and the database here l
+parakeet-v2                   11 wer=0.00 t=0.47s  Alright, so I see you said some test files still spec the story files
+parakeet-v2                   12 wer=0.03 t=0.57s  Alright, so I want you to spin up a story to let's merge these two rep
+parakeet-v2                   13 wer=0.00 t=0.29s  All right, fix what's fixable and commit and push everything.
+parakeet-v2                   14 wer=0.05 t=0.35s  See how useful is Herder on our setup. I mean for all the projects I h
+parakeet-v2                   15 wer=0.23 t=0.32s  Alright, go ahead. I accept S twenty-four and go with the steps you sa
+parakeet-v2                   16 wer=0.00 t=0.39s  Sure, fix that document and review the production database and see if
+parakeet-v2                   17 wer=0.00 t=0.23s  Sure, so write a story for agency and start the work.
+parakeet-v2                   18 wer=0.13 t=0.55s  How hard would it be to build a CLI command here in Agent C that allow
+parakeet-v2                   19 wer=0.00 t=0.51s  What happens if we close those PRs before merging? I mean I want to di
+parakeet-v2                   20 wer=0.00 t=0.45s  Alright, Claude, so I need you to tell me what were the last things we
+Fetching 4 files:   0%|          | 0/4 [00:00<?, ?it/s]Fetching 4 files:  25%|██▌       | 1/4 [00:00<00:00,  4.06it/s]Fetching 4 files:  75%|███████▌  | 3/4 [00:08<00:02,  2.98s/it]Fetching 4 files: 100%|██████████| 4/4 [00:23<00:00,  7.31s/it]Fetching 4 files: 100%|██████████| 4/4 [00:23<00:00,  5.90s/it]
+parakeet-v3                    1 wer=0.00 t=0.43s  Alright, so I accepted the permissions. So use the CLI and attempt to
+parakeet-v3                    2 wer=0.00 t=0.56s  Fantastic, alright. So I need you to tell me what was the last stuff w
+parakeet-v3                    3 wer=0.00 t=0.39s  Sure, approve 114 and commit the next upgrade, and I think that leads
+parakeet-v3                    4 wer=0.00 t=0.64s  Alright, fantastic. So let's spin up an agency meeting about what was
+parakeet-v3                    5 wer=0.00 t=0.37s  Maybe if you switch the active GitHub account you can check if everyth
+parakeet-v3                    6 wer=0.00 t=0.54s  Good, I have a question. So the locations feature, which is a new feat
+parakeet-v3                    7 wer=0.00 t=0.38s  So spin up agency session and tell me what was the last thing that was
+parakeet-v3                    8 wer=0.04 t=0.51s  Alright, go ahead and implement everything that's missing to shift ent
+parakeet-v3                    9 wer=0.00 t=0.41s  Alright, accept T026 and merge it, update my database, import the data
+parakeet-v3                   10 wer=0.00 t=0.46s  Alright, so I need you to start the repository and the database here l
+parakeet-v3                   11 wer=0.00 t=0.40s  Alright, so I see you said some test files still spec the story files
+parakeet-v3                   12 wer=0.00 t=0.42s  Alright, so I want you to spin up a story to let's merge these two rep
+parakeet-v3                   13 wer=0.20 t=0.22s  Alright, fix what's fixable and commit and push everything.
+parakeet-v3                   14 wer=0.05 t=0.34s  See how useful is Herder on our setup. I mean for all the projects I h
+parakeet-v3                   15 wer=0.00 t=0.26s  Alright, go ahead. I accept S24 and go with the steps you said.
+parakeet-v3                   16 wer=0.00 t=0.45s  Sure, fix that document and review the production database and see if
+parakeet-v3                   17 wer=0.00 t=0.21s  Sure, so write a story for agency and start the work.
+parakeet-v3                   18 wer=0.13 t=0.54s  How hard would it be to build a CLI command here in agent C that allow
+parakeet-v3                   19 wer=0.00 t=0.51s  What happens if we close those PRs before merging? I mean I want to di
+parakeet-v3                   20 wer=0.00 t=0.47s  Alright, Claude, so I need you to tell me what were the last things we
+hex-parakeet_unified_en        1 wer=0.00 t=4.60s  Alright, so I accepted the permissions. So use the CLI and attempt to
+hex-parakeet_unified_en        2 wer=0.00 t=1.01s  Fantastic, alright. So I need you to tell me what was the last stuff w
+hex-parakeet_unified_en        3 wer=0.00 t=0.97s  Sure, approve 114 and commit the next upgrade, and I think that leads
+hex-parakeet_unified_en        4 wer=0.00 t=1.04s  Alright, fantastic. So let's spin up an agency meeting about what was
+hex-parakeet_unified_en        5 wer=0.00 t=0.96s  Maybe if you switch the active GitHub account you can check if everyth
+hex-parakeet_unified_en        6 wer=0.00 t=1.00s  Good I have a question. So the locations feature, which is a new featu
+hex-parakeet_unified_en        7 wer=0.00 t=0.96s  So, spin up agency session, and tell me what was the last thing that w
+hex-parakeet_unified_en        8 wer=0.04 t=1.01s  Alright, go ahead and implement everything that's missing to shift ent
+hex-parakeet_unified_en        9 wer=0.00 t=0.98s  Alright, accept T026 and merge it, update my database, import the data
+hex-parakeet_unified_en       10 wer=0.00 t=0.98s  Alright, so I need you to start the repository and the database here l
+hex-parakeet_unified_en       11 wer=0.00 t=1.00s  Alright, so I see you said some test files still spec the story files
+hex-parakeet_unified_en       12 wer=0.03 t=1.02s  Alright, so I want you to spin up a story to let's merge these two rep
+hex-parakeet_unified_en       13 wer=0.20 t=0.94s  Alright, fix what's fixable and commit, and push everything.
+hex-parakeet_unified_en       14 wer=0.05 t=0.96s  See how useful is Herder on our setup. I mean for all the projects I h
+hex-parakeet_unified_en       15 wer=0.00 t=0.94s  Alright, go ahead. I accept S24 and go with the steps you said.
+hex-parakeet_unified_en       16 wer=0.00 t=0.98s  Sure, fix that document and review the production database and see if
+hex-parakeet_unified_en       17 wer=0.00 t=0.92s  Sure, so write a story for agency and start the work.
+hex-parakeet_unified_en       18 wer=0.13 t=1.01s  How hard would it be to build a CLI command here in Agent C that allow
+hex-parakeet_unified_en       19 wer=0.00 t=1.08s  What happens if we close those PRs before merging? I mean I want to di
+hex-parakeet_unified_en       20 wer=0.00 t=1.04s  Alright Claude, so I need you to tell me what were the last things we
+hex-whisper_large_v3_turbo     1 wer=0.07 t=2.82s  All right, so I accepted the permissions. So use the CLI and attempt t
+hex-whisper_large_v3_turbo     2 wer=0.06 t=1.19s  Fantastic, all right. So I need you to tell me what was the last stuff
+hex-whisper_large_v3_turbo     3 wer=0.00 t=1.16s  Sure, approve 114 and commit the next upgrade, and I think that leads
+hex-whisper_large_v3_turbo     4 wer=0.05 t=1.24s  All right, fantastic. So let's spin up an agency meeting about what wa
+hex-whisper_large_v3_turbo     5 wer=0.00 t=1.16s  Maybe if you switch the active GitHub account you can check if everyth
+hex-whisper_large_v3_turbo     6 wer=0.00 t=1.18s  Good, I have a question. So the locations feature, which is a new feat
+hex-whisper_large_v3_turbo     7 wer=0.00 t=1.15s  So spin up agency session and tell me what was the last thing that was
+hex-whisper_large_v3_turbo     8 wer=0.00 t=1.18s  Alright, go ahead and implement everything that's missing to shift ent
+hex-whisper_large_v3_turbo     9 wer=0.00 t=1.18s  Alright, accept T026 and merge it, update my database, import the data
+hex-whisper_large_v3_turbo    10 wer=0.09 t=1.20s  Alright, so I need you to start the repository and the database here l
+hex-whisper_large_v3_turbo    11 wer=0.07 t=1.20s  All right, so I see you said some test files still spec the story file
+hex-whisper_large_v3_turbo    12 wer=0.03 t=1.21s  Alright, so I want you to spin up a story to let's merge these two rep
+hex-whisper_large_v3_turbo    13 wer=0.20 t=1.16s  Alright, fix what's fixable and commit, and push everything.
+hex-whisper_large_v3_turbo    14 wer=0.05 t=1.17s  See how useful is Herder on our setup. I mean for all the projects I h
+hex-whisper_large_v3_turbo    15 wer=0.00 t=1.14s  Alright, go ahead. I accept S24 and go with the steps you said.
+hex-whisper_large_v3_turbo    16 wer=0.00 t=1.17s  Sure, fix that document and review the production database and see if
+hex-whisper_large_v3_turbo    17 wer=0.00 t=1.15s  Sure, so write a story for agency and start the work.
+hex-whisper_large_v3_turbo    18 wer=0.13 t=1.19s  How hard would it be to build a CLI command here in Agent C that allow
+hex-whisper_large_v3_turbo    19 wer=0.00 t=1.21s  What happens if we close those PRs before merging? I mean I want to di
+hex-whisper_large_v3_turbo    20 wer=0.05 t=1.20s  All right, Claude, so I need you to tell me what were the last things
+
+model                        provider  load s  WER % s/sentence    RTF
+whisper-base                 cpu          1.1    5.4       0.92   0.11
+whisper-large-v3-turbo       cpu         34.4    4.2       7.70   0.92
+parakeet-v2                  cpu          2.0    2.8       0.44   0.05
+parakeet-v3                  cpu         26.0    1.6       0.42   0.05
+hex-parakeet_unified_en      hex          0.0    1.8       1.17   0.14
+hex-whisper_large_v3_turbo   hex          0.0    4.0       1.26   0.15

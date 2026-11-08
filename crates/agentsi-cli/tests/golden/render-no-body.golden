@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi render: Minutes "alpha-000" not found in any product
+

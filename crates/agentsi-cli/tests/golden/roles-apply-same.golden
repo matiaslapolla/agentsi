@@ -1,0 +1,12 @@
+exit: 0
+--- stdout
+Se configura alpha.
+
+Roster: pm, dev, qa -> pm, dev, qa
+
+Base de datos (brief y overlays): sin cambios.
+
+Simulacro: no se escribió nada. Repetí con --yes para aplicar.
+
+--- stderr
+

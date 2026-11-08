@@ -1,0 +1,15 @@
+exit: 1
+--- stdout
+
+--- stderr
+Unknown story subcommand "bogus".
+Usage: agentsi story list [--json] [--show-archived] [--product <id>]
+       agentsi story show <id> [--json] [--product <id>]
+       agentsi story new "<text>" [--type task] [--product <id>]
+       agentsi story suggest [--product <id>]
+       agentsi story changes <id> "<note>" [--product <id>]
+       agentsi story approve|discard <id> [--product <id>]
+       agentsi story run|review|accept <id> [--product <id>]
+       agentsi story reject <id> [--force] [--product <id>]
+       agentsi story result <id> merged_changed|merged_unchanged --commit <sha> [--product <id>]
+

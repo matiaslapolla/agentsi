@@ -1,0 +1,25 @@
+[package]
+name = "agentsi-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "CLI client of the core"
+
+[[bin]]
+name = "agentsi"
+path = "src/main.rs"
+
+[dependencies]
+agentsi-proto = { workspace = true }
+libc = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[dev-dependencies]
+agentsi-agency = { workspace = true }
+agentsi-store = { workspace = true }
+rusqlite = { workspace = true }
+tempfile = { workspace = true }

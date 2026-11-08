@@ -1,0 +1,25 @@
+exit: 1
+--- stdout
+{
+  "passed": false,
+  "failures": [
+    "Priority #0 \"Sin fuente\" has no source.",
+    "Priority #1 \"Objetivo malo\" objective \"o9\" must be one of the brief ids: o1, o2.",
+    "Priority #1: path source \"docs/none.md\" does not resolve.",
+    "Priority #1: commit source \"zzz\" does not resolve.",
+    "Priority #1: commit source \"deadbeef\" does not resolve.",
+    "Priority #1: issue source \"8\" does not resolve.",
+    "Priority #1: url source \"ftp://x\" does not resolve.",
+    "Priority #1: story source \"S999\" does not resolve.",
+    "Priority #1: other source \"x\" does not resolve.",
+    "Priority #2 \"Sin objetivo\" objective is missing and must be one of the brief ids: o1, o2.",
+    "Decision #0 \"Link\" links priority index 7, which does not exist (0 to 2).",
+    "Decision #0 \"Link\" links priority index -1, which does not exist (0 to 2).",
+    "No priority cites a north star declared in the brief (docs/vision.md).",
+    "Call script names story S001 by its id: say its title \"Sort mail\".",
+    "Call script names story S002 by its id: say its title \"Search mail\"."
+  ]
+}
+
+--- stderr
+

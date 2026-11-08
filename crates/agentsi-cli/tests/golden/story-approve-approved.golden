@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi story: Story S004 has approval approved; only a pending story can be approved.
+

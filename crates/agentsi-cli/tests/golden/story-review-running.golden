@@ -1,0 +1,12 @@
+exit: 0
+--- stdout
+S006 Snooze mail
+Session: work, attempt 1, branch story/S006-snooze-mail
+Worktree: <WORK>/repos/beta/.worktrees/S006-snooze-mail
+Checks: not done yet.
+Log: story_logs beta/S006
+
+Discard: agentsi story reject S006 (add --force to stop a session that still runs)
+
+--- stderr
+

@@ -1,0 +1,138 @@
+## ask --product beta --role dev --question=ask-is-it-ready
+exit: 0
+--- stdout
+El build tarda 9 minutos (docs/vision.md).
+
+--- stderr
+
+[dev · claude-sonnet-fake · 1.7s · in 560 (fresh 70, cache read 210, cache write 280) · out 140 · $0.0312]
+
+## @claude-calls
+exit: 0
+--- stdout
+=== ask-dev
+DISABLE_PROMPT_CACHING=
+cwd=<WORK>/repos/beta
+arg: -p
+arg: --model
+arg: sonnet
+arg: --system-prompt
+arg: You are the developer of a made-up product.
+arg: --no-session-persistence
+arg: --safe-mode
+arg: --restricted
+arg: --strict-mcp-config
+arg: --disable-slash-commands
+arg: --permission-mode
+arg: dontAsk
+arg: --permission-prompts
+arg: none
+arg: --max-budget-usd
+arg: 0.4
+arg: --tools=Read,Grep,Glob
+arg: --allowedTools
+arg: Read,Grep,Glob
+stdin:
+# Brief of the product
+<brief>
+<product stage="dreaming"><what>Second product</what><audience>Testers</audience></product>
+<objectives>
+<objective id="b1" due="2026-13-40" signal="Live">Launch</objective>
+</objectives>
+<north_stars><path>docs/missing.md</path></north_stars>
+<sources_of_truth>
+</sources_of_truth>
+<out_of_scope></out_of_scope>
+<roles>
+<agent id="pm">Keeps the plan.</agent>
+<agent id="extra">Not in the roster.</agent>
+</roles>
+</brief>
+
+# Snapshot of the product
+# Snapshot: Beta
+
+- Product: beta (planned)
+- Active roles: pm, dev, scout
+- Paths: <WORK>/repos/beta
+
+## North star and guidelines
+
+### CLAUDE.md
+
+# Beta guidelines
+
+- Keep each change small.
+- Write the test first.
+
+### README.md
+
+# Beta
+
+A second made-up product. It has one git repo and a few docs.
+
+## Stories
+
+- S001 Filter mail — not_implemented, approval approved, session ready
+- S002 Star mail — not_implemented, approval pending, session none
+- T003 Drop the old cache — not_implemented, approval approved, session none
+- S004 Mark mail as read — not_implemented, approval approved, session none
+- S005 Pin mail — not_implemented, approval approved, session failed
+- S006 Snooze mail — not_implemented, approval approved, session work
+- S007 Archive mail — not_implemented, approval changes_requested, session none
+
+Implemented: 1. Discarded: 0.
+
+## Open issues
+
+- #9 Fix the typo in the README
+- #7 Add a health route
+
+## Last minutes, priorities and marks
+
+### beta-001 — Is Beta ready?
+
+- #0 [x] Write the docs
+
+## Pending decisions
+
+- [8] Publish the docs → Push the docs
+
+## Commits, last 14 days
+
+2 commits
+
+- <HASH> <DATE> docs: write the launch plan
+- <HASH> <DATE> feat: first route
+
+## Journal tail
+
+# Journal
+
+- Session 1: wrote the API spec.
+- Session 2: wrote the launch plan.
+
+## Docs index
+
+- docs/ideas/widget.md — A widget idea
+- docs/specs/api.md — The API spec
+- docs/plans/launch.md — Launch plan
+- CLAUDE.md — Beta guidelines
+- README.md — Beta
+
+
+# Your memory about this product
+_Empty: you have not met on this product yet._
+
+# Question
+ask-is-it-ready
+
+# Instructions
+- You are the dev of the agency. Working directory: <WORK>/repos/beta (read-only: Read, Grep, Glob).
+- Answer in Spanish, short and direct. Keep identifiers, paths and code in English.
+- Base every claim on the snapshot, your memory or files you read. Write "[no data]" and name what is missing; never invent numbers, users, metrics or dates.
+- You only give opinions. Each change you propose is a decision Ada must approve. One priority you can defend beats five vague ones.
+- Cite sources inline: commit hashes, issue numbers or repo-relative paths. Plain text, no JSON.
+
+--- stderr
+

@@ -1,0 +1,65 @@
+## roles apply <WORK>/stages/alpha-ok --yes
+exit: 0
+--- stdout
+Se configura alpha.
+
+Roster: pm, dev, qa -> pm, dev, qa, dev.api
+  agregados: dev.api
+
+Base de datos (brief y overlays):
+  nuevo  alpha/agents/dev.api.md
+  cambiado  alpha/agents/qa.md
+    @@ -1,4 +1,5 @@
+     ---
+    -model: haiku
+    +model: sonnet
+     ---
+    -You are the QA of Alpha.
+    \ No newline at end of file
+    +You are the QA of Alpha.
+    +Break the importer first.
+    \ No newline at end of file
+  cambiado  alpha/brief.json
+    @@ -4,5 +4,5 @@
+         "what": "Mail sorter",
+         "audience": "Busy people",
+    -    "stage": "building"
+    +    "stage": "launched"
+       },
+       "objectives": [
+    @@ -28,5 +28,6 @@
+         "pm": "Keeps the plan.",
+         "dev": "Builds it.",
+    -    "qa": "Breaks it."
+    +    "qa": "Breaks it.",
+    +    "dev.api": "Builds the API."
+       },
+       "updated_at": "2026-10-01T10:00:00.000Z"
+
+Aplicado y commiteado.
+
+--- stderr
+Agent "dev.api": dropped tools not allowed in meetings: Bash
+
+## roles apply <WORK>/stages/alpha-ok
+exit: 0
+--- stdout
+Se configura alpha.
+
+Roster: pm, dev, qa, dev.api -> pm, dev, qa, dev.api
+
+Base de datos (brief y overlays): sin cambios.
+
+Simulacro: no se escribió nada. Repetí con --yes para aplicar.
+
+--- stderr
+Agent "dev.api": dropped tools not allowed in meetings: Bash
+
+## @commits
+exit: 0
+--- stdout
+roles(alpha): set roster
+chore: the registry
+
+--- stderr
+

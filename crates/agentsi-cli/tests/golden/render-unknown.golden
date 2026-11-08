@@ -1,0 +1,6 @@
+exit: 1
+--- stdout
+
+--- stderr
+agentsi render: Minutes "nope-001" not found in any product
+

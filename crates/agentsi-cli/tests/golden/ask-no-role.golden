@@ -1,0 +1,7 @@
+exit: 1
+--- stdout
+
+--- stderr
+Missing --role
+Usage: agentsi ask [--product <id>] --role <role> --question "<q>"
+

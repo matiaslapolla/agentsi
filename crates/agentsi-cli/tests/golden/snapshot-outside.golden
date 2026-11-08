@@ -1,0 +1,7 @@
+exit: 2
+--- stdout
+
+--- stderr
+No product matches <WORK>/outside. Pass --product <id>.
+Usage: agentsi snapshot [--product <id>]
+

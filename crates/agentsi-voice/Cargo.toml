@@ -1,0 +1,55 @@
+[package]
+name = "agentsi-voice"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+publish = false
+description = "Speech in and out on ONNX Runtime"
+
+[features]
+default = ["tts", "stt"]
+# Speech out: Kokoro on ONNX Runtime. The workspace entry turns it off, so a crate
+# that needs only the text rules does not link ONNX Runtime.
+tts = ["dep:agentsi-models", "dep:ort"]
+# Speech in: Parakeet TDT on ONNX Runtime.
+stt = ["dep:agentsi-models", "dep:ort"]
+
+[dependencies]
+agentsi-models = { workspace = true, optional = true }
+ort = { workspace = true, optional = true }
+regex = { workspace = true }
+serde = { workspace = true }
+toml = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+
+[[example]]
+name = "fetch"
+required-features = ["tts"]
+
+[[example]]
+name = "phonemes"
+required-features = ["tts"]
+
+[[example]]
+name = "say"
+required-features = ["tts"]
+
+[[test]]
+name = "tts"
+required-features = ["tts"]
+
+[[example]]
+name = "transcribe"
+required-features = ["stt"]
+
+[[test]]
+name = "stt"
+required-features = ["stt"]
+
+[[test]]
+name = "vad"
+required-features = ["stt"]

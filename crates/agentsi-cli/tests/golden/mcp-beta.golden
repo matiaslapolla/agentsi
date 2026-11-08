@@ -1,0 +1,372 @@
+{
+  "id": 1,
+  "jsonrpc": "2.0",
+  "result": {
+    "capabilities": {
+      "tools": {
+        "listChanged": true
+      }
+    },
+    "protocolVersion": "2025-06-18",
+    "serverInfo": {
+      "name": "agentsi",
+      "version": "0.2.0"
+    }
+  }
+}
+
+{
+  "id": 2,
+  "jsonrpc": "2.0",
+  "result": {
+    "tools": [
+      {
+        "description": "Full-text search over the product's docs, journal, commits, issues and minutes. Returns ranked hits (kind, ref, title, snippet); read one with get_doc. Query in the language of the documents.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "description": "Only this kind. memory is searched only when named.",
+              "enum": [
+                "doc",
+                "journal",
+                "commit",
+                "issue",
+                "minutes",
+                "memory"
+              ],
+              "type": "string"
+            },
+            "limit": {
+              "default": 5,
+              "description": "Max hits (default 5).",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            },
+            "query": {
+              "description": "Terms. Quotes for phrases, 'or' for alternatives, '-' to exclude.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "query"
+          ],
+          "type": "object"
+        },
+        "name": "search"
+      },
+      {
+        "description": "Read one indexed item by kind and ref from a search hit. Bodies over 12000 chars are cut; use section or offset for the rest.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "description": "Kind, as in the search hit.",
+              "enum": [
+                "doc",
+                "journal",
+                "commit",
+                "issue",
+                "minutes",
+                "memory"
+              ],
+              "type": "string"
+            },
+            "offset": {
+              "description": "Character offset to start reading from.",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            },
+            "ref": {
+              "description": "Ref, as in the search hit. A commit hash prefix works.",
+              "minLength": 1,
+              "type": "string"
+            },
+            "section": {
+              "description": "Markdown heading text (case-insensitive): return only that section.",
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "ref"
+          ],
+          "type": "object"
+        },
+        "name": "get_doc"
+      },
+      {
+        "description": "List recent meeting minutes: id, status, date, question and the owner's marks on the priorities. Read one with get_doc kind=minutes.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "include_archived": {
+              "default": false,
+              "description": "Also list archived minutes, marked as archived (default false).",
+              "type": "boolean"
+            },
+            "limit": {
+              "default": 5,
+              "description": "Max minutes (default 5).",
+              "maximum": 50,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "list_minutes"
+      },
+      {
+        "description": "List decisions waiting for the owner's approval, grouped by minutes. Never act on a pending decision.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "limit": {
+              "default": 10,
+              "description": "Max decisions (default 10).",
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "pending_decisions"
+      },
+      {
+        "description": "Read what one role learned about this product (active memory items, newest first, with ids). Read it before answering in that role.",
+        "execution": {
+          "taskSupport": "forbidden"
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "additionalProperties": false,
+          "properties": {
+            "product": {
+              "description": "Product id. Default: product of the cwd.",
+              "type": "string"
+            },
+            "role": {
+              "description": "Agent id: pm, social, dev, qa, scout or a specialist such as dev.backend.",
+              "pattern": "^[a-z0-9_.-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        "name": "role_memory"
+      }
+    ]
+  }
+}
+
+{
+  "id": 3,
+  "jsonrpc": "2.0",
+  "result": {}
+}
+
+{
+  "id": 4,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "1. [commit] ref=<HASH>\n   feat: first route\n2. [issue] ref=7\n   Add a health route\n3. [doc] ref=docs/specs/api.md\n   The API spec",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 5,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "1. [commit] ref=<HASH>\n   docs: write the launch plan\n2. [doc] ref=docs/plans/launch.md\n   Launch plan\n3. [journal] ref=.claude/JOURNAL.md\n   Journal",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 6,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "1. [commit] ref=<HASH>\n   feat: first route",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 7,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "1. [issue] ref=7\n   Add a health route",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 8,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "1. [doc] ref=CLAUDE.md\n   Beta guidelines",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 9,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "# Beta\nkind=doc ref=README.md updated=<TIME>\n\n# Beta\n\nA second made-up product. It has one git repo and a few docs.",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 10,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "# Journal\nkind=journal ref=.claude/JOURNAL.md updated=<TIME>\n\n# Journal\n\n- Session 1: wrote the API spec.\n- Session 2: wrote the launch plan.",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 11,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "# Add a health route\nkind=issue ref=7 updated=<TIME>\n\nAdd a health route",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 12,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "No commit \"deadbeef\" in beta. Use search to find valid refs.",
+        "type": "text"
+      }
+    ],
+    "isError": true
+  }
+}
+
+{
+  "id": 13,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "beta-001 | valid | 2026-10-10 10:00 | Is Beta ready? | marks: 1 accepted",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 14,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "minutes beta-001:\n  #8 Publish the docs\n     why: Docs are ready.\n     action: Push the docs",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "id": 15,
+  "jsonrpc": "2.0",
+  "result": {
+    "content": [
+      {
+        "text": "",
+        "type": "text"
+      }
+    ]
+  }
+}
+
+{
+  "error": {
+    "code": -32601,
+    "message": "Method not found"
+  },
+  "id": 16,
+  "jsonrpc": "2.0"
+}

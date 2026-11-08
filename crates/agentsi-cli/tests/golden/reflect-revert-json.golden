@@ -1,0 +1,96 @@
+## @sql-reflect
+exit: 0
+--- stdout
+
+--- stderr
+
+## @scenario-rcurate
+exit: 0
+--- stdout
+
+--- stderr
+
+## reflect --memory-only
+exit: 0
+--- stdout
+Reflexión r-<STAMP> en alpha
+  señales: 16 (pm 6, qa 4, dev 6)
+  dev: 1 nuevos, 1 retirados, 1 útiles, 1 dañinos
+    --- a/alpha/memory/dev
+    +++ b/alpha/memory/dev
+    @@ -1,3 +1,3 @@
+    +- [m-<NEW>] Confirmar que un archivo existe antes de citarlo.
+     - [m-k001] El build usa pnpm.
+     - [m-k006] Citar solo lo que se leyó.
+    -- [m-k002] Hay una nota vieja sobre npm.
+    descartado: add "Una lección sin evidencia.": cites no signal
+    descartado: add "El build usa pnpm.": duplicates an item
+    descartado: add: empty text
+    descartado: retire m-k003: no active item
+    descartado: retire m-k001: no reason
+    descartado: helpful m-zzzz: no active item
+  pm: 1 nuevos, 0 retirados, 0 útiles, 1 dañinos
+    --- a/alpha/memory/pm
+    +++ b/alpha/memory/pm
+    @@ -1 +1,2 @@
+    +- [m-<NEW>] Marcar el objetivo de cada prioridad.
+     - [m-k004] El dueño lee las actas los lunes.
+  qa: 0 nuevos, 0 retirados, 0 útiles, 0 dañinos
+
+--- stderr
+reflect dev: dropped add "Una lección sin evidencia.": cites no signal
+reflect dev: dropped add "El build usa pnpm.": duplicates an item
+reflect dev: dropped add: empty text
+reflect dev: dropped retire m-k003: no active item
+reflect dev: dropped retire m-k001: no reason
+reflect dev: dropped helpful m-zzzz: no active item
+
+## reflect revert r-<STAMP> --json
+exit: 0
+--- stdout
+{
+  "id": "r-<STAMP>",
+  "product": "alpha",
+  "created_at": "<NOW>",
+  "trigger": "manual",
+  "reverts": "r-<STAMP>",
+  "signals": [],
+  "memory": [
+    {
+      "agent": "dev",
+      "added": [],
+      "retired": [
+        "m-<NEW>"
+      ],
+      "helpful": [],
+      "harmful": [
+        "m-<NEW>"
+      ],
+      "restored": [
+        "m-k002"
+      ],
+      "dropped": [],
+      "diff": "--- a/alpha/memory/dev\n+++ b/alpha/memory/dev\n@@ -1,3 +1,3 @@\n-- [m-<NEW>] Confirmar que un archivo existe antes de citarlo.\n - [m-k001] El build usa pnpm.\n - [m-k006] Citar solo lo que se leyó.\n+- [m-k002] Hay una nota vieja sobre npm.\n"
+    },
+    {
+      "agent": "pm",
+      "added": [],
+      "retired": [
+        "m-<NEW>"
+      ],
+      "helpful": [],
+      "harmful": [
+        "m-<NEW>"
+      ],
+      "restored": [],
+      "dropped": [],
+      "diff": "--- a/alpha/memory/pm\n+++ b/alpha/memory/pm\n@@ -1,2 +1 @@\n-- [m-<NEW>] Marcar el objetivo de cada prioridad.\n - [m-k004] El dueño lee las actas los lunes.\n"
+    }
+  ],
+  "proposal": null,
+  "status": "applied",
+  "commit": null
+}
+
+--- stderr
+

@@ -1,0 +1,250 @@
+{
+  "id": "2026-10-11-0930-foco-semanal",
+  "product": "_demo",
+  "scope": null,
+  "question": "¿En qué debería enfocarse MiApp esta semana para llegar al primer consultorio pagando?",
+  "created_at": "2026-10-11T09:30:00-03:00",
+  "roles": {
+    "pm": {
+      "model": "sonnet",
+      "answer": "El cuello de botella no es producto, es el cobro. Hay 120 commits en 30 días y ningún consultorio paga todavía. Propongo cerrar la suscripción mensual antes de sumar funciones nuevas, y dejar los recordatorios por WhatsApp para después.",
+      "priorities": [],
+      "concerns": [
+        "El alcance de recordatorios crece sin que un consultorio lo pida."
+      ],
+      "memory_notes": [
+        "El equipo prioriza cobrar antes que sumar módulos."
+      ]
+    },
+    "dev": {
+      "model": "sonnet",
+      "answer": "El webhook de pagos no es idempotente: si el proveedor repite una notificación, la suscripción se acredita dos veces. Es un arreglo de un día y hay que hacerlo antes de abrir cobros reales. Además, las migraciones de turnos siguen sin test.",
+      "priorities": [],
+      "concerns": [
+        "Dos migraciones sin rollback en el schema de turnos."
+      ],
+      "memory_notes": [
+        "El webhook vive en app/api/webhooks/pagos."
+      ]
+    },
+    "social": {
+      "model": "haiku",
+      "answer": "Hay material para tres posts con capturas reales de la agenda. Los profesionales de salud responden a clips cortos de una recepcionista, no a capturas sueltas. Sugiero un clip de 20 segundos dando un turno desde el celular.",
+      "priorities": [],
+      "concerns": [
+        "No hay cuenta de Instagram dedicada al producto."
+      ],
+      "memory_notes": []
+    },
+    "qa": {
+      "model": "haiku",
+      "answer": "El alta de paciente falla en Safari con la fecha de nacimiento vacía y devuelve un error 500 sin mensaje. Con cobros por delante, ese formulario es la puerta de entrada y hoy no tiene validación de servidor.",
+      "priorities": [],
+      "concerns": [
+        "Sin pruebas en iOS Safari desde hace seis semanas."
+      ],
+      "memory_notes": [
+        "Reproducir siempre en Safari antes de dar por cerrado un formulario."
+      ]
+    },
+    "scout": {
+      "model": "haiku",
+      "answer": "Dos competidores cobran por profesional activo y ofrecen un mes gratis. Ninguno cobra la seña del turno por adelantado. Ahí hay un hueco que MiApp puede ocupar si cierra el cobro primero.",
+      "priorities": [],
+      "concerns": [
+        "La fuente de precios de los competidores es una página pública que puede cambiar."
+      ],
+      "memory_notes": [
+        "Seguir los precios de dos competidores una vez al mes."
+      ]
+    }
+  },
+  "priorities": [
+    {
+      "title": "Hacer idempotente el webhook de pagos antes de cobrar",
+      "why": "Una notificación repetida acredita la suscripción dos veces. Es el riesgo más barato de eliminar antes del primer cobro real.",
+      "sources": [
+        {
+          "type": "commit",
+          "ref": "3f9c2a1e7b"
+        },
+        {
+          "type": "path",
+          "ref": "app/api/webhooks/pagos/route.ts"
+        },
+        {
+          "type": "issue",
+          "ref": "58"
+        }
+      ],
+      "owner_role": "dev",
+      "mark": "accepted",
+      "is_new": false
+    },
+    {
+      "title": "Cerrar la suscripción mensual con un consultorio piloto",
+      "why": "Es lo que separa un producto con uso de uno con ingresos. PRODUCT.md fija el primer consultorio pagando como norte del trimestre.",
+      "sources": [
+        {
+          "type": "path",
+          "ref": "PRODUCT.md"
+        },
+        {
+          "type": "path",
+          "ref": "docs/specs/suscripcion.md"
+        },
+        {
+          "type": "issue",
+          "ref": "41"
+        }
+      ],
+      "owner_role": "pm",
+      "mark": null,
+      "is_new": false
+    },
+    {
+      "title": "Validar en servidor el alta de paciente y probarla en Safari",
+      "why": "El formulario devuelve 500 con la fecha de nacimiento vacía en Safari. Es la entrada del embudo de cobro.",
+      "sources": [
+        {
+          "type": "commit",
+          "ref": "b71d04c9aa"
+        },
+        {
+          "type": "path",
+          "ref": "app/pacientes/nuevo/actions.ts"
+        }
+      ],
+      "owner_role": "qa",
+      "mark": "changed",
+      "is_new": true
+    },
+    {
+      "title": "Publicar un clip de 20 segundos dando un turno desde el celular",
+      "why": "Los profesionales de salud responden a demos con una recepcionista real. Sirve para conseguir el consultorio piloto.",
+      "sources": [
+        {
+          "type": "path",
+          "ref": "docs/ideas/marketing-consultorios.md"
+        },
+        {
+          "type": "issue",
+          "ref": "63"
+        }
+      ],
+      "owner_role": "social",
+      "mark": "rejected",
+      "is_new": false
+    }
+  ],
+  "disagreements": [
+    {
+      "topic": "Recordatorios antes o después del cobro",
+      "positions": [
+        {
+          "role": "pm",
+          "view": "Después. Ningún consultorio lo pidió y el cobro es lo único que valida el negocio."
+        },
+        {
+          "role": "scout",
+          "view": "Antes de abrir cobros conviene tener recordatorios: bajan el ausentismo, y eso vende."
+        },
+        {
+          "role": "dev",
+          "view": "Neutral, pero los recordatorios tocan el mismo modelo de turnos que la suscripción y conviene no mezclarlos."
+        }
+      ]
+    },
+    {
+      "topic": "Cuánto testear antes del piloto",
+      "positions": [
+        {
+          "role": "qa",
+          "view": "Hace falta una pasada completa en iOS Safari sobre alta, agenda y cobro."
+        },
+        {
+          "role": "dev",
+          "view": "Alcanza con cubrir alta y webhook. El resto se ve con el piloto en uso."
+        }
+      ]
+    }
+  ],
+  "decisions": [
+    {
+      "text": "Congelar los recordatorios por WhatsApp hasta que haya un consultorio pagando",
+      "why": "Evita ampliar el alcance sin validación. Vuelve al backlog con la fecha del primer cobro."
+    },
+    {
+      "text": "Abrir una cuenta de Instagram dedicada a MiApp",
+      "why": "Es el canal donde están los profesionales de salud, según el scout."
+    },
+    {
+      "text": "Usar un mes gratis como oferta para el consultorio piloto",
+      "why": "Los competidores lo ofrecen y baja la fricción de arranque."
+    }
+  ],
+  "script": [
+    {
+      "role": "pm",
+      "text": "Buenos días. La pregunta de hoy es qué hacemos esta semana para llegar al primer consultorio pagando."
+    },
+    {
+      "role": "dev",
+      "text": "Primero lo que me preocupa: el webhook de pagos no es idempotente. Si el proveedor repite una notificación, la suscripción se acredita dos veces."
+    },
+    {
+      "role": "pm",
+      "text": "Eso entra como primera prioridad. ¿Cuánto cuesta arreglarlo?"
+    },
+    {
+      "role": "dev",
+      "text": "Un día, con un índice único sobre el identificador del pago. Lo demás del cobro depende de eso."
+    },
+    {
+      "role": "qa",
+      "text": "Yo sumo un problema en la entrada del embudo. El alta de paciente devuelve un error 500 en Safari si la fecha de nacimiento viene vacía."
+    },
+    {
+      "role": "pm",
+      "text": "Entonces el formulario también va antes del cobro. Social, ¿qué ves del lado de la audiencia?"
+    },
+    {
+      "role": "social",
+      "text": "Hay material para un clip corto de una recepcionista dando un turno con el celular. A los consultorios les llega eso más que una captura."
+    },
+    {
+      "role": "scout",
+      "text": "Y del lado del mercado, dos competidores cobran por profesional activo y regalan el primer mes. Ninguno cobra la seña del turno por adelantado."
+    },
+    {
+      "role": "pm",
+      "text": "Ese es el hueco. Pero hay un desacuerdo: ¿recordatorios antes o después del cobro?"
+    },
+    {
+      "role": "scout",
+      "text": "Antes. Bajan el ausentismo, y eso vende."
+    },
+    {
+      "role": "dev",
+      "text": "Yo prefiero no mezclarlos. Recordatorios y suscripción tocan el mismo modelo de turnos."
+    },
+    {
+      "role": "pm",
+      "text": "Me quedo con después. Ningún consultorio lo pidió. Propongo congelar los recordatorios hasta que haya un consultorio pagando."
+    },
+    {
+      "role": "qa",
+      "text": "Con esa decisión, pido una pasada completa en Safari sobre alta, agenda y cobro antes del piloto."
+    },
+    {
+      "role": "pm",
+      "text": "Anotado. Quedan cuatro prioridades y tres decisiones para que confirmes. Gracias a todos."
+    }
+  ],
+  "check": {
+    "passed": true,
+    "failures": [],
+    "repaired": true
+  },
+  "status": "valid"
+}

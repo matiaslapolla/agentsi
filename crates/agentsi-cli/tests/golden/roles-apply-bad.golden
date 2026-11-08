@@ -1,0 +1,18 @@
+exit: 1
+--- stdout
+
+--- stderr
+La etapa no es válida:
+  - Agent "pm" is repeated in the roster.
+  - Agent id "Dev" does not match /^[a-z]+(-[a-z]+)*(\.[a-z]+(-[a-z]+)*)?$/.
+  - Agent "ghost": Unknown role "ghost" (no <WORK>/root/plugin/agents/ghost.md)
+  - Agent "dev.x": Specialist "dev.x" has no overlay in alpha
+  - Overlay "Stray.md" is not named after a valid agent id.
+  - Overlay "qa.md" belongs to an agent that is not in the roster.
+  - Brief: product.stage "dreaming" is not one of idea, building, launched, growing, maintenance.
+  - Brief: roles has no entry for roster agent "ghost".
+  - Brief: roles has no entry for roster agent "Dev".
+  - Brief: roles has no entry for roster agent "dev.x".
+  - Brief: roles entry "dev" is not in the roster.
+  - Brief: roles entry "qa" is not in the roster.
+
