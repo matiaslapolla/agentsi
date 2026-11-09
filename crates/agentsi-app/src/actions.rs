@@ -140,6 +140,24 @@ gpui_kit::actions!(
         OpenContextMenu,
         /// Asks for the text of a new story of the active product.
         NewStory,
+        /// Asks for the title of a new ticket of the active product.
+        NewTicket,
+        /// Opens the ticket under the cursor of the tickets, or the ticket in view.
+        OpenTicket,
+        /// Marks the ticket in view done.
+        TicketDone,
+        /// Asks what the ticket in view waits on.
+        TicketWait,
+        /// Drops the ticket in view.
+        TicketDrop,
+        /// Opens the ticket in view again.
+        TicketReopen,
+        /// Promotes the ticket in view to a story, after one Confirm.
+        PromoteTicketStory,
+        /// Promotes the ticket in view to a decision.
+        PromoteTicketDecision,
+        /// Copies the id of the ticket in view.
+        CopyTicketId,
         /// Runs the reflection of the active product.
         ReflectProduct,
         /// Copies the folder of the active product to the clipboard.
@@ -668,6 +686,60 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(NewStory),
     },
     Entry {
+        label: "New ticket for the active product",
+        icon: IconName::Plus,
+        keywords: &["ticket", "note", "todo", "question", "new", "add"],
+        action: || Box::new(NewTicket),
+    },
+    Entry {
+        label: "Open the ticket under the cursor (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "open", "cursor"],
+        action: || Box::new(OpenTicket),
+    },
+    Entry {
+        label: "Mark the ticket done (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "done", "close", "finish"],
+        action: || Box::new(TicketDone),
+    },
+    Entry {
+        label: "Mark the ticket waiting (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "wait", "waiting", "pending", "blocked"],
+        action: || Box::new(TicketWait),
+    },
+    Entry {
+        label: "Drop the ticket (tickets)",
+        icon: IconName::Close,
+        keywords: &["ticket", "drop", "discard", "hide"],
+        action: || Box::new(TicketDrop),
+    },
+    Entry {
+        label: "Reopen the ticket (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "reopen", "open", "undo"],
+        action: || Box::new(TicketReopen),
+    },
+    Entry {
+        label: "Promote the ticket to a story (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "promote", "story", "pm", "cost"],
+        action: || Box::new(PromoteTicketStory),
+    },
+    Entry {
+        label: "Promote the ticket to a decision (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "promote", "decision"],
+        action: || Box::new(PromoteTicketDecision),
+    },
+    Entry {
+        label: "Copy the id of the ticket (tickets)",
+        icon: IconName::Copy,
+        keywords: &["ticket", "copy", "id", "clipboard"],
+        action: || Box::new(CopyTicketId),
+    },
+    Entry {
         label: "Reflect on the active product",
         icon: IconName::BookOpen,
         keywords: &["reflect", "reflection", "memory", "learn", "cost"],
@@ -913,6 +985,15 @@ mod tests {
             "Ungroup the tab group of the active tab",
             "Close the tab group of the active tab",
             "New story in the active product",
+            "New ticket for the active product",
+            "Open the ticket under the cursor (tickets)",
+            "Mark the ticket done (tickets)",
+            "Mark the ticket waiting (tickets)",
+            "Drop the ticket (tickets)",
+            "Reopen the ticket (tickets)",
+            "Promote the ticket to a story (tickets)",
+            "Promote the ticket to a decision (tickets)",
+            "Copy the id of the ticket (tickets)",
             "Reflect on the active product",
             "Copy the folder of the active product",
             "Open the folder of the active product",

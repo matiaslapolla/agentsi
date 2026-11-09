@@ -10,6 +10,7 @@ use agentsi_proto::marks_api::{ArchiveArchive, ArchiveKind, ArchiveParams};
 use agentsi_proto::reflect_api::{ReflectRun, ReflectRunParams};
 use agentsi_proto::story_api::{StoryGet, StoryIdParams, StoryNew, StoryNewParams};
 use agentsi_proto::terminal_api::{Kill, TerminalId};
+use agentsi_proto::ticket_api::{PromoteTo, TicketAdd, TicketAddParams, TicketKind, TicketState};
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{control, space};
 use gpui_kit::component::Placement;
@@ -25,6 +26,7 @@ use crate::model::ProductRef;
 use crate::pane::TerminalPanel;
 use crate::prompt::{Choice, Prompt};
 use crate::screens::meeting;
+use crate::screens::ticket::{self, Op};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec};
 use crate::tabs::GroupId;
 
@@ -98,6 +100,10 @@ impl Shell {
                     ..Facts::default()
                 }
             }
+            Target::Ticket(_, _, state) => Facts {
+                ticket: Some(*state),
+                ..Facts::default()
+            },
             Target::Reflection(_) | Target::Group(..) | Target::TabGroup(_) => Facts::default(),
         }
     }
@@ -161,6 +167,17 @@ impl Shell {
         {
             return;
         }
+        let on_tickets = self.open_screens(cx).iter().any(|s| {
+            let s = s.read(cx);
+            matches!(s.kind, ScreenKind::Ticket | ScreenKind::Tickets)
+                && s.focus_handle(cx).contains_focused(window, cx)
+        });
+        if on_tickets && let Some(target) = self.palette_target(Kind::Ticket, window, cx) {
+            let at = self.dock.read(cx).bounds().origin;
+            let position = Point::new(at.x + space(8), at.y + control::TOOLBAR_HEIGHT);
+            self.open_menu(MenuRequest { target, position }, window, cx);
+            return;
+        }
         match self.focused_terminal(window, cx) {
             Some(p) => {
                 let target = Target::Pane(PaneRef {
@@ -212,6 +229,7 @@ impl Shell {
                 match kind {
                     Kind::Pane => "No pane is in view. Open a terminal first.",
                     Kind::Story => "No story session is open. Open one in the sidebar first.",
+                    Kind::Ticket => "No ticket is in view. Open the tickets of a product first.",
                     Kind::Group => "The active product is in no group.",
                     Kind::TabGroup => "The active tab is in no tab group.",
                     _ => "No active product. Pick one in the sidebar first.",
@@ -242,6 +260,28 @@ impl Shell {
             Kind::TabGroup => {
                 let tab = self.active_tab(window, cx)?;
                 self.tabs.read(cx).group_of(tab).map(Target::TabGroup)
+            }
+            Kind::Ticket => {
+                // The ticket screens: the one with the focus, else the one in view.
+                let screens = self.open_screens(cx);
+                let pick = |focused: bool| {
+                    screens.iter().find_map(|s| {
+                        let s = s.read(cx);
+                        let tickets = matches!(s.kind, ScreenKind::Ticket | ScreenKind::Tickets);
+                        let on = if focused {
+                            s.focus_handle(cx).contains_focused(window, cx)
+                        } else {
+                            s.shown
+                        };
+                        let (id, state) = s.ticket_in_view(cx).filter(|_| tickets && on)?;
+                        let product = ProductRef {
+                            host: s.host.clone(),
+                            id: s.product.clone(),
+                        };
+                        Some(Target::Ticket(product, id, state))
+                    })
+                };
+                pick(true).or_else(|| pick(false))
             }
             Kind::Story => {
                 // The story screen with the focus, else the first session of the active product.
@@ -292,6 +332,7 @@ impl Shell {
                 }
             }
             Target::Story(p, id) => self.story_cmd(p, id, cmd, window, cx),
+            Target::Ticket(p, id, _) => self.ticket_cmd(p, id, cmd, window, cx),
             Target::TabGroup(g) => self.tab_group_cmd(g, cmd, window, cx),
             Target::Group(host, name) => match cmd {
                 Cmd::RenameGroup => self.ask(Ask::GroupName(host, name), window, cx),
@@ -330,6 +371,8 @@ impl Shell {
                 self.start_meeting(&p, cx);
             }
             Cmd::NewStory => self.ask(Ask::NewStory(p), window, cx),
+            Cmd::NewTicket => self.ask(Ask::NewTicket(p), window, cx),
+            Cmd::OpenTickets => self.show_screen(ScreenSpec::tickets(&p.id).on(p.host), window, cx),
             Cmd::Reflect => self.reflect(p, cx),
             Cmd::OpenGit => self.show_screen(ScreenSpec::git(&p.id).on(p.host), window, cx),
             Cmd::Label => self.ask(Ask::ProductLabel(p), window, cx),
@@ -593,6 +636,79 @@ impl Shell {
         }
     }
 
+    fn ticket_cmd(
+        &mut self,
+        p: ProductRef,
+        id: String,
+        cmd: Cmd,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let op = match cmd {
+            Cmd::Open => {
+                self.show_screen(ScreenSpec::ticket(&p.id, &id).on(p.host), window, cx);
+                return;
+            }
+            Cmd::CopyId => {
+                cx.write_to_clipboard(ClipboardItem::new_string(id));
+                return;
+            }
+            Cmd::TicketWait => {
+                self.ask(Ask::TicketWait(p, id), window, cx);
+                return;
+            }
+            Cmd::TicketDone => Op::Move(TicketState::Done, None),
+            Cmd::TicketDrop => Op::Move(TicketState::Dropped, None),
+            Cmd::TicketReopen => Op::Move(TicketState::Open, None),
+            Cmd::PromoteStory => Op::Promote(PromoteTo::Story),
+            Cmd::PromoteDecision => Op::Promote(PromoteTo::Decision),
+            _ => return,
+        };
+        self.ticket_op(p, id, op, cx);
+    }
+
+    /// Sends a move or a promote of the ticket. The core tells the screens when it is done.
+    fn ticket_op(&mut self, p: ProductRef, id: String, op: Op, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
+            return;
+        };
+        let done = ticket::run(&core, cx, &p.id, &id, op);
+        cx.spawn(async move |this, cx| {
+            let text = match done.await {
+                Ok(line) => line,
+                Err(e) => format!("Ticket {id} was not changed: {e}"),
+            };
+            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
+        })
+        .detach();
+    }
+
+    /// `ticket.add` with the title of the owner. The menu adds a note.
+    fn new_ticket(&mut self, p: ProductRef, title: String, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
+            return;
+        };
+        let call = core.read(cx).link.call::<TicketAdd>(&TicketAddParams {
+            product: p.id.clone(),
+            kind: TicketKind::Note,
+            title,
+            body: None,
+            assignee: None,
+            links: None,
+            scope: None,
+            objective: None,
+            author: ticket::owner(),
+        });
+        cx.spawn(async move |this, cx| {
+            let text = match call.await {
+                Ok(r) => format!("Added {} to {}.", r.ticket.id, p.id),
+                Err(e) => format!("No ticket for {}: {e}", p.id),
+            };
+            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
+        })
+        .detach();
+    }
+
     /// A terminal in the worktree of the story session.
     fn story_terminal(
         &mut self,
@@ -659,6 +775,32 @@ impl Shell {
                     )
                 }))
             }
+            Ask::NewTicket(p) => {
+                let title = format!("New ticket for {}", self.product_name(p, cx));
+                Some(cx.new(|cx| {
+                    Prompt::text(
+                        title,
+                        "Write the title, 120 characters or less. It becomes a note.",
+                        "",
+                        Vec::new(),
+                        window,
+                        cx,
+                    )
+                }))
+            }
+            Ask::TicketWait(_, id) => {
+                let title = format!("{id} waits on");
+                Some(cx.new(|cx| {
+                    Prompt::text(
+                        title,
+                        "Write who or what the ticket waits on.",
+                        "",
+                        Vec::new(),
+                        window,
+                        cx,
+                    )
+                }))
+            }
             Ask::GroupName(_, name) => {
                 let now = name.clone();
                 Some(cx.new(|cx| {
@@ -694,6 +836,7 @@ impl Shell {
                         self.product_name(p, cx)
                     }
                     Target::Story(p, _) => self.product_name(p, cx),
+                    Target::Ticket(_, id, _) => id.clone(),
                     Target::Group(_, name) => name.clone(),
                     Target::TabGroup(_) => "this tab group".to_string(),
                 };
@@ -719,6 +862,19 @@ impl Shell {
                 let text = answer.trim();
                 if !text.is_empty() {
                     self.new_story(p.clone(), text.to_string(), cx);
+                }
+            }
+            Ask::NewTicket(p) => {
+                let title = answer.trim();
+                if !title.is_empty() {
+                    self.new_ticket(p.clone(), title.to_string(), cx);
+                }
+            }
+            Ask::TicketWait(p, id) => {
+                let target = answer.trim();
+                if !target.is_empty() {
+                    let op = Op::Move(TicketState::Waiting, Some(target.to_string()));
+                    self.ticket_op(p.clone(), id.clone(), op, cx);
                 }
             }
             Ask::GroupName(host, name) => {
@@ -766,6 +922,15 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         StartMeeting => (Product, StartMeeting),
         CancelMeeting => (Meeting, CancelMeeting),
         NewStory => (Product, NewStory),
+        NewTicket => (Product, NewTicket),
+        OpenTicket => (Ticket, Open),
+        TicketDone => (Ticket, TicketDone),
+        TicketWait => (Ticket, TicketWait),
+        TicketDrop => (Ticket, TicketDrop),
+        TicketReopen => (Ticket, TicketReopen),
+        PromoteTicketStory => (Ticket, PromoteStory),
+        PromoteTicketDecision => (Ticket, PromoteDecision),
+        CopyTicketId => (Ticket, CopyId),
         ReflectProduct => (Product, Reflect),
         CopyProductPath => (Product, CopyPath),
         OpenProductFolder => (Product, OpenFolder),

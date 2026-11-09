@@ -17,7 +17,8 @@ use super::minutes::cursor_after;
 use super::parts::{Flash, Load, first_screen_ready, flash_line, notice};
 use super::ticket::{kind_tag, owner, state_tag};
 use crate::format;
-use crate::model::CoreState;
+use crate::menus::{self, Target};
+use crate::model::{CoreState, ProductRef};
 use crate::nav::{Nav, ScreenRequest};
 
 /// A done ticket stays on the list this long.
@@ -236,6 +237,23 @@ impl TicketsScreen {
             .collect()
     }
 
+    /// The ticket under the cursor.
+    pub fn cursor_ticket(&self) -> Option<&Ticket> {
+        let at = *self.flat().get(self.cursor)?;
+        self.tickets().get(at)
+    }
+
+    fn target_of(&self, t: &Ticket, cx: &App) -> Target {
+        Target::Ticket(
+            ProductRef {
+                host: self.core.read(cx).remote.clone(),
+                id: self.product.clone(),
+            },
+            t.id.clone(),
+            t.state,
+        )
+    }
+
     fn open(&self, t: &Ticket, cx: &App) {
         Nav::open(cx, &self.core, ScreenRequest::ticket(&self.product, &t.id));
     }
@@ -365,6 +383,7 @@ impl Render for TicketsScreen {
                 let row_at = at;
                 at += 1;
                 let id = t.id.clone();
+                let target = self.target_of(&t, cx);
                 let row = ListRow::new(("tickets-row", row_at), t.title.clone())
                     .meta(meta(&t, now))
                     .selected(self.cursor == row_at)
@@ -382,7 +401,20 @@ impl Render for TicketsScreen {
                         Nav::open(cx, &this.core, ScreenRequest::ticket(&this.product, &id));
                         cx.notify();
                     }));
-                list = list.child(div().pad_x(space(1)).child(row));
+                list = list.child(
+                    div()
+                        .pad_x(space(1))
+                        .on_mouse_down(
+                            MouseButton::Right,
+                            cx.listener(move |this, e: &MouseDownEvent, window, cx| {
+                                this.cursor = row_at;
+                                window.focus(&this.focus, cx);
+                                menus::request(cx, target.clone(), e.position);
+                                cx.notify();
+                            }),
+                        )
+                        .child(row),
+                );
             }
         }
         let body = match &self.data {

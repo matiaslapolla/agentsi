@@ -117,6 +117,10 @@ pub enum Ask {
     CloseTabs(Vec<PanelId>, usize),
     /// The text of a new story for this product.
     NewStory(ProductRef),
+    /// The title of a new ticket for this product.
+    NewTicket(ProductRef),
+    /// What the ticket waits on: the product and the ticket id.
+    TicketWait(ProductRef, String),
     /// A new name for the product group of this host.
     GroupName(Option<String>, String),
     GroupColor(Option<String>, String),

@@ -19,6 +19,7 @@
 
 pub mod call;
 pub mod desk;
+pub mod desk_tickets;
 pub mod git;
 pub mod git_config;
 pub mod guide;
@@ -454,6 +455,19 @@ impl ScreenPanel {
     pub fn minute_stamp(&self, cx: &App) -> Option<u64> {
         match &self.view {
             ScreenView::Minute(v) => v.read(cx).shown().then(|| v.read(cx).stamp()),
+            _ => None,
+        }
+    }
+
+    /// The id and the state of the ticket that this screen shows: the ticket screen's own,
+    /// or the ticket under the cursor of the tickets screen.
+    pub fn ticket_in_view(
+        &self,
+        cx: &App,
+    ) -> Option<(String, agentsi_proto::ticket_api::TicketState)> {
+        match &self.view {
+            ScreenView::Ticket(v) => v.read(cx).ticket().map(|t| (t.id.clone(), t.state)),
+            ScreenView::Tickets(v) => v.read(cx).cursor_ticket().map(|t| (t.id.clone(), t.state)),
             _ => None,
         }
     }

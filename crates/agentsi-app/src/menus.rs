@@ -16,6 +16,8 @@ use std::rc::Rc;
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::*;
 
+use agentsi_proto::ticket_api::TicketState;
+
 use crate::model::ProductRef;
 use crate::shell::PaneRef;
 
@@ -35,6 +37,8 @@ pub enum Target {
     Group(Option<String>, String),
     /// A tab group of the tab bar, by id.
     TabGroup(u32),
+    /// A ticket, by id, with its state when the menu opened.
+    Ticket(ProductRef, String, TicketState),
 }
 
 /// The kind of a target, to find the target of a palette entry.
@@ -48,6 +52,7 @@ pub enum Kind {
     Story,
     Group,
     TabGroup,
+    Ticket,
 }
 
 impl Target {
@@ -61,6 +66,7 @@ impl Target {
             Target::Story(..) => Kind::Story,
             Target::Group(..) => Kind::Group,
             Target::TabGroup(_) => Kind::TabGroup,
+            Target::Ticket(..) => Kind::Ticket,
         }
     }
 }
@@ -73,6 +79,8 @@ pub enum Cmd {
     OpenDesk,
     StartMeeting,
     NewStory,
+    NewTicket,
+    OpenTickets,
     Reflect,
     OpenGit,
     Label,
@@ -104,6 +112,14 @@ pub enum Cmd {
     Accept,
     Reject,
     StoryTerminal,
+    // A ticket.
+    TicketDone,
+    TicketWait,
+    TicketDrop,
+    TicketReopen,
+    PromoteStory,
+    PromoteDecision,
+    CopyId,
     // A product group.
     RenameGroup,
     ColorGroup,
@@ -138,6 +154,8 @@ pub struct Facts {
     pub tabbed: bool,
     /// The tab of the pane is in a tab group.
     pub grouped: bool,
+    /// The state of the ticket.
+    pub ticket: Option<TicketState>,
 }
 
 impl Facts {
@@ -155,6 +173,7 @@ impl Facts {
             ready: true,
             tabbed: true,
             grouped: true,
+            ticket: Some(TicketState::Open),
         }
     }
 }
@@ -200,6 +219,8 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
             on(OpenDesk, "Open desk"),
             when(StartMeeting, "Start meeting", !f.meeting),
             on(NewStory, "New story"),
+            on(NewTicket, "New ticket"),
+            on(OpenTickets, "Open tickets"),
             when(Reflect, "Reflect", !f.reflecting),
             on(OpenGit, "Open the git panel"),
             Item::Separator,
@@ -259,6 +280,30 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
             on(ColorGroup, "Color"),
             on(RemoveGroup, "Remove group"),
         ],
+        Target::Ticket(..) => {
+            let open = |act| {
+                f.ticket
+                    .is_some_and(|s| crate::screens::ticket::allowed(s, act))
+            };
+            use crate::screens::ticket::Act;
+            vec![
+                on(Open, "Open"),
+                Item::Separator,
+                when(TicketDone, "Done", open(Act::Done)),
+                when(TicketWait, "Wait", open(Act::Wait)),
+                when(TicketDrop, "Drop", open(Act::Drop)),
+                when(TicketReopen, "Reopen", open(Act::Reopen)),
+                Item::Separator,
+                when(PromoteStory, "Promote to story", open(Act::PromoteStory)),
+                when(
+                    PromoteDecision,
+                    "Promote to decision",
+                    open(Act::PromoteDecision),
+                ),
+                Item::Separator,
+                on(CopyId, "Copy id"),
+            ]
+        }
         Target::TabGroup(_) => vec![
             on(TabGroupRename, "Rename"),
             on(TabGroupColor, "Color"),
@@ -278,6 +323,8 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, OpenDesk) => "Open the front desk of the active product",
         (_, StartMeeting) => "Start the meeting in the question field (meeting)",
         (_, NewStory) => "New story in the active product",
+        (_, NewTicket) => "New ticket for the active product",
+        (_, OpenTickets) => "Open the tickets of the active product",
         (_, Reflect) => "Reflect on the active product",
         (_, OpenGit) => "Open the git panel of the active product",
         (_, Label) => "Label the active product",
@@ -304,6 +351,14 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, TabGroupColor) => "Color the tab group of the active tab",
         (_, Ungroup) => "Ungroup the tab group of the active tab",
         (_, CloseGroup) => "Close the tab group of the active tab",
+        (Kind::Ticket, Open) => "Open the ticket under the cursor (tickets)",
+        (_, TicketDone) => "Mark the ticket done (tickets)",
+        (_, TicketWait) => "Mark the ticket waiting (tickets)",
+        (_, TicketDrop) => "Drop the ticket (tickets)",
+        (_, TicketReopen) => "Reopen the ticket (tickets)",
+        (_, PromoteStory) => "Promote the ticket to a story (tickets)",
+        (_, PromoteDecision) => "Promote the ticket to a decision (tickets)",
+        (_, CopyId) => "Copy the id of the ticket (tickets)",
         (Kind::Meeting, Open) => "Open the meeting of the active product",
         (Kind::Reflection, Open) => "Open the memory of the active product",
         (_, Open) => "Open the story session",
@@ -322,7 +377,7 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
 /// a product. Accept and Reject of a story keep the Confirm of the story screen.
 pub fn confirms(cmd: Cmd, f: &Facts) -> bool {
     match cmd {
-        Cmd::Archive | Cmd::Reflect | Cmd::CancelMeeting => true,
+        Cmd::Archive | Cmd::Reflect | Cmd::CancelMeeting | Cmd::PromoteStory => true,
         // A pane with a tab closes through the tab, which has its own Confirm.
         Cmd::ClosePane => f.running && !f.tabbed,
         _ => false,
@@ -343,6 +398,10 @@ pub fn confirm_text(cmd: Cmd, name: &str) -> (String, &'static str) {
         Cmd::CancelMeeting => (
             format!("Cancel the meeting of {name}? The roles stop."),
             "Cancel the meeting",
+        ),
+        Cmd::PromoteStory => (
+            format!("Promote {name} to a story? The PM calls the model, which costs money."),
+            "Promote to story",
         ),
         _ => (
             format!("Close {name}? The program in it stops."),
@@ -418,6 +477,7 @@ mod tests {
     use crate::actions::ENTRIES;
     use crate::model::ProductRef;
     use crate::shell::PaneRef;
+    use agentsi_proto::ticket_api::TicketState;
 
     fn product() -> ProductRef {
         ProductRef {
@@ -438,6 +498,7 @@ mod tests {
             Target::Story(product(), "S1".into()),
             Target::Group(None, "Work".into()),
             Target::TabGroup(1),
+            Target::Ticket(product(), "C001".into(), TicketState::Open),
         ]
     }
 
@@ -461,6 +522,8 @@ mod tests {
                 "Open desk",
                 "Start meeting",
                 "New story",
+                "New ticket",
+                "Open tickets",
                 "Reflect",
                 "Open the git panel",
                 "Label",
@@ -505,6 +568,19 @@ mod tests {
         assert_eq!(
             labels(&t[6]),
             ["Rename", "Color", "Ungroup", "Close the group"]
+        );
+        assert_eq!(
+            labels(&t[7]),
+            [
+                "Open",
+                "Done",
+                "Wait",
+                "Drop",
+                "Reopen",
+                "Promote to story",
+                "Promote to decision",
+                "Copy id",
+            ]
         );
     }
 
@@ -589,7 +665,12 @@ mod tests {
             running: true,
             ..Facts::default()
         };
-        for cmd in [Cmd::Archive, Cmd::Reflect, Cmd::CancelMeeting] {
+        for cmd in [
+            Cmd::Archive,
+            Cmd::Reflect,
+            Cmd::CancelMeeting,
+            Cmd::PromoteStory,
+        ] {
             assert!(confirms(cmd, &idle), "{cmd:?}");
         }
         assert!(confirms(Cmd::ClosePane, &running));

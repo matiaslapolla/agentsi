@@ -16,7 +16,8 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::parts::{Flash, Load, column, first_screen_ready, flash_line, mono, notice, section};
-use crate::model::CoreState;
+use crate::menus::{self, Target};
+use crate::model::{CoreState, ProductRef};
 use crate::nav::{Nav, ScreenRequest};
 
 /// The owner as a writer. The core fills in the name of the owner block.
@@ -627,9 +628,27 @@ impl TicketScreen {
 
 impl Render for TicketScreen {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let menu = self.ticket().map(|t| {
+            Target::Ticket(
+                ProductRef {
+                    host: self.core.read(cx).remote.clone(),
+                    id: self.product.clone(),
+                },
+                t.id.clone(),
+                t.state,
+            )
+        });
         let root = div()
             .id("ticket-screen")
             .track_focus(&self.focus)
+            .on_mouse_down(
+                MouseButton::Right,
+                cx.listener(move |_, e: &MouseDownEvent, _, cx| {
+                    if let Some(target) = &menu {
+                        menus::request(cx, target.clone(), e.position);
+                    }
+                }),
+            )
             .size_full()
             .bg(surface::panel());
         let t = match &self.data {
