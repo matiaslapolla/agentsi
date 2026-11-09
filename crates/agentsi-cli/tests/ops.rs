@@ -125,14 +125,20 @@ fn normalize(text: &str, w: &Work) -> String {
         .into_owned()
 }
 
+/// The schema version of the last migration.
+fn latest() -> u32 {
+    agentsi_store::db::MIGRATIONS.last().unwrap().0
+}
+
 #[test]
 fn migrate_prints_the_schema_version_that_the_core_applied() {
     let w = work(true);
     let path = w.dir.path().join("bin");
     let (code, out, err) = agentsi(&w, &["migrate"], &path);
+    let want = format!("Database up to date, at schema version {}.\n", latest());
     assert_eq!(
         (code, out.as_str(), err.as_str()),
-        (0, "Database up to date, at schema version 1.\n", "")
+        (0, want.as_str(), "")
     );
 }
 
@@ -150,13 +156,13 @@ fn up_starts_the_core_and_prints_where_it_runs() {
     let w = work(true);
     let path = w.dir.path().join("bin");
     let (code, out, err) = agentsi(&w, &["up"], &path);
+    let want = format!(
+        "Core running: agentsi-core <VERSION>.\nData root: <WORK>/root\nDatabase up to date, at schema version {}.\n",
+        latest()
+    );
     assert_eq!(
         (code, out.as_str(), err.as_str()),
-        (
-            0,
-            "Core running: agentsi-core <VERSION>.\nData root: <WORK>/root\nDatabase up to date, at schema version 1.\n",
-            ""
-        )
+        (0, want.as_str(), "")
     );
     // A second run finds the same core.
     assert_eq!(agentsi(&w, &["up"], &path).0, 0);
@@ -169,9 +175,9 @@ fn doctor_reports_each_check_and_passes_when_the_required_ones_do() {
     let (code, out, err) = agentsi(&w, &["doctor"], &path);
     assert_eq!(err, "");
     assert_eq!(code, 0, "{out}");
-    let expected = "\
+    let expected = format!("\
 ok       core                            agentsi-core <VERSION>
-ok       data root                       <WORK>/root, schema 1
+ok       data root                       <WORK>/root, schema {}
 ok       claude                          2.1.0 (Claude Code)
 ok       git                             git version 2.50.0
 missing  bwrap (stories)                 Not found. It blocks story sessions (agentsi story run).
@@ -182,7 +188,7 @@ fail     voice models (optional)         0 of <N> downloaded. Download them in t
 ok       audio devices (optional)        1 output(s) (pactl)
 
 Every required check passes.
-";
+", latest());
     assert_eq!(out, expected);
 }
 

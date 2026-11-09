@@ -420,10 +420,9 @@ pub fn archived(c: &Connection, product: &str) -> Result<Vec<ArchiveRecord>> {
     )
 }
 
-/// The row count of each of the 17 tables, in the order of `schema::TABLES`.
+/// The row count of each table, in the order of `schema::all`.
 pub fn counts(c: &Connection) -> Result<Vec<(&'static str, i64)>> {
-    crate::schema::TABLES
-        .iter()
+    crate::schema::all()
         .map(|t| {
             Ok((
                 t.name,

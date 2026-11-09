@@ -1,10 +1,10 @@
-//! The schema: one write and read for each of the 17 tables, and the
-//! checks of the type map.
+//! The schema: one write and read for each table (the 17 tables of Postgres
+//! and the local tables), and the checks of the type map.
 
 mod common;
 
 use agentsi_store::Store;
-use agentsi_store::schema::{TABLES, table};
+use agentsi_store::schema::{LOCAL_TABLES, TABLES, all, table};
 use common::{row, select_all, t};
 use rusqlite::types::Value;
 use std::collections::BTreeSet;
@@ -46,9 +46,10 @@ macro_rules! table_tests {
         #[test]
         fn the_tests_cover_each_table() {
             let tested: BTreeSet<&str> = [$(stringify!($name)),*].into_iter().collect();
-            let tables: BTreeSet<&str> = TABLES.iter().map(|t| t.name).collect();
+            let tables: BTreeSet<&str> = all().map(|t| t.name).collect();
             assert_eq!(tested, tables);
-            assert_eq!(tables.len(), 17);
+            assert_eq!(TABLES.len(), 17);
+            assert_eq!(LOCAL_TABLES.iter().map(|t| t.name).collect::<Vec<_>>(), ["tickets"]);
         }
     };
 }
@@ -71,6 +72,7 @@ table_tests!(
     listens,
     reflections,
     archive_records,
+    tickets,
 );
 
 #[test]
@@ -78,7 +80,7 @@ fn the_sql_schema_has_the_columns_of_the_table_list() {
     let (_dir, store) = store();
     store
         .read(|c| {
-            for table in TABLES {
+            for table in all() {
                 let mut stmt = c.prepare(&format!(
                     "select name from pragma_table_info('{}') order by cid",
                     table.name
@@ -103,7 +105,7 @@ fn the_sql_schema_has_the_columns_of_the_table_list() {
 }
 
 #[test]
-fn the_schema_lists_the_tables_the_fts_table_and_each_btree_index_of_postgres() {
+fn the_schema_lists_the_tables_the_fts_table_and_each_btree_index() {
     let (_dir, store) = store();
     let names = |kind: &'static str| {
         store
@@ -118,7 +120,7 @@ fn the_schema_lists_the_tables_the_fts_table_and_each_btree_index_of_postgres() 
             })
             .unwrap()
     };
-    let mut tables: BTreeSet<String> = TABLES.iter().map(|t| t.name.to_string()).collect();
+    let mut tables: BTreeSet<String> = all().map(|t| t.name.to_string()).collect();
     tables.insert("documents_fts".into());
     assert_eq!(names("table"), tables);
     let indexes: BTreeSet<String> = [
@@ -130,6 +132,7 @@ fn the_schema_lists_the_tables_the_fts_table_and_each_btree_index_of_postgres() 
         "memory_product_agent_idx",
         "meeting_log_product_idx",
         "reflections_product_idx",
+        "tickets_product_state_idx",
     ]
     .into_iter()
     .map(String::from)
@@ -158,6 +161,11 @@ fn the_checks_of_the_type_map_reject_bad_values() {
         ("minutes", "status", t("unknown")),
         ("documents", "kind", t("note")),
         ("archive_records", "kind", t("other")),
+        ("tickets", "kind", t("task")),
+        ("tickets", "state", t("closed")),
+        ("tickets", "id", t("S001")),
+        ("tickets", "author", t("{not json")),
+        ("tickets", "links", t("{not json")),
     ];
     for (name, col, value) in bad {
         let table = table(name).unwrap();
@@ -191,7 +199,7 @@ fn the_store_sets_wal_foreign_keys_and_the_migration_number() {
             ))
         })
         .unwrap();
-    assert_eq!((mode.as_str(), version, fk), ("wal", 1, 1));
+    assert_eq!((mode.as_str(), version, fk), ("wal", 2, 1));
     drop(store);
     // A second open applies nothing and keeps the rows.
     let again = Store::open(&dir.path().join("agentsi.db")).unwrap();
@@ -199,8 +207,32 @@ fn the_store_sets_wal_foreign_keys_and_the_migration_number() {
         again
             .read(|c| Ok(c.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))?))
             .unwrap(),
-        1
+        2
     );
+}
+
+#[test]
+fn a_database_of_the_first_migration_opens_with_the_tracker_migration() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("agentsi.db");
+    {
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch(agentsi_store::db::MIGRATIONS[0].1).unwrap();
+        conn.pragma_update(None, "user_version", 1).unwrap();
+        conn.execute("insert into products (id) values ('p')", [])
+            .unwrap();
+    }
+    let store = Store::open(&path).unwrap();
+    let (version, tickets, products): (i64, i64, i64) = store
+        .read(|c| {
+            Ok((
+                c.pragma_query_value(None, "user_version", |r| r.get(0))?,
+                c.query_row("select count(*) from tickets", [], |r| r.get(0))?,
+                c.query_row("select count(*) from products", [], |r| r.get(0))?,
+            ))
+        })
+        .unwrap();
+    assert_eq!((version, tickets, products), (2, 0, 1));
 }
 
 #[test]

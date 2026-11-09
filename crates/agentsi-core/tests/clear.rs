@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-const TABLES: [&str; 17] = [
+const TABLES: [&str; 18] = [
     "priorities",
     "usage",
     "documents",
@@ -27,6 +27,7 @@ const TABLES: [&str; 17] = [
     "listens",
     "reflections",
     "archive_records",
+    "tickets",
     "products",
 ];
 
@@ -68,7 +69,9 @@ fn seed(c: &Connection, p: &str) {
          insert into listens values ('{p}', '{m1}', 'x'), ('{p}', '{m2}', 'x');
          insert into reflections values ('{p}', 'r1', 0, '{{}}');
          insert into archive_records values
-           ('{p}', 'minutes', '{m1}'), ('{p}', 'story', 'S001'), ('{p}', 'story', 'S003');"
+           ('{p}', 'minutes', '{m1}'), ('{p}', 'story', 'S001'), ('{p}', 'story', 'S003');
+         insert into tickets (product, id, kind, state, title, author, updated_by, created_at, updated_at)
+           values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');"
     ))
     .unwrap();
 }

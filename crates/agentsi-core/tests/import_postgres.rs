@@ -238,6 +238,10 @@ fn import_postgres_copies_each_table_and_a_second_run_inserts_nothing() {
         .run_to_completion(64, std::time::Duration::ZERO, None)
         .unwrap();
     for (table, n) in agentsi_store::read::counts(&restored).unwrap() {
+        if agentsi_store::schema::LOCAL_TABLES.iter().any(|t| t.name == table) {
+            assert_eq!(n, 0, "{table}");
+            continue;
+        }
         let pg_n: i64 = pg
             .query_one(&format!("select count(*) from \"{table}\""), &[])
             .unwrap()

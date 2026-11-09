@@ -16,8 +16,8 @@ use std::time::SystemTime;
 /// The only places of the data root where a delete removes files.
 pub const ALLOWED: [&str; 4] = ["workspace", "voice/transcripts", "logs", "backups"];
 
-/// The 17 tables, children first.
-pub const TABLES: [&str; 17] = [
+/// Each table, children first.
+pub const TABLES: [&str; 18] = [
     "priorities",
     "usage",
     "documents",
@@ -34,6 +34,7 @@ pub const TABLES: [&str; 17] = [
     "listens",
     "reflections",
     "archive_records",
+    "tickets",
     "products",
 ];
 
@@ -344,6 +345,7 @@ fn apply(tx: &Connection, root: &Path, item: &Item) -> Result<ItemPlan> {
                     "archive_records",
                     "delete from archive_records where product = ?1",
                 ),
+                ("tickets", "delete from tickets where product = ?1"),
                 ("products", "delete from products where id = ?1"),
             ] {
                 del(tx, t, table, sql, [product])?;
@@ -559,6 +561,7 @@ pub fn product_ids(conn: &Connection) -> Result<Vec<String>> {
         "select distinct product from stories",
         "select distinct product from memory",
         "select distinct product from decisions",
+        "select distinct product from tickets",
     ] {
         ids.extend(strings(conn, sql, [])?);
     }
@@ -687,7 +690,9 @@ mod tests {
              insert into reflections values ('{p}', 'r1', 0, '{{}}');
              insert into archive_records values
                ('{p}', 'minutes', '{m1}'), ('{p}', 'minutes', '{m2}'), ('{p}', 'story', 'S001'),
-               ('{p}', 'story', 'S003'), ('{p}', 'decision', (select id from decisions where product = '{p}' and minutes_id = '{m1}'));"
+               ('{p}', 'story', 'S003'), ('{p}', 'decision', (select id from decisions where product = '{p}' and minutes_id = '{m1}'));
+             insert into tickets (product, id, kind, state, title, author, updated_by, created_at, updated_at)
+               values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');"
         ))
         .unwrap();
     }
