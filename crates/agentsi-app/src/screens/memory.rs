@@ -9,11 +9,12 @@
 use agentsi_proto::marks_api::{DecideParams, DecideResult, DecisionDecide, Outcome, Verdict};
 use agentsi_proto::reflect_api::{
     AgentMemory, MemoryChange, MemoryEntry, MemoryList, MemoryListParams, MemoryListResult,
-    MemoryRetire, MemoryRetireParams, Proposal, ReflectRevert, ReflectRevertParams,
-    ReflectionEntry, Signal,
+    MemoryRetire, MemoryRetireParams, Proposal, ReflectCancel, ReflectCancelParams, ReflectRevert,
+    ReflectRevertParams, ReflectRun, ReflectRunParams, ReflectionEntry, Signal,
 };
 use agentsi_ui::components::{Button, Card, Force, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -32,6 +33,7 @@ const RETIRED_HERE: &str = "Retired by the owner in the app.";
 enum Pending {
     Retire { agent: String, id: String },
     Revert(String),
+    Reflect,
 }
 
 pub struct MemoryScreen {
@@ -48,6 +50,8 @@ pub struct MemoryScreen {
     /// A write waits for the core. The screen starts no second one.
     busy: bool,
     flash: Option<Flash>,
+    /// The box "Memory only" of Reflect.
+    memory_only: bool,
 }
 
 fn active_of(a: &AgentMemory) -> impl Iterator<Item = &MemoryEntry> {
@@ -67,6 +71,7 @@ impl MemoryScreen {
             pending: None,
             busy: false,
             flash: None,
+            memory_only: false,
         };
         screen.reload(cx);
         screen
@@ -135,6 +140,75 @@ impl MemoryScreen {
         cx.notify();
     }
 
+    /// "Reflect": shows the Confirm, because each agent calls the model.
+    pub fn ask_reflect(&mut self, cx: &mut Context<Self>) {
+        if !self.reflecting(cx) {
+            self.pending = Some(Pending::Reflect);
+            cx.notify();
+        }
+    }
+
+    fn reflecting(&self, cx: &App) -> bool {
+        self.core.read(cx).reflecting.contains(&self.product)
+    }
+
+    fn run_reflect(&mut self, cx: &mut Context<Self>) {
+        let core = self.core.clone();
+        let product = self.product.clone();
+        core.update(cx, |s, cx| {
+            if s.set_reflecting(&product, true) {
+                cx.notify();
+            }
+        });
+        let call = core.read(cx).link.call::<ReflectRun>(&ReflectRunParams {
+            product: product.clone(),
+            memory_only: self.memory_only,
+        });
+        self.flash = None;
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            core.update(cx, |s, cx| {
+                if s.set_reflecting(&product, false) {
+                    cx.notify();
+                }
+            });
+            let _ = this.update(cx, |this, cx| {
+                this.flash = Some(match result {
+                    Ok(r) if r.entry.is_some() => Flash::Done("Reflected.".into()),
+                    Ok(_) => Flash::Done("Nothing to reflect on.".into()),
+                    Err(e) => Flash::Failed(e.to_string()),
+                });
+                this.reload(cx);
+                cx.notify();
+            });
+        })
+        .detach();
+        cx.notify();
+    }
+
+    /// Stops the reflection of the product that runs.
+    pub fn cancel_reflect(&mut self, cx: &mut Context<Self>) {
+        let call = self
+            .core
+            .read(cx)
+            .link
+            .call::<ReflectCancel>(&ReflectCancelParams {
+                product: self.product.clone(),
+            });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| {
+                this.flash = Some(match result {
+                    Ok(r) if r.canceled => Flash::Done("The reflection stops.".into()),
+                    Ok(_) => Flash::Done("No reflection runs.".into()),
+                    Err(e) => Flash::Failed(e.to_string()),
+                });
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
     /// Sends one write, shows its outcome and reads the screen again.
     fn write<R: 'static>(
         &mut self,
@@ -172,6 +246,7 @@ impl MemoryScreen {
         };
         let link = self.core.read(cx).link.clone();
         match pending {
+            Pending::Reflect => self.run_reflect(cx),
             Pending::Retire { agent, id } => {
                 let done = format!("Item {id} retired.");
                 let call = link.call::<MemoryRetire>(&MemoryRetireParams {
@@ -252,6 +327,7 @@ impl MemoryScreen {
                 .filter(|i| i.id == *id)
                 .map(|i| i.text.clone())
                 .collect(),
+            Pending::Reflect => Vec::new(),
             Pending::Revert(id) => d
                 .reflections
                 .iter()
@@ -597,12 +673,55 @@ impl MemoryScreen {
         card
     }
 
+    fn reflect_row(&self, cx: &mut Context<Self>) -> Div {
+        let running = self.reflecting(cx);
+        div()
+            .flex()
+            .items_center()
+            .gap(space(3))
+            .child(
+                Button::new("memory-reflect")
+                    .secondary()
+                    .small()
+                    .label("Reflect")
+                    .disabled(running || self.busy)
+                    .on_click(cx.listener(|this, _, _, cx| this.ask_reflect(cx))),
+            )
+            .child(
+                Checkbox::new("memory-only")
+                    .label("Memory only")
+                    .checked(self.memory_only)
+                    .on_click(cx.listener(|this, on: &bool, _, cx| {
+                        this.memory_only = *on;
+                        cx.notify();
+                    })),
+            )
+            .when(running, |el| {
+                el.child(
+                    Button::new("memory-cancel-reflect")
+                        .danger()
+                        .small()
+                        .label("Cancel the reflection")
+                        .on_click(cx.listener(|this, _, _, cx| this.cancel_reflect(cx))),
+                )
+            })
+    }
+
     fn pending_card(&self, cx: &mut Context<Self>) -> Option<Div> {
         let (title, body) = match self.pending.as_ref()? {
             Pending::Retire { agent, id } => (
                 format!("Retire item {id} of {}", role_label(agent)),
                 "Meetings and reflections stop using this item. The screen keeps it under Retired."
                     .to_string(),
+            ),
+            Pending::Reflect => (
+                format!("Reflect on {}", self.product),
+                if self.memory_only {
+                    "Each agent calls the model, which costs money. It curates the memory only and makes no prompt proposal."
+                } else {
+                    "Each agent calls the model, which costs money. It curates the memory and may propose a prompt change."
+                }
+                .to_string(),
             ),
             Pending::Revert(id) => (
                 format!("Revert reflection {id}"),
@@ -713,6 +832,7 @@ impl Render for MemoryScreen {
         root.track_scroll(&self.scroll).overflow_y_scroll().child(
             column()
                 .child(header)
+                .child(self.reflect_row(cx))
                 .children(self.flash.as_ref().map(flash_line))
                 .children(self.pending_card(cx))
                 .children(blocks)
@@ -948,5 +1068,32 @@ mod tests {
         let request = sent(&mut other).unwrap();
         assert_eq!(request["method"], "decision.decide");
         assert_eq!(request["params"]["decision"], 9);
+    }
+
+    #[gpui::test]
+    fn reflect_asks_one_confirm_then_sends_the_box_and_cancel_calls_reflect_cancel(
+        cx: &mut TestAppContext,
+    ) {
+        use serde_json::json;
+        let (screen, mut other, cx) =
+            screen(cx, Load::Ready(serde_json::from_str(DATA).unwrap()));
+        screen.update(cx, |s, cx| {
+            s.memory_only = true;
+            s.ask_reflect(cx);
+        });
+        assert!(sent(&mut other).is_none(), "nothing is sent before Confirm");
+        assert_eq!(
+            screen.read_with(cx, |s, _| s.pending.clone()),
+            Some(Pending::Reflect)
+        );
+        screen.update(cx, |s, cx| s.confirm(cx));
+        let r = sent(&mut other).expect("reflect.run");
+        assert_eq!(r["method"], "reflect.run");
+        assert_eq!(r["params"], json!({"product": "demo", "memory_only": true}));
+
+        screen.update(cx, |s, cx| s.cancel_reflect(cx));
+        let r = sent(&mut other).expect("reflect.cancel");
+        assert_eq!(r["method"], "reflect.cancel");
+        assert_eq!(r["params"], json!({"product": "demo"}));
     }
 }

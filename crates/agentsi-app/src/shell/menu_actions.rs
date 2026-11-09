@@ -383,6 +383,7 @@ impl Shell {
             Cmd::NewTicket => self.ask(Ask::NewTicket(p), window, cx),
             Cmd::OpenTickets => self.show_screen(ScreenSpec::tickets(&p.id).on(p.host), window, cx),
             Cmd::Reflect => self.reflect(p, cx),
+            Cmd::CancelReflect => self.cancel_reflect(p, cx),
             Cmd::OpenGit => self.show_screen(ScreenSpec::git(&p.id).on(p.host), window, cx),
             Cmd::Label => self.ask(Ask::ProductLabel(p), window, cx),
             Cmd::Color => self.ask(Ask::ProductColor(p), window, cx),
@@ -436,6 +437,30 @@ impl Shell {
                 Ok(r) if r.entry.is_some() => format!("Reflected on {}.", p.id),
                 Ok(_) => format!("Nothing to reflect on in {}.", p.id),
                 Err(e) => format!("No reflection of {}: {e}", p.id),
+            };
+            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
+        })
+        .detach();
+    }
+
+    /// `reflect.cancel` for the product.
+    fn cancel_reflect(&mut self, p: ProductRef, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
+            return;
+        };
+        let call = core
+            .read(cx)
+            .link
+            .call::<agentsi_proto::reflect_api::ReflectCancel>(
+                &agentsi_proto::reflect_api::ReflectCancelParams {
+                    product: p.id.clone(),
+                },
+            );
+        cx.spawn(async move |this, cx| {
+            let text = match call.await {
+                Ok(r) if r.canceled => format!("The reflection of {} stops.", p.id),
+                Ok(_) => format!("No reflection of {} runs.", p.id),
+                Err(e) => format!("Could not cancel: {e}"),
             };
             let _ = this.update(cx, |this, cx| this.notice(&text, cx));
         })
@@ -917,6 +942,7 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         PromoteTicketDecision => (Ticket, PromoteDecision),
         CopyTicketId => (Ticket, CopyId),
         ReflectProduct => (Product, Reflect),
+        CancelReflection => (Product, CancelReflect),
         CopyProductPath => (Product, CopyPath),
         OpenProductFolder => (Product, OpenFolder),
         DeleteProductData => (Product, DeleteData),

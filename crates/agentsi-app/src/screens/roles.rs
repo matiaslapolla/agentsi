@@ -5,12 +5,13 @@
 
 use agentsi_proto::agency_api::{AuditParams, AuditReport, DataAudit};
 use agentsi_proto::roles_api::{
-    ApplyPlan, BriefView, ChangeStatus, ResetPlan, RoleSource, RolesApply, RolesApplyParams,
+    ApplyPlan, RoleDef, BriefView, ChangeStatus, ResetPlan, RoleSource, RolesApply, RolesApplyParams,
     RolesBrief, RolesBriefParams, RolesList, RolesListParams, RolesListResult, RolesReset,
     RolesResetParams, RolesValidate, RolesValidateParams, RolesValidateResult, RosterEntry,
 };
 use agentsi_ui::components::{Button, Card, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::IconName;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -38,6 +39,8 @@ pub struct RolesScreen {
     /// The result of the last action, or its error.
     message: Option<Result<String, String>>,
     scroll: ScrollHandle,
+    /// The resolved definition of one agent, in a panel: the agent and its definition or error.
+    definition: Option<(String, Result<RoleDef, String>)>,
 }
 
 /// The lines that describe a reset plan, as `agentsi reset` prints them.
@@ -100,6 +103,7 @@ impl RolesScreen {
             pending: None,
             message: None,
             scroll: ScrollHandle::new(),
+            definition: None,
         };
         screen.reload(cx);
         screen
@@ -163,11 +167,11 @@ impl RolesScreen {
     }
 
     /// Plans a reset of `agent`, or of the whole product, and waits for the confirm.
-    fn plan_reset(&mut self, agent: Option<String>, cx: &mut Context<Self>) {
+    fn plan_reset(&mut self, agent: Option<String>, memory: bool, cx: &mut Context<Self>) {
         let params = RolesResetParams {
             product: self.product.clone(),
             agent,
-            memory: false,
+            memory,
             yes: false,
         };
         let call = self.core.read(cx).link.call::<RolesReset>(&params);
@@ -183,6 +187,30 @@ impl RolesScreen {
                     Ok(r) => this.pending = Some(Pending::Reset(params, r.plan)),
                     Err(e) => this.message = Some(Err(e)),
                 }
+                cx.notify();
+            });
+        })
+        .detach();
+    }
+
+    /// Reads the resolved definition of `agent` and shows it in a panel. A second click hides it.
+    pub fn show_definition(&mut self, agent: String, cx: &mut Context<Self>) {
+        if self.definition.as_ref().is_some_and(|(a, _)| *a == agent) {
+            self.definition = None;
+            cx.notify();
+            return;
+        }
+        let call = self.core.read(cx).link.call::<RolesList>(&RolesListParams {
+            product: self.product.clone(),
+            agent: Some(agent.clone()),
+        });
+        cx.spawn(async move |this, cx| {
+            let result = call
+                .await
+                .map_err(|e| e.to_string())
+                .and_then(|r| r.agent.ok_or_else(|| "The core sent no definition.".to_string()));
+            let _ = this.update(cx, |this, cx| {
+                this.definition = Some((agent, result));
                 cx.notify();
             });
         })
@@ -328,6 +356,7 @@ fn line_list(lines: &[String]) -> Div {
 impl RolesScreen {
     fn agent_card(&self, i: usize, e: &RosterEntry, cx: &mut Context<Self>) -> Card {
         let id = e.id.clone();
+        let definition_of = e.id.clone();
         let model = match (&e.model, &e.effort) {
             (Some(m), Some(x)) => Some(format!("{m} · {x}")),
             (Some(m), None) => Some(m.clone()),
@@ -373,14 +402,23 @@ impl RolesScreen {
                 },
             )
             .child(
-                div().flex().justify_end().child(
+                div().flex().justify_end().gap(space(2)).child(
+                    Button::new(("roles-definition", i))
+                        .ghost()
+                        .small()
+                        .icon(IconName::FileText)
+                        .label("Definition")
+                        .on_click(cx.listener(move |this, _, _, cx| {
+                            this.show_definition(definition_of.clone(), cx);
+                        })),
+                ).child(
                     Button::new(("roles-reset", i))
                         .ghost()
                         .small()
                         .icon(IconName::RotateCw)
                         .label("Reset to the global role")
                         .on_click(cx.listener(move |this, _, _, cx| {
-                            this.plan_reset(Some(id.clone()), cx);
+                            this.plan_reset(Some(id.clone()), false, cx);
                         })),
                 ),
             )
@@ -410,6 +448,22 @@ impl RolesScreen {
                 .bg(surface::raised())
                 .child(section(&title, None))
                 .child(line_list(&lines))
+                .children(match pending {
+                    Pending::Reset(p, _) => {
+                        let (agent, memory) = (p.agent.clone(), p.memory);
+                        Some(
+                            div().child(
+                                Checkbox::new("roles-reset-memory")
+                                    .label("Also delete the memory")
+                                    .checked(memory)
+                                    .on_click(cx.listener(move |this, on: &bool, _, cx| {
+                                        this.plan_reset(agent.clone(), *on, cx)
+                                    })),
+                            ),
+                        )
+                    }
+                    _ => None,
+                })
                 .child(
                     div()
                         .flex()
@@ -429,6 +483,44 @@ impl RolesScreen {
                                 .on_click(cx.listener(|this, _, _, cx| this.cancel(cx))),
                         ),
                 ),
+        )
+    }
+
+    fn definition_block(&self) -> Option<Stateful<Div>> {
+        let (agent, def) = self.definition.as_ref()?;
+        let body = match def {
+            Ok(d) => {
+                let mut lines = vec![format!(
+                    "{} · {:?} · {}{}",
+                    d.role,
+                    d.source,
+                    d.model,
+                    d.effort.as_ref().map_or(String::new(), |e| format!(" · {e}"))
+                )];
+                if let Some(t) = &d.tools {
+                    lines.push(format!("Tools: {}", t.join(", ")));
+                }
+                lines.extend(d.body.lines().map(String::from));
+                lines
+            }
+            Err(e) => vec![format!("The definition did not load: {e}")],
+        };
+        Some(
+            div()
+                .id("roles-definition-panel")
+                .debug_selector(|| "roles-definition-panel".into())
+                .flex()
+                .flex_col()
+                .gap(space(1))
+                .max_h(space(80))
+                .overflow_y_scroll()
+                .p(space(3))
+                .rounded(radius::lg())
+                .border_1()
+                .border_color(line::border())
+                .bg(surface::raised())
+                .child(section(&format!("Definition of {}", role_label(agent)), None))
+                .children(body.into_iter().map(mono)),
         )
     }
 
@@ -530,7 +622,7 @@ impl Render for RolesScreen {
                             .danger()
                             .small()
                             .label("Reset all")
-                            .on_click(cx.listener(|this, _, _, cx| this.plan_reset(None, cx))),
+                            .on_click(cx.listener(|this, _, _, cx| this.plan_reset(None, false, cx))),
                     ),
             );
 
@@ -596,6 +688,7 @@ impl Render for RolesScreen {
                 .children(message)
                 .children(self.pending_card(cx))
                 .children(self.validation_block())
+                .children(self.definition_block())
                 .child(roles_block)
                 .child(specialists_block)
                 .children(overlays_block)
@@ -758,5 +851,32 @@ mod tests {
                 "Roster: pm, qa → pm"
             ]
         );
+    }
+
+    fn request(other: &mut std::os::unix::net::UnixStream) -> Option<serde_json::Value> {
+        other.set_nonblocking(true).unwrap();
+        let f = agentsi_proto::frame::read_frame(other).ok().flatten()?;
+        serde_json::from_slice(&f.payload).ok()
+    }
+
+    #[gpui::test]
+    fn a_definition_click_asks_for_the_agent_and_the_memory_box_plans_again(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(agentsi_ui::init);
+        let (end, mut other) = std::os::unix::net::UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
+        let (screen, cx) = cx.add_window_view(|_, cx| RolesScreen::new("demo".into(), core, cx));
+        while request(&mut other).is_some() {}
+        screen.update(cx, |s, cx| s.show_definition("dev.api".into(), cx));
+        let r = request(&mut other).expect("roles.list");
+        assert_eq!(r["method"], "roles.list");
+        assert_eq!(r["params"], serde_json::json!({"product": "demo", "agent": "dev.api"}));
+
+        screen.update(cx, |s, cx| s.plan_reset(Some("dev.api".into()), true, cx));
+        let r = request(&mut other).expect("roles.reset");
+        assert_eq!(r["method"], "roles.reset");
+        assert_eq!(r["params"]["memory"], true);
+        assert_eq!(r["params"]["yes"], false);
     }
 }

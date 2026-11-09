@@ -184,6 +184,8 @@ gpui_kit::actions!(
         CopyTicketId,
         /// Runs the reflection of the active product.
         ReflectProduct,
+        /// Stops the reflection of the active product.
+        CancelReflection,
         /// Copies the folder of the active product to the clipboard.
         CopyProductPath,
         /// Opens the folder of the active product in the file manager.
@@ -792,6 +794,12 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(CopyTicketId),
     },
     Entry {
+        label: "Cancel the reflection of the active product",
+        icon: IconName::Close,
+        keywords: &["reflect", "cancel", "stop"],
+        action: || Box::new(CancelReflection),
+    },
+    Entry {
         label: "Reflect on the active product",
         icon: IconName::BookOpen,
         keywords: &["reflect", "reflection", "memory", "learn", "cost"],
@@ -1107,6 +1115,7 @@ mod tests {
             "Promote the ticket to a decision (tickets)",
             "Copy the id of the ticket (tickets)",
             "Reflect on the active product",
+            "Cancel the reflection of the active product",
             "Copy the folder of the active product",
             "Open the folder of the active product",
             "Delete the data of the active product",
