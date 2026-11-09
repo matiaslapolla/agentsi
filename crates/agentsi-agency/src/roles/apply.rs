@@ -3,7 +3,8 @@
 //! compares it with the database. `write_plan` stores it: the brief and the
 //! overlays into the database, the roster (and the stories block) into the
 //! registry. The registry write is the last step, so a failed edit rolls the
-//! database back.
+//! database back. An inline stage holds the same files as text: `InlineStage`
+//! writes them into a private temporary folder, so the folder rules apply.
 
 use super::files::RoleFiles;
 use super::load::describe_roster;
@@ -132,6 +133,57 @@ fn read_stage(dir: &Path) -> (Option<Stage>, Vec<String>) {
             failures,
         ),
         _ => (None, failures),
+    }
+}
+
+/// The file names that a stage can hold: `brief.json`, `roster.json`, `stories.json`
+/// and `agents/<id>.md`. An agent id has letters, digits, `.`, `-` and `_`, and does not
+/// start with `.`.
+pub fn stage_key_ok(key: &str) -> bool {
+    if matches!(key, "brief.json" | "roster.json" | "stories.json") {
+        return true;
+    }
+    let Some(id) = key
+        .strip_prefix("agents/")
+        .and_then(|k| k.strip_suffix(".md"))
+    else {
+        return false;
+    };
+    !id.is_empty()
+        && !id.starts_with('.')
+        && id
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '_'))
+}
+
+/// An inline stage on disk: a temporary folder with mode 0700. Drop deletes it.
+pub struct InlineStage(tempfile::TempDir);
+
+impl InlineStage {
+    /// Writes `files` into a new folder. Each key must pass `stage_key_ok`.
+    pub fn write(files: &BTreeMap<String, String>) -> std::result::Result<InlineStage, String> {
+        if let Some(bad) = files.keys().find(|k| !stage_key_ok(k)) {
+            return Err(format!(
+                "\"{bad}\" is not a stage file. Use brief.json, roster.json, stories.json or agents/<id>.md."
+            ));
+        }
+        use std::os::unix::fs::PermissionsExt;
+        let dir = tempfile::Builder::new()
+            .prefix("agentsi-stage-")
+            .permissions(std::fs::Permissions::from_mode(0o700))
+            .tempdir()
+            .map_err(|e| format!("cannot make the stage folder: {e}"))?;
+        std::fs::create_dir(dir.path().join("agents"))
+            .map_err(|e| format!("cannot make the stage folder: {e}"))?;
+        for (name, text) in files {
+            std::fs::write(dir.path().join(name), text)
+                .map_err(|e| format!("cannot write the stage file {name}: {e}"))?;
+        }
+        Ok(InlineStage(dir))
+    }
+
+    pub fn path(&self) -> &Path {
+        self.0.path()
     }
 }
 
@@ -305,6 +357,7 @@ fn edit_registry(text: &str, planned: &Planned) -> std::result::Result<String, S
     let patch = Patch {
         roles: Some(plan.roster_after.clone()),
         stories: plan.stories_changed.then(|| plan.stories_after.clone()),
+        ..Patch::default()
     };
     update_product(text, &plan.product, &patch)
 }
@@ -453,6 +506,7 @@ pub fn write_plan(tx: &Transaction, root: &Path, planned: &Planned) -> super::Re
             )?;
         }
     }
+    planned.product.store_row(tx)?;
     let file: PathBuf = root.join(FILE);
     let text = std::fs::read_to_string(&file)
         .map_err(|e| super::Error::Invalid(format!("cannot read {}: {e}", file.display())))?;
@@ -654,5 +708,39 @@ mod tests {
         assert_eq!(p.plan.roster_before, Vec::<String>::new());
         let edited = edit_registry(REGISTRY, &p).unwrap();
         assert!(edited.contains(r#"{ "id": "q", "name": "Q", "paths": ["/q"], "status": "active", "roles": ["pm", "dev", "dev.api"], "stories": { "test": "run {files}", "gate": ["g"], "budget_usd": 2 } }"#));
+    }
+
+    #[test]
+    fn an_inline_stage_takes_only_the_stage_names_and_is_private() {
+        for ok in [
+            "brief.json",
+            "roster.json",
+            "stories.json",
+            "agents/dev.api.md",
+        ] {
+            assert!(stage_key_ok(ok), "{ok}");
+        }
+        for bad in [
+            "../brief.json",
+            "agents/.md",
+            "agents/../x.md",
+            "agents/a/b.md",
+            "notes.txt",
+            "agents/.x.md",
+        ] {
+            assert!(!stage_key_ok(bad), "{bad}");
+        }
+        use std::os::unix::fs::PermissionsExt;
+        let files = BTreeMap::from([("agents/dev.api.md".to_string(), "x".to_string())]);
+        let stage = InlineStage::write(&files).unwrap();
+        let path = stage.path().to_path_buf();
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o700);
+        assert_eq!(
+            std::fs::read_to_string(path.join("agents/dev.api.md")).unwrap(),
+            "x"
+        );
+        drop(stage);
+        assert!(!path.exists());
     }
 }

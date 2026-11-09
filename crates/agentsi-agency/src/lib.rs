@@ -19,6 +19,7 @@ pub mod registry;
 pub mod roles;
 pub mod roster;
 pub mod sandbox;
+pub mod setup;
 pub mod snapshot;
 pub mod status;
 pub mod story;

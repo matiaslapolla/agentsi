@@ -242,6 +242,7 @@ pub fn role_call(def: &RoleDef, ctx: &RoleContext, meeting: bool) -> Call {
     };
     let web = tools.iter().any(|t| t == "WebSearch");
     Call {
+        budget_usd: None,
         prompt: role_prompt(ctx, &def.id, web, meeting, code_graph),
         model: def.model.clone(),
         system: def.body.clone(),
@@ -366,6 +367,7 @@ pub struct SynthesisContext<'a> {
 /// The synthesis call, made with the pm agent of the product as its system prompt.
 pub fn synthesis_call(pm: &RoleDef, ctx: &SynthesisContext, repair: Option<&Repair>) -> Call {
     Call {
+        budget_usd: None,
         prompt: synthesis_prompt(
             ctx.question,
             ctx.answers,

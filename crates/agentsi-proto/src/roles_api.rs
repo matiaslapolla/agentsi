@@ -9,6 +9,7 @@ use crate::rpc::ErrorKind;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub fn register(c: &mut Catalog) {
     c.method::<RolesList>()
@@ -184,7 +185,13 @@ pub struct RolesApply;
 pub struct RolesApplyParams {
     pub product: String,
     /// The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.
-    pub stage_dir: String,
+    /// Send `stage_dir` or `stage`, not both.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage_dir: Option<String>,
+    /// The inline stage: the name of each stage file to its text. The names are `brief.json`,
+    /// `roster.json`, `stories.json` and `agents/<id>.md`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stage: Option<BTreeMap<String, String>>,
     /// true: write the plan. false: only plan.
     #[serde(default)]
     pub yes: bool,
@@ -250,10 +257,15 @@ pub struct RolesApplyResult {
 impl Method for RolesApply {
     const NAME: &'static str = "roles.apply";
     const DESCRIPTION: &'static str = "Checks a staged brief, roster and overlays and compares \
-        them with the database. With `yes` it writes the brief and the overlays into the store \
-        and the roster into `agentsi.config.json`, and commits that file. Without `yes` it \
-        writes nothing. It is what `agentsi roles apply` does.";
-    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+        them with the database. The stage is a folder (`stage_dir`) or inline text (`stage`). \
+        With `yes` it writes the brief, the overlays and the `products` row into the store and \
+        the roster into `agentsi.config.json`, commits that file and sends `data.changed` of \
+        kind `product`. Without `yes` it writes nothing. It is what `agentsi roles apply` does.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Invalid,
+        ErrorKind::Unavailable,
+    ];
     type Params = RolesApplyParams;
     type Result = RolesApplyResult;
 }

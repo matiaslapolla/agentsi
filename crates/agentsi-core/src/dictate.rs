@@ -11,7 +11,9 @@ use crate::state::Core;
 use agentsi_proto::RpcError;
 use agentsi_proto::client::Client;
 use agentsi_proto::core_api::Topic;
-use agentsi_proto::events::{DictationEdgeParams, DictationStart, DictationStop};
+use agentsi_proto::events::{
+    DictationEdgeParams, DictationStart, DictationStop, VoiceMic, VoiceMicParams,
+};
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_proto::socket::{SOCKET_ENV, socket_path};
 use agentsi_proto::vocabulary_api::{VocabularyEntry, VocabularyList};
@@ -57,6 +59,7 @@ pub fn command(core: &Core, action: DictateAction, at_us: Option<u64>) -> Result
     } else {
         core.publish::<DictationStop>(&edge);
     }
+    core.publish::<VoiceMic>(&VoiceMicParams { open: start });
     Ok(())
 }
 

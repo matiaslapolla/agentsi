@@ -184,6 +184,16 @@ fn strings(tx: &Connection, sql: &str, args: impl rusqlite::Params) -> Result<Ve
     Ok(rows.collect::<std::result::Result<_, _>>()?)
 }
 
+/// The log files of the data root that the item Logs deletes.
+const LOG_FILES: [&str; 2] = ["logs/hook.log", "logs/setup.jsonl"];
+
+fn log_files(root: &Path) -> impl Iterator<Item = FileEntry> + '_ {
+    LOG_FILES
+        .iter()
+        .filter_map(move |rel| sized(root, rel.to_string()))
+        .filter(|e| !e.dir)
+}
+
 fn sized(root: &Path, rel: String) -> Option<FileEntry> {
     let meta = std::fs::symlink_metadata(root.join(&rel)).ok()?;
     if meta.is_dir() {
@@ -496,7 +506,7 @@ fn apply(tx: &Connection, root: &Path, item: &Item) -> Result<ItemPlan> {
             }
         }
         Kind::VoiceTranscripts => files.extend(transcripts(root, item.before.as_deref())),
-        Kind::Logs => files.extend(sized(root, "logs/hook.log".into()).filter(|e| !e.dir)),
+        Kind::Logs => files.extend(log_files(root)),
         Kind::Backups => files.extend(old_backups(root)?),
         Kind::Everything => {
             for table in TABLES {
@@ -506,7 +516,7 @@ fn apply(tx: &Connection, root: &Path, item: &Item) -> Result<ItemPlan> {
                 files.extend(sized(root, format!("workspace/{p}")));
             }
             files.extend(transcripts(root, None));
-            files.extend(sized(root, "logs/hook.log".into()).filter(|e| !e.dir));
+            files.extend(log_files(root));
             files.extend(old_backups(root)?);
         }
     }
@@ -733,6 +743,7 @@ mod tests {
         age(dir.path(), "voice/transcripts/old.md", 1_000_000_000); // 2001
         age(dir.path(), "voice/transcripts/new.md", 1_900_000_000); // 2030
         put(dir.path(), "logs/hook.log", 50);
+        put(dir.path(), "logs/setup.jsonl", 20);
         for d in ["2026-11-01", "2026-11-02", "2026-11-03"] {
             put(dir.path(), &format!("backups/agentsi-{d}.db"), 20);
             put(dir.path(), &format!("backups/agentsi.config-{d}.json"), 5);
@@ -918,6 +929,7 @@ mod tests {
         );
         assert!(files_of(w.root(), "voice/transcripts").is_empty());
         assert!(!w.root().join("logs/hook.log").exists());
+        assert!(!w.root().join("logs/setup.jsonl").exists());
     }
 
     #[test]

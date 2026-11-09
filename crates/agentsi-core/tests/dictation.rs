@@ -8,7 +8,7 @@ use agentsi_proto::Event as _;
 use agentsi_proto::client::Client;
 use agentsi_proto::client::ClientError;
 use agentsi_proto::core_api::{Empty, Subscribe, SubscribeParams, Topic};
-use agentsi_proto::events::{DictationStart, DictationStop};
+use agentsi_proto::events::{DictationStart, DictationStop, VoiceMic};
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_proto::terminal_api::{Create, CreateParams};
 use agentsi_proto::vocabulary_api::{
@@ -348,4 +348,46 @@ fn the_vocabulary_is_seeded_from_the_registry_once_and_the_owner_edits_it() {
         "{e}"
     );
     assert_eq!(std::fs::read_to_string(&file).unwrap(), "not [toml");
+}
+
+#[test]
+fn each_dictate_start_and_stop_also_sends_voice_mic_on_the_voice_topic() {
+    let dir = TempDir::new();
+    let (core, mut client) = core(&dir, &dir.0.join("config"));
+    let mut pill = Client::connect(&core.socket.path).unwrap();
+    pill.call::<Subscribe>(&SubscribeParams {
+        topics: vec![Topic::Dictation],
+    })
+    .unwrap();
+    let mut app = Client::connect(&core.socket.path).unwrap();
+    app.set_timeout(Some(Duration::from_secs(10))).unwrap();
+    app.call::<Subscribe>(&SubscribeParams {
+        topics: vec![Topic::Voice],
+    })
+    .unwrap();
+    let mut mic = Vec::new();
+    for action in [
+        DictateAction::Start,
+        DictateAction::Stop,
+        DictateAction::Toggle,
+        DictateAction::Toggle,
+    ] {
+        client
+            .call::<Dictate>(&DictateParams {
+                action,
+                at_us: None,
+            })
+            .unwrap();
+        loop {
+            let n = app.next_notification().unwrap();
+            if n.method == VoiceMic::NAME {
+                mic.push(n.parse::<VoiceMic>().unwrap().open);
+                break;
+            }
+        }
+    }
+    assert_eq!(mic, [true, false, true, false]);
+    // The pill keeps only its own topic: its next events are the dictation edges.
+    let first = pill.next_notification().unwrap();
+    assert_eq!(first.method, DictationStart::NAME);
 }

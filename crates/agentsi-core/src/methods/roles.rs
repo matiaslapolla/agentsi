@@ -12,6 +12,7 @@ use agentsi_agency::roles::{
 use agentsi_agency::{Error as AgencyError, roster};
 use agentsi_proto::RpcError;
 use agentsi_proto::desk_api::Objective;
+use agentsi_proto::events::{DataChanged, DataChangedParams};
 use agentsi_proto::roles_api::{
     BriefView, CommitInfo, Registration, RolesApply, RolesApplyParams, RolesApplyResult,
     RolesBrief, RolesBriefParams, RolesBriefResult, RolesList, RolesListParams, RolesListResult,
@@ -282,14 +283,41 @@ fn registerable(id: &str, r: &Registration) -> roles::Result<Product> {
     })
 }
 
+/// The stage folder of a request: `stage_dir`, or `stage` written to a temporary folder
+/// that lives as long as the returned guard.
+fn stage_of(p: &RolesApplyParams) -> roles::Result<(PathBuf, Option<apply::InlineStage>)> {
+    match (&p.stage_dir, &p.stage) {
+        (Some(dir), None) => Ok((PathBuf::from(dir), None)),
+        (None, Some(files)) => {
+            let inline = apply::InlineStage::write(files).map_err(RolesError::Invalid)?;
+            Ok((inline.path().to_path_buf(), Some(inline)))
+        }
+        _ => Err(RolesError::Invalid(
+            "Send one of stage_dir and stage.".into(),
+        )),
+    }
+}
+
 async fn roles_apply(ctx: Ctx, p: RolesApplyParams) -> Result<RolesApplyResult, RpcError> {
-    blocking(&ctx, move |w| {
+    let product = p.product.clone();
+    let done = apply_stage(&ctx, p).await?;
+    if done.applied {
+        ctx.core.publish::<DataChanged>(&DataChangedParams {
+            product,
+            kind: "product".into(),
+        });
+    }
+    Ok(done)
+}
+
+async fn apply_stage(ctx: &Ctx, p: RolesApplyParams) -> Result<RolesApplyResult, RpcError> {
+    blocking(ctx, move |w| {
         let registering = p.register.is_some();
         let product = match &p.register {
             Some(r) => registerable(&p.product, r)?,
             None => w.registry.product(&p.product)?.clone(),
         };
-        let stage = PathBuf::from(&p.stage_dir);
+        let (stage, _inline) = stage_of(&p)?;
         let (planned, warnings) = read(&w.store, |c| {
             apply::plan_apply(c, &w.root, &stage, &product, registering)
         })?;

@@ -118,6 +118,7 @@ pub fn curation_call(
     root: &Path,
 ) -> Call {
     Call {
+        budget_usd: None,
         prompt: curation_prompt(agent, items, signals, brief_xml),
         model: CURATION_MODEL.into(),
         system: curation_system(),

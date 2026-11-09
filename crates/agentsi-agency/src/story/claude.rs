@@ -248,6 +248,8 @@ pub struct Call {
     pub timeout: Duration,
     /// The MCP servers, and the tools of theirs that the call may use.
     pub mcp: Option<McpAccess>,
+    /// The cap of the call in USD. `None` takes `default_budget_usd` of the model.
+    pub budget_usd: Option<f64>,
 }
 
 pub fn call_args(c: &Call) -> Vec<String> {
@@ -281,7 +283,9 @@ pub fn call_args(c: &Call) -> Vec<String> {
         ]
         .map(String::from),
     );
-    args.push(js_number(default_budget_usd(&c.model)));
+    args.push(js_number(
+        c.budget_usd.unwrap_or_else(|| default_budget_usd(&c.model)),
+    ));
     args.push(format!("--tools={}", c.tools.join(",")));
     let mut allowed = c.tools.clone();
     if let Some(mcp) = &c.mcp {

@@ -529,6 +529,7 @@ mod tests {
 
     fn call(model: &str) -> Call {
         Call {
+            budget_usd: None,
             prompt: String::new(),
             model: model.into(),
             system: String::new(),

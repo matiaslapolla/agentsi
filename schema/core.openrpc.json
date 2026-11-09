@@ -193,6 +193,56 @@
         ],
         "type": "object"
       },
+      "ArchivedDecision": {
+        "description": "A decision that the archive record holds.",
+        "properties": {
+          "action": {
+            "description": "What to run once the decision is approved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "`minutes`, `reflection` or `product`.",
+            "type": "string"
+          },
+          "minutes_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `approved`, `rejected` or `stale`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "why": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "type": "object"
+      },
       "AttachResult": {
         "properties": {
           "channel": {
@@ -877,6 +927,21 @@
           }
         ]
       },
+      "CoreDoctorResult": {
+        "properties": {
+          "checks": {
+            "description": "The checks in the order of `agentsi doctor`.",
+            "items": {
+              "$ref": "#/components/schemas/DoctorCheck"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "checks"
+        ],
+        "type": "object"
+      },
       "CoreStatusResult": {
         "properties": {
           "data_root": {
@@ -1169,6 +1234,21 @@
         ],
         "type": "object"
       },
+      "DecisionArchivedResult": {
+        "properties": {
+          "decisions": {
+            "description": "Newest id first.",
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDecision"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "decisions"
+        ],
+        "type": "object"
+      },
       "DeskResult": {
         "properties": {
           "index": {
@@ -1260,6 +1340,37 @@
         ],
         "type": "object"
       },
+      "DoctorCheck": {
+        "description": "One check of `agentsi doctor`.",
+        "properties": {
+          "blocks": {
+            "description": "The features that a failed check blocks.",
+            "type": "string"
+          },
+          "detail": {
+            "description": "The version or the found path when ok. Why it failed otherwise. Empty when missing.",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level",
+            "description": "`required` checks decide the exit code of `agentsi doctor`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "status",
+          "detail",
+          "blocks"
+        ],
+        "type": "object"
+      },
       "DownloadResult": {
         "properties": {
           "id": {
@@ -1279,6 +1390,15 @@
       "Empty": {
         "description": "The params or the result of a method that has none.",
         "type": "object"
+      },
+      "FieldOutcome": {
+        "description": "What the owner did with a drafted field before the apply.",
+        "enum": [
+          "kept",
+          "edited",
+          "cleared"
+        ],
+        "type": "string"
       },
       "FileChange": {
         "description": "A file of the stage that differs from what the database holds.",
@@ -2105,6 +2225,15 @@
         ],
         "type": "object"
       },
+      "Level": {
+        "description": "`required` checks decide the exit code. The others only name what they block.",
+        "enum": [
+          "required",
+          "stories",
+          "optional"
+        ],
+        "type": "string"
+      },
       "Link": {
         "description": "A link of a ticket. `story`, `decision`, `minutes`, `priority` (`<minutes id>#<idx>`) and\n`ticket` must exist. `url` is an http(s) URL. `commit`, `path` and `issue` are free text.",
         "properties": {
@@ -2177,6 +2306,34 @@
           "status",
           "paths",
           "archived"
+        ],
+        "type": "object"
+      },
+      "Manifest": {
+        "description": "The commands that the manifest of the folder proposes for Stories mode.",
+        "properties": {
+          "file": {
+            "description": "`package.json`, `Cargo.toml`, `pyproject.toml` or `composer.json`: the first one found.",
+            "type": "string"
+          },
+          "gate": {
+            "description": "The typecheck and lint commands that the manifest has.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "test": {
+            "description": "A test command with `{files}`. Null when the manifest names no runner that takes files.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "file",
+          "gate"
         ],
         "type": "object"
       },
@@ -3047,6 +3204,24 @@
         ],
         "type": "object"
       },
+      "OwnerChange": {
+        "description": "The owner fields to change. An absent field stays.",
+        "properties": {
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "PendingDecision": {
         "description": "A decision that waits for the owner.",
         "properties": {
@@ -3284,6 +3459,34 @@
           "why",
           "is_new",
           "sources"
+        ],
+        "type": "object"
+      },
+      "ProductChange": {
+        "description": "The product fields to change. An absent field stays.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paths": {
+            "description": "Existing absolute folders, one at least.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
         ],
         "type": "object"
       },
@@ -3784,6 +3987,54 @@
         "required": [
           "name",
           "path"
+        ],
+        "type": "object"
+      },
+      "RegistryProduct": {
+        "description": "A product of the registry. The roster and the stories block have their own methods.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paths": {
+            "description": "Absolute folders. The first one is the main folder.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "paths",
+          "status"
+        ],
+        "type": "object"
+      },
+      "RegistryResult": {
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Owner",
+            "description": "The owner block with its defaults."
+          },
+          "products": {
+            "description": "The products in registry order.",
+            "items": {
+              "$ref": "#/components/schemas/RegistryProduct"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "owner",
+          "products"
         ],
         "type": "object"
       },
@@ -4468,6 +4719,24 @@
         ],
         "type": "object"
       },
+      "ScanTools": {
+        "description": "The tools of the host that the forms need.",
+        "properties": {
+          "bwrap": {
+            "description": "True when `bwrap` is on the `PATH`. Without it, Stories mode cannot run.",
+            "type": "boolean"
+          },
+          "codebase_memory_mcp": {
+            "description": "True when `codebase-memory-mcp` is on the `PATH`.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bwrap",
+          "codebase_memory_mcp"
+        ],
+        "type": "object"
+      },
       "Segment": {
         "description": "One segment of the script, with its place in the audio. The names are the keys of `timings.json`.",
         "properties": {
@@ -4514,6 +4783,90 @@
         "required": [
           "session",
           "on"
+        ],
+        "type": "object"
+      },
+      "SetupDraftResult": {
+        "properties": {
+          "cost_usd": {
+            "format": "double",
+            "type": "number"
+          },
+          "draft": {
+            "description": "The id of the draft, for `setup.outcome`.",
+            "type": "string"
+          },
+          "fields": {
+            "description": "The values of the five forms: `product`, `objectives`, `roster`, `models` and `stories`."
+          },
+          "no_data": {
+            "description": "The paths of the fields that the files do not answer, for example `product.audience`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "seconds": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "draft",
+          "fields",
+          "no_data",
+          "cost_usd",
+          "seconds"
+        ],
+        "type": "object"
+      },
+      "SetupScanResult": {
+        "properties": {
+          "id": {
+            "description": "The folder name in lowercase, with `-` for each character that an id does not permit.",
+            "type": "string"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Manifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "description": "The folder name.",
+            "type": "string"
+          },
+          "north_stars": {
+            "description": "The north-star candidates that exist, relative to the folder: `docs/product.md`,\n`docs/vision*` and `ROADMAP*`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "path": {
+            "type": "string"
+          },
+          "registered": {
+            "description": "The product of the registry that holds the folder, as `product.whoami` finds it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tools": {
+            "$ref": "#/components/schemas/ScanTools"
+          }
+        },
+        "required": [
+          "path",
+          "id",
+          "name",
+          "north_stars",
+          "tools"
         ],
         "type": "object"
       },
@@ -4602,6 +4955,14 @@
           "ref"
         ],
         "type": "object"
+      },
+      "Status": {
+        "enum": [
+          "ok",
+          "missing",
+          "fail"
+        ],
+        "type": "string"
       },
       "StatusResult": {
         "properties": {
@@ -7235,6 +7596,56 @@
       }
     },
     {
+      "description": "Lists the decisions of a product that are archived, newest id first. `archive.restore` brings one back. It only reads.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "decision.archived",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DecisionArchivedResult"
+        }
+      }
+    },
+    {
       "description": "Hides a minutes, a pending decision, a story or a whole product from the lists and the counts. It writes one `archive_records` row and deletes nothing. An archived record is a conflict. Sends `data.changed`.",
       "errors": [
         {
@@ -7947,7 +8358,7 @@
       }
     },
     {
-      "description": "Checks a staged brief, roster and overlays and compares them with the database. With `yes` it writes the brief and the overlays into the store and the roster into `agentsi.config.json`, and commits that file. Without `yes` it writes nothing. It is what `agentsi roles apply` does.",
+      "description": "Checks a staged brief, roster and overlays and compares them with the database. The stage is a folder (`stage_dir`) or inline text (`stage`). With `yes` it writes the brief, the overlays and the `products` row into the store and the roster into `agentsi.config.json`, commits that file and sends `data.changed` of kind `product`. Without `yes` it writes nothing. It is what `agentsi roles apply` does.",
       "errors": [
         {
           "code": -32602,
@@ -8005,12 +8416,30 @@
           }
         },
         {
-          "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.",
-          "name": "stage_dir",
-          "required": true,
+          "description": "The inline stage: the name of each stage file to its text. The names are `brief.json`,\n`roster.json`, `stories.json` and `agents/<id>.md`.",
+          "name": "stage",
+          "required": false,
           "schema": {
-            "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.",
-            "type": "string"
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The inline stage: the name of each stage file to its text. The names are `brief.json`,\n`roster.json`, `stories.json` and `agents/<id>.md`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.\nSend `stage_dir` or `stage`, not both.",
+          "name": "stage_dir",
+          "required": false,
+          "schema": {
+            "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.\nSend `stage_dir` or `stage`, not both.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         {
@@ -10007,6 +10436,34 @@
       }
     },
     {
+      "description": "Runs the checks of `agentsi doctor` on the host of the core and gives each row: the core, the data root, the tools and the voice. It writes nothing. A run takes up to 15 seconds for each tool.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        }
+      ],
+      "name": "core.doctor",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/CoreDoctorResult"
+        }
+      }
+    },
+    {
       "description": "Gives the clear plan of the items: the rows per table, the files and the bytes that `data.clear` removes. It writes nothing.",
       "errors": [
         {
@@ -11598,6 +12055,281 @@
           "$ref": "#/components/schemas/TicketPromoteResult"
         }
       }
+    },
+    {
+      "description": "Gives the owner block and the products of `agentsi.config.json`. It only reads.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "registry.get",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/RegistryResult"
+        }
+      }
+    },
+    {
+      "description": "Changes the owner block, or the name and the paths of one product, in `agentsi.config.json`. Each other key stays. The file changes in one step, so a failed write leaves it as it was. A product change also writes its `products` row and sends `data.changed` of kind `product`. It makes no commit.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "registry.update",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "owner",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/RegistryResult"
+        }
+      }
+    },
+    {
+      "description": "Reads a product folder for the setup screen: a proposed id and name, the registered product, the commands of the manifest, the north-star docs and the tools on the PATH. It writes nothing and calls no model.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        }
+      ],
+      "name": "setup.scan",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "An existing absolute folder on the host of the core.",
+          "name": "path",
+          "required": true,
+          "schema": {
+            "description": "An existing absolute folder on the host of the core.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SetupScanResult"
+        }
+      }
+    },
+    {
+      "description": "Drafts the forms of the setup screen with one Claude call: model sonnet, no tools, a cap of 0.50 USD. It reads at most 15 files and 60 KiB of the folder and `git log --oneline -30`. `previous` and `failures` ask for a repair. It appends one line to `logs/setup.jsonl` of the data root. It writes nothing else.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "setup.draft",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "Why `roles.apply` refused the stage of the earlier draft.",
+          "name": "failures",
+          "required": false,
+          "schema": {
+            "description": "Why `roles.apply` refused the stage of the earlier draft.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "An existing absolute folder on the host of the core.",
+          "name": "path",
+          "required": true,
+          "schema": {
+            "description": "An existing absolute folder on the host of the core.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "An earlier draft to repair: the `fields` of its result.",
+          "name": "previous",
+          "required": false,
+          "schema": {
+            "description": "An earlier draft to repair: the `fields` of its result."
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SetupDraftResult"
+        }
+      }
+    },
+    {
+      "description": "Records what the owner did with each drafted field: kept, edited or cleared. It appends one line to `logs/setup.jsonl` of the data root. The app calls it after an apply.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "setup.outcome",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The id of the draft.",
+          "name": "draft",
+          "required": true,
+          "schema": {
+            "description": "The id of the draft.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "The path of each drafted field, for example `product.what`, to its outcome.",
+          "name": "fields",
+          "required": true,
+          "schema": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldOutcome"
+            },
+            "description": "The path of each drafted field, for example `product.what`, to its outcome.",
+            "type": "object"
+          }
+        },
+        {
+          "description": "The product that the apply wrote.",
+          "name": "product",
+          "required": true,
+          "schema": {
+            "description": "The product that the apply wrote.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/Empty"
+        }
+      }
     }
   ],
   "openrpc": "1.3.2",
@@ -11968,6 +12700,21 @@
           "required": true,
           "schema": {
             "type": "string"
+          }
+        }
+      ]
+    },
+    {
+      "description": "The microphone of a dictation opens or closes. The core sends it with each `dictation.start` and `dictation.stop`, so a client of the voice topic, such as the app, knows when the owner speaks. The pill ignores it.",
+      "name": "voice.mic",
+      "params": [
+        {
+          "description": "True from `dictation.start`, false from `dictation.stop`.",
+          "name": "open",
+          "required": true,
+          "schema": {
+            "description": "True from `dictation.start`, false from `dictation.stop`.",
+            "type": "boolean"
           }
         }
       ]

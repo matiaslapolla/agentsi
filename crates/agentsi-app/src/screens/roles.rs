@@ -207,7 +207,8 @@ impl RolesScreen {
         }
         let params = RolesApplyParams {
             product: self.product.clone(),
-            stage_dir: path,
+            stage_dir: Some(path),
+            stage: None,
             yes: false,
             register: None,
         };
