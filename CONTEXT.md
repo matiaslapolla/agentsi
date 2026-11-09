@@ -26,6 +26,38 @@ _Avoid_: Agency session, run
 The conversation that `/agentsi` opens, held by the PM, from which the owner asks, convenes a meeting or consults one role.
 _Avoid_: Lobby, chat, home
 
+**Desk session**:
+The one `claude -p` process of the core for the front desk of one product, with its saved session id. It plays the PM and reads only. It has no tool that writes product data.
+_Avoid_: Chat session, bot
+
+**Desk conversation**:
+The stored items of one desk session, and the right column of the front desk screen that draws them.
+_Avoid_: Chat, thread, front desk (when you mean the column)
+
+**Owner message**:
+One text that the owner sends to a desk session. It is not a turn of conversation mode.
+_Avoid_: Prompt, turn
+
+**Reply**:
+What Claude writes for one owner message, up to its `result` line. It streams as Markdown.
+_Avoid_: Answer, response
+
+**View**:
+One native component in the desk conversation. The closed `enum View` in `agentsi-proto` is the catalog. Claude shows a view with a `show_<kind>` tool of the MCP server.
+_Avoid_: Widget, card (when you mean the catalog entry), generated UI
+
+**Object view**:
+A view that names stored objects by id and reads them from the core. It shows no text that Claude copied. The decisions view is one.
+_Avoid_: Rich message
+
+**Desk note**:
+One line about a write of product data, which the core adds to the next owner message. An example is "The owner approved decision 14." The pane `/agentsi` and the app both cause desk notes.
+_Avoid_: Sync message, system message
+
+**Auth state**:
+The result of the login check of `claude` (`claude auth status --json`): `ready`, `signed_out`, `missing`, `not_read` or `unknown`. The desk conversation shows the message of a state that is not `ready` in place of the input, with a "Check again" button.
+_Avoid_: Login status, session expired
+
 **Role**:
 A fixed perspective with its own persona: PM, social, dev, QA, scout, or a custom role of one product such as SEO. A role lasts; the session that plays it does not.
 _Avoid_: Bot, teammate, persona

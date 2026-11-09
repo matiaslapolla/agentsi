@@ -66,9 +66,10 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 | `terminal` | `create {cwd, argv, env, product?}`, `list`, `attach {id, observe?}` returns a channel, `input {id, text, submit?}`, `resize`, `kill` |
 | `product` | `list`, `desk`, `status`, `whoami {cwd}` |
 | `minutes` | `list`, `get`, `check` |
-| `decision` | `list`, `decide`, `add` |
+| `decision` | `list`, `decide`, `add`, `get {product, ids}` (desk conversation) |
 | `mark` | `pending`, `set` |
 | `ticket` | `list`, `get`, `add`, `update`, `move`, `promote` (tracker, `agentsi-desktop-tracker.md`) |
+| `desk` | `history`, `send`, `stop`, `reset`, `show`, `auth` (desk conversation, below) |
 | `story` | `config`, `list`, `get`, `new`, `suggest`, `approve`, `discard`, `changes`, `run`, `exec`, `review`, `accept`, `reject`, `result` (U23) |
 | `meeting` | `start`, `ask`, `cancel` |
 | `knowledge` | `index`, `search`, `get_doc` |
@@ -87,13 +88,14 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 
 ### Events
 
-`core.subscribe {topics}` starts notifications on channel 0. The topics are the event namespaces: `terminal`, `data`, `meeting`, `voice`, `dictation` and `models`. A second call adds topics. The events are:
+`core.subscribe {topics}` starts notifications on channel 0. The topics are the event namespaces: `terminal`, `data`, `meeting`, `voice`, `dictation`, `models` and `desk`. A second call adds topics. The events are:
 
 - `terminal.state {id, state, kind?, msg?}`, `terminal.exit {id, code}`, `terminal.title {id, title}`.
 - `data.changed {product, kind}` after each write. The kind `tickets` follows each write of a ticket. `ticket.promote` sends `stories` or `decision` first.
 - `meeting.event {meeting, role, line}` carries each stream-json line of each role. `meeting.progress` carries the stages (U22).
 - `voice.speak {terminal, role, text}` and `voice.stop {terminal}`.
 - `dictation.target {terminal?}`, `dictation.start {at_us}` and `dictation.stop {at_us}` (U14). `at_us` is when the key edge happened, in microseconds since the Unix epoch.
+- `desk.state {product, state, message?}`, `desk.delta {product, text}` and `desk.item {product, seq, at, item}` (desk conversation).
 - `models.progress {id, bytes, total, verifying}`, `models.done {id}` and `models.error {id, error, message, file?}` (U15c).
 - `core.lagged {missed}` goes to each subscriber. The core keeps 1024 events of the topics of each connection. Past that, it drops the events, and then sends `core.lagged` where they are missing. Then the client must read the state again.
 
@@ -427,7 +429,7 @@ These additions are also part of protocol 1:
 
 These rules add no method. Each screen and pane uses the methods above on the core of its product's host.
 
-- The app subscribes to `voice`, `terminal`, `data` and `meeting` on each host. It relays a `voice.*` event to the local core. It keeps each other event with the state of that host.
+- The app subscribes to `voice`, `terminal`, `data`, `meeting` and `desk` on each host. It relays a `voice.*` event to the local core. It keeps each other event with the state of that host.
 - Each host has its own state: its link, its products and its terminals. A product id and a terminal id name something on one core only, so a local product and a product of a host can have the same id. A product of the app is the pair of host and id.
 - A screen or a pane holds the state of its host and no other. It reads the link at each call. So a write of a screen reaches only the core of the product on that screen. The app never uses the local core in place of a host that `hosts.toml` does not list.
 - A screen opened from a screen stays on the same host.
@@ -450,6 +452,32 @@ These rules add no method. Each screen and pane uses the methods above on the co
   - The local pill cannot dictate into a pane of a host. `focus.report` of such a pane reaches the core of the host. That core does not reach the local pill.
   - `roles.apply` with `stage_dir` reads the stage folder on the host. The setup screen sends the stage as text in `stage`, so it works for a product on a host too. Its folder dialog opens on this device only.
   - The app keeps the closed tabs of a host in memory. After a quit while the host is off, the terminal of such a tab keeps running.
+
+### The desk conversation
+
+The desk conversation is the right column of the front desk. Its spec is `agentsi-desktop-conversation.md`. These additions are also part of protocol 1.
+
+- The core keeps at most one desk session for each product: one `claude -p` process that plays the `pm` agent. The core stores the items in the tables `desk_sessions` and `desk_items` (`agentsi-desktop-data.md`).
+- The first desk request (`desk.history`, `desk.auth` or `desk.send`) runs `claude auth status --json` with a limit of 5 s. The core never reads the credentials.
+
+| Method | Params | Result | Errors |
+|---|---|---|---|
+| `desk.history` | `product, before?, limit?` (default 200) | `{session?, state, message?, items: [{seq, at, item}]}`, oldest first | `not_found`, `unavailable` |
+| `desk.send` | `product, text` | `{seq}` of the owner item | `not_found`, `invalid`, `busy`, `unavailable` |
+| `desk.stop` | `product` | `{stopped}`. False when no process ran | `not_found` |
+| `desk.reset` | `product` | `{session}`: a new uuid. The items go | `not_found`, `unavailable` |
+| `desk.show` | `session, view` | `{view_id}`: the `seq` of the `view` item | `not_found`, `invalid`, `unavailable` |
+| `desk.auth` | `recheck?` | `{state, message?}` | none |
+| `decision.get` | `product, ids` | `{decisions: [{id, kind, minutes_id, text, why, action, status, archived}]}` in the order of `ids`. An unknown id is left out | `not_found`, `unavailable` |
+
+- `item.kind` is `owner`, `reply`, `tool`, `view`, `note`, `end` or `error`. `view` holds `{kind: "decisions", ids}`. A field that the catalog does not know gives `invalid`.
+- `state` is `stopped`, `starting`, `idle`, `working`, `auth` or `failed`. `seq` counts from 1 for each product, and starts again after `desk.reset`.
+- `desk.send` returns `busy` while a reply runs. It returns `unavailable`, sends `desk.state auth` and starts no process while the login is not `ready`.
+- `desk.delta` carries one text delta of the reply that streams. The `reply` item that follows holds the whole text. One assistant message can give several `reply` items.
+- `decision.get` only reads. A view of the desk conversation reads the decisions with it, and reads them again after `data.changed` of kind `decision` or `minutes`.
+- Auth states: `ready`, `signed_out`, `missing`, `not_read` and `unknown`. `agentsi-desktop-conversation.md` lists their messages.
+- With `AGENTSI_DESK_SESSION` set, `agentsi mcp` lists one `show_<kind>` tool for each variant of `View`. Each tool calls `desk.show`. A desk session has no tool that writes product data.
+- After `decision.decide`, `decision.add`, `mark.set` or `archive.*`, the core stores a desk note if the product has a desk session. The next `desk.send` carries the unsent notes before the owner text.
 
 ### Hook bridge
 

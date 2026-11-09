@@ -11,7 +11,7 @@ ADR 0003 put the data in a Postgres container. The app runs on laptops and SSH h
 - The core of each host keeps the data in `<data root>/agentsi.db`, with `rusqlite` and the bundled SQLite.
 - Only the core opens the file. Clients read and write through the core protocol.
 - The schema keeps the 17 tables of Postgres, with the type map of `docs/specs/agentsi-desktop-data.md`.
-- A local table is a table that Postgres never had. The tracker adds `tickets` (`docs/specs/agentsi-desktop-tracker.md`). `schema::LOCAL_TABLES` lists local tables. The import from Postgres reads only the 17 tables.
+- A local table is a table that Postgres never had. The tracker adds `tickets` (`docs/specs/agentsi-desktop-tracker.md`). The desk conversation adds `desk_sessions` and `desk_items` (`docs/specs/agentsi-desktop-conversation.md`). `schema::LOCAL_TABLES` lists local tables. The import from Postgres reads only the 17 tables.
 - Full-text search uses FTS5 to find the matches. A port of the Postgres `ts_rank` orders them. On the owner's data, `bm25` gave the Postgres results for 6 of 10 fixed queries, and the port for 10 of 10.
 - The rest of ADR 0003 stays: the registry, the audio and the backups are files in the data root, and AgentSI makes no git commits of data.
 
