@@ -6,6 +6,7 @@
 use crate::meeting::log::NO_DATA;
 use crate::prompt_inputs::{self, brief_xml, objective_ids};
 use crate::roster::js_text;
+use crate::snapshot::OPEN_TICKETS;
 use crate::story::claude::Call;
 use crate::story::code_graph::mcp;
 use agentsi_proto::agency_api::Owner;
@@ -17,18 +18,27 @@ use std::time::Duration;
 const ROLE_TIMEOUT: Duration = Duration::from_secs(6 * 60);
 const BASE_TOOLS: [&str; 3] = ["Read", "Grep", "Glob"];
 
-fn source_schema() -> Value {
+/// true when the snapshot lists open tickets, so a priority may cite a ticket.
+pub fn cites_tickets(snapshot: &str) -> bool {
+    snapshot.lines().any(|l| l == OPEN_TICKETS)
+}
+
+fn source_schema(tickets: bool) -> Value {
+    let mut types = vec!["commit", "issue", "path", "url", "story"];
+    if tickets {
+        types.push("ticket");
+    }
     json!({
         "type": "object",
         "properties": {
-            "type": {"type": "string", "enum": ["commit", "issue", "path", "url", "story"]},
+            "type": {"type": "string", "enum": types},
             "ref": {"type": "string"},
         },
         "required": ["type", "ref"],
     })
 }
 
-pub fn role_answer_schema() -> Value {
+pub fn role_answer_schema(tickets: bool) -> Value {
     let strings = json!({"type": "array", "items": {"type": "string"}});
     json!({
         "type": "object",
@@ -41,7 +51,7 @@ pub fn role_answer_schema() -> Value {
                     "properties": {
                         "title": {"type": "string"},
                         "why": {"type": "string"},
-                        "sources": {"type": "array", "items": source_schema()},
+                        "sources": {"type": "array", "items": source_schema(tickets)},
                     },
                     "required": ["title", "why", "sources"],
                 },
@@ -54,13 +64,13 @@ pub fn role_answer_schema() -> Value {
 }
 
 /// With a brief, each priority must name one of its objectives.
-pub fn synthesis_schema(brief: Option<&Value>) -> Value {
+pub fn synthesis_schema(brief: Option<&Value>, tickets: bool) -> Value {
     let mut priority = Map::new();
     priority.insert("title".into(), json!({"type": "string"}));
     priority.insert("why".into(), json!({"type": "string"}));
     priority.insert(
         "sources".into(),
-        json!({"type": "array", "items": source_schema()}),
+        json!({"type": "array", "items": source_schema(tickets)}),
     );
     priority.insert("owner_role".into(), json!({"type": "string"}));
     let mut required = vec!["title", "why", "sources", "owner_role"];
@@ -177,8 +187,17 @@ fn role_prompt(
     }
     if meeting {
         let for_web = if web { ", for web pages" } else { "" };
+        let types = if cites_tickets(ctx.snapshot) {
+            format!(
+                "url (full http(s) URL{for_web}), story (an id from the Stories section of the snapshot) or ticket (an id from the Open tickets section of the snapshot)"
+            )
+        } else {
+            format!(
+                "url (full http(s) URL{for_web}) or story (an id from the Stories section of the snapshot)"
+            )
+        };
         rules.push(format!(
-            "- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), url (full http(s) URL{for_web}) or story (an id from the Stories section of the snapshot). {}",
+            "- Give at most 3 priorities. Each cites at least one source of type commit (hash from the snapshot), issue (number), path (a file that exists), {types}. {}",
             path_rule(ctx.scope)
         ));
         rules.push(if ctx.brief.is_some() {
@@ -228,7 +247,7 @@ pub fn role_call(def: &RoleDef, ctx: &RoleContext, meeting: bool) -> Call {
         system: def.body.clone(),
         cwd: ctx.cwd.to_string_lossy().into_owned(),
         tools,
-        schema: meeting.then(role_answer_schema),
+        schema: meeting.then(|| role_answer_schema(cites_tickets(ctx.snapshot))),
         effort: def.effort.clone(),
         timeout: ROLE_TIMEOUT,
         mcp: (!code_graph.is_empty()).then(mcp),
@@ -362,7 +381,7 @@ pub fn synthesis_call(pm: &RoleDef, ctx: &SynthesisContext, repair: Option<&Repa
         ),
         cwd: ctx.cwd.to_string_lossy().into_owned(),
         tools: Vec::new(),
-        schema: Some(synthesis_schema(ctx.brief)),
+        schema: Some(synthesis_schema(ctx.brief, cites_tickets(ctx.compact))),
         effort: pm.effort.clone(),
         timeout: ROLE_TIMEOUT,
         mcp: None,
@@ -376,12 +395,73 @@ mod tests {
     #[test]
     fn the_synthesis_schema_requires_an_objective_only_with_a_brief() {
         let brief = json!({"objectives": [{"id": "o1"}]});
-        let with = synthesis_schema(Some(&brief));
+        let with = synthesis_schema(Some(&brief), false);
         let props = &with["properties"]["priorities"]["items"];
         assert_eq!(props["properties"]["objective"]["enum"], json!(["o1"]));
         assert_eq!(props["required"][4], json!("objective"));
-        let without = synthesis_schema(None);
+        let without = synthesis_schema(None, false);
         let props = &without["properties"]["priorities"]["items"];
         assert!(props["properties"].get("objective").is_none());
+    }
+
+    #[test]
+    fn the_role_rule_lists_the_type_ticket_only_with_open_tickets() {
+        let owner = Owner {
+            name: "Ada".into(),
+            language: "English".into(),
+        };
+        let prompt = |snapshot: &str| {
+            let ctx = RoleContext {
+                question: "q",
+                snapshot,
+                memory: "",
+                scope: None,
+                cwd: Path::new("/work"),
+                brief: None,
+                owner: &owner,
+                code_graph: &[],
+            };
+            role_prompt(&ctx, "dev", false, true, &[])
+        };
+        let with = prompt("# Snapshot\n\n## Open tickets\n\n- C001 [note] x");
+        assert!(
+            with.contains("story (an id from the Stories section of the snapshot) or ticket (an id from the Open tickets section of the snapshot). "),
+            "{with}"
+        );
+        let without = prompt("# Snapshot\n\n## Open issues\n\n_None indexed._");
+        assert!(
+            without.contains(
+                "url (full http(s) URL) or story (an id from the Stories section of the snapshot). "
+            ),
+            "{without}"
+        );
+        assert!(!without.contains("ticket"), "{without}");
+    }
+
+    #[test]
+    fn the_source_type_ticket_comes_only_with_open_tickets() {
+        let types = |schema: &Value| {
+            schema["properties"]["priorities"]["items"]["properties"]
+            ["sources"]["items"]["properties"]["type"]["enum"]
+            .clone()
+        };
+        assert_eq!(
+            types(&synthesis_schema(None, false)),
+            json!(["commit", "issue", "path", "url", "story"])
+        );
+        assert_eq!(
+            types(&synthesis_schema(None, true)),
+            json!(["commit", "issue", "path", "url", "story", "ticket"])
+        );
+        assert_eq!(
+            types(&role_answer_schema(true)),
+            json!(["commit", "issue", "path", "url", "story", "ticket"])
+        );
+        assert!(cites_tickets(
+            "# Snapshot\n\n## Open tickets\n\n- C001 [note] x"
+        ));
+        assert!(!cites_tickets(
+            "# Snapshot\n\n## Open issues\n\n## Open tickets later"
+        ));
     }
 }

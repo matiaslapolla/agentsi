@@ -54,7 +54,7 @@ pub struct Criterion {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Source {
-    /// `commit`, `issue`, `path`, `url` or `story`.
+    /// `commit`, `issue`, `path`, `url`, `story` or, in minutes, `ticket`.
     #[serde(rename = "type")]
     pub kind: String,
     #[serde(rename = "ref")]

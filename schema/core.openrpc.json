@@ -4576,7 +4576,7 @@
             "type": "string"
           },
           "type": {
-            "description": "`commit`, `issue`, `path`, `url` or `story`.",
+            "description": "`commit`, `issue`, `path`, `url`, `story` or, in minutes, `ticket`.",
             "type": "string"
           }
         },
