@@ -2,9 +2,8 @@
 //! harmful counts, and the reflections with their changes and their proposals.
 //!
 //! Retire and Revert ask first: the screen shows what will change, and Confirm writes
-//! it. A pending proposal has Approve and Reject, which call `decision.decide`. There
-//! is no text field, so a retired item gets a fixed reason. The screen reads again
-//! after each write.
+//! it. A pending proposal has Approve and Reject, which call `decision.decide`. A retired
+//! item gets a fixed reason. Reflect asks one Confirm. The screen reads again after each write.
 
 use agentsi_proto::marks_api::{DecideParams, DecideResult, DecisionDecide, Outcome, Verdict};
 use agentsi_proto::reflect_api::{

@@ -1,7 +1,7 @@
 //! The roles of a product (U21): the roster, the specialists, the overlays, and the
 //! validate, apply and reset actions. `roles.apply` and `roles.reset` plan first. The
-//! screen shows the plan, and a second click on Confirm writes it. There is no text
-//! field: Apply takes the path of the stage folder from the clipboard.
+//! screen shows the plan, and a second click on Confirm writes it. Apply takes the path of
+//! the stage folder from the clipboard.
 
 use agentsi_proto::agency_api::{AuditParams, AuditReport, DataAudit};
 use agentsi_proto::roles_api::{
