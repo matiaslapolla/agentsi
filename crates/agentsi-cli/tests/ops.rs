@@ -136,10 +136,7 @@ fn migrate_prints_the_schema_version_that_the_core_applied() {
     let path = w.dir.path().join("bin");
     let (code, out, err) = agentsi(&w, &["migrate"], &path);
     let want = format!("Database up to date, at schema version {}.\n", latest());
-    assert_eq!(
-        (code, out.as_str(), err.as_str()),
-        (0, want.as_str(), "")
-    );
+    assert_eq!((code, out.as_str(), err.as_str()), (0, want.as_str(), ""));
 }
 
 #[test]
@@ -160,10 +157,7 @@ fn up_starts_the_core_and_prints_where_it_runs() {
         "Core running: agentsi-core <VERSION>.\nData root: <WORK>/root\nDatabase up to date, at schema version {}.\n",
         latest()
     );
-    assert_eq!(
-        (code, out.as_str(), err.as_str()),
-        (0, want.as_str(), "")
-    );
+    assert_eq!((code, out.as_str(), err.as_str()), (0, want.as_str(), ""));
     // A second run finds the same core.
     assert_eq!(agentsi(&w, &["up"], &path).0, 0);
 }

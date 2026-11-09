@@ -918,6 +918,18 @@ pub fn mcp_golden(work: &Path, stdout: &str) -> String {
         .collect();
     answers.sort_by_key(|a| a["id"].as_i64().unwrap_or(i64::MAX));
     for a in &mut answers {
+        // The TypeScript server has only these 5 tools. The ticket tools of the Rust
+        // server have their own test (`mcp_tickets.rs`).
+        if let Some(tools) = a.pointer_mut("/result/tools").and_then(Value::as_array_mut) {
+            tools.retain(|t| {
+                matches!(
+                    t["name"].as_str(),
+                    Some(
+                        "search" | "get_doc" | "list_minutes" | "pending_decisions" | "role_memory"
+                    )
+                )
+            });
+        }
         if let Some(items) = a
             .pointer_mut("/result/content")
             .and_then(Value::as_array_mut)
