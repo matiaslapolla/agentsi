@@ -191,6 +191,20 @@ pub fn decisions(c: &Connection, product: &str, status: Option<&str>) -> Result<
     )
 }
 
+/// The decisions of `product` that the archive record holds, newest id first.
+pub fn archived_decisions(c: &Connection, product: &str) -> Result<Vec<Decision>> {
+    all(
+        c,
+        &format!(
+            "{DECISION} d where product = ?1 and exists (select 1 from archive_records a \
+             where a.product = d.product and a.kind = 'decision' and a.ref = cast(d.id as text)) \
+             order by id desc"
+        ),
+        [product],
+        decision,
+    )
+}
+
 pub fn decisions_of_minutes(c: &Connection, minutes_id: &str) -> Result<Vec<Decision>> {
     all(
         c,

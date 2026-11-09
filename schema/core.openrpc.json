@@ -193,6 +193,56 @@
         ],
         "type": "object"
       },
+      "ArchivedDecision": {
+        "description": "A decision that the archive record holds.",
+        "properties": {
+          "action": {
+            "description": "What to run once the decision is approved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "`minutes`, `reflection` or `product`.",
+            "type": "string"
+          },
+          "minutes_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `approved`, `rejected` or `stale`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "why": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "type": "object"
+      },
       "AttachResult": {
         "properties": {
           "channel": {
@@ -1181,6 +1231,21 @@
         },
         "required": [
           "id"
+        ],
+        "type": "object"
+      },
+      "DecisionArchivedResult": {
+        "properties": {
+          "decisions": {
+            "description": "Newest id first.",
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDecision"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "decisions"
         ],
         "type": "object"
       },
@@ -7294,6 +7359,56 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DecisionAddResult"
+        }
+      }
+    },
+    {
+      "description": "Lists the decisions of a product that are archived, newest id first. `archive.restore` brings one back. It only reads.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "decision.archived",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DecisionArchivedResult"
         }
       }
     },

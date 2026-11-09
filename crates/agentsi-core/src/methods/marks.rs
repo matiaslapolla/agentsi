@@ -11,9 +11,10 @@ use agentsi_agency::{Error as AgencyError, clock};
 use agentsi_proto::RpcError;
 use agentsi_proto::events::{DataChanged, DataChangedParams};
 use agentsi_proto::marks_api::{
-    ArchiveArchive, ArchiveParams, ArchiveRestore, ArchiveResult, DecideParams, DecideResult,
-    DecisionAdd, DecisionAddParams, DecisionAddResult, DecisionDecide, MarkPending,
-    MarkPendingParams, MarkPendingResult, MarkSet, MarkSetParams, MarkSetResult,
+    ArchiveArchive, ArchiveParams, ArchiveRestore, ArchiveResult, ArchivedDecision, DecideParams,
+    DecideResult, DecisionAdd, DecisionAddParams, DecisionAddResult, DecisionArchived,
+    DecisionArchivedParams, DecisionArchivedResult, DecisionDecide, MarkPending, MarkPendingParams,
+    MarkPendingResult, MarkSet, MarkSetParams, MarkSetResult,
 };
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_store::Store;
@@ -25,6 +26,7 @@ pub fn register(r: Router) -> Router {
         .add(MarkSet, mark_set)
         .add(DecisionDecide, decision_decide)
         .add(DecisionAdd, decision_add)
+        .add(DecisionArchived, decision_archived)
         .add(ArchiveArchive, archive_archive)
         .add(ArchiveRestore, archive_restore)
 }
@@ -175,6 +177,35 @@ async fn decision_add(ctx: Ctx, p: DecisionAddParams) -> Result<DecisionAddResul
     };
     changed(&ctx, &product, "decision");
     Ok(DecisionAddResult { id })
+}
+
+async fn decision_archived(
+    ctx: Ctx,
+    p: DecisionArchivedParams,
+) -> Result<DecisionArchivedResult, RpcError> {
+    crate::blocking::spawn(move || {
+        registry()?.product(&p.product).map_err(agency)?;
+        let store = open_store(&ctx.core)?;
+        let rows = store
+            .read(|c| agentsi_store::read::archived_decisions(c, &p.product))
+            .map_err(|e| rpc(e.into()))?;
+        Ok(DecisionArchivedResult {
+            decisions: rows
+                .into_iter()
+                .map(|d| ArchivedDecision {
+                    id: d.id,
+                    kind: d.kind,
+                    minutes_id: d.minutes_id,
+                    text: d.text,
+                    why: d.why,
+                    action: d.action,
+                    status: d.status,
+                })
+                .collect(),
+        })
+    })
+    .await
+    .map_err(join)?
 }
 
 async fn archive_change(

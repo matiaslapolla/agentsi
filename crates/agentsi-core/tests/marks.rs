@@ -192,3 +192,54 @@ fn archiving_and_restoring_a_product_each_send_data_changed_of_kind_product() {
         );
     }
 }
+
+#[test]
+fn decision_archived_lists_the_archived_decisions_and_a_restore_removes_one() {
+    let dir = TempDir::new();
+    let home = setup(&dir);
+    let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", home.as_path())]);
+    let mut c = Framed::connect(&core.socket.path);
+    let ids = |c: &mut Framed| -> Vec<i64> {
+        let r = c.ok("decision.archived", json!({"product": "alpha"}));
+        r["decisions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|d| d["id"].as_i64().unwrap())
+            .collect()
+    };
+    assert!(ids(&mut c).is_empty());
+    for id in ["1", "2"] {
+        c.ok(
+            "archive.archive",
+            json!({"product": "alpha", "kind": "decision", "id": id}),
+        );
+    }
+    assert_eq!(ids(&mut c), [2, 1]);
+    let r = c.ok("decision.archived", json!({"product": "alpha"}));
+    assert_eq!(
+        r["decisions"][1],
+        json!({"id": 1, "kind": "minutes", "minutes_id": "m1", "text": "go", "why": "w",
+               "action": "Run it", "status": "pending"})
+    );
+    c.ok(
+        "archive.restore",
+        json!({"product": "alpha", "kind": "decision", "id": "1"}),
+    );
+    assert_eq!(ids(&mut c), [2]);
+
+    let r = c.call("decision.archived", json!({"product": "nope"}));
+    assert_eq!(kind(&r), "not_found", "{r}");
+}
+
+#[test]
+fn decision_archived_without_a_database_is_unavailable() {
+    let dir = TempDir::new();
+    let home = dir.0.join("root");
+    std::fs::create_dir_all(&home).unwrap();
+    std::fs::write(home.join("agentsi.config.json"), REGISTRY).unwrap();
+    let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", home.as_path())]);
+    let mut c = Framed::connect(&core.socket.path);
+    let r = c.call("decision.archived", json!({"product": "alpha"}));
+    assert_eq!(kind(&r), "unavailable", "{r}");
+}
