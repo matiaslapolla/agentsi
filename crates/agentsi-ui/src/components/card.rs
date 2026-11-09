@@ -158,16 +158,16 @@ impl RenderOnce for ListRow {
         let (look, ring) = look(&state, self.force, self.disabled, window, cx);
         let ring = ring || (self.focused && !self.disabled);
         let rest = if self.selected {
-            accent::SUBTLE
+            accent::subtle()
         } else {
             surface::PANEL
         };
         let fill = match look {
             Look::Rest => rest,
-            Look::Hover if self.selected => accent::SUBTLE,
+            Look::Hover if self.selected => accent::subtle(),
             Look::Hover => surface::OVERLAY,
             // A selected row keeps its fill: the meta text fails 4.5:1 on a pressed accent fill.
-            Look::Pressed if self.selected => accent::SUBTLE,
+            Look::Pressed if self.selected => accent::subtle(),
             Look::Pressed => state::pressed(surface::OVERLAY),
         };
         let fill = fade(&self.id, "fill", fill.hsla(), window, cx);

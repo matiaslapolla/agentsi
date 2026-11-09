@@ -350,7 +350,7 @@ impl StatesPanel {
                         .gap(space(3))
                         .child(swatch("accent", accent::BASE))
                         .child(swatch("accent HOVER", accent::HOVER))
-                        .child(swatch("accent SUBTLE", accent::SUBTLE))
+                        .child(swatch("accent SUBTLE", accent::subtle()))
                         .child(swatch("line BORDER", line::BORDER))
                         .children(Status::ALL.iter().map(|s| swatch(s.label(), s.color()))),
                 ),

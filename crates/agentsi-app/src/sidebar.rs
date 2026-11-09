@@ -281,7 +281,7 @@ impl Sidebar {
         });
         move |el| {
             el.on_drop(drop)
-                .drag_over::<DraggedProduct>(|style, _, _, _| style.bg(accent::SUBTLE))
+                .drag_over::<DraggedProduct>(|style, _, _, _| style.bg(accent::subtle()))
         }
     }
 

@@ -28,15 +28,15 @@ fn arrow_box() -> Pixels {
 /// The fill of a row for the pointer look.
 fn fill_of(look: Look, selected: bool) -> crate::tokens::Color {
     let rest = if selected {
-        accent::SUBTLE
+        accent::subtle()
     } else {
         surface::PANEL
     };
     match look {
         Look::Rest => rest,
-        Look::Hover if selected => accent::SUBTLE,
+        Look::Hover if selected => accent::subtle(),
         Look::Hover => surface::OVERLAY,
-        Look::Pressed if selected => accent::SUBTLE,
+        Look::Pressed if selected => accent::subtle(),
         Look::Pressed => state::pressed(surface::OVERLAY),
     }
 }

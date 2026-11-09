@@ -116,13 +116,13 @@ fn apply(cx: &mut App) {
         t.sidebar_primary_foreground = c(accent::ON);
 
         t.list_hover = c(surface::OVERLAY);
-        t.list_active = c(accent::SUBTLE);
+        t.list_active = c(accent::subtle());
         t.list_active_border = c(accent::BASE);
         t.list_even = c(surface::PANEL);
         t.list_head = c(surface::RAISED);
         t.table = c(surface::PANEL);
         t.table_hover = c(surface::OVERLAY);
-        t.table_active = c(accent::SUBTLE);
+        t.table_active = c(accent::subtle());
         t.table_active_border = c(accent::BASE);
         t.table_even = c(surface::PANEL);
         t.table_head = c(surface::RAISED);
@@ -142,8 +142,8 @@ fn apply(cx: &mut App) {
         t.scrollbar = surface::PANEL.alpha(0.0);
         t.scrollbar_thumb = line::STRONG.alpha(0.9);
         t.scrollbar_thumb_hover = c(text::TERTIARY);
-        t.switch = c(switch::TRACK);
-        t.switch_thumb = c(switch::THUMB);
+        t.switch = c(switch::track());
+        t.switch_thumb = c(switch::thumb());
         t.slider_bar = c(accent::BASE);
         t.slider_thumb = c(text::PRIMARY);
         t.progress_bar = c(accent::BASE);

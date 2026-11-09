@@ -2,6 +2,8 @@
 //!
 //! Screens read these values and never write a color or a size by hand.
 //! The colors are sRGB hex values, so the contrast test can read them.
+use std::cell::Cell;
+
 use gpui_kit::{Hsla, Pixels, Rgba, px};
 
 use crate::appearance::{Corners, Density, TextSize, current};
@@ -61,9 +63,94 @@ impl From<Color> for gpui_kit::Fill {
     }
 }
 
+/// The color values of one color theme.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct Palette {
+    pub surface_base: Color,
+    pub surface_panel: Color,
+    pub surface_raised: Color,
+    pub surface_overlay: Color,
+    pub text_primary: Color,
+    pub text_secondary: Color,
+    pub text_tertiary: Color,
+    pub line_border: Color,
+    pub line_strong: Color,
+    pub accent_base: Color,
+    pub accent_hover: Color,
+    pub accent_pressed: Color,
+    pub accent_on: Color,
+    /// Opacity of `accent::subtle()` over the panel.
+    pub accent_subtle_alpha: f32,
+    pub status_ok: Color,
+    pub status_warn: Color,
+    pub status_danger: Color,
+    pub status_info: Color,
+    pub status_off: Color,
+    pub switch_thumb: Color,
+    /// The label colors, in the order of `label::Hue::ALL`.
+    pub hues: [Color; 8],
+}
+
+impl Palette {
+    /// The colors of the app before the color theme existed.
+    pub const DARK: Palette = Palette {
+        surface_base: Color(0x0b0c0f),
+        surface_panel: Color(0x101115),
+        surface_raised: Color(0x16171c),
+        surface_overlay: Color(0x1e2027),
+        text_primary: Color(0xe8e9ed),
+        text_secondary: Color(0xa4a8b2),
+        text_tertiary: Color(0x8a8f9a),
+        line_border: Color(0x23252c),
+        line_strong: Color(0x31343d),
+        accent_base: Color(0x8b7cf6),
+        accent_hover: Color(0x9d90f8),
+        accent_pressed: Color(0x7a6af0),
+        accent_on: Color(0x0b0c0f),
+        accent_subtle_alpha: 0.16,
+        status_ok: Color(0x4ade80),
+        status_warn: Color(0xf2b84b),
+        status_danger: Color(0xf87171),
+        status_info: Color(0x60a5fa),
+        status_off: Color(0x9a9faa),
+        switch_thumb: Color(0xe8e9ed),
+        hues: [
+            Color(0xfb7185),
+            Color(0xfb923c),
+            Color(0xfbbf24),
+            Color(0xa3e635),
+            Color(0x2dd4bf),
+            Color(0x38bdf8),
+            Color(0xc084fc),
+            Color(0xf472b6),
+        ],
+    };
+}
+
+thread_local! {
+    static PALETTE: Cell<Palette> = const { Cell::new(Palette::DARK) };
+}
+
+/// The palette in effect on this thread. Before the first [`set_palette`], the dark one.
+pub fn current_palette() -> Palette {
+    PALETTE.with(Cell::get)
+}
+
+/// Makes `palette` the one that the color functions read. GPUI draws on the main thread, so
+/// the copy is thread-local, as `appearance::current` is.
+pub fn set_palette(palette: Palette) {
+    PALETTE.with(|c| c.set(palette));
+}
+
+/// Sets the palette of this thread with no app, for the tests of the tokens.
+#[cfg(test)]
+pub(crate) fn set_palette_for_test(palette: Palette) {
+    set_palette(palette);
+}
+
 /// Near-black surfaces, from the deepest to the highest.
 pub mod surface {
-    use super::Color;
+    use super::{Color, current_palette};
     /// Window behind the panels, sidebar, terminal well.
     pub const BASE: Color = Color(0x0b0c0f);
     /// Main content area.
@@ -72,6 +159,18 @@ pub mod surface {
     pub const RAISED: Color = Color(0x16171c);
     /// Popovers, inputs, the hover fill of a raised element.
     pub const OVERLAY: Color = Color(0x1e2027);
+    pub fn base() -> Color {
+        current_palette().surface_base
+    }
+    pub fn panel() -> Color {
+        current_palette().surface_panel
+    }
+    pub fn raised() -> Color {
+        current_palette().surface_raised
+    }
+    pub fn overlay() -> Color {
+        current_palette().surface_overlay
+    }
 }
 
 /// State layers. A pressed control is not a surface level: it is its fill with a
@@ -83,59 +182,99 @@ pub mod state {
     /// Opacity of a disabled component. WCAG 1.4.3 exempts the text of a disabled control.
     pub const DISABLED_ALPHA: f32 = 0.45;
     /// `fill` with the press layer on top.
-    pub const fn pressed(fill: Color) -> Color {
-        text::PRIMARY.over(fill, PRESS_ALPHA)
+    pub fn pressed(fill: Color) -> Color {
+        text::primary().over(fill, PRESS_ALPHA)
     }
 }
 
 /// The colors of a switch: the track when it is off, and the thumb. The track of a switch that is
 /// on uses the accent.
 pub mod switch {
-    use super::{Color, line, state, text};
+    use super::{Color, current_palette, line, state, text};
     /// Opacity of the hover layer on the track.
     pub const HOVER_ALPHA: f32 = 0.08;
-    pub const TRACK: Color = line::STRONG;
-    pub const TRACK_HOVER: Color = text::PRIMARY.over(TRACK, HOVER_ALPHA);
-    pub const TRACK_PRESSED: Color = state::pressed(TRACK_HOVER);
-    pub const THUMB: Color = text::PRIMARY;
+    pub fn track() -> Color {
+        line::strong()
+    }
+    pub fn track_hover() -> Color {
+        text::primary().over(track(), HOVER_ALPHA)
+    }
+    pub fn track_pressed() -> Color {
+        state::pressed(track_hover())
+    }
+    pub fn thumb() -> Color {
+        current_palette().switch_thumb
+    }
 }
 
 /// Text, from the strongest to the weakest. Each passes 4.5:1 on each surface.
 pub mod text {
-    use super::Color;
+    use super::{Color, current_palette};
     pub const PRIMARY: Color = Color(0xe8e9ed);
     pub const SECONDARY: Color = Color(0xa4a8b2);
     pub const TERTIARY: Color = Color(0x8a8f9a);
+    pub fn primary() -> Color {
+        current_palette().text_primary
+    }
+    pub fn secondary() -> Color {
+        current_palette().text_secondary
+    }
+    pub fn tertiary() -> Color {
+        current_palette().text_tertiary
+    }
 }
 
 /// Lines and the focus ring.
 pub mod line {
-    use super::Color;
+    use super::{Color, current_palette};
     /// Hairline between areas.
     pub const BORDER: Color = Color(0x23252c);
     /// Border of controls and of hovered cards.
     pub const STRONG: Color = Color(0x31343d);
     /// The 2 px focus ring.
     pub const FOCUS: Color = super::accent::BASE;
+    pub fn border() -> Color {
+        current_palette().line_border
+    }
+    pub fn strong() -> Color {
+        current_palette().line_strong
+    }
+    pub fn focus() -> Color {
+        current_palette().accent_base
+    }
 }
 
 /// The one violet accent.
 pub mod accent {
-    use super::Color;
+    use super::{Color, current_palette};
     pub const BASE: Color = Color(0x8b7cf6);
     pub const HOVER: Color = Color(0x9d90f8);
     pub const PRESSED: Color = Color(0x7a6af0);
     /// Text and icons on an accent fill.
     pub const ON: Color = super::surface::BASE;
     /// A selected row or tab: the accent at 16 % over the panel.
-    pub const SUBTLE: Color = BASE.over(super::surface::PANEL, 0.16);
+    pub fn subtle() -> Color {
+        base().over(super::surface::panel(), current_palette().accent_subtle_alpha)
+    }
     /// Opacity of the accent border of a hovered card.
     pub const HOVER_BORDER_ALPHA: f32 = 0.6;
+    pub fn base() -> Color {
+        current_palette().accent_base
+    }
+    pub fn hover() -> Color {
+        current_palette().accent_hover
+    }
+    pub fn pressed() -> Color {
+        current_palette().accent_pressed
+    }
+    pub fn on() -> Color {
+        current_palette().accent_on
+    }
 }
 
 /// The status colors. Each is a text color, and each has a tint fill.
 pub mod status {
-    use super::Color;
+    use super::{Color, current_palette};
     pub const OK: Color = Color(0x4ade80);
     pub const WARN: Color = Color(0xf2b84b);
     pub const DANGER: Color = Color(0xf87171);
@@ -150,6 +289,21 @@ pub mod status {
     /// Opacity of the danger tint of a pressed danger button. It is less than the
     /// hover tint, because danger text on a 30 % tint fails 4.5:1.
     pub const DANGER_PRESS_ALPHA: f32 = 0.17;
+    pub fn ok() -> Color {
+        current_palette().status_ok
+    }
+    pub fn warn() -> Color {
+        current_palette().status_warn
+    }
+    pub fn danger() -> Color {
+        current_palette().status_danger
+    }
+    pub fn info() -> Color {
+        current_palette().status_info
+    }
+    pub fn off() -> Color {
+        current_palette().status_off
+    }
 }
 
 /// A program state or a host state, with its color.
@@ -171,13 +325,13 @@ impl Status {
         Status::Off,
     ];
 
-    pub const fn color(self) -> Color {
+    pub fn color(self) -> Color {
         match self {
-            Status::Ok => status::OK,
-            Status::Warn => status::WARN,
-            Status::Danger => status::DANGER,
-            Status::Info => status::INFO,
-            Status::Off => status::OFF,
+            Status::Ok => status::ok(),
+            Status::Warn => status::warn(),
+            Status::Danger => status::danger(),
+            Status::Info => status::info(),
+            Status::Off => status::off(),
         }
     }
 
@@ -193,28 +347,28 @@ impl Status {
     }
 
     /// The opaque tint fill of this status over a raised surface.
-    pub const fn tint(self) -> Color {
-        self.color().over(surface::RAISED, status::TINT_ALPHA)
+    pub fn tint(self) -> Color {
+        self.color().over(surface::raised(), status::TINT_ALPHA)
     }
 }
 
 /// The fill of a danger button when hovered.
-pub const fn danger_fill_hover() -> Color {
-    status::DANGER.over(surface::RAISED, status::DANGER_HOVER_ALPHA)
+pub fn danger_fill_hover() -> Color {
+    status::danger().over(surface::raised(), status::DANGER_HOVER_ALPHA)
 }
 
 /// The fill of a danger button when pressed.
-pub const fn danger_fill_press() -> Color {
-    status::DANGER.over(surface::RAISED, status::DANGER_PRESS_ALPHA)
+pub fn danger_fill_press() -> Color {
+    status::danger().over(surface::raised(), status::DANGER_PRESS_ALPHA)
 }
 
 /// Colors of a terminal pane. `ANSI` holds the 16 colors, normal then bright.
 pub mod terminal {
     use super::Color;
     use gpui_kit::{Pixels, px};
-    pub const BACKGROUND: Color = super::surface::BASE;
+    pub const BACKGROUND: Color = Color(0x0b0c0f);
     pub const FOREGROUND: Color = Color(0xdcdde2);
-    pub const CURSOR: Color = super::accent::BASE;
+    pub const CURSOR: Color = Color(0x8b7cf6);
     pub const SELECTION: Color = Color(0x2f2a52);
     pub const ANSI: [Color; 16] = [
         Color(0x1e2027),
@@ -345,7 +499,7 @@ pub mod radius {
 /// The 8 colors that the owner gives to a product, a pane or a product group. Each one reaches
 /// 4.5:1 as text on every surface and on its own tint, so a label can use it as a text color.
 pub mod label {
-    use super::{Color, status, surface};
+    use super::{Color, current_palette, status, surface};
 
     #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
     pub enum Hue {
@@ -371,17 +525,8 @@ pub mod label {
             Hue::Pink,
         ];
 
-        pub const fn color(self) -> Color {
-            Color(match self {
-                Hue::Rose => 0xfb7185,
-                Hue::Orange => 0xfb923c,
-                Hue::Amber => 0xfbbf24,
-                Hue::Lime => 0xa3e635,
-                Hue::Teal => 0x2dd4bf,
-                Hue::Sky => 0x38bdf8,
-                Hue::Violet => 0xc084fc,
-                Hue::Pink => 0xf472b6,
-            })
+        pub fn color(self) -> Color {
+            current_palette().hues[self as usize]
         }
 
         /// The word in a file and in a list: `red`, `teal`.
@@ -416,13 +561,13 @@ pub mod label {
         }
 
         /// The fill behind a label in this color, over `below`.
-        pub const fn tint_over(self, below: Color) -> Color {
+        pub fn tint_over(self, below: Color) -> Color {
             self.color().over(below, status::TINT_ALPHA)
         }
 
         /// The fill of a label on the panel surface.
-        pub const fn tint(self) -> Color {
-            self.tint_over(surface::PANEL)
+        pub fn tint(self) -> Color {
+            self.tint_over(surface::panel())
         }
     }
 }
@@ -547,7 +692,7 @@ pub fn text_pairs() -> Vec<(String, Color, Color)> {
         ("surface::PANEL", surface::PANEL),
         ("surface::RAISED", surface::RAISED),
         ("surface::OVERLAY", surface::OVERLAY),
-        ("accent::SUBTLE", accent::SUBTLE),
+        ("accent::SUBTLE", accent::subtle()),
     ];
     let mut texts = vec![
         ("text::PRIMARY", text::PRIMARY),
@@ -686,6 +831,20 @@ mod tests {
     fn over_mixes_in_srgb() {
         assert_eq!(Color(0xffffff).over(Color(0x000000), 0.5), Color(0x808080));
         assert_eq!(accent::BASE.over(surface::PANEL, 1.0), accent::BASE);
+    }
+
+    #[test]
+    fn the_color_functions_read_the_palette() {
+        assert_eq!(surface::panel(), surface::PANEL);
+        assert_eq!(accent::subtle(), Color(0x8b7cf6).over(Color(0x101115), 0.16));
+        let light = Palette {
+            surface_panel: Color(0xf7f8fa),
+            ..Palette::DARK
+        };
+        set_palette_for_test(light);
+        assert_eq!(surface::panel(), Color(0xf7f8fa));
+        set_palette_for_test(Palette::DARK);
+        assert_eq!(surface::panel(), Color(0x101115));
     }
 
     #[test]

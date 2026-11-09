@@ -16,9 +16,9 @@ pub(crate) fn track(checked: bool, look: Look) -> Color {
         (true, Look::Rest) => accent::BASE,
         (true, Look::Hover) => accent::HOVER,
         (true, Look::Pressed) => accent::PRESSED,
-        (false, Look::Rest) => switch::TRACK,
-        (false, Look::Hover) => switch::TRACK_HOVER,
-        (false, Look::Pressed) => switch::TRACK_PRESSED,
+        (false, Look::Rest) => switch::track(),
+        (false, Look::Hover) => switch::track_hover(),
+        (false, Look::Pressed) => switch::track_pressed(),
     }
 }
 
@@ -114,7 +114,7 @@ impl RenderOnce for Switch {
                     .ml(x)
                     .size(control::SWITCH_THUMB)
                     .rounded(radius::FULL)
-                    .bg(switch::THUMB.hsla()),
+                    .bg(switch::thumb().hsla()),
             )
             .children(focus_ring(ring, radius::FULL))
             .when(self.disabled, |el| el.opacity(state::DISABLED_ALPHA));
