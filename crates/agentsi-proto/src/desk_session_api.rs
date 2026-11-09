@@ -250,11 +250,8 @@ impl Method for DeskSend {
         with the unsent desk notes before it. It starts the process when none runs. The reply \
         comes as `desk.delta` and `desk.item` events. `busy` while a reply runs. `unavailable` \
         when the login of Claude Code is not usable: then no process starts.";
-    const ERRORS: &'static [ErrorKind] = &[
-        ErrorKind::NotFound,
-        ErrorKind::Busy,
-        ErrorKind::Unavailable,
-    ];
+    const ERRORS: &'static [ErrorKind] =
+        &[ErrorKind::NotFound, ErrorKind::Busy, ErrorKind::Unavailable];
     type Params = DeskSendParams;
     type Result = DeskSendResult;
 }
@@ -410,7 +407,10 @@ mod tests {
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
         assert_eq!(names, ["show_decisions"]);
         let t = &tools[0];
-        assert!(t.description.starts_with("Shows pending decisions"), "{t:?}");
+        assert!(
+            t.description.starts_with("Shows pending decisions"),
+            "{t:?}"
+        );
         assert!(!t.description.contains('\n'), "{t:?}");
         assert_eq!(t.input_schema["type"], "object");
         assert_eq!(t.input_schema["required"], json!(["ids"]));
@@ -432,7 +432,10 @@ mod tests {
             json!({"kind": "decisions", "ids": ["x"]}),
             json!({"kind": "decisions", "ids": [1], "extra": 1}),
         ] {
-            assert!(serde_json::from_value::<View>(bad.clone()).is_err(), "{bad}");
+            assert!(
+                serde_json::from_value::<View>(bad.clone()).is_err(),
+                "{bad}"
+            );
         }
     }
 

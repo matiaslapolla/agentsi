@@ -19,6 +19,7 @@ pub fn register(c: &mut Catalog) {
         .method::<DecisionDecide>()
         .method::<DecisionAdd>()
         .method::<DecisionArchived>()
+        .method::<DecisionGet>()
         .method::<ArchiveArchive>()
         .method::<ArchiveRestore>();
 }

@@ -205,6 +205,19 @@ pub fn archived_decisions(c: &Connection, product: &str) -> Result<Vec<Decision>
     )
 }
 
+/// The decisions of `product` with these ids, in id order. An id of another product is left out.
+pub fn decisions_by_id(c: &Connection, product: &str, ids: &[i64]) -> Result<Vec<Decision>> {
+    let list: Vec<String> = ids.iter().map(i64::to_string).collect();
+    all(
+        c,
+        &format!(
+            "{DECISION} where product = ?1 and id in (select value from json_each(?2)) order by id"
+        ),
+        params![product, format!("[{}]", list.join(","))],
+        decision,
+    )
+}
+
 pub fn decisions_of_minutes(c: &Connection, minutes_id: &str) -> Result<Vec<Decision>> {
     all(
         c,

@@ -374,6 +374,36 @@
         ],
         "type": "object"
       },
+      "AuthState": {
+        "description": "The result of the login check of `claude`.",
+        "oneOf": [
+          {
+            "const": "ready",
+            "description": "`loggedIn` is true.",
+            "type": "string"
+          },
+          {
+            "const": "signed_out",
+            "description": "`loggedIn` is false.",
+            "type": "string"
+          },
+          {
+            "const": "missing",
+            "description": "No `claude` program on the PATH.",
+            "type": "string"
+          },
+          {
+            "const": "not_read",
+            "description": "A reply failed with an auth error: Claude Code did not use the login.",
+            "type": "string"
+          },
+          {
+            "const": "unknown",
+            "description": "Other output. The message is its first line.",
+            "type": "string"
+          }
+        ]
+      },
       "Author": {
         "description": "The author or the last writer of a ticket.",
         "properties": {
@@ -1249,6 +1279,298 @@
         ],
         "type": "object"
       },
+      "DecisionGetResult": {
+        "properties": {
+          "decisions": {
+            "description": "In the order of `ids`. An id that the product does not have is left out.",
+            "items": {
+              "$ref": "#/components/schemas/DecisionInfo"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "decisions"
+        ],
+        "type": "object"
+      },
+      "DecisionInfo": {
+        "description": "One stored decision, as a view of the desk conversation reads it.",
+        "properties": {
+          "action": {
+            "description": "What to run once the decision is approved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "archived": {
+            "description": "True when the archive record holds the decision.",
+            "type": "boolean"
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "`minutes`, `reflection` or `product`.",
+            "type": "string"
+          },
+          "minutes_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `approved`, `rejected` or `stale`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          },
+          "why": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "text",
+          "archived"
+        ],
+        "type": "object"
+      },
+      "DeskAuthResult": {
+        "properties": {
+          "message": {
+            "description": "What the owner must do. Null for `ready`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/AuthState"
+          }
+        },
+        "required": [
+          "state"
+        ],
+        "type": "object"
+      },
+      "DeskEntry": {
+        "description": "One item with its place in the desk conversation.",
+        "properties": {
+          "at": {
+            "description": "ISO 8601 UTC.",
+            "type": "string"
+          },
+          "item": {
+            "$ref": "#/components/schemas/DeskItem"
+          },
+          "seq": {
+            "description": "The number of the item in the conversation of its product. It only grows.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq",
+          "at",
+          "item"
+        ],
+        "type": "object"
+      },
+      "DeskHistoryResult": {
+        "properties": {
+          "items": {
+            "description": "Oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/DeskEntry"
+            },
+            "type": "array"
+          },
+          "message": {
+            "description": "What the state needs: the auth message, or the failure.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "session": {
+            "description": "The uuid of the desk session, or null when the product has none yet.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/DeskState"
+          }
+        },
+        "required": [
+          "state",
+          "items"
+        ],
+        "type": "object"
+      },
+      "DeskItem": {
+        "description": "One stored item of a desk conversation.",
+        "oneOf": [
+          {
+            "description": "A message of the owner.",
+            "properties": {
+              "kind": {
+                "const": "owner",
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The text of one assistant message of Claude, in Markdown.",
+            "properties": {
+              "kind": {
+                "const": "reply",
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "One tool use of Claude, as one line such as `Read: docs/a.md`.",
+            "properties": {
+              "kind": {
+                "const": "tool",
+                "type": "string"
+              },
+              "line": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "line"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A view that Claude showed.",
+            "properties": {
+              "kind": {
+                "const": "view",
+                "type": "string"
+              },
+              "view": {
+                "$ref": "#/components/schemas/View"
+              }
+            },
+            "required": [
+              "kind",
+              "view"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A desk note: one line about a write of product data. The next owner message carries it.",
+            "properties": {
+              "kind": {
+                "const": "note",
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "text"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The end of a reply.",
+            "properties": {
+              "cost_usd": {
+                "format": "double",
+                "type": "number"
+              },
+              "duration_ms": {
+                "format": "uint64",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "error": {
+                "description": "The error of the reply, if it failed.",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "const": "end",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "cost_usd",
+              "duration_ms"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "A failure of the desk session, such as a crash or a time limit.",
+            "properties": {
+              "kind": {
+                "const": "error",
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "message"
+            ],
+            "type": "object"
+          }
+        ]
+      },
+      "DeskResetResult": {
+        "properties": {
+          "session": {
+            "description": "The uuid of the new desk session.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "session"
+        ],
+        "type": "object"
+      },
       "DeskResult": {
         "properties": {
           "index": {
@@ -1311,6 +1633,79 @@
           "minutes_total",
           "last_minutes",
           "usage"
+        ],
+        "type": "object"
+      },
+      "DeskSendResult": {
+        "properties": {
+          "seq": {
+            "description": "The `seq` of the owner item.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq"
+        ],
+        "type": "object"
+      },
+      "DeskShowResult": {
+        "properties": {
+          "view_id": {
+            "description": "The `seq` of the stored `view` item.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "view_id"
+        ],
+        "type": "object"
+      },
+      "DeskState": {
+        "description": "The state of the desk session of a product.",
+        "oneOf": [
+          {
+            "const": "stopped",
+            "description": "No process runs. The next owner message starts one.",
+            "type": "string"
+          },
+          {
+            "const": "starting",
+            "description": "The process starts and has not answered yet.",
+            "type": "string"
+          },
+          {
+            "const": "idle",
+            "description": "The process waits for an owner message.",
+            "type": "string"
+          },
+          {
+            "const": "working",
+            "description": "A reply runs.",
+            "type": "string"
+          },
+          {
+            "const": "auth",
+            "description": "The login of Claude Code is not usable. `message` says what to do.",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "description": "The process failed. `message` says why. The next owner message starts a new process.",
+            "type": "string"
+          }
+        ]
+      },
+      "DeskStopResult": {
+        "properties": {
+          "stopped": {
+            "description": "False when no process ran.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stopped"
         ],
         "type": "object"
       },
@@ -5861,6 +6256,33 @@
         ],
         "type": "string"
       },
+      "View": {
+        "description": "The catalog of views. Claude shows one with the MCP tool `show_<kind>`. The doc comment of\neach variant is the description of its tool: it says when Claude calls it.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "Shows pending decisions of the product with Approve and Reject buttons. Call it when\nthe owner asks what waits for them, or when your reply names decisions. The ids come\nfrom pending_decisions.",
+            "properties": {
+              "ids": {
+                "items": {
+                  "format": "int64",
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "const": "decisions",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ids"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "VocabularyEntry": {
         "description": "One term and the forms that the speech model gives for it.",
         "properties": {
@@ -7089,6 +7511,338 @@
       }
     },
     {
+      "description": "Gives the stored items of the desk conversation of a product, oldest first, and the state of its desk session.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "desk.history",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "Only the items with a smaller `seq`. Leave it out for the newest items.",
+          "name": "before",
+          "required": false,
+          "schema": {
+            "description": "Only the items with a smaller `seq`. Leave it out for the newest items.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "The most items to give. The default is 200.",
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "description": "The most items to give. The default is 200.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskHistoryResult"
+        }
+      }
+    },
+    {
+      "description": "Sends an owner message to the desk session of a product, with the unsent desk notes before it. It starts the process when none runs. The reply comes as `desk.delta` and `desk.item` events. `busy` while a reply runs. `unavailable` when the login of Claude Code is not usable: then no process starts.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "busy"
+          },
+          "message": "busy"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "desk.send",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "text",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskSendResult"
+        }
+      }
+    },
+    {
+      "description": "Stops the process of the desk session of a product. The items and the session id stay, so the next owner message resumes the session.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        }
+      ],
+      "name": "desk.stop",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskStopResult"
+        }
+      }
+    },
+    {
+      "description": "Starts a new desk conversation: stops the process, deletes the items and gives the product a new session uuid.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "desk.reset",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskResetResult"
+        }
+      }
+    },
+    {
+      "description": "Shows a view in the desk conversation of a session. The `show_*` MCP tools call it. `invalid` for a view that does not match the catalog, `not_found` for an unknown session or an id that the product does not have. After the check, the core stores a `view` item and sends `desk.item`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "desk.show",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The uuid of the desk session, from `AGENTSI_DESK_SESSION`.",
+          "name": "session",
+          "required": true,
+          "schema": {
+            "description": "The uuid of the desk session, from `AGENTSI_DESK_SESSION`.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "view",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/View"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskShowResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the state of the login of Claude Code, from `claude auth status --json` with a limit of 5 s. The core never reads the credentials.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        }
+      ],
+      "name": "desk.auth",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "Run `claude auth status --json` again. Else the core gives the last result.",
+          "name": "recheck",
+          "required": false,
+          "schema": {
+            "default": false,
+            "description": "Run `claude auth status --json` again. Else the core gives the last result.",
+            "type": "boolean"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskAuthResult"
+        }
+      }
+    },
+    {
       "description": "Finds the product of a folder in the registry (`agentsi.config.json`), or the product with the given id. With `list` it gives the registry, and with `home` the data root. It is what `agentsi whoami` prints.",
       "errors": [
         {
@@ -7643,6 +8397,67 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DecisionArchivedResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the decisions of a product with these ids, archived or not, with their status. A view of the desk conversation reads it. It only reads.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "decision.get",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "ids",
+          "required": true,
+          "schema": {
+            "items": {
+              "format": "int64",
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DecisionGetResult"
         }
       }
     },
@@ -12335,6 +13150,95 @@
   ],
   "openrpc": "1.3.2",
   "x-notifications": [
+    {
+      "description": "The state of the desk session of a product changed.",
+      "name": "desk.state",
+      "params": [
+        {
+          "name": "message",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/DeskState"
+          }
+        }
+      ]
+    },
+    {
+      "description": "A part of the text of a reply, while it streams.",
+      "name": "desk.delta",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The next text of the reply that streams. The `reply` item holds the whole text.",
+          "name": "text",
+          "required": true,
+          "schema": {
+            "description": "The next text of the reply that streams. The `reply` item holds the whole text.",
+            "type": "string"
+          }
+        }
+      ]
+    },
+    {
+      "description": "The core stored an item of the desk conversation of a product.",
+      "name": "desk.item",
+      "params": [
+        {
+          "description": "ISO 8601 UTC.",
+          "name": "at",
+          "required": true,
+          "schema": {
+            "description": "ISO 8601 UTC.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "item",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/DeskItem"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "seq",
+          "required": true,
+          "schema": {
+            "format": "int64",
+            "type": "integer"
+          }
+        }
+      ]
+    },
     {
       "description": "One stage of a meeting, for the log of the CLI and the meeting screen.",
       "name": "meeting.progress",
