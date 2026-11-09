@@ -48,6 +48,10 @@ fn roles_brief_gives_the_brief_of_a_product_and_null_for_a_product_without_one()
     assert_eq!(got["brief"]["objectives"][0]["due"], "2026-12-01");
     assert_eq!(got["brief"]["north_stars"], json!(["Calm inbox"]));
     assert_eq!(got["brief"]["out_of_scope"], json!(["Calendar"]));
+    assert_eq!(
+        got["brief"]["sources_of_truth"],
+        json!([{"kind": "docs", "ref": "docs/", "note": "the docs"}])
+    );
     assert_eq!(got["brief"]["roles"]["dev"], "Builds it.");
     assert_eq!(got["brief"]["updated_at"], "2026-10-30T10:00:00.000Z");
 
@@ -96,6 +100,7 @@ fn roles_brief_reads_a_lacking_field_as_empty() {
     assert_eq!(brief["objectives"][1]["id"], "");
     assert_eq!(brief["north_stars"], json!(["Calm inbox"]));
     assert_eq!(brief["out_of_scope"], json!([]));
+    assert_eq!(brief["sources_of_truth"], json!([]));
     assert_eq!(brief["roles"], json!({"pm": "Ranks the work."}));
     assert_eq!(brief["updated_at"], Value::Null);
 

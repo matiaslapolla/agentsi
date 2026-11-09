@@ -436,6 +436,13 @@
             "description": "What each agent is for, by agent id.",
             "type": "object"
           },
+          "sources_of_truth": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SourceOfTruth"
+            },
+            "type": "array"
+          },
           "stage": {
             "default": "",
             "description": "`idea`, `building`, `launched`, `growing` or `maintenance`.",
@@ -4937,6 +4944,24 @@
           "type",
           "ref"
         ],
+        "type": "object"
+      },
+      "SourceOfTruth": {
+        "description": "A source of truth of a brief: `issues`, `analytics`, `docs` or `other`, with a reference and a note.",
+        "properties": {
+          "kind": {
+            "default": "",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "type": "string"
+          },
+          "ref": {
+            "default": "",
+            "type": "string"
+          }
+        },
         "type": "object"
       },
       "SourceRef": {

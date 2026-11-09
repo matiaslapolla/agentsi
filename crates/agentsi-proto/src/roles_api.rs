@@ -104,6 +104,17 @@ pub struct RolesBriefParams {
     pub product: String,
 }
 
+/// A source of truth of a brief: `issues`, `analytics`, `docs` or `other`, with a reference and a note.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+pub struct SourceOfTruth {
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default, rename = "ref")]
+    pub reference: String,
+    #[serde(default)]
+    pub note: String,
+}
+
 /// The brief of a product, as `/agentsi setup` stores it. A field that the stored brief lacks reads as empty.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
 pub struct BriefView {
@@ -121,6 +132,8 @@ pub struct BriefView {
     pub north_stars: Vec<String>,
     #[serde(default)]
     pub out_of_scope: Vec<String>,
+    #[serde(default)]
+    pub sources_of_truth: Vec<SourceOfTruth>,
     /// What each agent is for, by agent id.
     #[serde(default)]
     pub roles: std::collections::BTreeMap<String, String>,

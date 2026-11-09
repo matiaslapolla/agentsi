@@ -611,6 +611,15 @@ impl SetupScreen {
             f.stage = b.stage.clone();
             f.out_of_scope = b.out_of_scope.clone();
             f.north_stars = b.north_stars.clone();
+            f.sources = b
+                .sources_of_truth
+                .iter()
+                .map(|s| Source {
+                    kind: s.kind.clone(),
+                    reference: s.reference.clone(),
+                    note: s.note.clone(),
+                })
+                .collect();
             f.objectives = b
                 .objectives
                 .iter()
@@ -1298,11 +1307,22 @@ impl SetupScreen {
             .child(section("Objectives", None))
             .child(hint("One to three. Leave a row empty to skip it."))
             .children(rows)
-            .child(self.area_field("north", "North-star docs, one path for each line", "docs/product.md", 16, window, cx))
-            .child(self.area_field("sources", "Sources of truth, one for each line: kind | ref | note", "issues | github.com/me/app | Open bugs", 16, window, cx))
-            .when(self.baseline.is_some(), |el| {
-                el.child(hint("The app cannot read the sources of truth back. The apply replaces them with this box."))
-            })
+            .child(self.area_field(
+                "north",
+                "North-star docs, one path for each line",
+                "docs/product.md",
+                16,
+                window,
+                cx,
+            ))
+            .child(self.area_field(
+                "sources",
+                "Sources of truth, one for each line: kind | ref | note",
+                "issues | github.com/me/app | Open bugs",
+                16,
+                window,
+                cx,
+            ))
             .child(self.problems_of(Form::Objectives))
     }
 
@@ -1915,6 +1935,7 @@ mod tests {
                     "what": "A mail filter", "audience": "Teams", "stage": "launched",
                     "objectives": [{"id": "o1", "text": "Ship", "signal": "10 users", "due": "2026-12-31"}],
                     "north_stars": [], "out_of_scope": ["Billing"],
+                    "sources_of_truth": [{"kind": "docs", "ref": "docs/", "note": "the docs"}],
                     "roles": {"pm": "Ranks.", "dev": "Judges."}, "updated_at": null
                 }))
                 .unwrap(),
@@ -1950,6 +1971,17 @@ mod tests {
             ("demo", "Demo", "A mail filter", "launched")
         );
         assert_eq!(f.out_of_scope, ["Billing"]);
+        assert_eq!(f.sources.len(), 1, "the stored sources fill the box");
+        let stage = f.stage(
+            screen.read_with(cx, |s, _| s.baseline.clone()).as_ref(),
+            "2026-11-09",
+        );
+        let brief: serde_json::Value = serde_json::from_str(&stage["brief.json"]).unwrap();
+        assert_eq!(
+            brief["sources_of_truth"],
+            json!([{"kind": "docs", "ref": "docs/", "note": "the docs"}]),
+            "an untouched box keeps the sources"
+        );
         assert_eq!(f.roster(), ["pm", "dev"]);
         assert_eq!(f.why["dev"], "Judges.");
         // An unchanged form keeps the Stories block: no `stories.json` in the stage.

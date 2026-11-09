@@ -14,7 +14,7 @@ use agentsi_proto::RpcError;
 use agentsi_proto::desk_api::Objective;
 use agentsi_proto::events::{DataChanged, DataChangedParams};
 use agentsi_proto::roles_api::{
-    BriefView, CommitInfo, Registration, RolesApply, RolesApplyParams, RolesApplyResult,
+    BriefView, CommitInfo, SourceOfTruth, Registration, RolesApply, RolesApplyParams, RolesApplyResult,
     RolesBrief, RolesBriefParams, RolesBriefResult, RolesList, RolesListParams, RolesListResult,
     RolesReset, RolesResetParams, RolesResetResult, RolesValidate, RolesValidateParams,
     RolesValidateResult,
@@ -197,6 +197,14 @@ fn brief_view(stored: serde_json::Value) -> BriefView {
             .collect(),
         north_stars: texts("north_stars"),
         out_of_scope: texts("out_of_scope"),
+        sources_of_truth: list(&stored, "sources_of_truth")
+            .iter()
+            .map(|s| SourceOfTruth {
+                kind: text(s, "kind"),
+                reference: text(s, "ref"),
+                note: text(s, "note"),
+            })
+            .collect(),
         roles: stored
             .get("roles")
             .and_then(Value::as_object)
