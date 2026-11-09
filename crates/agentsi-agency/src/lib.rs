@@ -7,6 +7,7 @@ pub mod archive;
 pub mod audit;
 pub mod call;
 pub mod clock;
+pub mod desk;
 pub mod error;
 pub mod git_env;
 pub mod gitpanel;
