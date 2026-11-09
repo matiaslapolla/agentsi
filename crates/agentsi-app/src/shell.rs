@@ -1082,7 +1082,7 @@ impl Shell {
             .justify_center()
             .items_start()
             .pt(space(16))
-            .bg(surface::BASE.alpha(control::SCRIM_ALPHA))
+            .bg(surface::base().alpha(control::SCRIM_ALPHA))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| this.close_palette(window, cx)),
@@ -1092,7 +1092,7 @@ impl Shell {
                     .w(control::PALETTE_WIDTH)
                     .h_auto()
                     .rounded(radius::lg())
-                    .bg(surface::OVERLAY)
+                    .bg(surface::overlay())
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
                         Command::new(&state)
@@ -1323,8 +1323,8 @@ impl Render for Shell {
             .size_full()
             .flex()
             .relative()
-            .bg(surface::PANEL)
-            .text_color(text::PRIMARY)
+            .bg(surface::panel())
+            .text_color(text::primary())
             .font_family(font::UI)
             .text_size(size::base())
             .on_action(cx.listener(|this, _: &actions::TogglePalette, window, cx| this.toggle_palette(window, cx)))
@@ -1523,14 +1523,14 @@ impl Render for Shell {
                                 .items_center()
                                 .justify_center()
                                 .gap(space(2))
-                                .text_color(text::SECONDARY)
+                                .text_color(text::secondary())
                                 .child(format!(
                                     "Pick a product in the sidebar, or press {terminal_key} for a terminal."
                                 ))
                                 .child(
                                     div()
                                         .text_size(size::sm())
-                                        .text_color(text::TERTIARY)
+                                        .text_color(text::tertiary())
                                         .child(format!("{palette_key} lists each action.")),
                                 ),
                         )

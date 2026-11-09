@@ -536,13 +536,13 @@ impl GitScreen {
             .flex_none()
             .pad_x(space(4))
             .border_b_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .child(
                 div()
                     .debug_selector(|| "git-branch".into())
                     .text_size(size::md())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child(head.0),
             )
             .children(head.2)
@@ -623,7 +623,7 @@ impl GitScreen {
                 div()
                     .text_size(size::sm())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child(format!("{title}  {count}")),
             )
             .child(
@@ -664,7 +664,7 @@ impl GitScreen {
             .flex_none()
             .pad_x(space(3))
             .border_b_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .child(mono(format!(
                 "{} · {}",
                 shown.path,
@@ -730,7 +730,7 @@ impl GitScreen {
             .flex_none()
             .p(space(3))
             .border_t_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .child(
                 div()
                     .flex()
@@ -804,7 +804,7 @@ impl GitScreen {
 
 impl Render for GitScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let root = div().size_full().flex().flex_col().bg(surface::PANEL);
+        let root = div().size_full().flex().flex_col().bg(surface::panel());
         let body = match (&self.status, self.tab) {
             (Load::Loading, Tab::Changes) => notice("Reading the repo…", None).into_any_element(),
             (Load::Failed(e), Tab::Changes) => notice(
@@ -835,7 +835,7 @@ impl Render for GitScreen {
                                 .flex()
                                 .flex_col()
                                 .border_r_1()
-                                .border_color(line::BORDER)
+                                .border_color(line::border())
                                 .child(self.file_list(window, cx)),
                         )
                         .child(self.diff_pane(cx)),

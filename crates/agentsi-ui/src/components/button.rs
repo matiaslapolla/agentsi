@@ -37,32 +37,32 @@ pub(crate) fn colors(v: ButtonVariant, look: Look) -> (Hsla, Hsla) {
     let c = |c: Color| c.hsla();
     let (rest, hover, press, fg_rest, fg_hover) = match v {
         ButtonVariant::Primary => (
-            c(accent::BASE),
-            c(accent::HOVER),
-            c(accent::PRESSED),
-            accent::ON,
-            accent::ON,
+            c(accent::base()),
+            c(accent::hover()),
+            c(accent::pressed()),
+            accent::on(),
+            accent::on(),
         ),
         ButtonVariant::Secondary => (
-            c(surface::RAISED),
-            c(surface::OVERLAY),
-            c(state::pressed(surface::OVERLAY)),
-            text::PRIMARY,
-            text::PRIMARY,
+            c(surface::raised()),
+            c(surface::overlay()),
+            c(state::pressed(surface::overlay())),
+            text::primary(),
+            text::primary(),
         ),
         ButtonVariant::Ghost => (
-            surface::OVERLAY.alpha(0.),
-            c(surface::OVERLAY),
-            c(state::pressed(surface::OVERLAY)),
-            text::SECONDARY,
-            text::PRIMARY,
+            surface::overlay().alpha(0.),
+            c(surface::overlay()),
+            c(state::pressed(surface::overlay())),
+            text::secondary(),
+            text::primary(),
         ),
         ButtonVariant::Danger => (
             c(Status::Danger.tint()),
             c(danger_fill_hover()),
             c(danger_fill_press()),
-            status::DANGER,
-            status::DANGER,
+            status::danger(),
+            status::danger(),
         ),
     };
     match look {
@@ -186,7 +186,7 @@ impl RenderOnce for Button {
             .rounded(radius::md())
             .bg(fill)
             .when(self.variant == ButtonVariant::Secondary, |el| {
-                el.border_1().border_color(line::STRONG.hsla())
+                el.border_1().border_color(line::strong().hsla())
             })
             .text_size(text_size)
             .font_weight(weight::MEDIUM)

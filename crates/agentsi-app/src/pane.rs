@@ -648,9 +648,9 @@ impl Render for PaneHeader {
             .gap(space(2))
             .h(control::height_md())
             .pad_x(space(2))
-            .bg(surface::PANEL)
+            .bg(surface::panel())
             .border_b_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .text_size(size::sm())
             .when_some(hue, |el, h| {
                 el.child(tab_bar(h, format!("header-color:{}", self.id)))
@@ -660,12 +660,12 @@ impl Render for PaneHeader {
                 div()
                     .min_w_0()
                     .truncate()
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .font_weight(weight::MEDIUM)
                     .child(title),
             )
             .when_some(place, |el, p| {
-                el.child(div().flex_none().text_color(text::TERTIARY).child(p))
+                el.child(div().flex_none().text_color(text::tertiary()).child(p))
             })
             .child(div().flex_1())
             .when_some(closed, |el, why| el.child(status_tag(why, Status::Off)))
@@ -687,7 +687,7 @@ impl Render for PaneHeader {
                                 voice_mode(&this.core, &this.id, Some(*on), cx)
                             })),
                     )
-                    .child(div().text_color(text::SECONDARY).child(if voice {
+                    .child(div().text_color(text::secondary()).child(if voice {
                         "Voice on"
                     } else {
                         "Voice off"
@@ -801,7 +801,7 @@ impl Render for TerminalPanel {
             .size_full()
             .flex()
             .flex_col()
-            .bg(surface::BASE)
+            .bg(surface::base())
             .child(
                 self.header.clone().cached(
                     StyleRefinement::default()

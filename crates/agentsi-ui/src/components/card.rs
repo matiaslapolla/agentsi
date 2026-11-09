@@ -54,11 +54,11 @@ impl RenderOnce for Card {
         let clickable = self.on_click.is_some();
         let state = use_interaction(&self.id, clickable, window, cx);
         let (look, ring) = look(&state, self.force, self.disabled, window, cx);
-        let accent_border = accent::BASE.alpha(accent::HOVER_BORDER_ALPHA);
+        let accent_border = accent::base().alpha(accent::HOVER_BORDER_ALPHA);
         let (border, fill) = match look {
-            Look::Rest => (line::BORDER.hsla(), surface::RAISED.hsla()),
-            Look::Hover => (accent_border, surface::RAISED.hsla()),
-            Look::Pressed => (accent_border, state::pressed(surface::RAISED).hsla()),
+            Look::Rest => (line::border().hsla(), surface::raised().hsla()),
+            Look::Hover => (accent_border, surface::raised().hsla()),
+            Look::Pressed => (accent_border, state::pressed(surface::raised()).hsla()),
         };
         let border = fade(&self.id, "border", border, window, cx);
         let fill = fade(&self.id, "fill", fill, window, cx);
@@ -78,7 +78,7 @@ impl RenderOnce for Card {
             .border_color(border)
             .bg(fill)
             .text_size(size::base())
-            .text_color(text::PRIMARY.hsla())
+            .text_color(text::primary().hsla())
             .children(focus_ring(ring, radius::lg()))
             .when(self.disabled, |el| el.opacity(state::DISABLED_ALPHA))
             .children(self.children);
@@ -158,17 +158,17 @@ impl RenderOnce for ListRow {
         let (look, ring) = look(&state, self.force, self.disabled, window, cx);
         let ring = ring || (self.focused && !self.disabled);
         let rest = if self.selected {
-            accent::SUBTLE
+            accent::subtle()
         } else {
-            surface::PANEL
+            surface::panel()
         };
         let fill = match look {
             Look::Rest => rest,
-            Look::Hover if self.selected => accent::SUBTLE,
-            Look::Hover => surface::OVERLAY,
+            Look::Hover if self.selected => accent::subtle(),
+            Look::Hover => surface::overlay(),
             // A selected row keeps its fill: the meta text fails 4.5:1 on a pressed accent fill.
-            Look::Pressed if self.selected => accent::SUBTLE,
-            Look::Pressed => state::pressed(surface::OVERLAY),
+            Look::Pressed if self.selected => accent::subtle(),
+            Look::Pressed => state::pressed(surface::overlay()),
         };
         let fill = fade(&self.id, "fill", fill.hsla(), window, cx);
         let selector = format!("list-row:{}", self.id);
@@ -196,7 +196,7 @@ impl RenderOnce for ListRow {
                         .bottom(control::SELECTION_INSET)
                         .w(control::SELECTION_BAR)
                         .rounded(radius::FULL)
-                        .bg(accent::BASE.hsla()),
+                        .bg(accent::base().hsla()),
                 )
             })
             .child(
@@ -211,7 +211,7 @@ impl RenderOnce for ListRow {
                             .debug_selector(|| "list-row-title".into())
                             .text_size(size::sm())
                             .font_weight(weight::MEDIUM)
-                            .text_color(text::PRIMARY.hsla())
+                            .text_color(text::primary().hsla())
                             .truncate()
                             .child(self.title),
                     )
@@ -219,7 +219,7 @@ impl RenderOnce for ListRow {
                         el.child(
                             div()
                                 .text_size(size::xs())
-                                .text_color(text::TERTIARY.hsla())
+                                .text_color(text::tertiary().hsla())
                                 .truncate()
                                 .child(m),
                         )

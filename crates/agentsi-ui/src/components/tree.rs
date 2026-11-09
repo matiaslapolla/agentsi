@@ -28,16 +28,16 @@ fn arrow_box() -> Pixels {
 /// The fill of a row for the pointer look.
 fn fill_of(look: Look, selected: bool) -> crate::tokens::Color {
     let rest = if selected {
-        accent::SUBTLE
+        accent::subtle()
     } else {
-        surface::PANEL
+        surface::panel()
     };
     match look {
         Look::Rest => rest,
-        Look::Hover if selected => accent::SUBTLE,
-        Look::Hover => surface::OVERLAY,
-        Look::Pressed if selected => accent::SUBTLE,
-        Look::Pressed => state::pressed(surface::OVERLAY),
+        Look::Hover if selected => accent::subtle(),
+        Look::Hover => surface::overlay(),
+        Look::Pressed if selected => accent::subtle(),
+        Look::Pressed => state::pressed(surface::overlay()),
     }
 }
 
@@ -173,7 +173,7 @@ impl RenderOnce for ProductRow {
                     IconName::ChevronRight
                 })
                 .size(control::icon_sm())
-                .text_color(text::TERTIARY.hsla()),
+                .text_color(text::tertiary().hsla()),
             )
             .on_click(move |e, w, cx| {
                 cx.stop_propagation();
@@ -207,7 +207,7 @@ impl RenderOnce for ProductRow {
                         .bottom(control::SELECTION_INSET)
                         .w(control::SELECTION_BAR)
                         .rounded(radius::FULL)
-                        .bg(accent::BASE.hsla()),
+                        .bg(accent::base().hsla()),
                 )
             })
             .child(arrow)
@@ -231,7 +231,7 @@ impl RenderOnce for ProductRow {
                                     .flex_shrink(1.)
                                     .text_size(size::sm())
                                     .font_weight(weight::MEDIUM)
-                                    .text_color(text::PRIMARY.hsla())
+                                    .text_color(text::primary().hsla())
                                     .truncate()
                                     .child(self.title),
                             )
@@ -250,7 +250,7 @@ impl RenderOnce for ProductRow {
                         el.child(
                             div()
                                 .text_size(size::xs())
-                                .text_color(text::TERTIARY.hsla())
+                                .text_color(text::tertiary().hsla())
                                 .truncate()
                                 .child(m),
                         )
@@ -387,7 +387,7 @@ impl RenderOnce for ItemRow {
                     .flex_1()
                     .min_w_0()
                     .text_size(size::sm())
-                    .text_color(text::PRIMARY.hsla())
+                    .text_color(text::primary().hsla())
                     .truncate()
                     .child(self.title),
             )
@@ -398,7 +398,7 @@ impl RenderOnce for ItemRow {
                         .min_w_0()
                         .max_w(control::TRAILING_MAX)
                         .text_size(size::xs())
-                        .text_color(text::TERTIARY.hsla())
+                        .text_color(text::tertiary().hsla())
                         .truncate()
                         .child(m),
                 )
@@ -510,7 +510,7 @@ impl RenderOnce for GroupHeader {
                             IconName::ChevronDown
                         })
                         .size(control::icon_sm())
-                        .text_color(text::TERTIARY.hsla()),
+                        .text_color(text::tertiary().hsla()),
                     ),
             )
             .child(
@@ -519,7 +519,7 @@ impl RenderOnce for GroupHeader {
                     .flex_none()
                     .size(control::icon_sm() / 2.)
                     .rounded(radius::sm())
-                    .bg(self.hue.map_or(text::TERTIARY.hsla(), |h| h.color().hsla())),
+                    .bg(self.hue.map_or(text::tertiary().hsla(), |h| h.color().hsla())),
             )
             .child(
                 div()
@@ -527,7 +527,7 @@ impl RenderOnce for GroupHeader {
                     .min_w_0()
                     .text_size(size::xs())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::SECONDARY.hsla())
+                    .text_color(text::secondary().hsla())
                     .truncate()
                     .child(self.name),
             )
@@ -535,7 +535,7 @@ impl RenderOnce for GroupHeader {
                 div()
                     .flex_none()
                     .text_size(size::xs())
-                    .text_color(text::TERTIARY.hsla())
+                    .text_color(text::tertiary().hsla())
                     .child(self.count.to_string()),
             );
         let el = match self.decorate {

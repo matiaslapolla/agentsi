@@ -281,7 +281,7 @@ impl Sidebar {
         });
         move |el| {
             el.on_drop(drop)
-                .drag_over::<DraggedProduct>(|style, _, _, _| style.bg(accent::SUBTLE))
+                .drag_over::<DraggedProduct>(|style, _, _, _| style.bg(accent::subtle()))
         }
     }
 
@@ -638,7 +638,7 @@ fn caption(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::xs())
         .font_weight(weight::MEDIUM)
-        .text_color(text::TERTIARY)
+        .text_color(text::tertiary())
         .child(s.into())
 }
 
@@ -666,7 +666,7 @@ fn host_header(state: &HostState, name: impl Into<SharedString>) -> Div {
             div()
                 .text_size(size::sm())
                 .font_weight(weight::MEDIUM)
-                .text_color(text::SECONDARY)
+                .text_color(text::secondary())
                 .child(name.into()),
         )
         .child(caption(word))
@@ -717,9 +717,9 @@ impl Render for Sidebar {
             .flex_none()
             .w(control::SIDEBAR_WIDTH)
             .h_full()
-            .bg(surface::BASE)
+            .bg(surface::base())
             .border_r_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .child(
                 div()
                     .debug_selector(|| "sidebar-header".into())
@@ -729,12 +729,12 @@ impl Render for Sidebar {
                     .h(control::TOOLBAR_HEIGHT)
                     .pad_x(space(4))
                     .border_b_1()
-                    .border_color(line::BORDER)
+                    .border_color(line::border())
                     .child(
                         div()
                             .text_size(size::md())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child("AgentSI"),
                     )
                     .child(keys::hint(cx, keys::PALETTE)),
@@ -769,7 +769,7 @@ impl Render for Sidebar {
                         .gap(space(2))
                         .p(space(3))
                         .border_t_1()
-                        .border_color(line::BORDER)
+                        .border_color(line::border())
                         .when_some(host_off, |el, why| el.child(caption(why)))
                         .children(notices.into_iter().map(caption)),
                 )

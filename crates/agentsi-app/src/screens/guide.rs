@@ -116,7 +116,7 @@ impl Render for GuideScreen {
             .id("guide")
             .debug_selector(|| "guide-root".into())
             .size_full()
-            .bg(surface::PANEL)
+            .bg(surface::panel())
             .track_focus(&self.focus)
             .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.scroll_key(e, cx)))
             .child(column().h_full().child(view))

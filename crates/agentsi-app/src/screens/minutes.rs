@@ -197,7 +197,7 @@ impl MinutesScreen {
 
 impl Render for MinutesScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let root = div().size_full().flex().flex_col().bg(surface::PANEL);
+        let root = div().size_full().flex().flex_col().bg(surface::panel());
         let count = self.rows().len();
         let body = match &self.data {
             Load::Loading => notice("Reading the minutes…", None).into_any_element(),
@@ -293,18 +293,18 @@ impl Render for MinutesScreen {
                 .flex_none()
                 .pad_x(space(4))
                 .border_b_1()
-                .border_color(line::BORDER)
+                .border_color(line::border())
                 .child(
                     div()
                         .text_size(size::md())
                         .font_weight(weight::SEMIBOLD)
-                        .text_color(text::PRIMARY)
+                        .text_color(text::primary())
                         .child("Minutes"),
                 )
                 .child(
                     div()
                         .text_size(size::sm())
-                        .text_color(text::TERTIARY)
+                        .text_color(text::tertiary())
                         .child(format!("{count} meetings")),
                 ),
         )

@@ -82,13 +82,13 @@ pub fn notice(message: impl Into<SharedString>, hint: Option<String>) -> Div {
         .justify_center()
         .gap(space(2))
         .p(space(8))
-        .text_color(text::SECONDARY)
+        .text_color(text::secondary())
         .child(div().text_size(size::base()).child(message.into()))
         .when_some(hint, |el, h| {
             el.child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::TERTIARY)
+                    .text_color(text::tertiary())
                     .child(h),
             )
         })
@@ -112,14 +112,14 @@ pub fn section(title: &str, count: Option<usize>) -> Div {
             div()
                 .text_size(size::md())
                 .font_weight(weight::SEMIBOLD)
-                .text_color(text::PRIMARY)
+                .text_color(text::primary())
                 .child(title.to_string()),
         )
         .when_some(count, |el, n| {
             el.child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::TERTIARY)
+                    .text_color(text::tertiary())
                     .child(n.to_string()),
             )
         })
@@ -135,14 +135,14 @@ pub fn stat(label: &str, value: impl Into<SharedString>) -> Div {
             div()
                 .text_size(size::xs())
                 .font_weight(weight::MEDIUM)
-                .text_color(text::TERTIARY)
+                .text_color(text::tertiary())
                 .child(label.to_string()),
         )
         .child(
             div()
                 .text_size(size::lg())
                 .font_weight(weight::SEMIBOLD)
-                .text_color(text::PRIMARY)
+                .text_color(text::primary())
                 .child(value.into()),
         )
 }
@@ -157,8 +157,8 @@ pub fn stats(items: Vec<Div>) -> Div {
         .p(space(4))
         .rounded(radius::lg())
         .border_1()
-        .border_color(line::BORDER)
-        .bg(surface::RAISED)
+        .border_color(line::border())
+        .bg(surface::raised())
         .children(items)
 }
 
@@ -167,7 +167,7 @@ pub fn mono(s: impl Into<SharedString>) -> Div {
     div()
         .font_family(font::MONO)
         .text_size(size::xs())
-        .text_color(text::TERTIARY)
+        .text_color(text::tertiary())
         .child(s.into())
 }
 
@@ -252,8 +252,8 @@ pub enum Flash {
 /// The line that tells the owner what the last write did.
 pub fn flash_line(flash: &Flash) -> Div {
     let (text_color, tint, border, message) = match flash {
-        Flash::Done(m) => (status::OK, Status::Ok.tint(), status::OK, m),
-        Flash::Failed(m) => (status::DANGER, Status::Danger.tint(), status::DANGER, m),
+        Flash::Done(m) => (status::ok(), Status::Ok.tint(), status::ok(), m),
+        Flash::Failed(m) => (status::danger(), Status::Danger.tint(), status::danger(), m),
     };
     div()
         .p(space(3))

@@ -16,7 +16,7 @@ impl SettingsScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child("Git config that AgentSI gives to each git command of each product. A product overrides a key on its git screen. The files .git/config and ~/.gitconfig stay as they are."),
             )
             .child(self.git.clone())

@@ -345,13 +345,13 @@ impl GitConfigEditor {
                 .p(space(4))
                 .rounded(radius::lg())
                 .border_1()
-                .border_color(line::BORDER)
-                .bg(surface::RAISED)
+                .border_color(line::border())
+                .bg(surface::raised())
                 .child(section("Save a key that starts a program", None))
                 .children(lines.into_iter().map(|l| {
                     div()
                         .text_size(size::sm())
-                        .text_color(text::SECONDARY)
+                        .text_color(text::secondary())
                         .child(l)
                 }))
                 .child(

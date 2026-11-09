@@ -200,7 +200,7 @@ fn swatch(hue: Option<Hue>) -> Div {
         .size(control::icon_sm())
         .rounded(radius::sm())
         .when_some(hue, |el, h| el.bg(h.color()))
-        .when(hue.is_none(), |el| el.border_1().border_color(line::STRONG))
+        .when(hue.is_none(), |el| el.border_1().border_color(line::strong()))
 }
 
 impl Render for Prompt {
@@ -230,9 +230,9 @@ impl Render for Prompt {
                     .rounded(radius::md())
                     .cursor_pointer()
                     .text_size(size::base())
-                    .text_color(text::PRIMARY)
-                    .when(on, |el| el.bg(surface::RAISED))
-                    .hover(|el| el.bg(surface::RAISED))
+                    .text_color(text::primary())
+                    .when(on, |el| el.bg(surface::raised()))
+                    .hover(|el| el.bg(surface::raised()))
                     .when(c.hue.is_some() || self.input.is_none(), |el| {
                         el.child(swatch(c.hue))
                     })
@@ -254,7 +254,7 @@ impl Render for Prompt {
             .justify_center()
             .items_start()
             .pt(space(16))
-            .bg(surface::BASE.alpha(control::SCRIM_ALPHA))
+            .bg(surface::base().alpha(control::SCRIM_ALPHA))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|_, _, _, cx| cx.emit(PromptEvent::Cancel)),
@@ -270,13 +270,13 @@ impl Render for Prompt {
                     .gap(space(2))
                     .p(space(3))
                     .rounded(radius::lg())
-                    .bg(surface::OVERLAY)
+                    .bg(surface::overlay())
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .child(
                         div()
                             .text_size(size::md())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child(self.title.clone()),
                     )
                     .when_some(self.input.clone(), |el, i| el.child(Input::new(&i)))
@@ -285,7 +285,7 @@ impl Render for Prompt {
                         el.child(
                             div()
                                 .text_size(size::xs())
-                                .text_color(text::TERTIARY)
+                                .text_color(text::tertiary())
                                 .child(h),
                         )
                     }),

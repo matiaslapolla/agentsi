@@ -569,21 +569,21 @@ fn speaker(role: &str, lit: bool) -> Div {
                 .justify_center()
                 .rounded(radius::FULL)
                 .border_2()
-                .border_color(if lit { status::OK } else { line::BORDER })
+                .border_color(if lit { status::ok() } else { line::border() })
                 .bg(if lit {
                     Status::Ok.tint()
                 } else {
-                    surface::RAISED
+                    surface::raised()
                 })
                 .text_size(size::lg())
                 .font_weight(weight::SEMIBOLD)
-                .text_color(if lit { status::OK } else { text::SECONDARY })
+                .text_color(if lit { status::ok() } else { text::secondary() })
                 .child(initial),
         )
         .child(
             div()
                 .text_size(size::sm())
-                .text_color(if lit { text::PRIMARY } else { text::TERTIARY })
+                .text_color(if lit { text::primary() } else { text::tertiary() })
                 .child(role_label(role)),
         )
 }
@@ -606,7 +606,7 @@ impl Render for CallScreen {
                 cx.listener(|this, _, _, cx| this.touch(cx)),
             )
             .size_full()
-            .bg(surface::PANEL);
+            .bg(surface::panel());
         let c = match &self.data {
             Load::Loading => return root.child(notice("Reading the call…", None)),
             Load::Failed(e) => {
@@ -752,7 +752,7 @@ impl Render for CallScreen {
                 div()
                     .text_size(size::lg())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child(c.question.clone()),
             )
             .child(
@@ -773,7 +773,7 @@ impl Render for CallScreen {
                     .child(
                         div()
                             .text_size(size::sm())
-                            .text_color(text::TERTIARY)
+                            .text_color(text::tertiary())
                             .child(place),
                     ),
             );
@@ -787,8 +787,8 @@ impl Render for CallScreen {
             .p(space(6))
             .rounded(radius::lg())
             .border_1()
-            .border_color(line::BORDER)
-            .bg(surface::RAISED)
+            .border_color(line::border())
+            .bg(surface::raised())
             .children(
                 participants(&c.segments)
                     .into_iter()
@@ -816,7 +816,7 @@ impl Render for CallScreen {
                                     div()
                                         .text_size(size::sm())
                                         .font_weight(weight::SEMIBOLD)
-                                        .text_color(if now { accent::BASE } else { text::PRIMARY })
+                                        .text_color(if now { accent::base() } else { text::primary() })
                                         .child(role_label(&s.role)),
                                 )
                                 .when(c.timed, |el| el.child(mono(clock(s.start)))),
@@ -824,7 +824,7 @@ impl Render for CallScreen {
                         .child(
                             div()
                                 .text_size(size::base())
-                                .text_color(text::SECONDARY)
+                                .text_color(text::secondary())
                                 .child(s.text.clone()),
                         )
                 }));

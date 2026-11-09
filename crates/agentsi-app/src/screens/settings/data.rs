@@ -545,7 +545,7 @@ impl SettingsScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child(row.note),
             );
         let mut right = div().flex().items_center().gap(space(2));
@@ -584,7 +584,7 @@ impl SettingsScreen {
                     div()
                         .text_size(size::sm())
                         .font_weight(weight::MEDIUM)
-                        .text_color(text::PRIMARY)
+                        .text_color(text::primary())
                         .child(name(&p.item)),
                 )
                 .child(mono(describe(p)))
@@ -597,14 +597,14 @@ impl SettingsScreen {
             .p(space(4))
             .rounded(radius::lg())
             .border_1()
-            .border_color(line::BORDER)
-            .bg(surface::RAISED)
+            .border_color(line::border())
+            .bg(surface::raised())
             .child(section("Clear plan", None))
             .children(lines)
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child(format!(
                         "Total: {} rows, {} files or folders, {}.",
                         r.plan.rows,
@@ -651,13 +651,13 @@ impl SettingsScreen {
             .p(space(4))
             .rounded(radius::lg())
             .border_1()
-            .border_color(line::BORDER)
-            .bg(surface::RAISED)
+            .border_color(line::border())
+            .bg(surface::raised())
             .child(section("Deleted", None))
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child(format!(
                         "{} rows and {} files or folders ({}).",
                         done.rows,
@@ -732,7 +732,7 @@ impl SettingsScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child("Select what to delete, review what the delete removes, then delete. A backup runs before each delete. Repos, branches and models stay."),
             )
             .child(div().debug_selector(|| "clear-root".into()).child(mono(head)))
@@ -780,7 +780,7 @@ fn pair_row(left: Div, right: Div) -> Div {
         .gap(space(4))
         .py(space(2))
         .border_b_1()
-        .border_color(line::BORDER)
+        .border_color(line::border())
         .child(left)
         .child(right)
 }

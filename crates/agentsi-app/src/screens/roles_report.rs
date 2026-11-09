@@ -171,14 +171,14 @@ fn label(s: &str) -> Div {
     div()
         .text_size(size::xs())
         .font_weight(weight::MEDIUM)
-        .text_color(text::TERTIARY)
+        .text_color(text::tertiary())
         .child(s.to_string())
 }
 
 fn body(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::sm())
-        .text_color(text::SECONDARY)
+        .text_color(text::secondary())
         .child(s.into())
 }
 
@@ -190,8 +190,8 @@ fn block() -> Div {
         .p(space(4))
         .rounded(agentsi_ui::tokens::radius::lg())
         .border_1()
-        .border_color(line::BORDER)
-        .bg(agentsi_ui::tokens::surface::RAISED)
+        .border_color(line::border())
+        .bg(agentsi_ui::tokens::surface::raised())
 }
 
 /// A table of text. The first column holds the agent.
@@ -199,9 +199,9 @@ fn table<const N: usize>(head: [&str; N], rows: Vec<[String; N]>) -> Div {
     let cell = |s: String, first: bool| {
         let c = div().flex_1().text_size(size::sm());
         if first {
-            c.text_color(text::PRIMARY).child(s)
+            c.text_color(text::primary()).child(s)
         } else {
-            c.text_right().text_color(text::SECONDARY).child(s)
+            c.text_right().text_color(text::secondary()).child(s)
         }
     };
     div()
@@ -214,7 +214,7 @@ fn table<const N: usize>(head: [&str; N], rows: Vec<[String; N]>) -> Div {
                 .gap(space(3))
                 .pb(space(1))
                 .border_b_1()
-                .border_color(line::BORDER)
+                .border_color(line::border())
                 .children(head.iter().enumerate().map(|(i, h)| {
                     let c = div().flex_1();
                     if i == 0 {
