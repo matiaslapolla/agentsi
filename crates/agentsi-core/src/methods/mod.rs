@@ -20,6 +20,7 @@ mod reflect;
 mod roles;
 mod story;
 mod terminal;
+mod tickets;
 mod vocabulary;
 mod voice;
 
@@ -52,6 +53,7 @@ pub fn router() -> Router {
         .group(data::register)
         .group(reflect::register)
         .group(git::register)
+        .group(tickets::register)
 }
 
 /// What a handler can use: the core, and the state of its connection.

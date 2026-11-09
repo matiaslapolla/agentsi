@@ -2,6 +2,8 @@
 //! `docs/specs/agentsi-desktop-tracker.md`. The field names of `Ticket` are the
 //! contract of each client that shows tickets.
 
+use crate::method::{Catalog, Method};
+use crate::rpc::ErrorKind;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -280,4 +282,77 @@ pub struct TicketMoveParams {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct TicketResult {
     pub ticket: Ticket,
+}
+
+pub fn register(c: &mut Catalog) {
+    c.method::<TicketList>()
+        .method::<TicketGet>()
+        .method::<TicketAdd>()
+        .method::<TicketUpdate>()
+        .method::<TicketMove>();
+}
+
+pub struct TicketList;
+
+impl Method for TicketList {
+    const NAME: &'static str = "ticket.list";
+    const DESCRIPTION: &'static str = "Lists the tickets of a product: by state, then the newest \
+        write, then the highest id. It never writes.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = TicketListParams;
+    type Result = TicketListResult;
+}
+
+pub struct TicketGet;
+
+impl Method for TicketGet {
+    const NAME: &'static str = "ticket.get";
+    const DESCRIPTION: &'static str = "Gives one ticket and its Markdown text. It never writes.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = TicketGetParams;
+    type Result = TicketGetResult;
+}
+
+pub struct TicketAdd;
+
+impl Method for TicketAdd {
+    const NAME: &'static str = "ticket.add";
+    const DESCRIPTION: &'static str = "Adds an open ticket with the next id of the product. Each \
+        link target and the objective must exist. Sends `data.changed` with the kind `tickets`.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = TicketAddParams;
+    type Result = TicketResult;
+}
+
+pub struct TicketUpdate;
+
+impl Method for TicketUpdate {
+    const NAME: &'static str = "ticket.update";
+    const DESCRIPTION: &'static str = "Changes the given fields of a ticket. A session changes \
+        only its own tickets and the tickets assigned to `claude`, else `conflict`. Sends \
+        `data.changed` with the kind `tickets`.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Conflict,
+        ErrorKind::Unavailable,
+    ];
+    type Params = TicketUpdateParams;
+    type Result = TicketResult;
+}
+
+pub struct TicketMove;
+
+impl Method for TicketMove {
+    const NAME: &'static str = "ticket.move";
+    const DESCRIPTION: &'static str = "Moves a ticket to another state: open to waiting (with \
+        `waiting_on`), waiting to open, an open state to done or dropped, done or dropped to \
+        open. A move to the same state succeeds. The session rule of `ticket.update` applies. \
+        Sends `data.changed` with the kind `tickets` when the row changed.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Conflict,
+        ErrorKind::Unavailable,
+    ];
+    type Params = TicketMoveParams;
+    type Result = TicketResult;
 }
