@@ -45,6 +45,10 @@ pub struct OpenItem {
     pub item: ItemKey,
 }
 
+/// The owner pressed "New product" at the end of a host group: the host, or `None` for this
+/// device. The shell opens the setup screen.
+pub struct NewProduct(pub Option<String>);
+
 /// The owner pressed the bell: the shell shows the alert log.
 pub struct ShowAlerts;
 
@@ -101,6 +105,7 @@ impl EventEmitter<SelectProduct> for Sidebar {}
 impl EventEmitter<OpenItem> for Sidebar {}
 impl EventEmitter<TreeChanged> for Sidebar {}
 impl EventEmitter<ShowAlerts> for Sidebar {}
+impl EventEmitter<NewProduct> for Sidebar {}
 
 impl Sidebar {
     pub fn new(cores: Cores, probe: Option<AttentionProbe>, cx: &mut Context<Self>) -> Self {
@@ -630,7 +635,32 @@ impl Sidebar {
             }
         }
         out.extend(self.archived_rows(&host, &scope, off, cx));
+        if !off {
+            out.push(self.new_product_row(&host, &scope, cx));
+        }
         out
+    }
+
+    /// The button at the end of a host group that opens the setup screen.
+    fn new_product_row(
+        &mut self,
+        host: &Option<String>,
+        scope: &str,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let host = host.clone();
+        div()
+            .id(ElementId::Name(format!("{scope}new-product").into()))
+            .debug_selector({
+                let id = format!("new-product:{scope}");
+                move || id
+            })
+            .cursor_pointer()
+            .pad_x(space(3))
+            .py(space(1))
+            .on_click(cx.listener(move |_, _, _, cx| cx.emit(NewProduct(host.clone()))))
+            .child(caption("New product"))
+            .into_any_element()
     }
 
     /// Shows or hides the archived products of a host. The choice is not saved.
@@ -1052,7 +1082,7 @@ mod tests {
         use crate::look::{self, Look};
         use crate::model::{CoreState, Cores, ProductRef, StorySessionItem};
         use crate::screens::meeting::{MeetingFeed, Meetings};
-        use crate::sidebar::{OpenItem, SelectProduct, Sidebar, TreeChanged};
+        use crate::sidebar::{NewProduct, OpenItem, SelectProduct, Sidebar, TreeChanged};
         use crate::tree::ItemKey;
 
         fn product(id: &str) -> ProductInfo {
@@ -1095,6 +1125,7 @@ mod tests {
             Select(ProductRef),
             Item(ProductRef, ItemKey),
             Tree,
+            New(Option<String>),
         }
 
         struct Tree {
@@ -1163,6 +1194,11 @@ mod tests {
                         t.borrow_mut()
                             .push(Told::Item(e.product.clone(), e.item.clone()))
                     }
+                })
+                .detach();
+                cx.subscribe(&sidebar, {
+                    let t = t.clone();
+                    move |_, e: &NewProduct, _| t.borrow_mut().push(Told::New(e.0.clone()))
                 })
                 .detach();
                 cx.subscribe(&sidebar, move |_, _: &TreeChanged, _| {
@@ -1413,6 +1449,14 @@ mod tests {
             assert!(at(cx, "tree-row:product-old").is_none());
             click(cx, "toggle-archived:");
             assert!(at(cx, "tree-row:archived-old").is_none());
+        }
+
+        #[gpui::test]
+        fn the_new_product_button_tells_the_shell_the_host(cx: &mut TestAppContext) {
+            let (t, cx) = tree(cx, "new-product");
+            assert!(at(cx, "new-product:").is_some());
+            click(cx, "new-product:");
+            assert_eq!(*t.told.borrow(), [Told::New(None)]);
         }
 
         #[gpui::test]

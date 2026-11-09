@@ -37,6 +37,10 @@ gpui_kit::actions!(
         OpenTickets,
         /// Opens the git screen of the active product.
         OpenGit,
+        /// Opens the setup screen for a new product, on the host of the active product.
+        NewProduct,
+        /// Opens the setup screen to update the brief of the active product.
+        UpdateBrief,
         /// Opens the meeting of the active product.
         OpenMeeting,
         /// Starts the meeting in the question field of the active product.
@@ -444,6 +448,18 @@ pub const ENTRIES: &[Entry] = &[
             "git", "branch", "commit", "stage", "unstage", "diff", "status", "history", "config",
         ],
         action: || Box::new(OpenGit),
+    },
+    Entry {
+        label: "Set up a new product",
+        icon: IconName::Plus,
+        keywords: &["setup", "new", "product", "register", "add", "brief", "folder"],
+        action: || Box::new(NewProduct),
+    },
+    Entry {
+        label: "Update the brief of the active product",
+        icon: IconName::FileText,
+        keywords: &["setup", "brief", "roster", "objectives", "stories", "update", "apply"],
+        action: || Box::new(UpdateBrief),
     },
     Entry {
         label: "Open the meeting of the active product",
