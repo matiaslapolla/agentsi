@@ -32,6 +32,8 @@ pub mod parts;
 pub mod roles;
 pub mod roles_report;
 pub mod settings;
+pub mod setup;
+pub mod setup_stage;
 pub mod stories;
 pub mod story;
 pub mod ticket;
@@ -80,6 +82,8 @@ pub enum ScreenKind {
     Tickets,
     /// One ticket. Its id is the argument of the panel.
     Ticket,
+    /// The setup of a new product, or of the brief of the product of the panel.
+    Setup,
 }
 
 impl ScreenKind {
@@ -99,6 +103,7 @@ impl ScreenKind {
             ScreenKind::Guide => "guide",
             ScreenKind::Tickets => "tickets",
             ScreenKind::Ticket => "ticket",
+            ScreenKind::Setup => "setup",
         }
     }
 
@@ -118,6 +123,7 @@ impl ScreenKind {
             "guide" => Some(ScreenKind::Guide),
             "tickets" => Some(ScreenKind::Tickets),
             "ticket" => Some(ScreenKind::Ticket),
+            "setup" => Some(ScreenKind::Setup),
             _ => None,
         }
     }
@@ -143,6 +149,7 @@ impl ScreenKind {
             ScreenKind::Guide => "Guide".into(),
             ScreenKind::Tickets => "Tickets".into(),
             ScreenKind::Ticket => arg.unwrap_or("Ticket").into(),
+            ScreenKind::Setup => "Setup".into(),
         }
     }
 }
@@ -208,6 +215,7 @@ enum ScreenView {
     Guide(Entity<guide::GuideScreen>),
     Tickets(Entity<tickets::TicketsScreen>),
     Ticket(Entity<ticket::TicketScreen>),
+    Setup(Entity<setup::SetupScreen>),
 }
 
 impl ScreenView {
@@ -260,6 +268,9 @@ impl ScreenView {
                 let id = spec.arg.clone().unwrap_or_default();
                 ScreenView::Ticket(cx.new(|cx| ticket::TicketScreen::new(product, id, core, cx)))
             }
+            ScreenKind::Setup => {
+                ScreenView::Setup(cx.new(|cx| setup::SetupScreen::new(product, core, cx)))
+            }
         }
     }
 
@@ -279,6 +290,7 @@ impl ScreenView {
             ScreenView::Guide(v) => v.clone().into(),
             ScreenView::Tickets(v) => v.clone().into(),
             ScreenView::Ticket(v) => v.clone().into(),
+            ScreenView::Setup(v) => v.clone().into(),
         }
     }
 
@@ -310,6 +322,7 @@ impl ScreenView {
             ScreenView::Git(v) => v.update(cx, |s, cx| s.reload(cx)),
             ScreenView::Tickets(v) => v.update(cx, |s, cx| s.reload(cx)),
             ScreenView::Ticket(v) => v.update(cx, |s, cx| s.reload(cx)),
+            ScreenView::Setup(v) => v.update(cx, |s, cx| s.reload(cx)),
             // The events keep this screen current.
             ScreenView::Meeting(_) => {}
             // The page is in the program.
@@ -580,6 +593,9 @@ impl Panel for ScreenPanel {
         if self.kind.of_no_product() {
             return div().child(self.kind.title(None));
         }
+        if self.kind == ScreenKind::Setup && self.product.is_empty() {
+            return div().child("Set up a product");
+        }
         let name = self
             .core
             .read(cx)
@@ -750,6 +766,7 @@ mod tests {
             ScreenKind::Guide,
             ScreenKind::Tickets,
             ScreenKind::Ticket,
+            ScreenKind::Setup,
         ] {
             assert_eq!(ScreenKind::parse(k.name()), Some(k));
         }
