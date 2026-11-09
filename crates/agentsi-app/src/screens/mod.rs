@@ -448,6 +448,20 @@ impl ScreenPanel {
         }
     }
 
+    /// Opens the form "New story" on a stories screen.
+    pub fn stories_new(&self, cx: &mut App) {
+        if let ScreenView::Stories(v) = &self.view {
+            v.update(cx, |s, cx| s.new_story(cx));
+        }
+    }
+
+    /// Calls `story.suggest` from a stories screen, after the Confirm of the menu.
+    pub fn stories_suggest(&self, cx: &mut App) {
+        if let ScreenView::Stories(v) = &self.view {
+            v.update(cx, |s, cx| s.run_suggest(cx));
+        }
+    }
+
     /// Shows or hides the context of the next meeting on a meeting screen.
     pub fn meeting_context(&self, cx: &mut App) {
         if let ScreenView::Meeting(v) = &self.view {

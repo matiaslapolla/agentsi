@@ -156,6 +156,14 @@ gpui_kit::actions!(
         OpenContextMenu,
         /// Asks for the text of a new story of the active product.
         NewStory,
+        /// The PM suggests stories for the active product, after one Confirm.
+        SuggestStories,
+        /// Archives the story of the screen in view.
+        ArchiveStorySession,
+        /// Restores the archived story of the screen in view.
+        RestoreStorySession,
+        /// Opens the form that records a merge of the story.
+        RecordStoryMerge,
         /// Asks for the title of a new ticket of the active product.
         NewTicket,
         /// Opens the ticket under the cursor of the tickets, or the ticket in view.
@@ -700,6 +708,30 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(CloseTabGroup),
     },
     Entry {
+        label: "Suggest stories for the active product",
+        icon: IconName::Bot,
+        keywords: &["story", "suggest", "pm", "propose"],
+        action: || Box::new(SuggestStories),
+    },
+    Entry {
+        label: "Archive the story",
+        icon: IconName::Folder,
+        keywords: &["story", "archive"],
+        action: || Box::new(ArchiveStorySession),
+    },
+    Entry {
+        label: "Restore the story",
+        icon: IconName::Folder,
+        keywords: &["story", "restore", "archive"],
+        action: || Box::new(RestoreStorySession),
+    },
+    Entry {
+        label: "Record a merge of the story",
+        icon: IconName::Check,
+        keywords: &["story", "merge", "commit", "result"],
+        action: || Box::new(RecordStoryMerge),
+    },
+    Entry {
         label: "New story in the active product",
         icon: IconName::Check,
         keywords: &["story", "task", "pm", "new", "propose"],
@@ -1061,6 +1093,10 @@ mod tests {
             "Ungroup the tab group of the active tab",
             "Close the tab group of the active tab",
             "New story in the active product",
+            "Suggest stories for the active product",
+            "Archive the story",
+            "Restore the story",
+            "Record a merge of the story",
             "New ticket for the active product",
             "Open the ticket under the cursor (tickets)",
             "Mark the ticket done (tickets)",

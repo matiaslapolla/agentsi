@@ -1,19 +1,21 @@
 //! One story (U23): its criteria, its session state, the diff of its branch, its log,
 //! and the review actions that are legal now. Approve writes at once. Changes, Discard,
 //! Run, Accept and Reject show what they will do first, and a click on Confirm does it.
-//! There is no text field: Changes takes its note from the clipboard, as the roles
-//! screen takes its stage folder.
+//! Changes opens a form with a note field and the check box "The PM rewrites the story".
+//! "Record a merge" opens a form with the commit. Archive and Restore write at once.
 
 use agentsi_proto::story_api::{
     Story, StoryAccept, StoryApprove, StoryChanges, StoryChangesParams, StoryConfig,
     StoryConfigGet, StoryConfigParams, StoryDiscard, StoryGet, StoryGetResult, StoryIdParams,
-    StoryReject, StoryRejectParams, StoryReview, StoryRun,
+    StoryReject, StoryRejectParams, StoryResultParams, StoryResultSet, StoryReview, StoryRun,
 };
+use agentsi_proto::marks_api::{ArchiveArchive, ArchiveKind, ArchiveParams, ArchiveRestore};
 use agentsi_ui::components::{Button, Card, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::form::{Form, FormEvent};
 use super::parts::{Load, column, first_screen_ready, mono, notice, section};
 use super::stories::story_tag;
 use crate::menus::{self, Target};
@@ -36,7 +38,7 @@ pub struct StoryData {
 /// An action that waits for the owner to confirm it.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Pending {
-    Changes(String),
+    Changes { note: String, rewrite: bool },
     Discard,
     Run,
     Accept,
@@ -52,6 +54,9 @@ pub struct StoryScreen {
     message: Option<Result<String, String>>,
     busy: bool,
     scroll: ScrollHandle,
+    /// The form that the next draw opens: "changes" or "merge".
+    want_form: Option<&'static str>,
+    form: Option<(Entity<Form>, Subscription)>,
 }
 
 /// What a pending action will do, in plain lines.
@@ -66,11 +71,15 @@ pub fn pending_lines(
         .map(|x| x.branch.clone())
         .unwrap_or_else(|| format!("story/{}-{}", s.id, s.slug));
     match p {
-        Pending::Changes(note) => (
+        Pending::Changes { note, rewrite } => (
             "Request changes".into(),
             vec![
                 format!("Note: {note}"),
-                "The approval becomes changes_requested. Run agentsi story changes to let the PM rewrite it.".into(),
+                if *rewrite {
+                    "The PM rewrites the story with the note. It calls the model, which costs money. The approval goes back to pending.".into()
+                } else {
+                    "The approval becomes changes_requested. Only the note is recorded.".into()
+                },
             ],
         ),
         Pending::Discard => (
@@ -132,6 +141,8 @@ impl StoryScreen {
             message: None,
             busy: false,
             scroll: ScrollHandle::new(),
+            want_form: None,
+            form: None,
         };
         screen.reload(cx);
         screen
@@ -204,29 +215,24 @@ impl StoryScreen {
     /// Starts an action: Approve at once, the others after a confirm.
     pub fn act(&mut self, action: &str, cx: &mut Context<Self>) {
         self.message = None;
-        let running = self.story().is_some_and(|s| {
-            s.session
-                .as_ref()
-                .is_some_and(|x| x.state != "ready" && x.state != "failed")
-        });
+        let running = self.story().is_some_and(running);
         self.pending = match action {
             "approve" => {
                 self.pending = None;
                 self.send(None, cx);
                 return;
             }
-            "changes" => {
-                let note = cx
-                    .read_from_clipboard()
-                    .and_then(|c| c.text())
-                    .map(|t| t.trim().to_string())
-                    .unwrap_or_default();
-                if note.is_empty() {
-                    self.message = Some(Err("Copy the note of the change request first.".into()));
-                    cx.notify();
-                    return;
-                }
-                Some(Pending::Changes(note))
+            "changes" | "merge" => {
+                self.pending = None;
+                self.want_form = Some(if action == "merge" { "merge" } else { "changes" });
+                self.form = None;
+                cx.notify();
+                return;
+            }
+            "archive" | "restore" => {
+                self.pending = None;
+                self.archive(action == "archive", cx);
+                return;
             }
             "discard" => Some(Pending::Discard),
             "run" => Some(Pending::Run),
@@ -251,12 +257,12 @@ impl StoryScreen {
                         .map_err(|e| e.to_string())
                 })
             }
-            Some(Pending::Changes(note)) => {
+            Some(Pending::Changes { note, rewrite }) => {
                 let call = link.call::<StoryChanges>(&StoryChangesParams {
                     product: p.product,
                     id: p.id,
                     note,
-                    rewrite: false,
+                    rewrite,
                 });
                 cx.background_spawn(async move {
                     call.await
@@ -309,6 +315,11 @@ impl StoryScreen {
                 })
             }
         };
+        self.finish(done, cx);
+    }
+
+    /// Waits for a write, shows its line and reads the story again.
+    fn finish(&mut self, done: Task<Result<String, String>>, cx: &mut Context<Self>) {
         self.busy = true;
         cx.spawn(async move |this, cx| {
             let result = done.await;
@@ -323,6 +334,103 @@ impl StoryScreen {
         cx.notify();
     }
 
+    /// `archive.archive` or `archive.restore` for the story.
+    fn archive(&mut self, archive: bool, cx: &mut Context<Self>) {
+        if self.busy {
+            return;
+        }
+        let params = ArchiveParams {
+            product: self.product.clone(),
+            kind: ArchiveKind::Story,
+            id: Some(self.id.clone()),
+        };
+        let link = self.core.read(cx).link.clone();
+        let id = self.id.clone();
+        let task = if archive {
+            let call = link.call::<ArchiveArchive>(&params);
+            cx.background_spawn(async move {
+                call.await
+                    .map(|_| format!("Archived {id}."))
+                    .map_err(|e| e.to_string())
+            })
+        } else {
+            let call = link.call::<ArchiveRestore>(&params);
+            cx.background_spawn(async move {
+                call.await
+                    .map(|_| format!("Restored {id}."))
+                    .map_err(|e| e.to_string())
+            })
+        };
+        self.finish(task, cx);
+    }
+
+    fn ensure_form(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(which) = self.want_form else {
+            return;
+        };
+        if self.form.is_some() {
+            return;
+        }
+        let form = cx.new(|cx| match which {
+            "merge" => Form::new("story-merge", "Record a merge", "Record the merge", cx)
+                .field("Commit", "The full commit hash", true, window, cx)
+                .pick("Result", &["merged unchanged", "merged with changes"]),
+            _ => Form::new("story-changes", "Request changes", "Review the request", cx)
+                .field("Note", "What should change?", true, window, cx)
+                .check("The PM rewrites the story", false),
+        });
+        let sub = cx.subscribe(&form, move |this, form, e: &FormEvent, cx| match e {
+            FormEvent::Submit => this.submit_form(which, &form, cx),
+            FormEvent::Cancel => this.close_form(cx),
+        });
+        form.update(cx, |f, cx| f.focus_first(window, cx));
+        self.form = Some((form, sub));
+    }
+
+    fn close_form(&mut self, cx: &mut Context<Self>) {
+        self.want_form = None;
+        self.form = None;
+        cx.notify();
+    }
+
+    fn submit_form(&mut self, which: &str, form: &Entity<Form>, cx: &mut Context<Self>) {
+        let (text, option, rewrite) = {
+            let f = form.read(cx);
+            let picked = if f.has_picks() { f.picked(0) } else { "" };
+            (f.value(0, cx), picked, f.has_checks() && f.checked(0))
+        };
+        self.close_form(cx);
+        if which == "merge" {
+            if self.busy {
+                return;
+            }
+            let kind = if option == "merged with changes" {
+                "merged_changed"
+            } else {
+                "merged_unchanged"
+            };
+            let call = self.core.read(cx).link.call::<StoryResultSet>(&StoryResultParams {
+                product: self.product.clone(),
+                id: self.id.clone(),
+                kind: kind.into(),
+                commit: text,
+            });
+            let id = self.id.clone();
+            let task = cx.background_spawn(async move {
+                call.await
+                    .map(|_| format!("Recorded the merge of {id}."))
+                    .map_err(|e| e.to_string())
+            });
+            self.finish(task, cx);
+        } else {
+            self.pending = Some(Pending::Changes {
+                note: text,
+                rewrite,
+            });
+            cx.notify();
+        }
+    }
+
     fn confirm(&mut self, cx: &mut Context<Self>) {
         if let Some(p) = self.pending.take() {
             self.send(Some(p), cx);
@@ -335,10 +443,17 @@ impl StoryScreen {
     }
 }
 
+/// A story session that has not ended. Archive is off while it runs.
+fn running(s: &Story) -> bool {
+    s.session
+        .as_ref()
+        .is_some_and(|x| x.state != "ready" && x.state != "failed")
+}
+
 fn label(action: &str) -> &'static str {
     match action {
         "approve" => "Approve",
-        "changes" => "Request changes (note from the clipboard)",
+        "changes" => "Request changes",
         "discard" => "Discard",
         "run" => "Run the story session",
         "accept" => "Accept and merge",
@@ -415,6 +530,29 @@ impl StoryScreen {
                             .disabled(busy)
                             .on_click(cx.listener(move |this, _, _, cx| this.act(&action, cx)))
                     }))
+                    .child(
+                        Button::new("story-merge")
+                            .secondary()
+                            .small()
+                            .label("Record a merge")
+                            .disabled(busy || s.status == "implemented")
+                            .on_click(cx.listener(|this, _, _, cx| this.act("merge", cx))),
+                    )
+                    .child(if d.get.archived {
+                        Button::new("story-restore")
+                            .secondary()
+                            .small()
+                            .label("Restore")
+                            .disabled(busy)
+                            .on_click(cx.listener(|this, _, _, cx| this.act("restore", cx)))
+                    } else {
+                        Button::new("story-archive")
+                            .secondary()
+                            .small()
+                            .label("Archive")
+                            .disabled(busy || running(s))
+                            .on_click(cx.listener(|this, _, _, cx| this.act("archive", cx)))
+                    })
                     .child(
                         Button::new("story-reload")
                             .ghost()
@@ -614,7 +752,9 @@ fn results_block(s: &Story) -> Option<Div> {
 }
 
 impl Render for StoryScreen {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.ensure_form(window, cx);
+        let form = self.form.as_ref().map(|(f, _)| f.clone());
         let (product, id) = (self.product(cx), self.id.clone());
         let root = div()
             .id("story-screen")
@@ -644,6 +784,7 @@ impl Render for StoryScreen {
                 .child(self.header(&d, cx))
                 .children(message)
                 .children(self.pending_card(&d, cx))
+                .children(form)
                 .child(want(s))
                 .child(criteria(s))
                 .children(session_block(&d))
@@ -718,6 +859,97 @@ mod tests {
         assert_eq!(
             (skipped, lines),
             (1, vec!["b".to_string(), "c".to_string()])
+        );
+    }
+
+    fn request(other: &mut std::os::unix::net::UnixStream) -> Option<serde_json::Value> {
+        other.set_nonblocking(true).unwrap();
+        loop {
+            let f = agentsi_proto::frame::read_frame(other).ok().flatten()?;
+            let v: serde_json::Value = serde_json::from_slice(&f.payload).ok()?;
+            if !["story.get", "story.config", "story.review"]
+                .contains(&v["method"].as_str().unwrap_or_default())
+            {
+                return Some(v);
+            }
+        }
+    }
+
+    fn screen(
+        cx: &mut gpui::TestAppContext,
+    ) -> (
+        gpui::Entity<super::StoryScreen>,
+        std::os::unix::net::UnixStream,
+        &mut gpui::VisualTestContext,
+    ) {
+        use gpui_kit::AppContext as _;
+        cx.update(agentsi_ui::init);
+        let (end, other) = std::os::unix::net::UnixStream::pair().unwrap();
+        let core = cx.new(|_| {
+            crate::model::CoreState::new(std::sync::Arc::new(crate::link::Link::for_tests(end)))
+        });
+        let (screen, cx) = cx.add_window_view(|_, cx| {
+            super::StoryScreen::new("demo".into(), "S001".into(), core, cx)
+        });
+        (screen, other, cx)
+    }
+
+    #[gpui::test]
+    fn changes_opens_a_form_and_the_rewrite_box_reaches_the_confirm_and_the_call(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let (screen, mut other, cx) = screen(cx);
+        screen.update(cx, |s, cx| s.act("changes", cx));
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let form = screen.read_with(cx, |s, _| s.form.as_ref().expect("a form").0.clone());
+        form.update_in(cx, |f, w, cx| {
+            f.set_value(0, "Add a test", w, cx);
+            f.set_checked(0, true, cx);
+            f.submit(cx);
+        });
+        assert!(request(&mut other).is_none(), "the Confirm comes first");
+        assert_eq!(
+            screen.read_with(cx, |s, _| s.pending.clone()),
+            Some(Pending::Changes {
+                note: "Add a test".into(),
+                rewrite: true
+            })
+        );
+        screen.update(cx, |s, cx| s.confirm(cx));
+        let r = request(&mut other).expect("story.changes");
+        assert_eq!(r["method"], "story.changes");
+        assert_eq!(r["params"]["rewrite"], true);
+        assert_eq!(r["params"]["note"], "Add a test");
+    }
+
+    #[gpui::test]
+    fn archive_restore_and_record_a_merge_call_their_methods(cx: &mut gpui::TestAppContext) {
+        let (screen, mut other, cx) = screen(cx);
+        screen.update(cx, |s, cx| s.act("archive", cx));
+        let r = request(&mut other).unwrap();
+        assert_eq!(r["method"], "archive.archive");
+        assert_eq!(
+            r["params"],
+            serde_json::json!({"product": "demo", "kind": "story", "id": "S001"})
+        );
+        screen.update(cx, |s, _| s.busy = false);
+        screen.update(cx, |s, cx| s.act("restore", cx));
+        assert_eq!(request(&mut other).unwrap()["method"], "archive.restore");
+        screen.update(cx, |s, _| s.busy = false);
+
+        screen.update(cx, |s, cx| s.act("merge", cx));
+        cx.update(|window, cx| window.draw(cx).clear(cx));
+        let form = screen.read_with(cx, |s, _| s.form.as_ref().unwrap().0.clone());
+        form.update_in(cx, |f, w, cx| {
+            f.set_value(0, "abc123", w, cx);
+            f.select(0, 1, cx);
+            f.submit(cx);
+        });
+        let r = request(&mut other).unwrap();
+        assert_eq!(r["method"], "story.result");
+        assert_eq!(
+            r["params"],
+            serde_json::json!({"product": "demo", "id": "S001", "kind": "merged_changed", "commit": "abc123"})
         );
     }
 }

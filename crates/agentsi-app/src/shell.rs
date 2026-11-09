@@ -115,8 +115,6 @@ pub enum Ask {
     /// The one Confirm before tabs close while a program runs in some of them: the tabs, and the
     /// number that run a program.
     CloseTabs(Vec<PanelId>, usize),
-    /// The text of a new story for this product.
-    NewStory(ProductRef),
     /// The title of a new ticket for this product.
     NewTicket(ProductRef),
     /// What the ticket waits on: the product and the ticket id.
