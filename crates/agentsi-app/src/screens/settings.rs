@@ -608,7 +608,7 @@ impl SettingsScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child("Speech models mishear names. When a dictation has a heard form, the app types the term instead. Whole words only, any case."),
             )
             .children(rows)
@@ -779,7 +779,7 @@ impl SettingsScreen {
                 let shown = if waiting == Some(id) {
                     div()
                         .text_size(size::sm())
-                        .text_color(accent::BASE)
+                        .text_color(accent::base())
                         .child("Press the new key. Escape cancels.")
                         .into_any_element()
                 } else {
@@ -841,7 +841,7 @@ impl SettingsScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child("Change a key and it works at once. A key needs Ctrl, Alt or Super, unless it is a function key."),
             )
             .children(problems.into_iter().map(|p| {
@@ -856,7 +856,7 @@ impl SettingsScreen {
                 el.child(
                     div()
                         .text_size(size::sm())
-                        .text_color(text::SECONDARY)
+                        .text_color(text::secondary())
                         .child("No key matches the filter."),
                 )
             })
@@ -944,7 +944,7 @@ impl SettingsScreen {
                                 div()
                                     .text_size(size::md())
                                     .font_weight(weight::SEMIBOLD)
-                                    .text_color(text::PRIMARY)
+                                    .text_color(text::primary())
                                     .child(m.name.clone()),
                             )
                             .child(tag),
@@ -954,7 +954,7 @@ impl SettingsScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child(m.description.clone()),
             )
             .child(mono(format!(
@@ -972,7 +972,7 @@ impl SettingsScreen {
                         .text_color(if failed {
                             Status::Danger.color()
                         } else {
-                            text::SECONDARY
+                            text::secondary()
                         })
                         .child(d),
                 )
@@ -995,13 +995,13 @@ fn bar(fraction: f32) -> Div {
         .w_full()
         .h(space(1))
         .rounded(radius::FULL)
-        .bg(line::BORDER)
+        .bg(line::border())
         .child(
             div()
                 .h_full()
                 .w(relative(fraction))
                 .rounded(radius::FULL)
-                .bg(accent::BASE),
+                .bg(accent::base()),
         )
 }
 
@@ -1014,11 +1014,11 @@ fn pair(label: impl Into<SharedString>, value: impl IntoElement) -> Div {
         .gap(space(4))
         .py(space(2))
         .border_b_1()
-        .border_color(line::BORDER)
+        .border_color(line::border())
         .child(
             div()
                 .text_size(size::base())
-                .text_color(text::PRIMARY)
+                .text_color(text::primary())
                 .child(label.into()),
         )
         .child(value)
@@ -1035,7 +1035,7 @@ fn voice_rows(v: &VoicesResult) -> Div {
                 div()
                     .font_family(font::MONO)
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child(voice.to_string()),
             )
             .when_some(note.cloned(), |el, n| {
@@ -1089,7 +1089,7 @@ fn host_value(h: &RemoteHost) -> Div {
         .children(why.into_iter().chain(h.note.clone()).map(|t| {
             div()
                 .text_size(size::xs())
-                .text_color(text::TERTIARY)
+                .text_color(text::tertiary())
                 .child(t)
         }))
 }
@@ -1108,7 +1108,7 @@ fn host_rows(h: &Hosts) -> Div {
                 div()
                     .py(space(2))
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .child("No SSH hosts. Add a [[host]] table to the file below."),
             )
         })
@@ -1134,7 +1134,7 @@ impl Render for SettingsScreen {
             .id("settings")
             .debug_selector(|| "settings-root".into())
             .size_full()
-            .bg(surface::PANEL)
+            .bg(surface::panel())
             // A click outside the row that waits ends the capture.
             .on_mouse_down(
                 MouseButton::Left,
@@ -1188,13 +1188,13 @@ impl Render for SettingsScreen {
                             div()
                                 .text_size(size::lg())
                                 .font_weight(weight::SEMIBOLD)
-                                .text_color(text::PRIMARY)
+                                .text_color(text::primary())
                                 .child("Settings"),
                         )
                         .child(
                             div()
                                 .text_size(size::sm())
-                                .text_color(text::SECONDARY)
+                                .text_color(text::secondary())
                                 .child("The look of the app, voice models, voices, the vocabulary and the keys of this device, its SSH hosts, and the data to delete."),
                         ),
                 )

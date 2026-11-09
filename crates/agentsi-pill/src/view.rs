@@ -286,9 +286,9 @@ impl Render for PillView {
             .justify_center()
             .gap(space(1))
             .rounded(radius::FULL)
-            .bg(surface::OVERLAY.alpha(0.92))
+            .bg(surface::overlay().alpha(0.92))
             .border_1()
-            .border_color(tokens::line::STRONG.hsla())
+            .border_color(tokens::line::strong().hsla())
             .cursor_pointer()
             .when(conversing, |el| el.child(conversation_mark()))
             .child(content)
@@ -326,7 +326,7 @@ fn bars(phase: Phase, t: f32) -> impl IntoElement {
             };
             bar(
                 space(1) * level.round(),
-                tokens::accent::BASE,
+                tokens::accent::base(),
                 if speaking { 1.0 } else { 0.6 },
             )
         }))
@@ -340,7 +340,7 @@ fn listening(t: f32, toggle: bool) -> impl IntoElement {
     let dot = div()
         .size(space(3))
         .rounded(radius::FULL)
-        .bg(status::DANGER.alpha(pulse));
+        .bg(status::danger().alpha(pulse));
     div()
         .flex()
         .items_center()
@@ -353,7 +353,7 @@ fn listening(t: f32, toggle: bool) -> impl IntoElement {
                 .justify_center()
                 .rounded(radius::FULL)
                 .border_1()
-                .border_color(status::DANGER.alpha(0.8))
+                .border_color(status::danger().alpha(0.8))
                 .child(dot)
                 .into_any_element()
         } else {
@@ -370,7 +370,7 @@ fn listening(t: f32, toggle: bool) -> impl IntoElement {
                         + 4.0
                             * (0.5 + 0.5 * (t * 6.0 + i * 1.3).sin())
                             * (0.6 + 0.4 * (t * 2.3 + i).sin().abs());
-                    bar(space(1) * level.round(), text::PRIMARY, 0.85)
+                    bar(space(1) * level.round(), text::primary(), 0.85)
                 })),
         )
 }
@@ -386,7 +386,7 @@ fn dots(t: f32) -> impl IntoElement {
             div()
                 .size(space(2))
                 .rounded(radius::FULL)
-                .bg(tokens::accent::BASE.alpha(if i == lit { 1.0 } else { 0.35 }))
+                .bg(tokens::accent::base().alpha(if i == lit { 1.0 } else { 0.35 }))
         }))
 }
 
@@ -401,7 +401,7 @@ fn waiting() -> impl IntoElement {
             div()
                 .size(space(2))
                 .rounded(radius::FULL)
-                .bg(tokens::accent::BASE.alpha(0.5))
+                .bg(tokens::accent::base().alpha(0.5))
         }))
 }
 
@@ -417,12 +417,12 @@ fn conversation_mark() -> impl IntoElement {
         .gap(space(1))
         .rounded(radius::sm())
         .border_1()
-        .border_color(tokens::accent::BASE.alpha(0.9))
+        .border_color(tokens::accent::base().alpha(0.9))
         .children((0..2).map(|_| {
             div()
                 .size(space(1))
                 .rounded(radius::FULL)
-                .bg(tokens::accent::BASE.alpha(0.9))
+                .bg(tokens::accent::base().alpha(0.9))
         }))
 }
 
@@ -437,13 +437,13 @@ fn error_line(message: &str) -> impl IntoElement {
                 .size(space(2))
                 .flex_none()
                 .rounded(radius::FULL)
-                .bg(status::DANGER.hsla()),
+                .bg(status::danger().hsla()),
         )
         .child(
             div()
                 .text_size(size::sm())
                 .font_family(font::UI)
-                .text_color(text::PRIMARY.hsla())
+                .text_color(text::primary().hsla())
                 .overflow_hidden()
                 .text_ellipsis()
                 .whitespace_nowrap()

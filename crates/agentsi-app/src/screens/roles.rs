@@ -343,7 +343,7 @@ impl RolesScreen {
                         div()
                             .text_size(size::md())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child(role_label(&e.id)),
                     )
                     .child(mono(e.id.clone()))
@@ -355,7 +355,7 @@ impl RolesScreen {
                 el.child(
                     div()
                         .text_size(size::sm())
-                        .text_color(text::SECONDARY)
+                        .text_color(text::secondary())
                         .child(error),
                 )
             })
@@ -367,7 +367,7 @@ impl RolesScreen {
                     el.child(
                         div()
                             .text_size(size::sm())
-                            .text_color(text::SECONDARY)
+                            .text_color(text::secondary())
                             .child(why),
                     )
                 },
@@ -406,8 +406,8 @@ impl RolesScreen {
                 .p(space(4))
                 .rounded(radius::lg())
                 .border_1()
-                .border_color(line::BORDER)
-                .bg(surface::RAISED)
+                .border_color(line::border())
+                .bg(surface::raised())
                 .child(section(&title, None))
                 .child(line_list(&lines))
                 .child(
@@ -455,7 +455,7 @@ impl RolesScreen {
 
 impl Render for RolesScreen {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let root = div().id("roles-screen").size_full().bg(surface::PANEL);
+        let root = div().id("roles-screen").size_full().bg(surface::panel());
         let r = match &self.data {
             Load::Loading => {
                 return root.child(notice("Reading the roles…", None));
@@ -492,7 +492,7 @@ impl Render for RolesScreen {
                         div()
                             .text_size(size::xl())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child("Roles"),
                     )
                     .child(mono(format!(
@@ -553,7 +553,7 @@ impl Render for RolesScreen {
                     el.child(
                         div()
                             .text_size(size::sm())
-                            .text_color(text::TERTIARY)
+                            .text_color(text::tertiary())
                             .child(empty.to_string()),
                     )
                 })

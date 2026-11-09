@@ -609,7 +609,7 @@ impl SettingsScreen {
         let line = |why: String| {
             div()
                 .text_size(size::sm())
-                .text_color(text::SECONDARY)
+                .text_color(text::secondary())
                 .child(why)
         };
         let env = match &d.env {
@@ -636,7 +636,7 @@ impl SettingsScreen {
         let shown = if d.waiting() {
             div()
                 .text_size(size::sm())
-                .text_color(accent::BASE)
+                .text_color(accent::base())
                 .child("Press the new key. Escape cancels.")
                 .into_any_element()
         } else {
@@ -672,7 +672,7 @@ impl SettingsScreen {
         let converse_shown = if converse_waiting {
             div()
                 .text_size(size::sm())
-                .text_color(accent::BASE)
+                .text_color(accent::base())
                 .child("Press the new key. Escape cancels.")
                 .into_any_element()
         } else {

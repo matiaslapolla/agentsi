@@ -16,8 +16,8 @@ const NAME_WIDTH: Pixels = px(160.);
 /// The fill of the chip for the pointer look.
 fn fill_of(look: Look, hue: Option<Hue>) -> Color {
     let (rest, hover) = match hue {
-        Some(h) => (h.tint(), h.tint_over(surface::OVERLAY)),
-        None => (surface::RAISED, surface::OVERLAY),
+        Some(h) => (h.tint(), h.tint_over(surface::overlay())),
+        None => (surface::raised(), surface::overlay()),
     };
     match look {
         Look::Rest => rest,
@@ -94,7 +94,7 @@ impl RenderOnce for TabChip {
         let state = use_interaction(&self.id, false, window, cx);
         let (look, _) = look(&state, self.force, false, window, cx);
         let fill = fade(&self.id, "fill", fill_of(look, self.hue).hsla(), window, cx);
-        let ink = self.hue.map_or(text::SECONDARY, Hue::color);
+        let ink = self.hue.map_or(text::secondary(), Hue::color);
         let selector = format!("tab-chip:{}", self.id);
         let el = div()
             .id(self.id.clone())

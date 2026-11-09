@@ -196,6 +196,6 @@ pub(crate) fn focus_ring(on: bool, r: Pixels) -> Option<Div> {
             .bottom(-w)
             .rounded(r + w)
             .border(w)
-            .border_color(line::FOCUS.hsla())
+            .border_color(line::focus().hsla())
     })
 }

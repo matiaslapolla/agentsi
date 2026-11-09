@@ -320,7 +320,7 @@ fn revert_line(m: &MemoryChange) -> String {
 fn small(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::sm())
-        .text_color(text::SECONDARY)
+        .text_color(text::secondary())
         .child(s.into())
 }
 
@@ -357,7 +357,7 @@ fn item_text(i: &MemoryEntry) -> Div {
             div().flex().gap(space(2)).child(mono(i.id.clone())).child(
                 div()
                     .text_size(size::base())
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child(i.text.clone()),
             ),
         )
@@ -382,8 +382,8 @@ fn code_block(body: &str) -> Div {
         .p(space(3))
         .rounded(radius::md())
         .border_1()
-        .border_color(line::BORDER)
-        .bg(surface::RAISED)
+        .border_color(line::border())
+        .bg(surface::raised())
         .children(body.trim_end().lines().map(|l| mono(l.to_string())))
 }
 
@@ -496,7 +496,7 @@ impl MemoryScreen {
                         div()
                             .text_size(size::base())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child(format!("Prompt of {}", role_label(&p.agent))),
                     )
                     .child(mono(p.target.clone()))
@@ -618,8 +618,8 @@ impl MemoryScreen {
                 .p(space(4))
                 .rounded(radius::lg())
                 .border_1()
-                .border_color(line::BORDER)
-                .bg(surface::RAISED)
+                .border_color(line::border())
+                .bg(surface::raised())
                 .child(section(&title, None))
                 .children(self.pending_lines().into_iter().map(mono))
                 .child(small(body))
@@ -655,7 +655,7 @@ impl Render for MemoryScreen {
             .key_context("Memory")
             .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.key_down(e, cx)))
             .size_full()
-            .bg(surface::PANEL);
+            .bg(surface::panel());
         let d = match &self.data {
             Load::Loading => return root.child(notice("Reading the memory…", None)),
             Load::Failed(e) => {
@@ -676,7 +676,7 @@ impl Render for MemoryScreen {
                 div()
                     .text_size(size::xl())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child("Memory"),
             )
             .child(mono(format!(

@@ -24,7 +24,7 @@ impl SettingsScreen {
                     .child(
                         div()
                             .text_size(size::sm())
-                            .text_color(text::SECONDARY)
+                            .text_color(text::secondary())
                             .child("How to install, start and use AgentSI. It opens in a tab."),
                     )
                     .child(

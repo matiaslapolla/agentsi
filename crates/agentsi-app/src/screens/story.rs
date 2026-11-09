@@ -349,7 +349,7 @@ fn label(action: &str) -> &'static str {
 fn text_block(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::sm())
-        .text_color(text::SECONDARY)
+        .text_color(text::secondary())
         .child(s.into())
 }
 
@@ -382,7 +382,7 @@ impl StoryScreen {
                         div()
                             .text_size(size::xl())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child(s.title.clone()),
                     )
                     .child(mono(format!(
@@ -436,8 +436,8 @@ impl StoryScreen {
                 .p(space(4))
                 .rounded(radius::lg())
                 .border_1()
-                .border_color(line::BORDER)
-                .bg(surface::RAISED)
+                .border_color(line::border())
+                .bg(surface::raised())
                 .child(section(&title, None))
                 .child(lines_block(&lines))
                 .child(
@@ -561,8 +561,8 @@ fn diff_block(d: &StoryData) -> Option<Div> {
                     .p(space(3))
                     .rounded(radius::lg())
                     .border_1()
-                    .border_color(line::BORDER)
-                    .bg(surface::RAISED)
+                    .border_color(line::border())
+                    .bg(surface::raised())
                     .child(lines_block(shown)),
             )
             .when(more > 0, |el| {
@@ -620,7 +620,7 @@ impl Render for StoryScreen {
             .id("story-screen")
             .debug_selector(|| "story-screen".into())
             .size_full()
-            .bg(surface::PANEL)
+            .bg(surface::panel())
             .on_mouse_down(MouseButton::Right, move |e, _, cx| {
                 menus::request(cx, Target::Story(product.clone(), id.clone()), e.position)
             });

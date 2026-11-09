@@ -624,12 +624,12 @@ impl MeetingScreen {
             .flex_none()
             .pad_x(space(4))
             .border_b_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .child(
                 div()
                     .text_size(size::md())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child("Meeting"),
             )
             .when_some(run, |el, r| {
@@ -639,7 +639,7 @@ impl MeetingScreen {
                         .min_w_0()
                         .truncate()
                         .text_size(size::sm())
-                        .text_color(text::TERTIARY)
+                        .text_color(text::tertiary())
                         .child(status_line(r)),
                 )
             })
@@ -698,7 +698,7 @@ impl MeetingScreen {
             .gap(space(2))
             .p(space(4))
             .border_b_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
             .child(
                 div()
                     .flex()
@@ -717,11 +717,11 @@ impl MeetingScreen {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::TERTIARY)
+                    .text_color(text::tertiary())
                     .child("A meeting runs one Claude call for each role, then the synthesis. It costs money and takes minutes."),
             )
             .when_some(self.message.clone(), |el, m| {
-                el.child(div().text_size(size::sm()).text_color(text::SECONDARY).child(m))
+                el.child(div().text_size(size::sm()).text_color(text::secondary()).child(m))
             })
     }
 
@@ -740,8 +740,8 @@ impl MeetingScreen {
             .min_w_0()
             .rounded(radius::lg())
             .border_1()
-            .border_color(line::BORDER)
-            .bg(surface::RAISED)
+            .border_color(line::border())
+            .bg(surface::raised())
             .child(
                 div()
                     .flex()
@@ -750,7 +750,7 @@ impl MeetingScreen {
                     .gap(space(2))
                     .p(space(2))
                     .border_b_1()
-                    .border_color(line::BORDER)
+                    .border_color(line::border())
                     .child(
                         div()
                             .flex_1()
@@ -758,13 +758,13 @@ impl MeetingScreen {
                             .truncate()
                             .font_family(font::MONO)
                             .text_size(size::sm())
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child(pane.role.clone()),
                     )
                     .child(
                         div()
                             .text_size(size::xs())
-                            .text_color(text::TERTIARY)
+                            .text_color(text::tertiary())
                             .child(pane_figures(pane)),
                     )
                     .child(pane_tag(&pane.state)),
@@ -781,12 +781,12 @@ impl MeetingScreen {
                     .gap(space(1))
                     .p(space(2))
                     .text_size(size::sm())
-                    .text_color(text::SECONDARY)
+                    .text_color(text::secondary())
                     .children(pane.lines.iter().map(|l| div().child(l.clone())))
                     .when(empty, |el| {
                         el.child(
                             div()
-                                .text_color(text::TERTIARY)
+                                .text_color(text::tertiary())
                                 .child("Waiting for the first line…"),
                         )
                     })
@@ -841,7 +841,7 @@ impl Render for MeetingScreen {
             .size_full()
             .flex()
             .flex_col()
-            .bg(surface::PANEL)
+            .bg(surface::panel())
             .on_mouse_down(MouseButton::Right, move |e, _, cx| {
                 menus::request(cx, Target::Meeting(product.clone()), e.position)
             })
@@ -873,7 +873,7 @@ impl Render for MeetingScreen {
                 .pad_x(space(4))
                 .pt(space(2))
                 .text_size(size::sm())
-                .text_color(text::SECONDARY)
+                .text_color(text::secondary())
                 .children(notes.into_iter().map(|n| div().child(n))),
         )
         .child(self.panes(&run))

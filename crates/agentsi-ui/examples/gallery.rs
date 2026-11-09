@@ -59,7 +59,7 @@ fn label(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::xs())
         .font_weight(weight::MEDIUM)
-        .text_color(text::TERTIARY.hsla())
+        .text_color(text::tertiary().hsla())
         .child(s.into())
 }
 
@@ -68,7 +68,7 @@ fn section(title: &'static str) -> Div {
         div()
             .text_size(size::md())
             .font_weight(weight::SEMIBOLD)
-            .text_color(text::PRIMARY.hsla())
+            .text_color(text::primary().hsla())
             .child(title),
     )
 }
@@ -84,20 +84,20 @@ fn swatch(name: &'static str, c: Color) -> Div {
                 .h(space(8))
                 .rounded(radius::md())
                 .border_1()
-                .border_color(line::BORDER.hsla())
+                .border_color(line::border().hsla())
                 .bg(c.hsla()),
         )
         .child(
             div()
                 .text_size(size::xs())
-                .text_color(text::SECONDARY.hsla())
+                .text_color(text::secondary().hsla())
                 .child(name),
         )
         .child(
             div()
                 .text_size(size::xs())
                 .font_family(font::MONO)
-                .text_color(text::TERTIARY.hsla())
+                .text_color(text::tertiary().hsla())
                 .child(format!("#{:06x}", c.0)),
         )
 }
@@ -154,7 +154,7 @@ impl StatesPanel {
                     div()
                         .w(px(110.))
                         .text_size(size::sm())
-                        .text_color(text::SECONDARY.hsla())
+                        .text_color(text::secondary().hsla())
                         .child(name),
                 )
                 .children(
@@ -313,11 +313,11 @@ impl StatesPanel {
                         .child(div().text_size(size::xl()).font_weight(weight::SEMIBOLD).child("Front desk 28"))
                         .child(div().text_size(size::lg()).font_weight(weight::SEMIBOLD).child("Pending decisions 20"))
                         .child(div().text_size(size::md()).font_weight(weight::SEMIBOLD).child("Import the Postgres data first 16"))
-                        .child(div().text_size(size::base()).text_color(text::SECONDARY.hsla()).child(
+                        .child(div().text_size(size::base()).text_color(text::secondary().hsla()).child(
                             "Body 14: the core reads SQLite only. The import keeps the row count of each table.",
                         ))
-                        .child(div().text_size(size::sm()).text_color(text::SECONDARY.hsla()).child("List 13: 3 priorities, 2 decisions"))
-                        .child(div().text_size(size::xs()).text_color(text::TERTIARY.hsla()).child("Meta 12: docs/specs/agentsi-desktop-ui.md"))
+                        .child(div().text_size(size::sm()).text_color(text::secondary().hsla()).child("List 13: 3 priorities, 2 decisions"))
+                        .child(div().text_size(size::xs()).text_color(text::tertiary().hsla()).child("Meta 12: docs/specs/agentsi-desktop-ui.md"))
                         .child(
                             div()
                                 .font_family(font::MONO)
@@ -333,13 +333,13 @@ impl StatesPanel {
                         .flex()
                         .flex_wrap()
                         .gap(space(3))
-                        .child(swatch("BASE", surface::BASE))
-                        .child(swatch("PANEL", surface::PANEL))
-                        .child(swatch("RAISED", surface::RAISED))
-                        .child(swatch("OVERLAY", surface::OVERLAY))
-                        .child(swatch("text PRIMARY", text::PRIMARY))
-                        .child(swatch("text SECONDARY", text::SECONDARY))
-                        .child(swatch("text TERTIARY", text::TERTIARY)),
+                        .child(swatch("BASE", surface::base()))
+                        .child(swatch("PANEL", surface::panel()))
+                        .child(swatch("RAISED", surface::raised()))
+                        .child(swatch("OVERLAY", surface::overlay()))
+                        .child(swatch("text PRIMARY", text::primary()))
+                        .child(swatch("text SECONDARY", text::secondary()))
+                        .child(swatch("text TERTIARY", text::tertiary())),
                 ),
             )
             .child(
@@ -348,10 +348,10 @@ impl StatesPanel {
                         .flex()
                         .flex_wrap()
                         .gap(space(3))
-                        .child(swatch("accent", accent::BASE))
-                        .child(swatch("accent HOVER", accent::HOVER))
+                        .child(swatch("accent", accent::base()))
+                        .child(swatch("accent HOVER", accent::hover()))
                         .child(swatch("accent SUBTLE", accent::subtle()))
-                        .child(swatch("line BORDER", line::BORDER))
+                        .child(swatch("line BORDER", line::border()))
                         .children(Status::ALL.iter().map(|s| swatch(s.label(), s.color()))),
                 ),
             )
@@ -406,7 +406,7 @@ impl StatesPanel {
                                 .child(
                                     div()
                                         .text_size(size::sm())
-                                        .text_color(text::SECONDARY.hsla())
+                                        .text_color(text::secondary().hsla())
                                         .child("macbook · device off"),
                                 ),
                         )
@@ -445,7 +445,7 @@ impl Render for LivePanel {
                                         cx.notify();
                                     },
                                 )))
-                                .child(div().text_size(size::sm()).text_color(text::SECONDARY.hsla()).child(if voice_on { "Voice on" } else { "Voice off" })),
+                                .child(div().text_size(size::sm()).text_color(text::secondary().hsla()).child(if voice_on { "Voice on" } else { "Voice off" })),
                         ),
                 )
                 .child(
@@ -453,7 +453,7 @@ impl Render for LivePanel {
                         .on_click(|_, _, _| {})
                         .child(div().flex().justify_between().child(neutral_tag("Decision · Dev")).child(label("docs/ideas/agentsi-desktop.md")))
                         .child(div().text_size(size::md()).font_weight(weight::SEMIBOLD).child("Import the Postgres data before the switch-over"))
-                        .child(div().text_size(size::sm()).text_color(text::SECONDARY.hsla()).child(
+                        .child(div().text_size(size::sm()).text_color(text::secondary().hsla()).child(
                             "The Rust core reads SQLite only. The import must keep the row count of each table.",
                         )),
                 ),
@@ -480,8 +480,8 @@ impl Render for MinutesList {
             .flex_col()
             .rounded(radius::lg())
             .border_1()
-            .border_color(line::BORDER.hsla())
-            .bg(surface::PANEL.hsla())
+            .border_color(line::border().hsla())
+            .bg(surface::panel().hsla())
             .overflow_hidden()
             .child(
                 div()
@@ -491,7 +491,7 @@ impl Render for MinutesList {
                     .px(space(4))
                     .h(px(40.))
                     .border_b_1()
-                    .border_color(line::BORDER.hsla())
+                    .border_color(line::border().hsla())
                     .child(
                         div()
                             .text_size(size::sm())
@@ -545,7 +545,7 @@ impl Render for StatesPanel {
                     .flex_col()
                     .gap(space(1))
                     .child(div().text_size(size::xl()).font_weight(weight::SEMIBOLD).child("agentsi-ui"))
-                    .child(div().text_size(size::base()).text_color(text::SECONDARY.hsla()).child(
+                    .child(div().text_size(size::base()).text_color(text::secondary().hsla()).child(
                         "Tokens and components of the AgentSI app. Each transition is 120 ms ease-out.",
                     )),
             )
@@ -561,8 +561,8 @@ impl Render for Gallery {
         div()
             .size_full()
             .flex()
-            .bg(surface::PANEL.hsla())
-            .text_color(text::PRIMARY.hsla())
+            .bg(surface::panel().hsla())
+            .text_color(text::primary().hsla())
             .font_family(font::UI)
             .text_size(size::base())
             .when_some(self.bench.as_ref(), |el, b| el.child(b.marker()))
@@ -582,9 +582,9 @@ impl Render for Gallery {
                     .flex_none()
                     .gap(space(6))
                     .p(space(6))
-                    .bg(surface::BASE.hsla())
+                    .bg(surface::base().hsla())
                     .border_l_1()
-                    .border_color(line::BORDER.hsla())
+                    .border_color(line::border().hsla())
                     .child(
                         div()
                             .w_full()

@@ -13,9 +13,9 @@ type ChangeHandler = Rc<dyn Fn(&bool, &mut Window, &mut App)>;
 /// The track color of a switch in one look.
 pub(crate) fn track(checked: bool, look: Look) -> Color {
     match (checked, look) {
-        (true, Look::Rest) => accent::BASE,
-        (true, Look::Hover) => accent::HOVER,
-        (true, Look::Pressed) => accent::PRESSED,
+        (true, Look::Rest) => accent::base(),
+        (true, Look::Hover) => accent::hover(),
+        (true, Look::Pressed) => accent::pressed(),
         (false, Look::Rest) => switch::track(),
         (false, Look::Hover) => switch::track_hover(),
         (false, Look::Pressed) => switch::track_pressed(),

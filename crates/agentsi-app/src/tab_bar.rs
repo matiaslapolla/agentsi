@@ -281,10 +281,10 @@ impl Render for TabPreview {
             .overflow_hidden()
             .whitespace_nowrap()
             .border_1()
-            .border_color(line::STRONG)
+            .border_color(line::strong())
             .rounded(radius::md())
-            .bg(surface::OVERLAY)
-            .text_color(text::PRIMARY)
+            .bg(surface::overlay())
+            .text_color(text::primary())
             .opacity(0.75)
             .child(self.panel.title(window, cx))
     }
@@ -386,7 +386,7 @@ impl GroupedTabs {
                     .min_w(space(16))
                     .when(droppable, |this| {
                         this.drag_over::<DragPanel>(|this, _, _, _| {
-                            this.bg(accent::BASE.alpha(0.12))
+                            this.bg(accent::base().alpha(0.12))
                         })
                         .on_drop({
                             let (group, tabs) = (group.clone(), self.tabs.clone());
@@ -443,7 +443,7 @@ impl GroupedTabs {
                 if !droppable {
                     return el;
                 }
-                el.drag_over::<DragPanel>(|this, _, _, _| this.bg(accent::BASE.alpha(0.2)))
+                el.drag_over::<DragPanel>(|this, _, _, _| this.bg(accent::base().alpha(0.2)))
                     .on_drop(move |drag: &DragPanel, window, cx| {
                         drop_on(&group, &tabs, drag, Place::Into(id), window, cx)
                     })
@@ -498,9 +498,9 @@ impl GroupedTabs {
                         .xsmall()
                         .custom(
                             ButtonCustomVariant::new(cx)
-                                .foreground(Hsla::from(text::SECONDARY))
-                                .hover(Hsla::from(surface::OVERLAY))
-                                .active(Hsla::from(surface::OVERLAY)),
+                                .foreground(Hsla::from(text::secondary()))
+                                .hover(Hsla::from(surface::overlay()))
+                                .active(Hsla::from(surface::overlay())),
                         )
                         .ml(-space(2))
                         .mr(space(2))
@@ -543,7 +543,7 @@ impl GroupedTabs {
                         this.rounded_l_none()
                             .border_l_2()
                             .border_r_0()
-                            .border_color(accent::BASE)
+                            .border_color(accent::base())
                     })
                     .on_drop({
                         let (group, tabs) = (group.clone(), self.tabs.clone());
@@ -578,8 +578,8 @@ impl GroupedTabs {
             .flex_none()
             .border_l_1()
             .border_b_1()
-            .border_color(line::BORDER)
-            .bg(surface::BASE)
+            .border_color(line::border())
+            .bg(surface::base())
             .pad_x(space(2))
             .gap(space(1))
             .occlude()

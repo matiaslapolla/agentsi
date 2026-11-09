@@ -254,14 +254,14 @@ fn decision_card(
             div()
                 .text_size(size::md())
                 .font_weight(weight::SEMIBOLD)
-                .text_color(text::PRIMARY)
+                .text_color(text::primary())
                 .child(d.text.clone()),
         );
     if let Some(why) = &d.why {
         card = card.child(
             div()
                 .text_size(size::sm())
-                .text_color(text::SECONDARY)
+                .text_color(text::secondary())
                 .child(why.clone()),
         );
     }
@@ -269,7 +269,7 @@ fn decision_card(
         card = card.child(
             div()
                 .text_size(size::sm())
-                .text_color(text::TERTIARY)
+                .text_color(text::tertiary())
                 .child(format!("Action: {action}")),
         );
     }
@@ -356,7 +356,7 @@ impl Render for DeskScreen {
                 cx.listener(|this, _, _, cx| this.touch(cx)),
             )
             .size_full()
-            .bg(surface::PANEL);
+            .bg(surface::panel());
         let d = match &self.data {
             Load::Loading => return root.child(notice("Reading the front desk…", None)),
             Load::Failed(e) => {
@@ -390,7 +390,7 @@ impl Render for DeskScreen {
                         div()
                             .text_size(size::xl())
                             .font_weight(weight::SEMIBOLD)
-                            .text_color(text::PRIMARY)
+                            .text_color(text::primary())
                             .child(d.product.name.clone()),
                     )
                     .child(mono(d.product.id.clone()))
@@ -457,7 +457,7 @@ impl Render for DeskScreen {
                 el.child(
                     div()
                         .text_size(size::sm())
-                        .text_color(text::TERTIARY)
+                        .text_color(text::tertiary())
                         .child("Nothing waits for your approval."),
                 )
             })
@@ -483,18 +483,18 @@ impl Render for DeskScreen {
                         .p(space(4))
                         .rounded(radius::lg())
                         .border_1()
-                        .border_color(line::BORDER)
+                        .border_color(line::border())
                         .child(
                             div()
                                 .text_size(size::base())
                                 .font_weight(weight::MEDIUM)
-                                .text_color(text::PRIMARY)
+                                .text_color(text::primary())
                                 .child(o.text.clone()),
                         )
                         .child(
                             div()
                                 .text_size(size::sm())
-                                .text_color(text::SECONDARY)
+                                .text_color(text::secondary())
                                 .child(format!("Signal: {}", o.signal)),
                         )
                         .child(mono(format!("{} · due {}", o.id, o.due)))
@@ -541,7 +541,7 @@ impl Render for DeskScreen {
                 el.child(
                     div()
                         .text_size(size::sm())
-                        .text_color(text::TERTIARY)
+                        .text_color(text::tertiary())
                         .child("No meetings yet. Convene one with agentsi meet."),
                 )
             })

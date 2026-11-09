@@ -392,14 +392,14 @@ fn mark_of(text: &str) -> Option<Mark> {
 fn body(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::base())
-        .text_color(text::SECONDARY)
+        .text_color(text::secondary())
         .child(s.into())
 }
 
 fn small(s: impl Into<SharedString>) -> Div {
     div()
         .text_size(size::sm())
-        .text_color(text::TERTIARY)
+        .text_color(text::tertiary())
         .child(s.into())
 }
 
@@ -413,7 +413,7 @@ fn list(title: &str, items: &[String]) -> Option<Div> {
                 div()
                     .text_size(size::xs())
                     .font_weight(weight::MEDIUM)
-                    .text_color(text::TERTIARY)
+                    .text_color(text::tertiary())
                     .child(title.to_string()),
             )
             .children(items.iter().map(|i| body(format!("• {i}"))))
@@ -498,7 +498,7 @@ fn priorities(
                                     div()
                                         .text_size(size::md())
                                         .font_weight(weight::SEMIBOLD)
-                                        .text_color(text::PRIMARY)
+                                        .text_color(text::primary())
                                         .child(p.title.clone()),
                                 ),
                         )
@@ -554,7 +554,7 @@ fn disagreements(m: &MinutesDetail) -> Div {
                     div()
                         .text_size(size::md())
                         .font_weight(weight::SEMIBOLD)
-                        .text_color(text::PRIMARY)
+                        .text_color(text::primary())
                         .child(d.topic.clone()),
                 )
                 .children(d.positions.iter().map(|p| {
@@ -564,7 +564,7 @@ fn disagreements(m: &MinutesDetail) -> Div {
                         .gap(space(1))
                         .p(space(3))
                         .rounded(radius::md())
-                        .bg(surface::RAISED)
+                        .bg(surface::raised())
                         .child(neutral_tag(role_label(&p.role)))
                         .child(body(p.view.clone()))
                 }))
@@ -591,7 +591,7 @@ fn decisions(m: &MinutesDetail) -> Div {
                             div()
                                 .text_size(size::md())
                                 .font_weight(weight::SEMIBOLD)
-                                .text_color(text::PRIMARY)
+                                .text_color(text::primary())
                                 .child(d.text.clone()),
                         )
                         .child(decision_tag(&d.status, d.id.is_some())),
@@ -622,7 +622,7 @@ fn roles(m: &MinutesDetail) -> Div {
                             div()
                                 .text_size(size::md())
                                 .font_weight(weight::SEMIBOLD)
-                                .text_color(text::PRIMARY)
+                                .text_color(text::primary())
                                 .child(role_label(&r.role)),
                         )
                         .when_some(r.model.as_deref(), |el, model| {
@@ -646,7 +646,7 @@ fn cell(s: impl Into<SharedString>) -> Div {
         .text_right()
         .font_family(font::MONO)
         .text_size(size::sm())
-        .text_color(text::SECONDARY)
+        .text_color(text::secondary())
         .child(s.into())
 }
 
@@ -658,7 +658,7 @@ fn usage(m: &MinutesDetail) -> Div {
             .text_right()
             .text_size(size::xs())
             .font_weight(weight::MEDIUM)
-            .text_color(text::TERTIARY)
+            .text_color(text::tertiary())
             .child(s.to_string())
     };
     let name = |role: SharedString, model: SharedString| {
@@ -671,7 +671,7 @@ fn usage(m: &MinutesDetail) -> Div {
             .child(
                 div()
                     .text_size(size::sm())
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child(role),
             )
             .child(mono(model))
@@ -683,7 +683,7 @@ fn usage(m: &MinutesDetail) -> Div {
             .gap(space(3))
             .py(space(2))
             .border_b_1()
-            .border_color(line::BORDER)
+            .border_color(line::border())
     };
     if m.usage.is_empty() {
         return div().child(small("No usage is stored for this minutes."));
@@ -694,7 +694,7 @@ fn usage(m: &MinutesDetail) -> Div {
         .flex_col()
         .p(space(4))
         .rounded(radius::lg())
-        .bg(surface::RAISED)
+        .bg(surface::raised())
         .child(
             row()
                 .child(
@@ -702,7 +702,7 @@ fn usage(m: &MinutesDetail) -> Div {
                         .flex_1()
                         .text_size(size::xs())
                         .font_weight(weight::MEDIUM)
-                        .text_color(text::TERTIARY)
+                        .text_color(text::tertiary())
                         .child("Role"),
                 )
                 .child(head("In"))
@@ -727,7 +727,7 @@ fn usage(m: &MinutesDetail) -> Div {
                         .flex_1()
                         .text_size(size::sm())
                         .font_weight(weight::SEMIBOLD)
-                        .text_color(text::PRIMARY)
+                        .text_color(text::primary())
                         .child("Total"),
                 )
                 .child(cell(format::compact(t.input_tokens)))
@@ -798,7 +798,7 @@ impl Render for MinuteScreen {
                 cx.listener(|this, _, _, cx| this.touch(cx)),
             )
             .size_full()
-            .bg(surface::PANEL);
+            .bg(surface::panel());
         let m = match &self.data {
             Load::Loading => return root.child(notice("Reading the minutes…", None)),
             Load::Failed(e) => {
@@ -856,7 +856,7 @@ impl Render for MinuteScreen {
                 div()
                     .text_size(size::lg())
                     .font_weight(weight::SEMIBOLD)
-                    .text_color(text::PRIMARY)
+                    .text_color(text::primary())
                     .child(m.question.clone()),
             )
             .child(
@@ -890,13 +890,13 @@ impl Render for MinuteScreen {
                 .p(space(4))
                 .rounded(radius::lg())
                 .border_1()
-                .border_color(status::DANGER.alpha(status::BORDER_ALPHA))
+                .border_color(status::danger().alpha(status::BORDER_ALPHA))
                 .bg(Status::Danger.tint())
                 .child(
                     div()
                         .text_size(size::base())
                         .font_weight(weight::MEDIUM)
-                        .text_color(status::DANGER)
+                        .text_color(status::danger())
                         .child(if c.repaired {
                             "The check failed. The PM repaired it once."
                         } else {

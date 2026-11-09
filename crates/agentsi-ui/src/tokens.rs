@@ -56,7 +56,7 @@ impl From<Color> for Hsla {
     }
 }
 
-/// So a screen writes `.bg(surface::PANEL)` with no conversion.
+/// So a screen writes `.bg(surface::panel())` with no conversion.
 impl From<Color> for gpui_kit::Fill {
     fn from(c: Color) -> Self {
         c.hsla().into()
@@ -152,13 +152,9 @@ pub(crate) fn set_palette_for_test(palette: Palette) {
 pub mod surface {
     use super::{Color, current_palette};
     /// Window behind the panels, sidebar, terminal well.
-    pub const BASE: Color = Color(0x0b0c0f);
     /// Main content area.
-    pub const PANEL: Color = Color(0x101115);
     /// Cards and raised rows.
-    pub const RAISED: Color = Color(0x16171c);
     /// Popovers, inputs, the hover fill of a raised element.
-    pub const OVERLAY: Color = Color(0x1e2027);
     pub fn base() -> Color {
         current_palette().surface_base
     }
@@ -210,9 +206,6 @@ pub mod switch {
 /// Text, from the strongest to the weakest. Each passes 4.5:1 on each surface.
 pub mod text {
     use super::{Color, current_palette};
-    pub const PRIMARY: Color = Color(0xe8e9ed);
-    pub const SECONDARY: Color = Color(0xa4a8b2);
-    pub const TERTIARY: Color = Color(0x8a8f9a);
     pub fn primary() -> Color {
         current_palette().text_primary
     }
@@ -228,11 +221,8 @@ pub mod text {
 pub mod line {
     use super::{Color, current_palette};
     /// Hairline between areas.
-    pub const BORDER: Color = Color(0x23252c);
     /// Border of controls and of hovered cards.
-    pub const STRONG: Color = Color(0x31343d);
     /// The 2 px focus ring.
-    pub const FOCUS: Color = super::accent::BASE;
     pub fn border() -> Color {
         current_palette().line_border
     }
@@ -247,11 +237,7 @@ pub mod line {
 /// The one violet accent.
 pub mod accent {
     use super::{Color, current_palette};
-    pub const BASE: Color = Color(0x8b7cf6);
-    pub const HOVER: Color = Color(0x9d90f8);
-    pub const PRESSED: Color = Color(0x7a6af0);
     /// Text and icons on an accent fill.
-    pub const ON: Color = super::surface::BASE;
     /// A selected row or tab: the accent at 16 % over the panel.
     pub fn subtle() -> Color {
         base().over(super::surface::panel(), current_palette().accent_subtle_alpha)
@@ -275,11 +261,6 @@ pub mod accent {
 /// The status colors. Each is a text color, and each has a tint fill.
 pub mod status {
     use super::{Color, current_palette};
-    pub const OK: Color = Color(0x4ade80);
-    pub const WARN: Color = Color(0xf2b84b);
-    pub const DANGER: Color = Color(0xf87171);
-    pub const INFO: Color = Color(0x60a5fa);
-    pub const OFF: Color = Color(0x9a9faa);
     /// Opacity of a status tint over a raised surface.
     pub const TINT_ALPHA: f32 = 0.14;
     /// Opacity of the status border of an attention marker.
@@ -688,17 +669,17 @@ pub fn contrast(a: Color, b: Color) -> f32 {
 /// Each text color on each fill where the components draw it.
 pub fn text_pairs() -> Vec<(String, Color, Color)> {
     let surfaces = [
-        ("surface::BASE", surface::BASE),
-        ("surface::PANEL", surface::PANEL),
-        ("surface::RAISED", surface::RAISED),
-        ("surface::OVERLAY", surface::OVERLAY),
-        ("accent::SUBTLE", accent::subtle()),
+        ("surface::base()", surface::base()),
+        ("surface::panel()", surface::panel()),
+        ("surface::raised()", surface::raised()),
+        ("surface::overlay()", surface::overlay()),
+        ("accent::subtle()", accent::subtle()),
     ];
     let mut texts = vec![
-        ("text::PRIMARY", text::PRIMARY),
-        ("text::SECONDARY", text::SECONDARY),
-        ("text::TERTIARY", text::TERTIARY),
-        ("accent::BASE", accent::BASE),
+        ("text::primary()", text::primary()),
+        ("text::secondary()", text::secondary()),
+        ("text::tertiary()", text::tertiary()),
+        ("accent::base()", accent::base()),
         ("terminal::FOREGROUND", terminal::FOREGROUND),
     ];
     for s in Status::ALL {
@@ -712,10 +693,10 @@ pub fn text_pairs() -> Vec<(String, Color, Color)> {
     }
     for h in label::Hue::ALL {
         for (sn, s) in [
-            ("BASE", surface::BASE),
-            ("PANEL", surface::PANEL),
-            ("RAISED", surface::RAISED),
-            ("OVERLAY", surface::OVERLAY),
+            ("BASE", surface::base()),
+            ("PANEL", surface::panel()),
+            ("RAISED", surface::raised()),
+            ("OVERLAY", surface::overlay()),
         ] {
             pairs.push((format!("label {} on {sn}", h.key()), h.color(), s));
             pairs.push((
@@ -726,34 +707,34 @@ pub fn text_pairs() -> Vec<(String, Color, Color)> {
         }
     }
     // Controls draw only the 3 text levels on a pressed fill.
-    for (fname, fill) in [("RAISED", surface::RAISED), ("OVERLAY", surface::OVERLAY)] {
+    for (fname, fill) in [("RAISED", surface::raised()), ("OVERLAY", surface::overlay())] {
         for (tn, t) in [
-            ("text::PRIMARY", text::PRIMARY),
-            ("text::SECONDARY", text::SECONDARY),
-            ("text::TERTIARY", text::TERTIARY),
+            ("text::primary()", text::primary()),
+            ("text::secondary()", text::secondary()),
+            ("text::tertiary()", text::tertiary()),
         ] {
             pairs.push((format!("{tn} on pressed {fname}"), t, state::pressed(fill)));
         }
     }
-    for fill in [accent::BASE, accent::HOVER, accent::PRESSED] {
-        pairs.push(("accent::ON on an accent fill".into(), accent::ON, fill));
+    for fill in [accent::base(), accent::hover(), accent::pressed()] {
+        pairs.push(("accent::on() on an accent fill".into(), accent::on(), fill));
     }
     for s in Status::ALL {
         pairs.push((format!("{s:?} on its tint"), s.color(), s.tint()));
         pairs.push((
-            format!("text::PRIMARY on the {s:?} tint"),
-            text::PRIMARY,
+            format!("text::primary() on the {s:?} tint"),
+            text::primary(),
             s.tint(),
         ));
     }
     pairs.push((
-        "status::DANGER on danger_fill_hover".into(),
-        status::DANGER,
+        "status::danger() on danger_fill_hover".into(),
+        status::danger(),
         danger_fill_hover(),
     ));
     pairs.push((
-        "status::DANGER on danger_fill_press".into(),
-        status::DANGER,
+        "status::danger() on danger_fill_press".into(),
+        status::danger(),
         danger_fill_press(),
     ));
     pairs.push((
@@ -801,10 +782,10 @@ mod tests {
                 h.key()
             );
             for (name, s) in [
-                ("BASE", surface::BASE),
-                ("PANEL", surface::PANEL),
-                ("RAISED", surface::RAISED),
-                ("OVERLAY", surface::OVERLAY),
+                ("BASE", surface::base()),
+                ("PANEL", surface::panel()),
+                ("RAISED", surface::raised()),
+                ("OVERLAY", surface::overlay()),
             ] {
                 assert!(contrast(h.color(), s) >= 4.5, "{} on {name}", h.key());
                 assert!(
@@ -830,12 +811,12 @@ mod tests {
     #[test]
     fn over_mixes_in_srgb() {
         assert_eq!(Color(0xffffff).over(Color(0x000000), 0.5), Color(0x808080));
-        assert_eq!(accent::BASE.over(surface::PANEL, 1.0), accent::BASE);
+        assert_eq!(accent::base().over(surface::panel(), 1.0), accent::base());
     }
 
     #[test]
     fn the_color_functions_read_the_palette() {
-        assert_eq!(surface::panel(), surface::PANEL);
+        assert_eq!(surface::panel(), Color(0x101115));
         assert_eq!(accent::subtle(), Color(0x8b7cf6).over(Color(0x101115), 0.16));
         let light = Palette {
             surface_panel: Color(0xf7f8fa),

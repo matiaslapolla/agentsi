@@ -17,14 +17,14 @@ pub fn status_tag(label: impl Into<SharedString>, s: Status) -> Tag {
 
 /// The `gpui-component` tag in neutral colors.
 pub fn neutral_tag(label: impl Into<SharedString>) -> Tag {
-    tag(label.into(), surface::OVERLAY, text::SECONDARY)
+    tag(label.into(), surface::overlay(), text::secondary())
 }
 
 /// The tag of a label in a color of `tokens::label`, or neutral with none.
 pub fn label_tag(label: impl Into<SharedString>, hue: Option<Hue>) -> Tag {
     match hue {
         Some(h) => tag(label.into(), h.tint(), h.color()),
-        None => tag(label.into(), surface::OVERLAY, text::SECONDARY),
+        None => tag(label.into(), surface::overlay(), text::secondary()),
     }
 }
 
