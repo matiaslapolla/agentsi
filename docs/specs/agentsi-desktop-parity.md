@@ -15,6 +15,7 @@ The plugin runs `agentsi` commands and reads their JSON. The owner uses the web 
 ## Non-goals
 
 - New commands or new flags. A new feature waits until after the switch-over.
+  - Exception (owner, 2026-11-09): four desktop modules come before the switch-over. They are actions, the tracker, the conversational desk and the immersive app (`docs/ideas/desktop-*.md`). They land in the Rust programs only. Their specs say which parity checks change, such as the count of MCP tools.
 
 ## Terms
 

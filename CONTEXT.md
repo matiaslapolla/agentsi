@@ -108,11 +108,15 @@ _Avoid_: Run mode, lite mode
 
 **Story**:
 One unit of work that says who wants what and why, with 2 to 5 criteria. It is not implemented, implemented or discarded.
-_Avoid_: Ticket, issue, task (when you mean a story)
+_Avoid_: Issue, task (when you mean a story)
 
 **Task**:
 A story with no user, for work such as debt, infra or a refactor.
 _Avoid_: Chore, tech story
+
+**Ticket**:
+One note, to-do or question of a product that the owner or Claude writes and the owner closes. It gates nothing and runs nothing. A ticket that becomes work turns into a story.
+_Avoid_: Card, issue, item, entry, task (when you mean a ticket)
 
 **Criterion**:
 One "given, when, then" line of a story, with the user-facing test that QA writes for it before the work starts.
