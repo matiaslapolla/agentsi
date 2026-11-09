@@ -421,6 +421,13 @@ impl ScreenPanel {
         }
     }
 
+    /// Scrolls the Owner section of a settings screen into view.
+    pub fn reveal_owner(&self, cx: &mut App) {
+        if let ScreenView::Settings(v) = &self.view {
+            v.update(cx, |s, cx| s.reveal_owner(cx));
+        }
+    }
+
     /// Runs the checks of the Health section of a settings screen.
     pub fn check_health(&self, cx: &mut App) {
         if let ScreenView::Settings(v) = &self.view {

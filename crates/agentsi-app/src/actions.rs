@@ -88,6 +88,8 @@ gpui_kit::actions!(
         OpenSettings,
         /// Opens the settings at the Data section, where the owner deletes data.
         OpenDataSettings,
+        /// Opens the settings at the Owner section, where the owner edits the name and the language.
+        OpenOwnerSettings,
         /// Opens the settings and checks the health of the tools.
         CheckHealth,
         /// Opens the settings and backs up the data now.
@@ -991,6 +993,12 @@ pub const ENTRIES: &[Entry] = &[
             "logs",
         ],
         action: || Box::new(OpenDataSettings),
+    },
+    Entry {
+        label: "Open the owner settings",
+        icon: IconName::Settings,
+        keywords: &["owner", "name", "language", "settings", "prompt"],
+        action: || Box::new(OpenOwnerSettings),
     },
     Entry {
         label: "Show the context of the next meeting",
