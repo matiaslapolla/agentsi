@@ -663,3 +663,30 @@ fn the_ticket_menu_runs_its_entries_and_the_state_decides_which_are_on(cx: &mut 
         c.notices.iter().any(|n| n.contains("No ticket is in view"))
     }));
 }
+
+#[gpui::test]
+fn an_archived_product_has_one_menu_entry_and_restore_calls_archive_restore(
+    cx: &mut TestAppContext,
+) {
+    use crate::menus::Facts;
+    let dir = folder("menu-archived");
+    let (mut f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    let archived = Facts {
+        archived: true,
+        ..Facts::default()
+    };
+    let only: Vec<Cmd> = crate::menus::items(&Target::Product(product("b")), &archived)
+        .into_iter()
+        .filter_map(|i| match i {
+            crate::menus::Item::Entry(e) => Some(e.cmd),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(only, [Cmd::RestoreProduct]);
+    let _ = sent(&mut f);
+    run(&f, cx, Target::Product(product("b")), Cmd::RestoreProduct);
+    let s = sent(&mut f);
+    let restore = call(&s, "archive.restore").expect("the product is restored");
+    assert_eq!(restore["params"]["product"], "b");
+    assert_eq!(restore["params"]["kind"], "product");
+}

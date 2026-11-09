@@ -184,6 +184,8 @@ gpui_kit::actions!(
         CopyTicketId,
         /// Runs the reflection of the active product.
         ReflectProduct,
+        /// Shows or hides the archived products in the sidebar.
+        ToggleArchivedProducts,
         /// Stops the reflection of the active product.
         CancelReflection,
         /// Copies the folder of the active product to the clipboard.
@@ -794,6 +796,12 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(CopyTicketId),
     },
     Entry {
+        label: "Show the archived products",
+        icon: IconName::Folder,
+        keywords: &["archive", "restore", "products", "sidebar"],
+        action: || Box::new(ToggleArchivedProducts),
+    },
+    Entry {
         label: "Cancel the reflection of the active product",
         icon: IconName::Close,
         keywords: &["reflect", "cancel", "stop"],
@@ -1116,6 +1124,7 @@ mod tests {
             "Copy the id of the ticket (tickets)",
             "Reflect on the active product",
             "Cancel the reflection of the active product",
+            "Show the archived products",
             "Copy the folder of the active product",
             "Open the folder of the active product",
             "Delete the data of the active product",

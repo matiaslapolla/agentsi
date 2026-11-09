@@ -1480,6 +1480,11 @@ impl Render for Shell {
                 this.show_active(ScreenSpec::meeting, window, cx);
                 this.on_active_meeting(window, cx, |p, window, cx| p.meeting_ask(window, cx));
             }))
+            .on_action(cx.listener(|this, _: &actions::ToggleArchivedProducts, _, cx| {
+                let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
+                this.sidebar
+                    .update(cx, |s, cx| s.toggle_archived(host.as_deref(), cx));
+            }))
             .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
                 this.show_screen(ScreenSpec::settings(), window, cx);
                 for p in this.open_screens(cx) {

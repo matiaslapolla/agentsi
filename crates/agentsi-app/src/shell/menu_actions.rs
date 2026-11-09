@@ -68,6 +68,7 @@ impl Shell {
                     local: p.host.is_none(),
                     meeting: meeting(p),
                     reflecting: c.reflecting.contains(&p.id),
+                    archived: c.archived_products.iter().any(|x| x.id == p.id),
                     ..Facts::default()
                 }
             }
@@ -408,6 +409,7 @@ impl Shell {
                 }
             }
             Cmd::Archive => self.archive(p, cx),
+            Cmd::RestoreProduct => self.restore_product(p, cx),
             _ => {}
         }
     }
@@ -437,6 +439,29 @@ impl Shell {
                 Ok(r) if r.entry.is_some() => format!("Reflected on {}.", p.id),
                 Ok(_) => format!("Nothing to reflect on in {}.", p.id),
                 Err(e) => format!("No reflection of {}: {e}", p.id),
+            };
+            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
+        })
+        .detach();
+    }
+
+    /// `archive.restore` for an archived product. The core tells the app when the list changes.
+    fn restore_product(&mut self, p: ProductRef, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
+            return;
+        };
+        let call = core
+            .read(cx)
+            .link
+            .call::<agentsi_proto::marks_api::ArchiveRestore>(&ArchiveParams {
+                product: p.id.clone(),
+                kind: ArchiveKind::Product,
+                id: None,
+            });
+        cx.spawn(async move |this, cx| {
+            let text = match call.await {
+                Ok(_) => format!("{} is restored.", p.id),
+                Err(e) => format!("{} was not restored: {e}", p.id),
             };
             let _ = this.update(cx, |this, cx| this.notice(&text, cx));
         })

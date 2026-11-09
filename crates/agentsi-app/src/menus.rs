@@ -92,6 +92,7 @@ pub enum Cmd {
     OpenFolder,
     DeleteData,
     Archive,
+    RestoreProduct,
     // A pane.
     Rename,
     ColorPane,
@@ -161,6 +162,8 @@ pub struct Facts {
     pub grouped: bool,
     /// The state of the ticket.
     pub ticket: Option<TicketState>,
+    /// The product is archived: its menu holds Restore only.
+    pub archived: bool,
 }
 
 impl Facts {
@@ -179,6 +182,7 @@ impl Facts {
             tabbed: true,
             grouped: true,
             ticket: Some(TicketState::Open),
+            archived: false,
         }
     }
 }
@@ -219,6 +223,7 @@ fn when(cmd: Cmd, label: &'static str, enabled: bool) -> Item {
 pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
     use Cmd::*;
     match target {
+        Target::Product(_) if f.archived => vec![on(RestoreProduct, "Restore")],
         Target::Product(_) => vec![
             on(NewTerminal, "New terminal"),
             on(OpenDesk, "Open desk"),
@@ -350,6 +355,7 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, OpenFolder) => "Open the folder of the active product",
         (_, DeleteData) => "Delete the data of the active product",
         (_, Archive) => "Archive the active product",
+        (_, RestoreProduct) => "Restore the archived product",
         (_, Rename) => "Rename the active pane",
         (_, ColorPane) => "Color the active pane",
         (_, TalkToPane) => "Talk to this pane",
