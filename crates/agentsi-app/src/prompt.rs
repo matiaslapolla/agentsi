@@ -200,7 +200,9 @@ fn swatch(hue: Option<Hue>) -> Div {
         .size(control::icon_sm())
         .rounded(radius::sm())
         .when_some(hue, |el, h| el.bg(h.color()))
-        .when(hue.is_none(), |el| el.border_1().border_color(line::strong()))
+        .when(hue.is_none(), |el| {
+            el.border_1().border_color(line::strong())
+        })
 }
 
 impl Render for Prompt {

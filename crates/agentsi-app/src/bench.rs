@@ -13,6 +13,8 @@
 //! - `--bench attention`: one pane of the first product, whose program turns `blocked`
 //!   and `idle` on a line of input. The bench sends the line and takes the time to the
 //!   paint of both markers: on the pane and on the product.
+//! - `--bench alert`: two panes in one tab group. The second pane is not in view. Its program
+//!   turns `blocked` after the start, the glow runs, and the bench waits 10 s before it counts frames.
 //! - `--bench start --runs 10`: the normal start, with the layout file read only.
 //! - `--size WxH` fixes the area of the panes, so that runs on different monitors compare.
 
@@ -47,6 +49,8 @@ pub struct BenchPlan {
     /// A bench that shows a screen of the first product in place of panes.
     screen: Option<ScreenKind>,
     pub panes: usize,
+    /// The alert bench.
+    alert: bool,
     /// `--size WxH`: the size in pixels of the area of the panes. Without it, the
     /// panes fill the window, whose size the window manager decides.
     pub size: Option<(f32, f32)>,
@@ -73,10 +77,15 @@ impl BenchPlan {
             .and_then(|n| n.parse().ok())
             .unwrap_or(1usize)
             .clamp(1, 16);
+        let panes = if kind == BenchKind::Alert {
+            panes.max(2)
+        } else {
+            panes
+        };
         let script = match (flag("--program"), kind) {
             (Some(p), _) => p,
             (None, BenchKind::Terminal) => WRITER.to_string(),
-            (None, BenchKind::Attention) => ATTENTION.to_string(),
+            (None, BenchKind::Attention | BenchKind::Alert) => ATTENTION.to_string(),
             (None, _) => "exec sh".to_string(),
         };
         let size = flag("--size").and_then(|s| {
@@ -90,6 +99,7 @@ impl BenchPlan {
                 .filter(|k| *k != ScreenKind::Minute)
                 .or((kind == BenchKind::Scroll).then_some(ScreenKind::Minutes)),
             panes,
+            alert: kind == BenchKind::Alert,
             size,
             argv: vec!["sh".into(), "-c".into(), script],
             probe: (kind == BenchKind::Attention).then(AttentionProbe::default),
@@ -137,6 +147,7 @@ impl BenchPlan {
             })
             .collect();
         let plan = self.clone();
+        let alert = self.alert;
         cx.spawn_in(window, async move |this, cx| {
             let mut ids = Vec::new();
             for c in created {
@@ -149,6 +160,7 @@ impl BenchPlan {
                 .borrow_mut()
                 .extend(ids.iter().map(|t| t.id.clone()));
             let first = ids.first().map(|t| t.id.clone());
+            let hidden = ids.get(1).map(|t| t.id.clone());
             let _ = this.update_in(cx, |shell, window, cx| {
                 let core = shell.core().clone();
                 // Only the terminal bench takes the read-to-paint samples of the pane.
@@ -165,7 +177,11 @@ impl BenchPlan {
                     shell.open().borrow_mut().terminals.push(panel.downgrade());
                     panels.push(panel);
                 }
-                let grid = grid(&panels, cx);
+                let grid = if alert {
+                    tab_group(&panels, cx)
+                } else {
+                    grid(&panels, cx)
+                };
                 shell
                     .dock()
                     .update(cx, |d, cx| d.set_center(grid, window, cx));
@@ -173,6 +189,17 @@ impl BenchPlan {
                     window.focus(&p.focus_handle(cx), cx);
                 }
             });
+            if let (true, Some(id)) = (alert, hidden) {
+                cx.background_executor().timer(SETTLE).await;
+                drop(
+                    link.call::<Input>(&InputParams {
+                        id,
+                        text: "b\n".into(),
+                        submit: false,
+                    })
+                    .await,
+                );
+            }
             if let (Some(id), Some(probe), Some(bench)) = (
                 first,
                 plan.probe.clone(),
@@ -190,6 +217,15 @@ impl BenchPlan {
             drop(link.call::<Kill>(&TerminalId { id: id.clone() }));
         }
     }
+}
+
+/// All the panes as tabs of one group. The first tab is in view.
+fn tab_group(panels: &[Entity<TerminalPanel>], cx: &App) -> DockLayout {
+    let mut tabs = DockLayout::tabs();
+    for p in panels {
+        tabs = tabs.panel_view(panel_handle(p.clone()), cx);
+    }
+    tabs
 }
 
 /// The panes in rows of at most 4.

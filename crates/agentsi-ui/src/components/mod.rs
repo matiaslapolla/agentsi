@@ -16,7 +16,7 @@ mod tree;
 pub use button::{Button, ButtonSize, ButtonVariant};
 pub use card::{Card, ListRow};
 pub use display::{
-    AttentionMarker, StatusDot, key_hint, key_hint_for, label_tag, neutral_tag, status_tag,
+    StateMark, StatusDot, key_hint, key_hint_for, label_tag, neutral_tag, state_icon, status_tag,
 };
 pub use gpui_kit::component::{kbd::Kbd, tag::Tag};
 pub use switch::Switch;

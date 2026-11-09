@@ -125,6 +125,40 @@ impl Palette {
             Color(0xf472b6),
         ],
     };
+
+    /// The light color theme. Each value passes the contrast tests of this file.
+    pub const LIGHT: Palette = Palette {
+        surface_base: Color(0xeef0f3),
+        surface_panel: Color(0xf7f8fa),
+        surface_raised: Color(0xffffff),
+        surface_overlay: Color(0xe8eaee),
+        text_primary: Color(0x15171c),
+        text_secondary: Color(0x484d59),
+        text_tertiary: Color(0x5c6270),
+        line_border: Color(0xdcdfe5),
+        line_strong: Color(0xc3c7cf),
+        accent_base: Color(0x6248d8),
+        accent_hover: Color(0x5539cc),
+        accent_pressed: Color(0x4a2fb8),
+        accent_on: Color(0xffffff),
+        accent_subtle_alpha: 0.12,
+        status_ok: Color(0x146c33),
+        status_warn: Color(0x8a4f00),
+        status_danger: Color(0xb01f26),
+        status_info: Color(0x1a54ad),
+        status_off: Color(0x575d69),
+        switch_thumb: Color(0xffffff),
+        hues: [
+            Color(0xa50f34),
+            Color(0x9c370a),
+            Color(0x7a5000),
+            Color(0x3f6110),
+            Color(0x0c6159),
+            Color(0x075a8b),
+            Color(0x7c2bc4),
+            Color(0xa0164f),
+        ],
+    };
 }
 
 thread_local! {
@@ -240,7 +274,10 @@ pub mod accent {
     /// Text and icons on an accent fill.
     /// A selected row or tab: the accent at 16 % over the panel.
     pub fn subtle() -> Color {
-        base().over(super::surface::panel(), current_palette().accent_subtle_alpha)
+        base().over(
+            super::surface::panel(),
+            current_palette().accent_subtle_alpha,
+        )
     }
     /// Opacity of the accent border of a hovered card.
     pub const HOVER_BORDER_ALPHA: f32 = 0.6;
@@ -330,6 +367,92 @@ impl Status {
     /// The opaque tint fill of this status over a raised surface.
     pub fn tint(self) -> Color {
         self.color().over(surface::raised(), status::TINT_ALPHA)
+    }
+}
+
+/// The one state that the app shows for a pane, a meeting role, a story session or an agent.
+/// `rank()` keeps the order of the state map: when two states apply, the lower rank wins.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WorkState {
+    Blocked,
+    Failed,
+    Review,
+    Repairing,
+    Speaking,
+    Listening,
+    Working,
+    Done,
+    Off,
+}
+
+impl WorkState {
+    pub const ALL: [WorkState; 9] = [
+        WorkState::Blocked,
+        WorkState::Failed,
+        WorkState::Review,
+        WorkState::Repairing,
+        WorkState::Speaking,
+        WorkState::Listening,
+        WorkState::Working,
+        WorkState::Done,
+        WorkState::Off,
+    ];
+
+    /// 0 for Blocked, up to 8 for Off.
+    pub const fn rank(self) -> u8 {
+        self as u8
+    }
+
+    /// The edge, the icon and the text color of this state.
+    pub fn color(self) -> Color {
+        match self {
+            WorkState::Blocked | WorkState::Repairing => status::warn(),
+            WorkState::Failed => status::danger(),
+            WorkState::Review | WorkState::Listening => accent::base(),
+            WorkState::Speaking | WorkState::Done => status::ok(),
+            WorkState::Working => status::info(),
+            WorkState::Off => status::off(),
+        }
+    }
+
+    /// The opaque fill of this state over a raised surface.
+    pub fn tint(self) -> Color {
+        self.color().over(surface::raised(), status::TINT_ALPHA)
+    }
+
+    /// The word of this state. A screen may add a reason after it.
+    pub const fn word(self) -> &'static str {
+        match self {
+            WorkState::Blocked => "Blocked",
+            WorkState::Failed => "Failed",
+            WorkState::Review => "Review",
+            WorkState::Repairing => "Repairing the minutes",
+            WorkState::Speaking => "Speaking",
+            WorkState::Listening => "Listening",
+            WorkState::Working => "Working",
+            WorkState::Done => "Done",
+            WorkState::Off => "Off",
+        }
+    }
+
+    /// The status of the plain dot for this state.
+    pub const fn status(self) -> Status {
+        match self {
+            WorkState::Blocked | WorkState::Repairing => Status::Warn,
+            WorkState::Failed => Status::Danger,
+            WorkState::Review | WorkState::Listening | WorkState::Working => Status::Info,
+            WorkState::Speaking | WorkState::Done => Status::Ok,
+            WorkState::Off => Status::Off,
+        }
+    }
+
+    /// How many times the glow pulses after it fades in. Zero means this state has no glow.
+    pub const fn pulses(self) -> usize {
+        match self {
+            WorkState::Blocked => motion::PULSES,
+            WorkState::Failed | WorkState::Review => 1,
+            _ => 0,
+        }
     }
 }
 
@@ -597,6 +720,9 @@ pub mod control {
         by_text(14., 16., 18.)
     }
     pub const FOCUS_RING: Pixels = px(2.);
+    /// The edge of a glow, and the blur of its shadow.
+    pub const GLOW_EDGE: Pixels = px(2.);
+    pub const GLOW_BLUR: Pixels = px(8.);
     /// Gap between an icon and its label.
     pub const ICON_GAP: Pixels = px(6.);
     /// Horizontal padding of a small and of a normal button.
@@ -645,6 +771,14 @@ pub mod motion {
     pub const CARET_IDLE: Duration = Duration::from_secs(5);
     /// The ease-out cubic curve, as cubic-bezier points. It is the default curve
     /// of `gpui_kit::base::motion::Transition`.
+    /// One rise and fall of the glow shadow.
+    pub const PULSE: Duration = Duration::from_millis(1200);
+    /// The pulses of a Blocked glow. The glow of another state pulses once.
+    pub const PULSES: usize = 3;
+    /// A pulse redraws at most this many times per second.
+    pub const PULSE_FPS: f32 = 30.;
+    /// The glow fades in during this time.
+    pub const GLOW_IN: Duration = Duration::from_millis(180);
     pub const EASE_OUT: (f32, f32, f32, f32) = (0.33, 1.0, 0.68, 1.0);
 }
 
@@ -666,8 +800,16 @@ pub fn contrast(a: Color, b: Color) -> f32 {
     (hi + 0.05) / (lo + 0.05)
 }
 
-/// Each text color on each fill where the components draw it.
-pub fn text_pairs() -> Vec<(String, Color, Color)> {
+/// Each text color on each fill where the components draw it, in `palette`.
+pub fn text_pairs(palette: Palette) -> Vec<(String, Color, Color)> {
+    let before = current_palette();
+    set_palette(palette);
+    let pairs = text_pairs_in_effect();
+    set_palette(before);
+    pairs
+}
+
+fn text_pairs_in_effect() -> Vec<(String, Color, Color)> {
     let surfaces = [
         ("surface::base()", surface::base()),
         ("surface::panel()", surface::panel()),
@@ -680,7 +822,6 @@ pub fn text_pairs() -> Vec<(String, Color, Color)> {
         ("text::secondary()", text::secondary()),
         ("text::tertiary()", text::tertiary()),
         ("accent::base()", accent::base()),
-        ("terminal::FOREGROUND", terminal::FOREGROUND),
     ];
     for s in Status::ALL {
         texts.push((s.label(), s.color()));
@@ -707,7 +848,10 @@ pub fn text_pairs() -> Vec<(String, Color, Color)> {
         }
     }
     // Controls draw only the 3 text levels on a pressed fill.
-    for (fname, fill) in [("RAISED", surface::raised()), ("OVERLAY", surface::overlay())] {
+    for (fname, fill) in [
+        ("RAISED", surface::raised()),
+        ("OVERLAY", surface::overlay()),
+    ] {
         for (tn, t) in [
             ("text::primary()", text::primary()),
             ("text::secondary()", text::secondary()),
@@ -737,6 +881,12 @@ pub fn text_pairs() -> Vec<(String, Color, Color)> {
         status::danger(),
         danger_fill_press(),
     ));
+    // The terminal keeps its dark colors in both color themes.
+    pairs.push((
+        "terminal::FOREGROUND".into(),
+        terminal::FOREGROUND,
+        terminal::BACKGROUND,
+    ));
     pairs.push((
         "terminal::FOREGROUND on terminal::SELECTION".into(),
         terminal::FOREGROUND,
@@ -757,20 +907,32 @@ mod tests {
 
     #[test]
     fn each_text_and_fill_pair_reaches_4_5_to_1() {
-        let failures: Vec<String> = text_pairs()
-            .into_iter()
-            .filter(|(_, t, f)| contrast(*t, *f) < 4.5)
-            .map(|(n, t, f)| format!("{n}: #{:06x} on #{:06x} is {:.2}", t.0, f.0, contrast(t, f)))
-            .collect();
-        assert!(
-            failures.is_empty(),
-            "pairs under 4.5:1:\n{}",
-            failures.join("\n")
-        );
+        for (name, palette) in [("dark", Palette::DARK), ("light", Palette::LIGHT)] {
+            let failures: Vec<String> = text_pairs(palette)
+                .into_iter()
+                .filter(|(_, t, f)| contrast(*t, *f) < 4.5)
+                .map(|(n, t, f)| {
+                    format!("{n}: #{:06x} on #{:06x} is {:.2}", t.0, f.0, contrast(t, f))
+                })
+                .collect();
+            assert!(
+                failures.is_empty(),
+                "{name} pairs under 4.5:1:\n{}",
+                failures.join("\n")
+            );
+        }
     }
 
     #[test]
     fn the_8_label_colors_are_distinct_and_reach_4_5_to_1_on_each_surface_and_on_their_tint() {
+        for palette in [Palette::DARK, Palette::LIGHT] {
+            set_palette_for_test(palette);
+            labels_pass();
+        }
+        set_palette_for_test(Palette::DARK);
+    }
+
+    fn labels_pass() {
         use label::Hue;
         let colors: std::collections::BTreeSet<_> = Hue::ALL.iter().map(|h| h.color().0).collect();
         assert_eq!(colors.len(), 8);
@@ -803,6 +965,42 @@ mod tests {
     }
 
     #[test]
+    fn each_work_state_color_reaches_3_to_1_on_each_surface_of_both_palettes() {
+        for (name, palette) in [("dark", Palette::DARK), ("light", Palette::LIGHT)] {
+            set_palette_for_test(palette);
+            for w in WorkState::ALL {
+                for (sn, s) in [
+                    ("base", surface::base()),
+                    ("panel", surface::panel()),
+                    ("raised", surface::raised()),
+                    ("overlay", surface::overlay()),
+                ] {
+                    assert!(
+                        contrast(w.color(), s) >= 3.0,
+                        "{name}: {w:?} on {sn} is {:.2}",
+                        contrast(w.color(), s)
+                    );
+                }
+            }
+        }
+        set_palette_for_test(Palette::DARK);
+    }
+
+    #[test]
+    fn each_work_state_has_a_word_a_rank_and_the_glow_of_the_state_map() {
+        let words: std::collections::BTreeSet<_> =
+            WorkState::ALL.iter().map(|w| w.word()).collect();
+        assert_eq!(words.len(), 9);
+        for (i, w) in WorkState::ALL.into_iter().enumerate() {
+            assert_eq!(w.rank() as usize, i);
+        }
+        assert_eq!(WorkState::Blocked.pulses(), 3);
+        assert_eq!(WorkState::Failed.pulses(), 1);
+        assert_eq!(WorkState::Review.pulses(), 1);
+        assert_eq!(WorkState::Working.pulses(), 0);
+    }
+
+    #[test]
     fn contrast_matches_known_values() {
         assert!((contrast(Color(0x000000), Color(0xffffff)) - 21.0).abs() < 0.01);
         assert!((contrast(Color(0x777777), Color(0xffffff)) - 4.48).abs() < 0.01);
@@ -817,7 +1015,10 @@ mod tests {
     #[test]
     fn the_color_functions_read_the_palette() {
         assert_eq!(surface::panel(), Color(0x101115));
-        assert_eq!(accent::subtle(), Color(0x8b7cf6).over(Color(0x101115), 0.16));
+        assert_eq!(
+            accent::subtle(),
+            Color(0x8b7cf6).over(Color(0x101115), 0.16)
+        );
         let light = Palette {
             surface_panel: Color(0xf7f8fa),
             ..Palette::DARK
@@ -987,10 +1188,10 @@ mod tests {
     #[test]
     fn the_text_and_fill_colors_do_not_depend_on_the_appearance() {
         // Colors are constants, so each combination keeps the 4.5:1 of the test above.
-        let pairs = text_pairs();
+        let pairs = text_pairs(Palette::DARK);
         for a in Appearance::all() {
             set_for_test(a);
-            assert_eq!(text_pairs(), pairs, "{a:?}");
+            assert_eq!(text_pairs(Palette::DARK), pairs, "{a:?}");
         }
         set_for_test(Appearance::default());
         assert_eq!(Appearance::all().count(), 27);

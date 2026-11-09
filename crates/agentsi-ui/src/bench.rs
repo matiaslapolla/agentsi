@@ -1,4 +1,4 @@
-//! Bench mode: `--bench <idle|scroll|terminal|start|attention> --seconds <n> --json`.
+//! Bench mode: `--bench <idle|scroll|terminal|start|attention|alert> --seconds <n> --json`.
 //!
 //! A view puts `Bench::marker` in its root and calls `Bench::start` in its context.
 //! The marker records the time of each paint and each input event. After a warm-up,
@@ -31,6 +31,9 @@ pub enum BenchKind {
     /// Take the time from a `blocked` state that the bench asks for to the paint of the
     /// attention marker. The marker records each sample.
     Attention,
+    /// Ask for a `blocked` state in a pane that is not in view, wait for the glow to end, and
+    /// count the frames of an idle window.
+    Alert,
 }
 
 impl BenchKind {
@@ -41,6 +44,7 @@ impl BenchKind {
             "terminal" => BenchKind::Terminal,
             "start" => BenchKind::Start,
             "attention" => BenchKind::Attention,
+            "alert" => BenchKind::Alert,
             _ => return None,
         })
     }
@@ -51,6 +55,7 @@ impl BenchKind {
             BenchKind::Terminal => "terminal",
             BenchKind::Start => "start",
             BenchKind::Attention => "attention",
+            BenchKind::Alert => "alert",
         }
     }
 }
@@ -69,7 +74,7 @@ pub struct BenchArgs {
     pub unfocused: bool,
 }
 
-pub const USAGE: &str = "usage: --bench <idle|scroll|terminal|start|attention> [--seconds <0.1..3600>] \
+pub const USAGE: &str = "usage: --bench <idle|scroll|terminal|start|attention|alert> [--seconds <0.1..3600>] \
 [--warmup-ms <0..600000>] [--speed <px/s>] [--runs <1..100>] [--unfocused] [--json]";
 
 const SECONDS_MAX: f64 = 3600.;
@@ -85,6 +90,9 @@ const SCROLL_P95_FACTOR: f64 = 1.2;
 const TERMINAL_P95_MS: f64 = 16.;
 const START_P95_MS: f64 = 400.;
 const ATTENTION_P95_MS: f64 = 100.;
+/// The alert bench waits this long after the `blocked` state before it counts frames.
+/// The glow ends after 0.18 s + 3 pulses of 1.2 s.
+const ALERT_WAIT: Duration = Duration::from_secs(10);
 /// The attention line of the spec is a p95 over 20 runs: one sample per run.
 pub const ATTENTION_SAMPLES: usize = 20;
 
@@ -97,6 +105,7 @@ impl BenchArgs {
     /// Reads the bench flags. `Ok(None)` when there is no `--bench`.
     pub fn parse<I: IntoIterator<Item = String>>(args: I) -> Result<Option<Self>, String> {
         let mut kind = None;
+        let mut warmup_given = false;
         let mut out = BenchArgs {
             kind: BenchKind::Idle,
             seconds: 10.,
@@ -132,6 +141,7 @@ impl BenchArgs {
                         ));
                     }
                     out.warmup = Duration::from_millis(ms);
+                    warmup_given = true;
                 }
                 "--speed" => {
                     let v: f32 = number("--speed", &value("--speed")?)?;
@@ -151,6 +161,9 @@ impl BenchArgs {
                 "--json" => out.json = true,
                 _ => {}
             }
+        }
+        if kind == Some(BenchKind::Alert) && !warmup_given {
+            out.warmup = ALERT_WAIT;
         }
         Ok(kind.map(|k| BenchArgs { kind: k, ..out }))
     }
@@ -417,7 +430,7 @@ impl Bench {
         let frames = in_window.len();
         let pass = match s.args.kind {
             _ if !valid => None,
-            BenchKind::Idle => Some(frames == 0),
+            BenchKind::Idle | BenchKind::Alert => Some(frames == 0),
             BenchKind::Scroll => {
                 refresh_ms.map(|r| interval_ms.n > 0 && interval_ms.p95 <= SCROLL_P95_FACTOR * r)
             }
@@ -653,6 +666,19 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!((a.runs, a.unfocused), (10, true));
+    }
+
+    #[test]
+    fn the_alert_bench_waits_10_s_unless_the_warmup_is_given() {
+        let a = args("--bench alert --seconds 10 --json").unwrap().unwrap();
+        assert_eq!(
+            (a.kind, a.warmup),
+            (BenchKind::Alert, Duration::from_secs(10))
+        );
+        let a = args("--bench alert --warmup-ms 500").unwrap().unwrap();
+        assert_eq!(a.warmup, Duration::from_millis(500));
+        let a = args("--bench idle").unwrap().unwrap();
+        assert_eq!(a.warmup, Duration::from_millis(1000));
     }
 
     #[test]

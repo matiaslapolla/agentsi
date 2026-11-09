@@ -7,7 +7,7 @@ use gpui_kit::*;
 
 use crate::tokens::label::Hue;
 use crate::tokens::{
-    Color, Status, control, grid, radius, size, space, status, surface, text, weight,
+    Color, Status, WorkState, control, grid, radius, size, space, status, surface, text, weight,
 };
 
 /// The `gpui-component` tag in a status color on its tint. Long text ends with an ellipsis.
@@ -68,20 +68,28 @@ impl RenderOnce for StatusDot {
     }
 }
 
-/// The attention marker of a pane or a product: a program is `blocked` and waits for the owner.
-/// It does not pulse, so an idle window draws no frames. Long text ends with an ellipsis.
+/// The icon, the word and the color of a work state. The word may carry a reason, for example
+/// "Blocked: Bash". It does not pulse, so an idle window draws no frames. Long text ends with an
+/// ellipsis.
 #[derive(IntoElement)]
-pub struct AttentionMarker {
-    msg: SharedString,
+pub struct StateMark {
+    state: WorkState,
+    reason: SharedString,
     compact: bool,
 }
 
-impl AttentionMarker {
-    pub fn new(msg: impl Into<SharedString>) -> Self {
-        AttentionMarker {
-            msg: msg.into(),
+impl StateMark {
+    pub fn new(state: WorkState) -> Self {
+        StateMark {
+            state,
+            reason: SharedString::default(),
             compact: false,
         }
+    }
+    /// The text after the word of the state.
+    pub fn reason(mut self, reason: impl Into<SharedString>) -> Self {
+        self.reason = reason.into();
+        self
     }
     /// Only the icon, for the sidebar.
     pub fn compact(mut self) -> Self {
@@ -90,9 +98,28 @@ impl AttentionMarker {
     }
 }
 
-impl RenderOnce for AttentionMarker {
+/// The icon of a state. Working and Off use a status dot, drawn by [`StateMark`].
+pub fn state_icon(state: WorkState) -> Option<IconName> {
+    Some(match state {
+        WorkState::Blocked => IconName::TriangleAlert,
+        WorkState::Failed => IconName::CircleX,
+        WorkState::Review => IconName::Eye,
+        WorkState::Repairing => IconName::RefreshCw,
+        WorkState::Speaking => IconName::Play,
+        WorkState::Listening => IconName::Mic,
+        WorkState::Done => IconName::CircleCheck,
+        WorkState::Working | WorkState::Off => return None,
+    })
+}
+
+impl RenderOnce for StateMark {
     fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
-        let s = Status::Warn;
+        let s = self.state;
+        let word: SharedString = if self.reason.is_empty() {
+            s.word().into()
+        } else {
+            format!("{}: {}", s.word(), self.reason).into()
+        };
         div()
             .flex()
             .flex_shrink(1.)
@@ -111,14 +138,21 @@ impl RenderOnce for AttentionMarker {
             .text_size(size::xs())
             .font_weight(weight::MEDIUM)
             .text_color(s.color().hsla())
-            .child(
-                Icon::new(IconName::TriangleAlert)
+            .child(match state_icon(s) {
+                Some(icon) => Icon::new(icon)
                     .flex_none()
                     .size(control::icon_sm())
-                    .text_color(s.color().hsla()),
-            )
+                    .text_color(s.color().hsla())
+                    .into_any_element(),
+                None => div()
+                    .flex_none()
+                    .size(grid(2))
+                    .rounded(radius::FULL)
+                    .bg(s.color().hsla())
+                    .into_any_element(),
+            })
             .when(!self.compact, |el| {
-                el.child(div().min_w_0().truncate().child(self.msg))
+                el.child(div().min_w_0().truncate().child(word))
             })
     }
 }
