@@ -16,7 +16,7 @@ use agentsi_proto::marks_api::{
     PendingDecisionItem, PendingItem, PendingPriority, Verdict,
 };
 use agentsi_ui::components::{Button, Card, Force, ListRow, neutral_tag, status_tag};
-use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
+use agentsi_ui::tokens::{Status, control, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::IconName;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -35,6 +35,7 @@ use crate::model::CoreState;
 use crate::nav::{Nav, ScreenRequest};
 
 pub struct DeskScreen {
+    pub(super) conversation: Entity<super::desk_conversation::DeskConversation>,
     tickets: Entity<super::desk_tickets::DeskTickets>,
     product: String,
     core: Entity<CoreState>,
@@ -76,7 +77,12 @@ impl DeskScreen {
             let (product, core) = (product.clone(), core.clone());
             cx.new(|cx| super::desk_tickets::DeskTickets::new(product, core, cx))
         };
+        let conversation = {
+            let (product, core) = (product.clone(), core.clone());
+            cx.new(|cx| super::desk_conversation::DeskConversation::new(product, core, cx))
+        };
         let mut screen = DeskScreen {
+            conversation,
             tickets,
             product,
             core,
@@ -122,6 +128,12 @@ impl DeskScreen {
         if shown {
             self.touch(cx);
         }
+    }
+
+    /// The palette entry "Ask the front desk": the input of the conversation takes the focus.
+    pub fn ask(&mut self, cx: &mut Context<Self>) {
+        self.touch(cx);
+        self.conversation.update(cx, |c, cx| c.ask(cx));
     }
 
     /// The decision under the cursor, if the item there is a decision.
@@ -640,24 +652,56 @@ fn minutes_row(i: usize, m: &MinutesRow, product: &str, cx: &mut Context<DeskScr
 impl Render for DeskScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_form(window, cx);
-        let root = div()
+        let main = self.main(cx);
+        div()
             .id("desk")
             .track_focus(&self.focus)
             .key_context("Desk")
-            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.key_down(e, cx)))
+            .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
+                // The letters of the owner go to the input of the conversation.
+                if !this.conversation.read(cx).input_focused(window, cx) {
+                    this.key_down(e, cx);
+                }
+            }))
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| this.touch(cx)),
             )
             .size_full()
-            .bg(surface::panel());
+            .bg(surface::panel())
+            .flex()
+            .flex_row()
+            .child(main)
+            .child(
+                div()
+                    .flex_none()
+                    .w(control::DESK_CONVERSATION_WIDTH)
+                    .h_full()
+                    .border_l_1()
+                    .border_color(line::border())
+                    .child(self.conversation.clone()),
+            )
+    }
+}
+
+impl DeskScreen {
+    /// The left column: the state of the product. It stays on screen when the data fails to
+    /// load, and the conversation at its right still works.
+    fn main(&mut self, cx: &mut Context<Self>) -> AnyElement {
+        let column_box = || div().id("desk-main").flex_1().min_w_0().h_full();
         let d = match &self.data {
-            Load::Loading => return root.child(notice("Reading the front desk…", None)),
+            Load::Loading => {
+                return column_box()
+                    .child(notice("Reading the front desk…", None))
+                    .into_any_element();
+            }
             Load::Failed(e) => {
-                return root.child(notice(
-                    format!("The front desk did not load: {e}"),
-                    Some(super::parts::reload_hint(cx)),
-                ));
+                return column_box()
+                    .child(notice(
+                        format!("The front desk did not load: {e}"),
+                        Some(super::parts::reload_hint(cx)),
+                    ))
+                    .into_any_element();
             }
             Load::Ready(d) => d,
         };
@@ -927,17 +971,21 @@ impl Render for DeskScreen {
                     .map(|(i, m)| minutes_row(i, m, &product, cx)),
             );
 
-        root.track_scroll(&self.scroll).overflow_y_scroll().child(
-            column()
-                .child(header)
-                .child(stats(figures))
-                .child(decisions)
-                .child(self.tickets.clone())
-                .children(objectives)
-                .children(usage)
-                .child(minutes)
-                .child(mono(index_line)),
-        )
+        column_box()
+            .track_scroll(&self.scroll)
+            .overflow_y_scroll()
+            .child(
+                column()
+                    .child(header)
+                    .child(stats(figures))
+                    .child(decisions)
+                    .child(self.tickets.clone())
+                    .children(objectives)
+                    .children(usage)
+                    .child(minutes)
+                    .child(mono(index_line)),
+            )
+            .into_any_element()
     }
 }
 
@@ -1020,6 +1068,15 @@ mod tests {
         screen(cx, Load::Ready(empty));
     }
 
+    /// The reads of the parts of the desk: the tickets and the desk conversation. A test of
+    /// the left column does not count them.
+    fn is_part_read(method: &str) -> bool {
+        matches!(
+            method,
+            "ticket.list" | "mark.pending" | "desk.history" | "decision.get"
+        )
+    }
+
     /// The next request that the screen sent to the core, as JSON, or `None`. The read of the
     /// tickets part of the desk (`desk_tickets.rs`) is not counted.
     fn sent(other: &mut std::os::unix::net::UnixStream) -> Option<serde_json::Value> {
@@ -1027,7 +1084,7 @@ mod tests {
         loop {
             let frame = agentsi_proto::frame::read_frame(other).ok().flatten()?;
             let request: serde_json::Value = serde_json::from_slice(&frame.payload).ok()?;
-            if request["method"] != "ticket.list" && request["method"] != "mark.pending" {
+            if !is_part_read(request["method"].as_str().unwrap_or_default()) {
                 return Some(request);
             }
         }
@@ -1037,7 +1094,7 @@ mod tests {
     fn methods(socket: &mut std::os::unix::net::UnixStream) -> Vec<String> {
         crate::model::two_cores::methods(socket)
             .into_iter()
-            .filter(|m| m != "ticket.list" && m != "mark.pending")
+            .filter(|m| !is_part_read(m))
             .collect()
     }
 

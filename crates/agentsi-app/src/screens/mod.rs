@@ -19,6 +19,7 @@
 
 pub mod call;
 pub mod desk;
+pub mod desk_conversation;
 pub mod desk_tickets;
 pub mod form;
 pub mod git;

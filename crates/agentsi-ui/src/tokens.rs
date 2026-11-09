@@ -744,6 +744,8 @@ pub mod control {
     /// The widest trailing element of a list row. The title keeps the rest.
     pub const TRAILING_MAX: Pixels = px(160.);
     pub const SIDEBAR_WIDTH: Pixels = px(248.);
+    /// The desk conversation: the right column of the front desk.
+    pub const DESK_CONVERSATION_WIDTH: Pixels = px(380.);
     /// The widest column of a screen of text: longer lines read badly.
     pub const CONTENT_WIDTH: Pixels = px(880.);
     /// The width of a number column in a table.

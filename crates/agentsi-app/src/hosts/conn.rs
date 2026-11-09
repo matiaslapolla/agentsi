@@ -473,7 +473,13 @@ impl Host {
             };
         let subscribed = wait(
             link.call::<Subscribe>(&SubscribeParams {
-                topics: vec![Topic::Voice, Topic::Terminal, Topic::Data, Topic::Meeting],
+                topics: vec![
+                    Topic::Voice,
+                    Topic::Terminal,
+                    Topic::Data,
+                    Topic::Meeting,
+                    Topic::Desk,
+                ],
             }),
             self.limits.call,
         );

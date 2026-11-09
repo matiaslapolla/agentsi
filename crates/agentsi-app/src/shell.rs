@@ -393,6 +393,7 @@ impl Shell {
                 Topic::Models,
                 Topic::Meeting,
                 Topic::Voice,
+                Topic::Desk,
             ],
         });
         let products = link.call::<ProductList>(&Empty {});
