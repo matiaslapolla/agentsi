@@ -3167,6 +3167,24 @@
         ],
         "type": "object"
       },
+      "OwnerChange": {
+        "description": "The owner fields to change. An absent field stays.",
+        "properties": {
+          "language": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
       "PendingDecision": {
         "description": "A decision that waits for the owner.",
         "properties": {
@@ -3404,6 +3422,34 @@
           "why",
           "is_new",
           "sources"
+        ],
+        "type": "object"
+      },
+      "ProductChange": {
+        "description": "The product fields to change. An absent field stays.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "paths": {
+            "description": "Existing absolute folders, one at least.",
+            "items": {
+              "type": "string"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id"
         ],
         "type": "object"
       },
@@ -3904,6 +3950,54 @@
         "required": [
           "name",
           "path"
+        ],
+        "type": "object"
+      },
+      "RegistryProduct": {
+        "description": "A product of the registry. The roster and the stories block have their own methods.",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "paths": {
+            "description": "Absolute folders. The first one is the main folder.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "paths",
+          "status"
+        ],
+        "type": "object"
+      },
+      "RegistryResult": {
+        "properties": {
+          "owner": {
+            "$ref": "#/components/schemas/Owner",
+            "description": "The owner block with its defaults."
+          },
+          "products": {
+            "description": "The products in registry order.",
+            "items": {
+              "$ref": "#/components/schemas/RegistryProduct"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "owner",
+          "products"
         ],
         "type": "object"
       },
@@ -11820,6 +11914,112 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/TicketPromoteResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the owner block and the products of `agentsi.config.json`. It only reads.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "registry.get",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/RegistryResult"
+        }
+      }
+    },
+    {
+      "description": "Changes the owner block, or the name and the paths of one product, in `agentsi.config.json`. Each other key stays. The file changes in one step, so a failed write leaves it as it was. A product change also writes its `products` row and sends `data.changed` of kind `product`. It makes no commit.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "registry.update",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "owner",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnerChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProductChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/RegistryResult"
         }
       }
     }

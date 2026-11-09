@@ -22,6 +22,7 @@ pub mod method;
 pub mod models_api;
 pub mod ops_api;
 pub mod reflect_api;
+pub mod registry_api;
 pub mod roles_api;
 pub mod rpc;
 pub mod schema;

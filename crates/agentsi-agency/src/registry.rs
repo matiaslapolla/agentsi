@@ -44,6 +44,23 @@ impl Product {
     }
 }
 
+/// Replaces the registry file of `root` with `text` in one step: a write of a temporary
+/// file next to it, then a rename. A failed step leaves the file as it was.
+pub fn write_file(root: &Path, text: &str) -> std::io::Result<()> {
+    use std::io::Write;
+    let file = root.join(FILE);
+    let tmp = root.join(format!("{FILE}.tmp"));
+    let mode = std::fs::metadata(&file).map(|m| m.permissions()).ok();
+    let mut out = std::fs::File::create(&tmp)?;
+    out.write_all(text.as_bytes())?;
+    out.sync_all()?;
+    drop(out);
+    if let Some(mode) = mode {
+        std::fs::set_permissions(&tmp, mode)?;
+    }
+    std::fs::rename(&tmp, &file)
+}
+
 const DEFAULT_OWNER: (&str, &str) = ("the owner", "English");
 
 fn strings(v: &Value, key: &str) -> Vec<String> {

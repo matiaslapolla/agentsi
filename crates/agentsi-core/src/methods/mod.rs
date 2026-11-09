@@ -17,6 +17,7 @@ mod meeting;
 pub mod models;
 mod ops;
 mod reflect;
+mod registry;
 mod roles;
 mod story;
 mod terminal;
@@ -54,6 +55,7 @@ pub fn router() -> Router {
         .group(reflect::register)
         .group(git::register)
         .group(tickets::register)
+        .group(registry::register)
 }
 
 /// What a handler can use: the core, and the state of its connection.

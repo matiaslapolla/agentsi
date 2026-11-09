@@ -357,6 +357,7 @@ fn edit_registry(text: &str, planned: &Planned) -> std::result::Result<String, S
     let patch = Patch {
         roles: Some(plan.roster_after.clone()),
         stories: plan.stories_changed.then(|| plan.stories_after.clone()),
+        ..Patch::default()
     };
     update_product(text, &plan.product, &patch)
 }

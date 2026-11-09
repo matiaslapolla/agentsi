@@ -1,6 +1,6 @@
 //! `registry-edit.ts`: a text edit of `agentsi.config.json` that touches one
 //! line. The registry keeps one product on each line, so a diff shows one
-//! changed line.
+//! changed line. The owner block is one line too.
 
 use regex::Regex;
 use serde_json::{Map, Value};
@@ -8,6 +8,8 @@ use std::sync::LazyLock;
 
 static PRODUCT_LINE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r#"^(\s*)\{ "id":.*\}(,?)\s*$"#).unwrap());
+static OWNER_LINE: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r#"^(\s*)"owner": \{.*\}(,?)\s*$"#).unwrap());
 static LAST_LINE_END: LazyLock<Regex> = LazyLock::new(|| Regex::new(r",?\s*$").unwrap());
 
 /// What `updateProduct` changes in a product.
@@ -16,6 +18,8 @@ pub struct Patch {
     pub roles: Option<Vec<String>>,
     /// `Some(None)` removes the `stories` key, `Some(Some(block))` sets it.
     pub stories: Option<Option<Value>>,
+    pub name: Option<String>,
+    pub paths: Option<Vec<String>>,
 }
 
 /// A number as JavaScript prints it: `5.0` is `5`.
@@ -91,6 +95,12 @@ pub fn update_product(text: &str, id: &str, patch: &Patch) -> Result<String, Str
         .cloned()
         .ok_or_else(|| format!("Unknown product \"{id}\""))?;
     let mut updated: Map<String, Value> = product.as_object().cloned().unwrap_or_default();
+    if let Some(name) = &patch.name {
+        updated.insert("name".into(), name.clone().into());
+    }
+    if let Some(paths) = &patch.paths {
+        updated.insert("paths".into(), paths.clone().into());
+    }
     if let Some(roles) = &patch.roles {
         updated.insert("roles".into(), roles.clone().into());
     }
@@ -118,6 +128,52 @@ pub fn update_product(text: &str, id: &str, patch: &Patch) -> Result<String, Str
         if p.get("id").and_then(Value::as_str) == Some(id) {
             *p = updated.clone();
         }
+    }
+    checked(lines.join("\n"), &doc)
+}
+
+/// Sets `name` and `language` of the owner block, which is one line. The other keys of
+/// the block keep their order. A registry with no owner block gets one after `{`.
+pub fn update_owner(
+    text: &str,
+    name: Option<&str>,
+    language: Option<&str>,
+) -> Result<String, String> {
+    let mut doc = parse(text)?;
+    let root = doc
+        .as_object_mut()
+        .ok_or_else(|| "The registry is not an object.".to_string())?;
+    let had_owner = root.contains_key("owner");
+    let mut owner: Map<String, Value> = match root.get("owner") {
+        None => Map::new(),
+        Some(Value::Object(o)) => o.clone(),
+        Some(_) => return Err("The owner block of the registry must be an object.".into()),
+    };
+    if let Some(name) = name {
+        owner.insert("name".into(), name.into());
+    }
+    if let Some(language) = language {
+        owner.insert("language".into(), language.into());
+    }
+    let owner = Value::Object(owner);
+    let mut lines: Vec<String> = text.split('\n').map(String::from).collect();
+    if had_owner {
+        let at = lines.iter().position(|l| OWNER_LINE.is_match(l));
+        let Some(at) = at else {
+            return Err("The owner block is not one line in the registry.".into());
+        };
+        let caps = OWNER_LINE.captures(&lines[at]).expect("the line matched");
+        lines[at] = format!("{}\"owner\": {}{}", &caps[1], one_line(&owner), &caps[2]);
+        root.insert("owner".into(), owner);
+    } else {
+        let Some(at) = lines.iter().position(|l| l.trim() == "{") else {
+            return Err("The registry has no line with the opening brace alone.".into());
+        };
+        lines.insert(at + 1, format!("  \"owner\": {},", one_line(&owner)));
+        let mut with_owner = Map::new();
+        with_owner.insert("owner".into(), owner);
+        with_owner.extend(root.clone());
+        *root = with_owner;
     }
     checked(lines.join("\n"), &doc)
 }
@@ -288,5 +344,43 @@ mod tests {
             update_product(&spread, "a", &Patch::default()).unwrap_err(),
             "Product \"a\" is not one line in the registry."
         );
+    }
+
+    #[test]
+    fn a_product_gets_a_new_name_and_new_paths_on_its_line() {
+        let out = update_product(
+            REGISTRY,
+            "b",
+            &Patch {
+                name: Some("Bee".into()),
+                paths: Some(vec!["/y/b".into(), "/y/c".into()]),
+                ..Patch::default()
+            },
+        )
+        .unwrap();
+        assert!(out.contains(
+            r#"    { "id": "b", "name": "Bee", "paths": ["/y/b", "/y/c"], "status": "planned", "roles": ["pm"] }"#
+        ));
+        assert_eq!(out.lines().count(), REGISTRY.lines().count());
+    }
+
+    #[test]
+    fn the_owner_line_changes_and_keeps_its_other_keys() {
+        let text = REGISTRY.replace(r#"{ "name": "Ada" }"#, r#"{ "name": "Ada", "tz": "UTC" }"#);
+        let out = update_owner(&text, Some("Bea"), Some("Spanish")).unwrap();
+        assert!(
+            out.contains(r#"  "owner": { "name": "Bea", "tz": "UTC", "language": "Spanish" },"#)
+        );
+        assert_eq!(out.lines().count(), text.lines().count());
+
+        let bare = "{\n  \"products\": []\n}\n";
+        let added = update_owner(bare, Some("Bea"), None).unwrap();
+        assert_eq!(
+            added,
+            "{\n  \"owner\": { \"name\": \"Bea\" },\n  \"products\": []\n}\n"
+        );
+
+        let multi = "{\n  \"owner\": {\n    \"name\": \"Ada\"\n  },\n  \"products\": []\n}\n";
+        assert!(update_owner(multi, Some("Bea"), None).is_err());
     }
 }

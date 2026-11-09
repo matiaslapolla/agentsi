@@ -169,7 +169,7 @@ pub fn write_reset(tx: &Transaction, root: &Path, planned: &Planned) -> Result<(
             .map_err(|e| super::Error::Invalid(format!("cannot read {}: {e}", file.display())))?;
         let patch = Patch {
             roles: Some(plan.roster_after.clone()),
-            stories: None,
+            ..Patch::default()
         };
         let edited = update_product(&text, id, &patch).map_err(super::Error::Invalid)?;
         std::fs::write(&file, edited)
