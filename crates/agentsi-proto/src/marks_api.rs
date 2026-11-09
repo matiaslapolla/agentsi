@@ -273,6 +273,47 @@ impl Method for DecisionArchived {
     type Result = DecisionArchivedResult;
 }
 
+pub struct DecisionGet;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DecisionGetParams {
+    pub product: String,
+    pub ids: Vec<i64>,
+}
+
+/// One stored decision, as a view of the desk conversation reads it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DecisionInfo {
+    pub id: i64,
+    /// `minutes`, `reflection` or `product`.
+    pub kind: String,
+    pub minutes_id: Option<String>,
+    pub text: String,
+    pub why: Option<String>,
+    /// What to run once the decision is approved.
+    pub action: Option<String>,
+    /// `pending`, `approved`, `rejected` or `stale`.
+    pub status: Option<String>,
+    /// True when the archive record holds the decision.
+    pub archived: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DecisionGetResult {
+    /// In the order of `ids`. An id that the product does not have is left out.
+    pub decisions: Vec<DecisionInfo>,
+}
+
+impl Method for DecisionGet {
+    const NAME: &'static str = "decision.get";
+    const DESCRIPTION: &'static str = "Gives the decisions of a product with these ids, \
+        archived or not, with their status. A view of the desk conversation reads it. It only \
+        reads.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = DecisionGetParams;
+    type Result = DecisionGetResult;
+}
+
 /// The kind of record that an archive record names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]

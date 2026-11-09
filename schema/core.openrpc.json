@@ -5741,7 +5741,8 @@
           "meeting",
           "voice",
           "dictation",
-          "models"
+          "models",
+          "desk"
         ],
         "type": "string"
       },
