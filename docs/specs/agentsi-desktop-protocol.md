@@ -68,6 +68,7 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 | `minutes` | `list`, `get`, `check` |
 | `decision` | `list`, `decide`, `add` |
 | `mark` | `pending`, `set` |
+| `ticket` | `list`, `get`, `add`, `update`, `move`, `promote` (tracker, `agentsi-desktop-tracker.md`) |
 | `story` | `config`, `list`, `get`, `new`, `suggest`, `approve`, `discard`, `changes`, `run`, `exec`, `review`, `accept`, `reject`, `result` (U23) |
 | `meeting` | `start`, `ask`, `cancel` |
 | `knowledge` | `index`, `search`, `get_doc` |
@@ -87,7 +88,7 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 `core.subscribe {topics}` starts notifications on channel 0. The topics are the event namespaces: `terminal`, `data`, `meeting`, `voice`, `dictation` and `models`. A second call adds topics. The events are:
 
 - `terminal.state {id, state, kind?, msg?}`, `terminal.exit {id, code}`, `terminal.title {id, title}`.
-- `data.changed {product, kind}` after each write.
+- `data.changed {product, kind}` after each write. The kind `tickets` follows each write of a ticket. `ticket.promote` sends `stories` or `decision` first.
 - `meeting.event {meeting, role, line}` carries each stream-json line of each role. `meeting.progress` carries the stages (U22).
 - `voice.speak {terminal, role, text}` and `voice.stop {terminal}`.
 - `dictation.target {terminal?}`, `dictation.start {at_us}` and `dictation.stop {at_us}` (U14). `at_us` is when the key edge happened, in microseconds since the Unix epoch.

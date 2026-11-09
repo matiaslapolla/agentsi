@@ -87,6 +87,7 @@ A bench run is valid only when no input and no change of focus reach the window 
 | Meeting | One live pane for each role, from the stream-json events | M2 |
 | Call | Player that shows the speaking role, listened mark. See `agentsi-desktop-calls.md` | M2 (U26) |
 | Stories | List, and one story with criteria, session state, diff and the review actions | M2 |
+| Tickets | The tickets of a product by state, with an add field and filters, and one ticket with its fields, links and actions. The front desk shows the tickets for the owner. See `agentsi-desktop-tracker.md` | M2 |
 | Memory | Items of each agent with helpful and harmful counts, retire, reflections with revert and the decision of a proposal | M2 (U25) |
 | Roles | Roster, overlays, specialists, validate, apply, reset | M2 (U21) |
 
