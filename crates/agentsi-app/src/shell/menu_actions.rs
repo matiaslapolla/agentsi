@@ -386,6 +386,7 @@ impl Shell {
             Cmd::Reflect => self.reflect(p, cx),
             Cmd::CancelReflect => self.cancel_reflect(p, cx),
             Cmd::OpenGit => self.show_screen(ScreenSpec::git(&p.id).on(p.host), window, cx),
+            Cmd::UpdateBrief => self.show_screen(ScreenSpec::setup(&p.id).on(p.host), window, cx),
             Cmd::Label => self.ask(Ask::ProductLabel(p), window, cx),
             Cmd::Color => self.ask(Ask::ProductColor(p), window, cx),
             Cmd::MoveToGroup => self.ask(Ask::ProductGroup(p), window, cx),

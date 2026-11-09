@@ -37,6 +37,10 @@ gpui_kit::actions!(
         OpenTickets,
         /// Opens the git screen of the active product.
         OpenGit,
+        /// Opens the setup screen for a new product, on the host of the active product.
+        NewProduct,
+        /// Opens the setup screen to update the brief of the active product.
+        UpdateBrief,
         /// Opens the meeting of the active product.
         OpenMeeting,
         /// Starts the meeting in the question field of the active product.
@@ -84,6 +88,8 @@ gpui_kit::actions!(
         OpenSettings,
         /// Opens the settings at the Data section, where the owner deletes data.
         OpenDataSettings,
+        /// Opens the settings at the Owner section, where the owner edits the name and the language.
+        OpenOwnerSettings,
         /// Opens the settings and checks the health of the tools.
         CheckHealth,
         /// Opens the settings and backs up the data now.
@@ -444,6 +450,18 @@ pub const ENTRIES: &[Entry] = &[
             "git", "branch", "commit", "stage", "unstage", "diff", "status", "history", "config",
         ],
         action: || Box::new(OpenGit),
+    },
+    Entry {
+        label: "Set up a new product",
+        icon: IconName::Plus,
+        keywords: &["setup", "new", "product", "register", "add", "brief", "folder"],
+        action: || Box::new(NewProduct),
+    },
+    Entry {
+        label: "Update the brief of the active product",
+        icon: IconName::FileText,
+        keywords: &["setup", "brief", "roster", "objectives", "stories", "update", "apply"],
+        action: || Box::new(UpdateBrief),
     },
     Entry {
         label: "Open the meeting of the active product",
@@ -975,6 +993,12 @@ pub const ENTRIES: &[Entry] = &[
             "logs",
         ],
         action: || Box::new(OpenDataSettings),
+    },
+    Entry {
+        label: "Open the owner settings",
+        icon: IconName::Settings,
+        keywords: &["owner", "name", "language", "settings", "prompt"],
+        action: || Box::new(OpenOwnerSettings),
     },
     Entry {
         label: "Show the context of the next meeting",

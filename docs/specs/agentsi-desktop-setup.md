@@ -105,6 +105,6 @@ The owner did not answer these questions. Each line takes the recommendation of 
 - [ ] `cargo test -p agentsi-core --test setup draft` passes with a fake `claude`: the call has `--max-budget-usd 0.50`, and `setup.jsonl` gets one line.
 - [ ] `cargo test -p agentsi-cli --test golden` passes, and `git diff --stat main -- crates/agentsi-cli/tests/golden` prints nothing.
 - [ ] `cargo test -p agentsi-proto --test schema` passes.
-- [ ] A test of `agentsi-app` with a fake core does the five steps for a new product and finds no write call before Confirm.
-- [ ] `rg -n 'read_from_clipboard' crates/agentsi-app/src/screens/roles.rs` finds nothing.
+- [x] A test of `agentsi-app` with a fake core does the five steps for a new product and finds no write call before Confirm.
+- [x] `rg -n 'read_from_clipboard' crates/agentsi-app/src/screens/roles.rs` finds nothing.
 - [ ] The owner registers one real product in the app, and `agentsi roles validate` passes on it.

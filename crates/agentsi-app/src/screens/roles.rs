@@ -1,11 +1,11 @@
 //! The roles of a product (U21): the roster, the specialists, the overlays, and the
 //! validate, apply and reset actions. `roles.apply` and `roles.reset` plan first. The
-//! screen shows the plan, and a second click on Confirm writes it. Apply takes the path of
-//! the stage folder from the clipboard.
+//! screen shows the plan, and a second click on Confirm writes it. "Update the brief" opens
+//! the setup screen, which applies a new brief.
 
 use agentsi_proto::agency_api::{AuditParams, AuditReport, DataAudit};
 use agentsi_proto::roles_api::{
-    ApplyPlan, RoleDef, BriefView, ChangeStatus, ResetPlan, RoleSource, RolesApply, RolesApplyParams,
+    ApplyPlan, RoleDef, BriefView, ChangeStatus, ResetPlan, RoleSource,
     RolesBrief, RolesBriefParams, RolesList, RolesListParams, RolesListResult, RolesReset,
     RolesResetParams, RolesValidate, RolesValidateParams, RolesValidateResult, RosterEntry,
 };
@@ -19,12 +19,13 @@ use gpui_kit::*;
 use super::parts::{Load, column, first_screen_ready, mono, notice, role_label, section};
 use super::roles_report;
 use crate::model::CoreState;
+use crate::nav::Nav;
+use super::ScreenSpec;
 
 /// A plan that waits for the owner to confirm it.
 #[derive(Clone)]
 enum Pending {
     Reset(RolesResetParams, ResetPlan),
-    Apply(RolesApplyParams, ApplyPlan),
 }
 
 pub struct RolesScreen {
@@ -217,57 +218,6 @@ impl RolesScreen {
         .detach();
     }
 
-    /// Plans an apply of the stage folder whose path is on the clipboard.
-    fn plan_apply(&mut self, cx: &mut Context<Self>) {
-        let path = cx
-            .read_from_clipboard()
-            .and_then(|c| c.text())
-            .map(|t| t.trim().to_string())
-            .unwrap_or_default();
-        let host = self.core.read(cx).remote.clone();
-        if path.is_empty() {
-            self.message = Some(Err(match &host {
-                Some(h) => format!("Copy the path of the stage folder on {h} first."),
-                None => "Copy the path of the stage folder first.".into(),
-            }));
-            cx.notify();
-            return;
-        }
-        let params = RolesApplyParams {
-            product: self.product.clone(),
-            stage_dir: Some(path),
-            stage: None,
-            yes: false,
-            register: None,
-        };
-        let call = self.core.read(cx).link.call::<RolesApply>(&params);
-        cx.spawn(async move |this, cx| {
-            // The core of the host reads the path, so a folder of this device fails there.
-            let result = call.await.map_err(|e| match &host {
-                Some(h) => format!("{e} The stage folder must be on {h}."),
-                None => e.to_string(),
-            });
-            let _ = this.update(cx, |this, cx| {
-                this.message = None;
-                match result {
-                    Ok(r) => match r.plan {
-                        Some(plan) => this.pending = Some(Pending::Apply(params, plan)),
-                        None => {
-                            this.pending = None;
-                            this.message = Some(Err(format!(
-                                "The stage is not valid: {}",
-                                r.failures.join(" · ")
-                            )));
-                        }
-                    },
-                    Err(e) => this.message = Some(Err(e)),
-                }
-                cx.notify();
-            });
-        })
-        .detach();
-    }
-
     /// Writes the pending plan.
     fn confirm(&mut self, cx: &mut Context<Self>) {
         let Some(pending) = self.pending.take() else {
@@ -290,23 +240,6 @@ impl RolesScreen {
                         })
                     }),
                     "Reset",
-                )
-            }
-            Pending::Apply(mut p, _) => {
-                p.yes = true;
-                let call = link.call::<RolesApply>(&p);
-                (
-                    cx.background_spawn(async move {
-                        call.await.map_err(|e| e.to_string()).and_then(|r| {
-                            if r.applied {
-                                Ok(r.commit)
-                            } else {
-                                Err("The data changed since the plan. Nothing was written."
-                                    .to_string())
-                            }
-                        })
-                    }),
-                    "Applied",
                 )
             }
         };
@@ -435,7 +368,6 @@ impl RolesScreen {
                 },
                 reset_lines(plan),
             ),
-            Pending::Apply(_, plan) => ("Apply the stage folder".to_string(), apply_lines(plan)),
         };
         Some(
             div()
@@ -463,7 +395,6 @@ impl RolesScreen {
                             ),
                         )
                     }
-                    _ => None,
                 })
                 .child(
                     div()
@@ -607,16 +538,13 @@ impl Render for RolesScreen {
                             .on_click(cx.listener(|this, _, _, cx| this.validate(cx))),
                     )
                     .child(
-                        Button::new("roles-apply")
+                        Button::new("roles-update-brief")
                             .secondary()
                             .small()
-                            .label(match &self.core.read(cx).remote {
-                                Some(h) => {
-                                    format!("Apply stage from the clipboard (a path on {h})")
-                                }
-                                None => "Apply stage from the clipboard".to_string(),
-                            })
-                            .on_click(cx.listener(|this, _, _, cx| this.plan_apply(cx))),
+                            .label("Update the brief")
+                            .on_click(cx.listener(|this, _, _, cx| {
+                                Nav::open(cx, &this.core, ScreenSpec::setup(&this.product))
+                            })),
                     )
                     .child(
                         Button::new("roles-reset-all")

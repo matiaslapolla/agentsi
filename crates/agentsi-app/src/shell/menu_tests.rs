@@ -98,6 +98,7 @@ fn each_entry_of_the_product_menu_runs_its_action_and_the_costly_ones_ask_one_co
         Cmd::OpenTickets,
         Cmd::Reflect,
         Cmd::OpenGit,
+        Cmd::UpdateBrief,
         Cmd::Label,
         Cmd::Color,
         Cmd::MoveToGroup,
@@ -121,6 +122,8 @@ fn each_entry_of_the_product_menu_runs_its_action_and_the_costly_ones_ask_one_co
     assert_eq!(active_tab(&f, cx), "screen:meeting");
     run(&f, cx, b(), Cmd::OpenGit);
     assert_eq!(active_tab(&f, cx), "screen:git");
+    run(&f, cx, b(), Cmd::UpdateBrief);
+    assert_eq!(active_tab(&f, cx), "screen:setup");
 
     // New story opens the form of the stories screen in place of a prompt.
     run(&f, cx, b(), Cmd::NewStory);

@@ -51,7 +51,7 @@ use crate::screens::memory::MemoryScreen;
 use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
 use crate::screens::settings::{ModelFeed, ModelFeedGlobal};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec, screen_of};
-use crate::sidebar::{OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged};
+use crate::sidebar::{NewProduct, OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged};
 use crate::tab_bar;
 use crate::tabs::{self, GroupId, TabGroups, TabsChanged};
 use crate::tree::ItemKey;
@@ -225,6 +225,9 @@ impl Shell {
             ),
             cx.subscribe_in(&sidebar, window, |this, _, e: &OpenItem, window, cx| {
                 this.open_item(&e.product, &e.item, window, cx)
+            }),
+            cx.subscribe_in(&sidebar, window, |this, _, e: &NewProduct, window, cx| {
+                this.show_screen(ScreenSpec::setup("").on(e.0.clone()), window, cx)
             }),
             cx.subscribe(&sidebar, |this, _, _: &ShowAlerts, cx| {
                 this.toggle_alert_log(cx)
@@ -1431,6 +1434,13 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::OpenGit, window, cx| {
                 this.show_active(ScreenSpec::git, window, cx)
             }))
+            .on_action(cx.listener(|this, _: &actions::UpdateBrief, window, cx| {
+                this.show_active(ScreenSpec::setup, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::NewProduct, window, cx| {
+                let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
+                this.show_screen(ScreenSpec::setup("").on(host), window, cx)
+            }))
             .on_action(cx.listener(|this, _: &actions::OpenMeeting, window, cx| {
                 this.show_active(ScreenSpec::meeting, window, cx)
             }))
@@ -1484,6 +1494,14 @@ impl Render for Shell {
                 let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
                 this.sidebar
                     .update(cx, |s, cx| s.toggle_archived(host.as_deref(), cx));
+            }))
+            .on_action(cx.listener(|this, _: &actions::OpenOwnerSettings, window, cx| {
+                this.show_screen(ScreenSpec::settings(), window, cx);
+                for p in this.open_screens(cx) {
+                    if p.read(cx).is(&ScreenSpec::settings()) {
+                        p.update(cx, |p, cx| p.reveal_owner(cx));
+                    }
+                }
             }))
             .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
                 this.show_screen(ScreenSpec::settings(), window, cx);

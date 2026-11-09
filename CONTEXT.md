@@ -54,6 +54,18 @@ _Avoid_: Fork, custom prompt
 The product as the owner defined it in setup: what it is, for whom, its stage, its objectives, its north-star docs and what is out of scope.
 _Avoid_: Profile, product config
 
+**Setup screen**:
+The screen of the app that registers a product or updates its brief in four steps: Folder, Forms, Review and Done. It writes only after the owner's Confirm, through `roles.apply`, `registry.update`, `decision.add` and `setup.outcome`, and never into the product repo.
+_Avoid_: Wizard, onboarding
+
+**Setup draft**:
+The field values that one Claude call proposes from the files of a product folder (`setup.draft`, model `sonnet`, no tools, a cap of 0.50 USD). The owner confirms the cost, edits each field, and a field that the files do not answer shows "no data".
+_Avoid_: Autofill, suggestion
+
+**Inline stage**:
+The stage files of `roles.apply` sent as text in the request (`stage`), in place of a folder path (`stage_dir`). It works for a product on an SSH host.
+_Avoid_: Virtual stage
+
 **Objective**:
 One goal of a brief, with the signal that shows it and a date. Every priority points to one.
 _Avoid_: OKR, KPI, target

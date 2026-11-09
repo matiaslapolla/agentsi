@@ -63,6 +63,16 @@ impl ScreenSpec {
         }
     }
 
+    /// The setup screen. An empty `product` registers a new one.
+    pub fn setup(product: &str) -> Self {
+        ScreenSpec {
+            kind: ScreenKind::Setup,
+            host: None,
+            product: product.into(),
+            arg: None,
+        }
+    }
+
     pub fn tickets(product: &str) -> Self {
         ScreenSpec {
             kind: ScreenKind::Tickets,

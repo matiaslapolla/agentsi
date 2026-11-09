@@ -38,6 +38,7 @@ mod dictation;
 mod git;
 mod guide;
 mod health;
+mod owner;
 use crate::model::{CoreState, HostState};
 pub use dictation::DictationGlobal;
 use dictation::DictationKey;
@@ -191,6 +192,8 @@ pub struct SettingsScreen {
     clear: data::ClearState,
     /// The Health section: the rows of `core.doctor`.
     health: health::HealthState,
+    /// The Owner section: the name and the language of the owner.
+    owner_state: owner::OwnerState,
     /// The error of the last save of the Appearance section.
     appearance_error: Option<String>,
     /// The error of the last save of the Alerts section.
@@ -282,6 +285,7 @@ impl SettingsScreen {
                 .map(DictationKey::new),
             clear: data::ClearState::default(),
             health: health::HealthState::default(),
+            owner_state: owner::OwnerState::default(),
             appearance_error: None,
             alerts_error: None,
             keys_note: None,
@@ -341,6 +345,7 @@ impl SettingsScreen {
         let vocab = link.call::<VocabularyGet>(&Empty {});
         self.pending.get_or_insert_default();
         self.git.update(cx, |g, cx| g.reload(cx));
+        self.load_owner(cx);
         cx.spawn(async move |this, cx| {
             let vocab = vocab.await.map_err(|e| e.to_string());
             let _ = this.update(cx, |this, cx| {
@@ -1179,6 +1184,7 @@ impl Render for SettingsScreen {
         let appearance = self.appearance_section(cx);
         let alerts = self.alerts_section(cx);
         let health = self.health_section(cx);
+        let owner = self.owner_section(window, cx);
         let data = self.data_section(window, cx);
         let git = self.git_section();
         let guide = self.guide_section(cx);
@@ -1209,6 +1215,7 @@ impl Render for SettingsScreen {
                                 .child("The look of the app, voice models, voices, the vocabulary and the keys of this device, its SSH hosts, and the data to delete."),
                         ),
                 )
+                .child(owner)
                 .child(appearance)
                 .child(alerts)
                 .child(
