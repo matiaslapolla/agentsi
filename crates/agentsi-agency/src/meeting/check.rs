@@ -32,6 +32,8 @@ pub struct SourceContext {
     pub north_stars: Option<Vec<PathBuf>>,
     /// The id and the title of each story.
     pub stories: Vec<(String, String)>,
+    /// The id of each ticket, in any state.
+    pub tickets: Vec<String>,
 }
 
 /// `path.relative` on two absolute paths.
@@ -74,12 +76,21 @@ pub fn source_context(c: &Connection, product: &Product) -> SourceContext {
             Some((id, js_text(s.get("title"))))
         })
         .collect();
+    // The same rule for the tickets.
+    let tickets = c
+        .prepare("select id from tickets where product = ?1")
+        .and_then(|mut stmt| {
+            stmt.query_map([&product.id], |r| r.get(0))?
+                .collect::<rusqlite::Result<Vec<String>>>()
+        })
+        .unwrap_or_default();
     SourceContext {
         product: product.clone(),
         roots,
         repos,
         north_stars: None,
         stories,
+        tickets,
     }
 }
 
@@ -153,6 +164,7 @@ fn resolve_detailed(source: &Value, ctx: &SourceContext) -> (bool, bool) {
         Some("issue") => (resolve_issue(reference, ctx), false),
         Some("url") => (is_http_url(reference), false),
         Some("story") => (ctx.stories.iter().any(|(id, _)| id == reference), false),
+        Some("ticket") => (ctx.tickets.iter().any(|id| id == reference), false),
         Some("path") => {
             let full = resolve_path(reference, &ctx.roots);
             let north_star = full.as_deref().is_some_and(|f| match &ctx.north_stars {
@@ -376,6 +388,31 @@ mod tests {
             "decisions": [],
             "script": [{"role": "dev", "text": "Hello."}],
         })
+    }
+
+    #[test]
+    fn a_ticket_source_resolves_only_when_the_product_has_that_ticket() {
+        let (_d, c) = db();
+        c.execute_batch(
+            r#"insert into tickets (product, id, kind, state, title, author, updated_by, created_at, updated_at)
+               values ('p', 'C001', 'todo', 'done', 't', '{}', '{}', 'x', 'x'),
+                      ('q', 'C002', 'todo', 'open', 't', '{}', '{}', 'x', 'x');"#,
+        )
+        .unwrap();
+        let dir = folder();
+        let mut m = minutes(json!({"type": "path", "ref": "README.md"}));
+        m["priorities"][0]["sources"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"type": "ticket", "ref": "C001"}));
+        let r = check(&c, &m, &product(dir.path(), &["dev"]), None, None);
+        assert_eq!(r.failures, Vec::<String>::new());
+        for unknown in ["C404", "C002"] {
+            m["priorities"][0]["sources"][1]["ref"] = json!(unknown);
+            let r = check(&c, &m, &product(dir.path(), &["dev"]), None, None);
+            assert_eq!(r.failures.len(), 1, "{:?}", r.failures);
+            assert!(r.failures[0].contains(unknown), "{:?}", r.failures);
+        }
     }
 
     #[test]

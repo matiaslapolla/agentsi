@@ -324,6 +324,32 @@
         ],
         "type": "object"
       },
+      "Author": {
+        "description": "The author or the last writer of a ticket.",
+        "properties": {
+          "by": {
+            "$ref": "#/components/schemas/AuthorBy"
+          },
+          "id": {
+            "default": "",
+            "description": "The name of the owner, the agent id, or the session id. A client of the owner leaves\nit out, and the core writes the name of the owner block.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "by"
+        ],
+        "type": "object"
+      },
+      "AuthorBy": {
+        "description": "Who wrote a ticket.",
+        "enum": [
+          "owner",
+          "agent",
+          "session"
+        ],
+        "type": "string"
+      },
       "BriefView": {
         "description": "The brief of a product, as `/agentsi setup` stores it. A field that the stored brief lacks reads as empty.",
         "properties": {
@@ -2079,6 +2105,36 @@
         ],
         "type": "object"
       },
+      "Link": {
+        "description": "A link of a ticket. `story`, `decision`, `minutes`, `priority` (`<minutes id>#<idx>`) and\n`ticket` must exist. `url` is an http(s) URL. `commit`, `path` and `issue` are free text.",
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "type": {
+            "$ref": "#/components/schemas/LinkType"
+          }
+        },
+        "required": [
+          "type",
+          "ref"
+        ],
+        "type": "object"
+      },
+      "LinkType": {
+        "enum": [
+          "story",
+          "decision",
+          "minutes",
+          "priority",
+          "ticket",
+          "url",
+          "commit",
+          "path",
+          "issue"
+        ],
+        "type": "string"
+      },
       "ListResult": {
         "properties": {
           "terminals": {
@@ -3326,6 +3382,14 @@
         ],
         "type": "string"
       },
+      "PromoteTo": {
+        "description": "What `ticket.promote` makes of a ticket.",
+        "enum": [
+          "story",
+          "decision"
+        ],
+        "type": "string"
+      },
       "Proposal": {
         "description": "One prompt change that replay judged.",
         "properties": {
@@ -4512,7 +4576,7 @@
             "type": "string"
           },
           "type": {
-            "description": "`commit`, `issue`, `path`, `url` or `story`.",
+            "description": "`commit`, `issue`, `path`, `url`, `story` or, in minutes, `ticket`.",
             "type": "string"
           }
         },
@@ -5126,6 +5190,187 @@
           "running"
         ],
         "type": "object"
+      },
+      "Ticket": {
+        "properties": {
+          "assignee": {
+            "description": "`owner`, `claude`, an agent id of the roster, or none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "author": {
+            "$ref": "#/components/schemas/Author"
+          },
+          "body": {
+            "description": "Markdown.",
+            "type": "string"
+          },
+          "closed_at": {
+            "description": "Set only in the states `done` and `dropped`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "description": "ISO 8601 UTC with 3 fraction digits.",
+            "type": "string"
+          },
+          "id": {
+            "description": "`C` and 3 or more digits, for example `C007`.",
+            "type": "string"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/TicketKind"
+          },
+          "links": {
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "type": "array"
+          },
+          "objective": {
+            "description": "An objective id of the brief.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "product": {
+            "type": "string"
+          },
+          "scope": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "$ref": "#/components/schemas/TicketState"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "updated_by": {
+            "$ref": "#/components/schemas/Author"
+          },
+          "waiting_on": {
+            "description": "Set only in the state `waiting`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "product",
+          "id",
+          "kind",
+          "state",
+          "title",
+          "body",
+          "author",
+          "updated_by",
+          "links",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "TicketGetResult": {
+        "properties": {
+          "markdown": {
+            "description": "The ticket as one Markdown text.",
+            "type": "string"
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket"
+          }
+        },
+        "required": [
+          "ticket",
+          "markdown"
+        ],
+        "type": "object"
+      },
+      "TicketKind": {
+        "enum": [
+          "note",
+          "todo",
+          "question"
+        ],
+        "type": "string"
+      },
+      "TicketListResult": {
+        "properties": {
+          "tickets": {
+            "description": "By state (`open`, `waiting`, `done`, `dropped`), then the newest `updated_at`, then the\nhighest id.",
+            "items": {
+              "$ref": "#/components/schemas/Ticket"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "tickets"
+        ],
+        "type": "object"
+      },
+      "TicketPromoteResult": {
+        "properties": {
+          "decision": {
+            "description": "The id of the new decision.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "story": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Story"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket",
+            "description": "The ticket in the state `done`, with a link to the new story or decision."
+          }
+        },
+        "required": [
+          "ticket"
+        ],
+        "type": "object"
+      },
+      "TicketResult": {
+        "properties": {
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket"
+          }
+        },
+        "required": [
+          "ticket"
+        ],
+        "type": "object"
+      },
+      "TicketState": {
+        "description": "`open` and `waiting` are the open states.",
+        "enum": [
+          "open",
+          "waiting",
+          "done",
+          "dropped"
+        ],
+        "type": "string"
       },
       "Topic": {
         "description": "A group of events. A subscriber gets each event whose name starts with\nits topic.",
@@ -10721,6 +10966,638 @@
           "$ref": "#/components/schemas/GitConfigResult"
         }
       }
+    },
+    {
+      "description": "Lists the tickets of a product: by state, then the newest write, then the highest id. It never writes.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.list",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "assignee",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "Only the tickets with this author kind.",
+          "name": "author",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AuthorBy"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only the tickets with this author kind."
+          }
+        },
+        {
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "description": "1 to 200. 50 when absent.",
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "description": "1 to 200. 50 when absent.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "Only the tickets that have this link.",
+          "name": "link",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Link"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only the tickets that have this link."
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "`[open, waiting, done]` when absent.",
+          "name": "states",
+          "required": false,
+          "schema": {
+            "description": "`[open, waiting, done]` when absent.",
+            "items": {
+              "$ref": "#/components/schemas/TicketState"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketListResult"
+        }
+      }
+    },
+    {
+      "description": "Gives one ticket and its Markdown text. It never writes.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.get",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketGetResult"
+        }
+      }
+    },
+    {
+      "description": "Adds an open ticket with the next id of the product. Each link target and the objective must exist. Sends `data.changed` with the kind `tickets`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.add",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "assignee",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "author",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Author"
+          }
+        },
+        {
+          "name": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "kind",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/TicketKind"
+          }
+        },
+        {
+          "name": "links",
+          "required": false,
+          "schema": {
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "objective",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "scope",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "title",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketResult"
+        }
+      }
+    },
+    {
+      "description": "Changes the given fields of a ticket. A session changes only its own tickets and the tickets assigned to `claude`, else `conflict`. Sends `data.changed` with the kind `tickets`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "conflict"
+          },
+          "message": "conflict"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.update",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "assignee",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "body",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "by",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Author"
+          }
+        },
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "kind",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TicketKind"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        {
+          "name": "links",
+          "required": false,
+          "schema": {
+            "items": {
+              "$ref": "#/components/schemas/Link"
+            },
+            "type": [
+              "array",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "objective",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "scope",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "title",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketResult"
+        }
+      }
+    },
+    {
+      "description": "Moves a ticket to another state: open to waiting (with `waiting_on`), waiting to open, an open state to done or dropped, done or dropped to open. A move to the same state succeeds. The session rule of `ticket.update` applies. Sends `data.changed` with the kind `tickets` when the row changed.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "conflict"
+          },
+          "message": "conflict"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.move",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "by",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Author"
+          }
+        },
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "state",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/TicketState"
+          }
+        },
+        {
+          "description": "Necessary for a move from `open` to `waiting`.",
+          "name": "waiting_on",
+          "required": false,
+          "schema": {
+            "description": "Necessary for a move from `open` to `waiting`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketResult"
+        }
+      }
+    },
+    {
+      "description": "Turns an open ticket into a story or a decision. `story` runs the PM of `story.new` on the title and the body, and spends money. `decision` adds a pending decision with the title as its text. Then one transaction links the new record and moves the ticket to `done`. A failed `story.new` leaves the ticket as it was. Sends `data.changed` with the kind `tickets`, and `stories` or `decision`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "conflict"
+          },
+          "message": "conflict"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.promote",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "by",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Author"
+          }
+        },
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "to",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/PromoteTo"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketPromoteResult"
+        }
+      }
     }
   ],
   "openrpc": "1.3.2",
@@ -11009,11 +11886,11 @@
       "name": "data.changed",
       "params": [
         {
-          "description": "The kind of record that changed, for example `minutes` or `git`.",
+          "description": "The kind of record that changed, for example `minutes`, `git` or `tickets`.",
           "name": "kind",
           "required": true,
           "schema": {
-            "description": "The kind of record that changed, for example `minutes` or `git`.",
+            "description": "The kind of record that changed, for example `minutes`, `git` or `tickets`.",
             "type": "string"
           }
         },

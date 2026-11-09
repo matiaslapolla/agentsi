@@ -4,6 +4,7 @@
 
 use super::tools::MAX_DOC_CHARS;
 use agentsi_proto::knowledge_api::{KbDoc, KbPendingResult, KbRecentMinutes, KbSearchHit};
+use agentsi_proto::ticket_api::Ticket;
 use regex::Regex;
 use std::sync::LazyLock;
 
@@ -230,6 +231,16 @@ pub fn pending_text(product: &str, pending: &KbPendingResult) -> String {
 }
 
 /// `YYYY-MM-DD HH:MM` in the local time zone, as the TypeScript `stamp` prints a `Date`.
+/// The answer of `list_tickets`.
+pub fn tickets_text(product: &str, tickets: &[Ticket]) -> String {
+    if tickets.is_empty() {
+        return "No tickets.".into();
+    }
+    let mut lines = vec![format!("Tickets of {product} ({}):", tickets.len())];
+    lines.extend(tickets.iter().map(Ticket::line));
+    lines.join("\n")
+}
+
 pub fn stamp(iso: &str) -> String {
     let Some(secs) = epoch_seconds(iso) else {
         return iso.to_string();

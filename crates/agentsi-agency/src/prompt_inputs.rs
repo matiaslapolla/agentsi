@@ -99,9 +99,10 @@ pub fn objective_ids(brief: &Value) -> Vec<String> {
         .collect()
 }
 
-const SPLIT_AT: [&str; 9] = [
+const SPLIT_AT: [&str; 10] = [
     "## North star",
     "## Open issues",
+    "## Open tickets",
     "## Last minutes",
     "## Pending decisions",
     "## Stories",
@@ -110,9 +111,10 @@ const SPLIT_AT: [&str; 9] = [
     "## Docs index",
     "## Database sections",
 ];
-const KEEP: [&str; 7] = [
+const KEEP: [&str; 8] = [
     "# Snapshot",
     "## North star",
+    "## Open tickets",
     "## Pending decisions",
     "## Last minutes",
     "## Stories",
@@ -124,6 +126,7 @@ fn limit(section: &str) -> Option<usize> {
     match section {
         "## North star" => Some(5000),
         "## Stories" => Some(1500),
+        "## Open tickets" => Some(1500),
         "## Commits" => Some(2500),
         "## Docs index" => Some(3500),
         _ => None,
@@ -182,6 +185,26 @@ mod tests {
         assert!(out.starts_with("# Snapshot of p\n\nintro\n\n## Stories\n"));
         assert!(!out.contains("Open issues"));
         assert!(out.contains("\n[cut]\n\n## Commits\n- a"));
+    }
+
+    #[test]
+    fn the_compact_snapshot_keeps_the_open_tickets_and_cuts_them_at_1500() {
+        let lines: Vec<String> = (1..=40)
+            .map(|k| format!("- C{k:03} [todo] A ticket with a long enough title"))
+            .collect();
+        let full = format!(
+            "# Snapshot of p\n\nintro\n## Open issues\nnone\n## Open tickets\n\n{}\n## Commits\n- a",
+            lines.join("\n")
+        );
+        let out = compact_snapshot(&full, 14_000);
+        assert!(
+            out.contains("\n\n## Open tickets\n\n- C001 [todo]"),
+            "{out}"
+        );
+        assert!(!out.contains("Open issues"));
+        assert!(out.contains("\n[cut]\n\n## Commits\n- a"), "{out}");
+        let kept = out.split("## Open tickets").nth(1).unwrap();
+        assert!(kept.split("[cut]").next().unwrap().len() < 1500);
     }
 
     #[test]

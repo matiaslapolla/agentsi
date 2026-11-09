@@ -27,6 +27,7 @@ pub mod schema;
 pub mod socket;
 pub mod story_api;
 pub mod terminal_api;
+pub mod ticket_api;
 pub mod vocabulary_api;
 pub mod voice_api;
 

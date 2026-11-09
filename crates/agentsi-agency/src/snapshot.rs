@@ -5,6 +5,7 @@
 use crate::error::Result;
 use crate::registry::Product;
 use crate::roster::resolve_under_roots;
+use crate::tickets;
 use agentsi_store::read;
 use regex::Regex;
 use rusqlite::Connection;
@@ -36,6 +37,9 @@ const GROUP_ORDER: [&str; 4] = ["docs/ideas", "docs/specs", "docs/plans", "docs/
 static BOOKKEEPING: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"^[A-Za-z0-9_]+ \S+ (minutes|memory|reflect|roles)\([A-Za-z0-9_.-]+\): ").unwrap()
 });
+/// The heading of the open tickets. A snapshot with this line lets a priority cite a ticket.
+pub const OPEN_TICKETS: &str = "## Open tickets";
+
 static HEADING: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(?m)^#\s+(.+)$").unwrap());
 
 /// A git repo of the product.
@@ -406,6 +410,33 @@ fn mark_box(mark: Option<&str>) -> &'static str {
     }
 }
 
+/// The most ticket lines that the snapshot lists.
+const MAX_TICKET_LINES: usize = 30;
+
+/// `## Open tickets`, or none when the product has no open ticket, so a product with no
+/// ticket keeps the snapshot of before the tracker.
+fn open_tickets_section(
+    c: &Connection,
+    product: &str,
+    scope: Option<&str>,
+) -> Result<Option<String>> {
+    let open =
+        tickets::open(c, product, scope).map_err(|e| crate::Error::Unavailable(e.to_string()))?;
+    if open.is_empty() {
+        return Ok(None);
+    }
+    let mut out = vec![OPEN_TICKETS.to_string(), String::new()];
+    out.extend(
+        open.iter()
+            .take(MAX_TICKET_LINES)
+            .map(|t| format!("- {}", t.line())),
+    );
+    if open.len() > MAX_TICKET_LINES {
+        out.push(format!("_{} more._", open.len() - MAX_TICKET_LINES));
+    }
+    Ok(Some(out.join("\n")))
+}
+
 fn db_sections_inner(c: &Connection, product: &str, scope: Option<&str>) -> Result<Vec<String>> {
     let mut sections = Vec::new();
 
@@ -428,6 +459,10 @@ fn db_sections_inner(c: &Connection, product: &str, scope: Option<&str>) -> Resu
             .map(|(r, t)| format!("- #{r} {}", t.as_deref().unwrap_or("null"))),
     );
     sections.push(out.join("\n"));
+
+    if let Some(open) = open_tickets_section(c, product, scope)? {
+        sections.push(open);
+    }
 
     let mut stmt = c.prepare_cached(
         "select id, question from minutes where product = ?1 order by created_at desc limit 3",
@@ -536,6 +571,78 @@ pub fn snapshot(c: &Connection, product: &Product, scope: Option<&str>) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn ticket_db(rows: &str) -> (tempfile::TempDir, Connection, Product) {
+        let dir = tempfile::tempdir().unwrap();
+        let conn = agentsi_store::db::open_writer(&dir.path().join("agentsi.db")).unwrap();
+        if !rows.is_empty() {
+            conn.execute_batch(&format!(
+                "insert into tickets (product, id, scope, kind, state, title, waiting_on, assignee,
+                   author, updated_by, created_at, updated_at) values {rows};
+                 update tickets set author = '{{\"by\":\"owner\",\"id\":\"Ada\"}}',
+                   updated_by = '{{\"by\":\"owner\",\"id\":\"Ada\"}}';"
+            ))
+            .unwrap();
+        }
+        let product = Product {
+            id: "p".into(),
+            name: "P".into(),
+            paths: vec![],
+            status: "active".into(),
+            roles: vec!["pm".into()],
+        };
+        (dir, conn, product)
+    }
+
+    #[test]
+    fn the_snapshot_lists_the_open_tickets_after_the_open_issues() {
+        let (_d, c, p) = ticket_db(
+            "('p', 'C001', null, 'todo', 'waiting', 'Install the bundle', 'Ada', 'owner', '{}', '{}', 'x', '2026-11-09T10:00:00.000Z'),
+             ('p', 'C002', 'web', 'note', 'open', 'Check the copy', null, null, '{}', '{}', 'x', '2026-11-09T09:00:00.000Z'),
+             ('p', 'C003', null, 'todo', 'done', 'Closed', null, null, '{}', '{}', 'x', '2026-11-09T11:00:00.000Z'),
+             ('q', 'C004', null, 'todo', 'open', 'Of another product', null, null, '{}', '{}', 'x', 'x')",
+        );
+        let text = snapshot(&c, &p, None).unwrap();
+        assert!(
+            text.contains(
+                "_None indexed._\n\n## Open tickets\n\n- C002 [note] Check the copy\n- C001 [todo, waiting on Ada] Install the bundle (for owner)\n\n## Last minutes"
+            ),
+            "{text}"
+        );
+        // With a scope: the tickets of that scope and the tickets with no scope.
+        let scoped = snapshot(&c, &p, Some("app")).unwrap();
+        assert!(
+            scoped.contains("## Open tickets\n\n- C001 [todo, waiting on Ada]"),
+            "{scoped}"
+        );
+        assert!(!scoped.contains("C002"), "{scoped}");
+    }
+
+    #[test]
+    fn the_snapshot_has_no_tickets_section_with_no_open_ticket_and_cuts_at_30() {
+        let (_d, c, p) = ticket_db(
+            "('p', 'C001', null, 'todo', 'dropped', 'Gone', null, null, '{}', '{}', 'x', 'x')",
+        );
+        let text = snapshot(&c, &p, None).unwrap();
+        assert!(!text.contains("Open tickets"), "{text}");
+        assert!(
+            text.contains("_None indexed._\n\n## Last minutes"),
+            "{text}"
+        );
+
+        let rows: Vec<String> = (1..=32)
+            .map(|k| {
+                format!("('p', 'C{k:03}', null, 'note', 'open', 't{k}', null, null, '{{}}', '{{}}', 'x', 'x')")
+            })
+            .collect();
+        let (_d, c, p) = ticket_db(&rows.join(", "));
+        let text = snapshot(&c, &p, None).unwrap();
+        let section = text.split("## Open tickets\n\n").nth(1).unwrap();
+        let section = section.split("\n\n").next().unwrap();
+        assert_eq!(section.lines().filter(|l| l.starts_with("- C")).count(), 30);
+        assert!(section.starts_with("- C032 [note] t32\n"), "{section}");
+        assert!(section.ends_with("\n_2 more._"), "{section}");
+    }
 
     #[test]
     fn the_bookkeeping_commits_of_the_workspace_are_left_out() {

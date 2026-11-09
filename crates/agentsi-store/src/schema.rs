@@ -1,5 +1,7 @@
-//! The 17 tables, their columns and their keys, as data. The import and the
-//! tests read this list. A test checks it against the SQL schema.
+//! The tables, their columns and their keys, as data. `TABLES` holds the 17
+//! tables of Postgres, and the import reads only that list. `LOCAL_TABLES`
+//! holds the tables that exist only in SQLite. A test checks both lists
+//! against the SQL schema.
 
 /// How a column maps from Postgres to SQLite (the type map of the data spec).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -215,6 +217,35 @@ pub const TABLES: &[Table] = &[
     },
 ];
 
+/// The tables that only SQLite has. A module that adds a local table adds it here.
+pub const LOCAL_TABLES: &[Table] = &[Table {
+    name: "tickets",
+    columns: &[
+        c("product", Text),
+        c("id", Text),
+        c("scope", Text),
+        c("kind", Text),
+        c("state", Text),
+        c("title", Text),
+        c("body", Text),
+        c("waiting_on", Text),
+        c("assignee", Text),
+        c("author", Json),
+        c("updated_by", Json),
+        c("links", Json),
+        c("objective", Text),
+        c("created_at", Time),
+        c("updated_at", Time),
+        c("closed_at", Time),
+    ],
+    key: &["product", "id"],
+}];
+
+/// Each table of SQLite: the tables of Postgres, then the local tables.
+pub fn all() -> impl Iterator<Item = &'static Table> {
+    TABLES.iter().chain(LOCAL_TABLES)
+}
+
 pub fn table(name: &str) -> Option<&'static Table> {
-    TABLES.iter().find(|t| t.name == name)
+    all().find(|t| t.name == name)
 }

@@ -103,7 +103,7 @@ pub struct DataChanged;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct DataChangedParams {
     pub product: String,
-    /// The kind of record that changed, for example `minutes` or `git`.
+    /// The kind of record that changed, for example `minutes`, `git` or `tickets`.
     pub kind: String,
 }
 

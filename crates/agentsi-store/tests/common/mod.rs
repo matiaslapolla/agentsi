@@ -32,6 +32,9 @@ pub fn row(table_name: &str, with: &[(&str, Value)]) -> Vec<Value> {
                 ("decisions", "status") => t("pending"),
                 ("decisions", "kind") => t("minutes"),
                 ("archive_records", "kind") => t("minutes"),
+                ("tickets", "id") => t("C001"),
+                ("tickets", "kind") => t("note"),
+                ("tickets", "state") => t("open"),
                 _ => match c.kind {
                     Kind::Text => t(&format!("{}-{}", table.name, c.name)),
                     Kind::Json => t(r#"{"k":[1,"x"]}"#),
