@@ -3,6 +3,8 @@
 //! the CLI depends only on this crate. The checks run on the host of the caller.
 
 use crate::ops_api::CoreStatusResult;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -10,14 +12,16 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// `required` checks decide the exit code. The others only name what they block.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Level {
     Required,
     Stories,
     Optional,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
 pub enum Status {
     Ok,
     Missing,

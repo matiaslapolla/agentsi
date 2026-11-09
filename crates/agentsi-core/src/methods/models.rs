@@ -228,6 +228,16 @@ impl Models {
         }
     }
 
+    /// The number of downloaded models and the number of models of the catalog.
+    pub fn downloaded(&self) -> (usize, usize) {
+        let models = self.catalog.models();
+        let have = models
+            .iter()
+            .filter(|m| self.info(m).state == ModelState::Downloaded)
+            .count();
+        (have, models.len())
+    }
+
     fn running_bytes(&self, id: &str) -> (u64, u64) {
         match lock(&self.slots).get(id) {
             Some(Slot::Running { bytes, total, .. }) => (*bytes, *total),

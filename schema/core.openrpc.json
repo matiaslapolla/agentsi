@@ -877,6 +877,21 @@
           }
         ]
       },
+      "CoreDoctorResult": {
+        "properties": {
+          "checks": {
+            "description": "The checks in the order of `agentsi doctor`.",
+            "items": {
+              "$ref": "#/components/schemas/DoctorCheck"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "checks"
+        ],
+        "type": "object"
+      },
       "CoreStatusResult": {
         "properties": {
           "data_root": {
@@ -1257,6 +1272,37 @@
         "required": [
           "topic",
           "positions"
+        ],
+        "type": "object"
+      },
+      "DoctorCheck": {
+        "description": "One check of `agentsi doctor`.",
+        "properties": {
+          "blocks": {
+            "description": "The features that a failed check blocks.",
+            "type": "string"
+          },
+          "detail": {
+            "description": "The version or the found path when ok. Why it failed otherwise. Empty when missing.",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level",
+            "description": "`required` checks decide the exit code of `agentsi doctor`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "status",
+          "detail",
+          "blocks"
         ],
         "type": "object"
       },
@@ -2104,6 +2150,15 @@
           "rounds"
         ],
         "type": "object"
+      },
+      "Level": {
+        "description": "`required` checks decide the exit code. The others only name what they block.",
+        "enum": [
+          "required",
+          "stories",
+          "optional"
+        ],
+        "type": "string"
       },
       "Link": {
         "description": "A link of a ticket. `story`, `decision`, `minutes`, `priority` (`<minutes id>#<idx>`) and\n`ticket` must exist. `url` is an http(s) URL. `commit`, `path` and `issue` are free text.",
@@ -4602,6 +4657,14 @@
           "ref"
         ],
         "type": "object"
+      },
+      "Status": {
+        "enum": [
+          "ok",
+          "missing",
+          "fail"
+        ],
+        "type": "string"
       },
       "StatusResult": {
         "properties": {
@@ -10003,6 +10066,34 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DataBackupResult"
+        }
+      }
+    },
+    {
+      "description": "Runs the checks of `agentsi doctor` on the host of the core and gives each row: the core, the data root, the tools and the voice. It writes nothing. A run takes up to 15 seconds for each tool.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        }
+      ],
+      "name": "core.doctor",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/CoreDoctorResult"
         }
       }
     },
