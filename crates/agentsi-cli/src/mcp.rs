@@ -488,8 +488,17 @@ mod tests {
             .iter()
             .map(|t| t["name"].as_str().unwrap())
             .collect();
-        assert_eq!(names.len(), 10);
-        assert_eq!(names[8..], ["update_ticket", "show_decisions"]);
+        assert_eq!(names.len(), 13);
+        assert_eq!(
+            names[8..],
+            [
+                "update_ticket",
+                "show_decisions",
+                "show_priorities",
+                "show_story",
+                "show_diff"
+            ]
+        );
         for (name, args) in [
             ("add_ticket", json!({"kind": "note", "title": "x"})),
             ("update_ticket", json!({"id": "C001", "state": "done"})),

@@ -6305,6 +6305,60 @@
               "ids"
             ],
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows the priorities of one minutes with their marks, and Accept, Accept with changes\nand Reject buttons for each unmarked priority. Call it when the owner asks about the\npriorities of a meeting. The minutes id comes from list_minutes.",
+            "properties": {
+              "kind": {
+                "const": "priorities",
+                "type": "string"
+              },
+              "minutes_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "minutes_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows one story with its state and its acceptance criteria, and a button that opens\nthe story screen. Call it when your reply is about one story. The id looks like S014\nor T003.",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "const": "story",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows the diff of the branch of a story, and a button that opens the story screen.\nCall it when the owner asks what a story changed in the code.",
+            "properties": {
+              "kind": {
+                "const": "diff",
+                "type": "string"
+              },
+              "story_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "story_id"
+            ],
+            "type": "object"
           }
         ]
       },

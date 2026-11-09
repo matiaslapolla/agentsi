@@ -29,6 +29,17 @@ pub enum View {
     /// the owner asks what waits for them, or when your reply names decisions. The ids come
     /// from pending_decisions.
     Decisions { ids: Vec<i64> },
+    /// Shows the priorities of one minutes with their marks, and Accept, Accept with changes
+    /// and Reject buttons for each unmarked priority. Call it when the owner asks about the
+    /// priorities of a meeting. The minutes id comes from list_minutes.
+    Priorities { minutes_id: String },
+    /// Shows one story with its state and its acceptance criteria, and a button that opens
+    /// the story screen. Call it when your reply is about one story. The id looks like S014
+    /// or T003.
+    Story { id: String },
+    /// Shows the diff of the branch of a story, and a button that opens the story screen.
+    /// Call it when the owner asks what a story changed in the code.
+    Diff { story_id: String },
 }
 
 impl View {
@@ -36,6 +47,9 @@ impl View {
     pub fn kind(&self) -> &'static str {
         match self {
             View::Decisions { .. } => "decisions",
+            View::Priorities { .. } => "priorities",
+            View::Story { .. } => "story",
+            View::Diff { .. } => "diff",
         }
     }
 }
@@ -405,7 +419,14 @@ mod tests {
     fn each_view_gives_a_show_tool_with_a_description_and_no_kind() {
         let tools = view_tools();
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
-        assert_eq!(names, ["show_decisions"]);
+        assert_eq!(
+            names,
+            ["show_decisions", "show_priorities", "show_story", "show_diff"]
+        );
+        let story = &tools[2];
+        assert_eq!(story.input_schema["required"], json!(["id"]));
+        assert!(story.description.contains("story screen"), "{story:?}");
+        assert_eq!(tools[3].input_schema["required"], json!(["story_id"]));
         let t = &tools[0];
         assert!(
             t.description.starts_with("Shows pending decisions"),

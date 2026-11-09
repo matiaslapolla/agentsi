@@ -56,7 +56,14 @@ fn setup(dir: &TempDir, auth: &str) -> World {
          insert into decisions (id, product, minutes_id, text, why, status, kind, action)
            values (1, 'alpha', null, 'Ship it', 'It is ready', 'pending', 'product', 'Run the release'),
                   (2, 'alpha', null, 'Old one', 'w', 'pending', 'product', null);
-         insert into archive_records values ('alpha', 'decision', '2');",
+         insert into archive_records values ('alpha', 'decision', '2');
+         insert into products (id, name, paths, status) values ('beta', 'Beta', '[]', 'active');
+         insert into minutes (id, product, question, status, created_at, data) values
+           ('m1', 'alpha', 'What now?', 'valid', '2026-11-02T10:00:00.000Z',
+            '{\"id\":\"m1\",\"question\":\"What now?\",\"priorities\":[{\"title\":\"P0\",\"why\":\"w\",\"sources\":[]}]}'),
+           ('mb', 'beta', 'Other?', 'valid', '2026-11-02T10:00:00.000Z', '{\"id\":\"mb\"}');
+         insert into priorities (minutes_id, idx, title, why) values ('m1', 0, 'P0', 'w');
+         insert into stories (product, id, data) values ('alpha', 'S001', '{\"id\":\"S001\"}');",
     )
     .unwrap();
     let fake = bin.join("claude");
@@ -387,6 +394,61 @@ fn a_view_names_decisions_of_the_product_and_decision_get_reads_them() {
     );
     let r = c.call("decision.get", json!({"product": "nope", "ids": [1]}));
     assert_eq!(kind(&r), "not_found", "{r}");
+}
+
+#[test]
+fn object_views_name_objects_of_the_product_and_accept_on_a_priority_writes_no_owner_message() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let show = |c: &mut Framed, view: Value| {
+        c.call("desk.show", json!({"session": session, "view": view}))
+    };
+
+    // An unknown id, or an object of another product, stores no view item.
+    for (view, word) in [
+        (json!({"kind": "story", "id": "S999"}), "S999"),
+        (json!({"kind": "diff", "story_id": "S404"}), "S404"),
+        (json!({"kind": "priorities", "minutes_id": "nope"}), "nope"),
+        (json!({"kind": "priorities", "minutes_id": "mb"}), "mb"),
+    ] {
+        let r = show(&mut c, view);
+        assert_eq!(kind(&r), "not_found", "{r}");
+        assert!(r["error"]["message"].as_str().unwrap().contains(word), "{r}");
+    }
+    let r = show(&mut c, json!({"kind": "story"}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+
+    for view in [
+        json!({"kind": "story", "id": "S001"}),
+        json!({"kind": "diff", "story_id": "S001"}),
+        json!({"kind": "priorities", "minutes_id": "m1"}),
+    ] {
+        let r = show(&mut c, view.clone());
+        assert!(r.get("error").is_none(), "{r}");
+        assert_eq!(c.next_event("desk.item")["item"]["view"], view);
+    }
+
+    // The priorities view sets a mark with mark.set. The core stores it and a desk note, and
+    // no owner message.
+    c.ok(
+        "mark.set",
+        json!({"entries": [{"minutes_id": "m1", "idx": 0, "mark": "accepted"}], "unmarked_only": true}),
+    );
+    let r = c.ok("minutes.get", json!({"id": "m1"}));
+    assert_eq!(r["priorities"][0]["mark"], "accepted");
+    let h = history(&mut c);
+    assert_eq!(
+        kinds(&h),
+        ["owner", "reply", "end", "view", "view", "view", "note"]
+    );
+    let n = &h["items"].as_array().unwrap()[6]["item"]["text"];
+    assert!(n.as_str().unwrap().contains("accepted"), "{n}");
 }
 
 #[test]

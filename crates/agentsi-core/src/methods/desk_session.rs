@@ -158,35 +158,69 @@ async fn show(ctx: Ctx, p: DeskShowParams) -> Result<DeskShowResult, RpcError> {
 /// The objects that a view names must exist in its product.
 fn check_view(store: &agentsi_store::Store, product: &str, view: &View) -> Result<(), RpcError> {
     match view {
-        View::Decisions { ids } => {
-            if ids.is_empty() {
-                return Err(RpcError::invalid_params(
-                    "ids is empty. Give the ids of one or more decisions.",
-                ));
-            }
-            let (p, wanted) = (product.to_string(), ids.clone());
+        View::Decisions { ids } => check_decisions(store, product, ids),
+        View::Priorities { minutes_id } => {
+            let id = minutes_id.clone();
             let found = store
-                .read(move |c| {
-                    agentsi_store::read::decisions_by_id(c, &p, &wanted)
-                        .map(|d| d.into_iter().map(|d| d.id).collect::<Vec<_>>())
-                })
+                .read(move |c| crate::desk_data::minutes(c, &id))
                 .map_err(store_error)?;
-            let missing: Vec<String> = ids
-                .iter()
-                .filter(|id| !found.contains(id))
-                .map(i64::to_string)
-                .collect();
-            if !missing.is_empty() {
-                return Err(RpcError::new(
+            match found {
+                Some(m) if m.product == product => Ok(()),
+                _ => Err(RpcError::new(
                     ErrorKind::NotFound,
-                    format!(
-                        "The product {product} has no decision with the id {}.",
-                        missing.join(", ")
-                    ),
-                    "Use pending_decisions for the ids that exist.",
-                ));
+                    format!("The product {product} has no minutes with the id {minutes_id}."),
+                    "Use list_minutes for the ids that exist.",
+                )),
             }
-            Ok(())
+        }
+        View::Story { id } | View::Diff { story_id: id } => {
+            let (p, wanted) = (product.to_string(), id.clone());
+            let found = store
+                .read(move |c| agentsi_store::read::story(c, &p, &wanted))
+                .map_err(store_error)?;
+            match found {
+                Some(_) => Ok(()),
+                None => Err(RpcError::new(
+                    ErrorKind::NotFound,
+                    format!("The product {product} has no story with the id {id}."),
+                    "Use search or the docs of the product for the story ids.",
+                )),
+            }
         }
     }
+}
+
+fn check_decisions(
+    store: &agentsi_store::Store,
+    product: &str,
+    ids: &[i64],
+) -> Result<(), RpcError> {
+    if ids.is_empty() {
+        return Err(RpcError::invalid_params(
+            "ids is empty. Give the ids of one or more decisions.",
+        ));
+    }
+    let (p, wanted) = (product.to_string(), ids.to_vec());
+    let found = store
+        .read(move |c| {
+            agentsi_store::read::decisions_by_id(c, &p, &wanted)
+                .map(|d| d.into_iter().map(|d| d.id).collect::<Vec<_>>())
+        })
+        .map_err(store_error)?;
+    let missing: Vec<String> = ids
+        .iter()
+        .filter(|id| !found.contains(id))
+        .map(i64::to_string)
+        .collect();
+    if !missing.is_empty() {
+        return Err(RpcError::new(
+            ErrorKind::NotFound,
+            format!(
+                "The product {product} has no decision with the id {}.",
+                missing.join(", ")
+            ),
+            "Use pending_decisions for the ids that exist.",
+        ));
+    }
+    Ok(())
 }
