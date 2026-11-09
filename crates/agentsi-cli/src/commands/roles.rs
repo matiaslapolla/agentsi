@@ -247,7 +247,8 @@ fn apply(argv: &[String]) -> Result<i32, Fail> {
     let stage = std::path::absolute(dir).map_err(|e| e.to_string())?;
     let mut params = RolesApplyParams {
         product,
-        stage_dir: stage.to_string_lossy().into_owned(),
+        stage_dir: Some(stage.to_string_lossy().into_owned()),
+        stage: None,
         yes: false,
         register: registration,
     };

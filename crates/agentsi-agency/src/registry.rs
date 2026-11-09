@@ -25,6 +25,25 @@ pub struct Registry {
     pub products: Vec<Product>,
 }
 
+impl Product {
+    /// Writes the `products` row of the product, which `product.list` reads. The registry
+    /// file stays the source of the roster and the stories block.
+    pub fn store_row(&self, c: &rusqlite::Connection) -> rusqlite::Result<()> {
+        c.execute(
+            "insert into products (id, name, paths, status) values (?1, ?2, ?3, ?4) \
+             on conflict (id) do update set name = excluded.name, paths = excluded.paths, \
+             status = excluded.status",
+            rusqlite::params![
+                self.id,
+                self.name,
+                Value::from(self.paths.clone()).to_string(),
+                self.status
+            ],
+        )?;
+        Ok(())
+    }
+}
+
 const DEFAULT_OWNER: (&str, &str) = ("the owner", "English");
 
 fn strings(v: &Value, key: &str) -> Vec<String> {

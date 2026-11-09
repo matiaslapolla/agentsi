@@ -8125,7 +8125,7 @@
       }
     },
     {
-      "description": "Checks a staged brief, roster and overlays and compares them with the database. With `yes` it writes the brief and the overlays into the store and the roster into `agentsi.config.json`, and commits that file. Without `yes` it writes nothing. It is what `agentsi roles apply` does.",
+      "description": "Checks a staged brief, roster and overlays and compares them with the database. The stage is a folder (`stage_dir`) or inline text (`stage`). With `yes` it writes the brief, the overlays and the `products` row into the store and the roster into `agentsi.config.json`, commits that file and sends `data.changed` of kind `product`. Without `yes` it writes nothing. It is what `agentsi roles apply` does.",
       "errors": [
         {
           "code": -32602,
@@ -8183,12 +8183,30 @@
           }
         },
         {
-          "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.",
-          "name": "stage_dir",
-          "required": true,
+          "description": "The inline stage: the name of each stage file to its text. The names are `brief.json`,\n`roster.json`, `stories.json` and `agents/<id>.md`.",
+          "name": "stage",
+          "required": false,
           "schema": {
-            "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.",
-            "type": "string"
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "The inline stage: the name of each stage file to its text. The names are `brief.json`,\n`roster.json`, `stories.json` and `agents/<id>.md`.",
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.\nSend `stage_dir` or `stage`, not both.",
+          "name": "stage_dir",
+          "required": false,
+          "schema": {
+            "description": "The folder of the stage: `brief.json`, `roster.json`, `agents/<id>.md` and `stories.json`. An absolute path.\nSend `stage_dir` or `stage`, not both.",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         {
