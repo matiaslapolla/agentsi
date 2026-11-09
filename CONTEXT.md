@@ -84,6 +84,14 @@ _Avoid_: Rating, score, feedback
 A priority with no mark, or a decision with status `pending`, in a product. `agentsi mark` lists them and walks through them.
 _Avoid_: Todo, open item
 
+**Form**:
+A group of text fields and choices inside a screen, with one button that writes and one Cancel button. `Enter` in the last field writes and `Escape` cancels.
+_Avoid_: Dialog, wizard
+
+**Health section**:
+The section of the settings screen that shows the result of `core.doctor`: one row for each tool check, with its status and what it blocks.
+_Avoid_: Doctor screen
+
 **Synthesis**:
 The last step of a meeting, in which the PM reads the answers of the roles and writes the minutes.
 _Avoid_: Summary, wrap-up

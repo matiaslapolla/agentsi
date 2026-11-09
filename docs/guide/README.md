@@ -151,7 +151,7 @@ Press `Ctrl+K`. The palette lists every action of the app. Type a few letters an
 
 | Screen | Key | What it shows |
 |---|---|---|
-| Front desk | `Ctrl+Shift+D` | State of the product, pending decisions, last minutes |
+| Front desk | `Ctrl+Shift+D` | State of the product, pending items, last minutes |
 | Minutes | `Ctrl+Shift+L` | The list of minutes, and one minutes |
 | Meeting | `Ctrl+Shift+G` | A live meeting, one pane for each role |
 | Call | `Ctrl+Shift+P` | The player of a meeting call |
@@ -159,7 +159,7 @@ Press `Ctrl+K`. The palette lists every action of the app. Type a few letters an
 | Memory | `Ctrl+Shift+Y` | What each agent learned, and the reflections |
 | Roles | `Ctrl+Shift+R` | The roster, the overlays and the specialists |
 | Git | `Ctrl+Shift+B` | Branch, changed files and diff. You stage files and commit here |
-| Settings | `Ctrl+,` | Look, voice, keys, hosts, guide and data |
+| Settings | `Ctrl+,` | Look, voice, keys, hosts, guide, health of the tools, backup and data |
 
 Other keys: `Ctrl+T` opens a terminal in the active product. `Ctrl+Shift+T` opens `claude`. `Ctrl+1` to `Ctrl+9` select a product. On macOS, `Cmd` takes the place of `Ctrl`.
 
@@ -173,7 +173,9 @@ The Settings screen has a section "Appearance". It has three choices, and each a
 - Corners: Square, Subtle or Round.
 - Text size: Small, Medium or Large. A terminal pane keeps its own font size.
 
-The Settings screen also has the voice models, the vocabulary, the keys, the SSH hosts, the Git config and the Data section. The line "Guide" opens this page.
+The Settings screen also has the voice models, the vocabulary, the keys, the SSH hosts, the Git config, the Health section and the Data section. The line "Guide" opens this page.
+
+The Health section shows one row for each check of `agentsi doctor`: the tool, its status and what a failed check blocks. "Check again" runs the checks again. In the Data section, "Back up now" copies the database and the registry into the backups folder, and shows the paths of both copies.
 
 ![The Settings screen. The section Appearance shows Density, Corners and Text size, and the section Voice models starts below it.](img/settings.png)
 
@@ -261,6 +263,8 @@ Use any of these three ways:
 - In a terminal, run `agentsi meet --question "What should we focus on this week?"` in the product repo.
 - In Claude Code, run `/agentsi` and ask for a meeting.
 
+Before you start, the Meeting screen has one check box for each agent of the roster. The PM stays on, because it writes the synthesis. "Ask one role" sends one question to one role. It asks one Confirm, because it costs money, and shows the answer in a panel. "Show the context" shows the Markdown that the next meeting reads.
+
 The Meeting screen shows one pane for each role and one for the synthesis. A pane shows the state, the seconds, the cost and the text of the run. You can cancel a meeting while it runs.
 
 ![The Meeting screen with a meeting in progress. The panes of the roles pm, dev and qa show their tool lines and answers, and each pane is marked running.](img/meeting.png)
@@ -320,7 +324,11 @@ The minutes hold two kinds of items that wait for you. A priority waits for your
 
 ### The desk
 
-The front desk lists the pending decisions of the product. Each one shows its text, its reason and its action. Use the buttons Approve, Reject and Archive. On the keyboard, `A` approves, `R` rejects and `X` archives the decision under the cursor.
+The front desk lists the pending items of the product: the priorities with no mark and the decisions that wait. A decision shows its text, its reason and its action. Use the buttons Approve, Reject and Archive. On the keyboard, `A` approves, `R` rejects and `X` archives the decision under the cursor. A priority has the buttons Accept, Change, Reject and New, and the keys `A`, `C`, `R` and `N`. `Enter` opens the minutes of the item.
+
+The desk has three more buttons. "Update the index" reads the repos of the product again. "New decision" opens a form with the text, the reason and an optional action. "Show archived" lists the archived decisions, each with Restore.
+
+After you approve a decision that has an action, the button "Run in Claude" opens a Claude pane in the folder of the product with that action. Nothing runs before you click it.
 
 An approved decision can carry an action. The action says what an agent does after your approval. A decision that AgentSI could not apply shows the reason.
 
@@ -347,7 +355,7 @@ agentsi decide <decision-id> approve
 
 ### Archive
 
-Archive hides a minutes, a decision or a story from the lists and counts. It deletes nothing. Run `agentsi restore` to bring an item back. To delete data, see [Data](#data).
+Archive hides a minutes, a decision, a story or a product from the lists and counts. It deletes nothing. Bring an item back with Restore: on the desk for a decision, on the story screen for a story, and in the sidebar for a product ("Show archived products"). In a terminal, run `agentsi restore`. To delete data, see [Data](#data).
 
 ## Stories
 
@@ -361,13 +369,15 @@ The story sessions run the `test` and `gate` commands through `sh -c`. Write onl
 
 ### The steps
 
-1. Propose. Run `agentsi story new "<text>"`, or `agentsi story suggest`. The PM writes the criteria.
+1. Propose. In the app, use "New story" (a text and a type: Story, Task or "The PM picks") or "Suggest" on the Stories screen. Each asks one Confirm, because the PM calls the model. In a terminal, run `agentsi story new "<text>"`, or `agentsi story suggest`. The PM writes the criteria.
 2. Approve with the Approve button, or `agentsi story approve <id>`.
 3. Run with `agentsi story run <id>`. QA writes the tests first, and each test must fail. Then the owner role writes the code.
 4. Review. The Stories screen shows the diff, the checks and the session log.
 5. Accept or reject. Accept merges the branch into the main branch of the product, locally. Reject drops it.
 
 The Stories screen opens with `Ctrl+Shift+S`. A button that changes a story shows what it will do first, and writes after you press Confirm.
+
+The story screen has more buttons. "Request changes" opens a form with a note and the box "The PM rewrites the story". "Record a merge" takes the commit hash and the choice "merged unchanged" or "merged with changes", for a merge that happened outside the app. "Archive" hides the story, and "Restore" brings it back. Archive is off while a session runs.
 
 ![The Stories screen of Lumen. Three stories are listed with their states: session ready, pending and implemented.](img/stories.png)
 
@@ -396,7 +406,7 @@ Each meeting leaves a log: which checks failed, which sources a role invented, a
 
 ### Reflect
 
-`agentsi reflect` reads the log and the marks. It adds and retires memory items of each agent. The next meeting uses them. It calls a model, so it costs money.
+`agentsi reflect` reads the log and the marks. The Memory screen has the same action: the button "Reflect" asks one Confirm, the box "Memory only" skips the prompt proposal, and "Cancel the reflection" stops a run. It adds and retires memory items of each agent. The next meeting uses them. It calls a model, so it costs money.
 
 If a role fails often, the reflection proposes a new prompt. A replay tests the prompt on old meetings. The prompt passes only if no metric gets worse, and it waits for your decision.
 
@@ -426,7 +436,7 @@ The Memory screen (`Ctrl+Shift+Y`) shows the items of each agent, newest first. 
 ### Brief, roster and audit
 
 - `/agentsi setup` in Claude Code interviews you and writes the brief and the roster of a product.
-- The Roles screen shows the roster, the specialists and the overlays. Validate checks them.
+- The Roles screen shows the roster, the specialists and the overlays. Validate checks them. "Definition" on a row shows the resolved definition of that agent. The reset plan has a box "Also delete the memory".
 - `agentsi roles` prints the roster. `agentsi reset <agent>` returns an agent to the global roles.
 - `agentsi audit` checks the config, the meetings, the marks and the memory. It makes no model call.
 
