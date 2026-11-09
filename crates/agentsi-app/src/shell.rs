@@ -1432,6 +1432,22 @@ impl Render for Shell {
                     }
                 }
             }))
+            .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
+                this.show_screen(ScreenSpec::settings(), window, cx);
+                for p in this.open_screens(cx) {
+                    if p.read(cx).is(&ScreenSpec::settings()) {
+                        p.update(cx, |p, cx| p.check_health(cx));
+                    }
+                }
+            }))
+            .on_action(cx.listener(|this, _: &actions::BackUpData, window, cx| {
+                this.show_screen(ScreenSpec::settings(), window, cx);
+                for p in this.open_screens(cx) {
+                    if p.read(cx).is(&ScreenSpec::settings()) {
+                        p.update(cx, |p, cx| p.back_up_now(cx));
+                    }
+                }
+            }))
             .on_action(cx.listener(|this, _: &actions::OpenGuide, window, cx| {
                 this.show_screen(ScreenSpec::guide(), window, cx)
             }))

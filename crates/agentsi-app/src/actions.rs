@@ -84,6 +84,10 @@ gpui_kit::actions!(
         OpenSettings,
         /// Opens the settings at the Data section, where the owner deletes data.
         OpenDataSettings,
+        /// Opens the settings and checks the health of the tools.
+        CheckHealth,
+        /// Opens the settings and backs up the data now.
+        BackUpData,
         /// Opens the guide of `docs/guide/` in the browser.
         OpenGuide,
         /// Opens the section "Install and start" of the guide in the browser.
@@ -909,6 +913,18 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(OpenDataSettings),
     },
     Entry {
+        label: "Check the health of the tools",
+        icon: IconName::Check,
+        keywords: &["doctor", "health", "tools", "check"],
+        action: || Box::new(CheckHealth),
+    },
+    Entry {
+        label: "Back up the data now",
+        icon: IconName::Folder,
+        keywords: &["backup", "data", "save", "copy"],
+        action: || Box::new(BackUpData),
+    },
+    Entry {
         label: "Open the guide: how AgentSI works",
         icon: IconName::FileText,
         keywords: &["help", "guide", "how", "works"],
@@ -958,6 +974,8 @@ mod tests {
             "Open the settings",
             "Talk to this pane",
             "Delete data: open the Data section of the settings",
+            "Check the health of the tools",
+            "Back up the data now",
             "Open the guide: how AgentSI works",
             "Open the guide: the first steps",
             "Approve the pending decision under the cursor (front desk)",

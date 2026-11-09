@@ -407,6 +407,23 @@ impl ScreenPanel {
         }
     }
 
+    /// Runs the checks of the Health section of a settings screen.
+    pub fn check_health(&self, cx: &mut App) {
+        if let ScreenView::Settings(v) = &self.view {
+            v.update(cx, |s, cx| s.check_health(cx));
+        }
+    }
+
+    /// Starts a backup from a settings screen, and scrolls its Data section into view.
+    pub fn back_up_now(&self, cx: &mut App) {
+        if let ScreenView::Settings(v) = &self.view {
+            v.update(cx, |s, cx| {
+                s.reveal_data(None, cx);
+                s.back_up_now(cx)
+            });
+        }
+    }
+
     /// Scrolls a guide screen to the section with this anchor.
     pub fn reveal_section(&self, anchor: &str, cx: &mut App) {
         if let ScreenView::Guide(v) = &self.view {
