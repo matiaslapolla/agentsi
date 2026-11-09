@@ -14,6 +14,7 @@ pub fn register(c: &mut Catalog) {
         .event::<MeetingEvent>()
         .event::<VoiceSpeak>()
         .event::<VoiceStop>()
+        .event::<VoiceMic>()
         .event::<DictationTarget>()
         .event::<DictationStart>()
         .event::<DictationStop>()
@@ -155,6 +156,22 @@ impl Event for VoiceStop {
     const NAME: &'static str = "voice.stop";
     const DESCRIPTION: &'static str = "The pill stops the speech of this terminal.";
     type Params = VoiceStopParams;
+}
+
+pub struct VoiceMic;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct VoiceMicParams {
+    /// True from `dictation.start`, false from `dictation.stop`.
+    pub open: bool,
+}
+
+impl Event for VoiceMic {
+    const NAME: &'static str = "voice.mic";
+    const DESCRIPTION: &'static str = "The microphone of a dictation opens or closes. The core \
+        sends it with each `dictation.start` and `dictation.stop`, so a client of the voice \
+        topic, such as the app, knows when the owner speaks. The pill ignores it.";
+    type Params = VoiceMicParams;
 }
 
 pub struct DictationTarget;

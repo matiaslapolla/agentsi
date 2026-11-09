@@ -12705,6 +12705,21 @@
       ]
     },
     {
+      "description": "The microphone of a dictation opens or closes. The core sends it with each `dictation.start` and `dictation.stop`, so a client of the voice topic, such as the app, knows when the owner speaks. The pill ignores it.",
+      "name": "voice.mic",
+      "params": [
+        {
+          "description": "True from `dictation.start`, false from `dictation.stop`.",
+          "name": "open",
+          "required": true,
+          "schema": {
+            "description": "True from `dictation.start`, false from `dictation.stop`.",
+            "type": "boolean"
+          }
+        }
+      ]
+    },
+    {
       "description": "The terminal that gets dictated text changed.",
       "name": "dictation.target",
       "params": [
