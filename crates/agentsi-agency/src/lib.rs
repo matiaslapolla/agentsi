@@ -22,5 +22,6 @@ pub mod sandbox;
 pub mod snapshot;
 pub mod status;
 pub mod story;
+pub mod tickets;
 
 pub use error::{Error, Result};
