@@ -24,6 +24,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::actions::product_id;
+use crate::alerts::{AlertTarget, Alerts};
 use crate::hosts::{Hosts, HostsGlobal, RemoteHost};
 use crate::keys::{self, Keys};
 use crate::look::{self, Look, LookData, LookGlobal};
@@ -113,6 +114,9 @@ impl Sidebar {
         }
         if let Some(l) = &look {
             observe.push(cx.observe(l, |_, _, cx| cx.notify()));
+        }
+        if let Some(center) = Alerts::try_get(cx) {
+            observe.push(cx.observe(&center, |_, _, cx| cx.notify()));
         }
         // The sidebar is cached: a new key shows only after it draws again.
         observe.push(cx.observe_global::<Keys>(|_, cx| cx.notify()));
@@ -414,13 +418,35 @@ impl Sidebar {
             )
         };
         let feed = core.read(cx).meetings.clone();
-        let lists: Vec<Vec<Item>> = products
+        let mut lists: Vec<Vec<Item>> = products
             .iter()
             .map(|p| {
                 let meetings = feed.as_ref().map(|f| &f.read(cx).0);
                 tree::items(core.read(cx), meetings, &data, &p.id)
             })
             .collect();
+        // The state of a product row: its items with the lowest rank, and the decisions.
+        let mut product_work: Vec<Option<WorkState>> = Vec::new();
+        for (p, list) in products.iter().zip(lists.iter_mut()) {
+            for item in list.iter_mut() {
+                let alert = AlertTarget::of_item(host.as_deref(), &p.id, &item.key)
+                    .and_then(|t| Alerts::glow(cx, &t));
+                item.work = item.work.or(alert);
+            }
+            let decisions = Alerts::glow(
+                cx,
+                &AlertTarget::Decisions {
+                    host: host.clone(),
+                    product: p.id.clone(),
+                },
+            );
+            product_work.push(
+                list.iter()
+                    .filter_map(|i| i.work)
+                    .chain(decisions)
+                    .min_by_key(|w| w.rank()),
+            );
+        }
         let arranged = data.arrange(host.as_deref(), products);
         let numbers: Vec<usize> = arranged.flat();
         let scope = slot.map_or_else(String::new, |i| format!("host-{i}-"));
@@ -497,7 +523,10 @@ impl Sidebar {
                 .label(style.label.map(SharedString::from))
                 .hue(style.hue)
                 .open(open)
-                .state(attention.contains(&p.id).then_some(WorkState::Blocked))
+                .state(
+                    product_work[i]
+                        .or_else(|| attention.contains(&p.id).then_some(WorkState::Blocked)),
+                )
                 .selected(active.as_ref() == Some(&product))
                 .focused(focused && this.cursor.as_ref() == Some(&key))
                 .trailing(trailing)

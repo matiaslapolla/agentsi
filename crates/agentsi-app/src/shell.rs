@@ -34,6 +34,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::actions::{self, ENTRIES};
+use crate::alerts::{AlertTarget, Alerts};
 use crate::bench::{BenchHandle, BenchPlan};
 use crate::hosts::HostsGlobal;
 use crate::keys;
@@ -303,7 +304,9 @@ impl Shell {
                         if models || n.method == Lagged::NAME {
                             feed.update(cx, |_, cx| cx.emit(n.clone()));
                         }
-                        if !models {
+                        if models {
+                            crate::model::raise_alerts(&core, &n, cx);
+                        } else {
                             take_event(&core, &n, cx);
                         }
                     }
@@ -337,7 +340,13 @@ impl Shell {
     fn start(&self, window: &mut Window, cx: &mut Context<Self>) {
         let link = self.link(cx);
         let subscribed = link.call::<Subscribe>(&SubscribeParams {
-            topics: vec![Topic::Terminal, Topic::Data, Topic::Models, Topic::Meeting],
+            topics: vec![
+                Topic::Terminal,
+                Topic::Data,
+                Topic::Models,
+                Topic::Meeting,
+                Topic::Voice,
+            ],
         });
         let products = link.call::<ProductList>(&Empty {});
         let terminals = link.call::<List>(&Empty {});
@@ -977,6 +986,12 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let host = product.host.clone();
+        if let (Some(center), Some(target)) = (
+            Alerts::try_get(cx),
+            AlertTarget::of_item(host.as_deref(), &product.id, item),
+        ) {
+            center.update(cx, |c, cx| c.opened(&target, cx));
+        }
         match item {
             ItemKey::Pane(id) => self.focus_terminal(host, id, window, cx),
             ItemKey::Meeting => {

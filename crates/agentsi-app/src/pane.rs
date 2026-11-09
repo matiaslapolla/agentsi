@@ -35,6 +35,7 @@ use gpui_kit::component::dock::{BasePanel, Panel, PanelEvent, PanelState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use crate::alerts::{AlertTarget, Alerts, Name};
 use crate::layout::{TERMINAL_PANEL, terminal_info};
 use crate::link::{CallError, Link, StreamItem};
 use crate::look::LookGlobal;
@@ -95,6 +96,24 @@ pub fn status_of(t: Option<&Term>) -> Status {
 /// The state that makes a pane glow: only a program that asks for the owner.
 pub fn glow_of(t: Option<&Term>) -> Option<WorkState> {
     t.and_then(Term::attention).map(|_| WorkState::Blocked)
+}
+
+/// [`glow_of`], else the glow of an alert on the pane `id`.
+pub fn glow_with_alert(
+    t: Option<&Term>,
+    host: Option<&str>,
+    id: &str,
+    cx: &App,
+) -> Option<WorkState> {
+    glow_of(t).or_else(|| {
+        Alerts::glow(
+            cx,
+            &AlertTarget::Pane {
+                host: host.map(str::to_string),
+                id: id.to_string(),
+            },
+        )
+    })
 }
 
 /// What the tab and the header of a pane show: the label of the owner, else the program title.
@@ -261,6 +280,10 @@ impl TerminalPanel {
                 }
             }),
         ];
+        let mut subscriptions = subscriptions;
+        if let Some(center) = Alerts::try_get(cx) {
+            subscriptions.push(cx.observe(&center, |_, _, cx| cx.notify()));
+        }
         let header = cx.new(|cx| PaneHeader::new(id.clone(), core.clone(), probe, cx));
         let mut panel = TerminalPanel {
             id,
@@ -486,8 +509,40 @@ impl TerminalPanel {
                 }
                 self.report_focus(*f, window, cx);
             }
-            PaneEvent::Title(_) | PaneEvent::Bell => {}
+            PaneEvent::Bell => self.bell(cx),
+            PaneEvent::Title(_) => {}
         }
+    }
+
+    /// Event 21: a bell in the terminal is an alert. The focused pane of an active window
+    /// is in view, so its glow would end at once: the alert still reaches the log.
+    fn bell(&mut self, cx: &mut Context<Self>) {
+        let Some(center) = Alerts::try_get(cx) else {
+            return;
+        };
+        let core = self.core.read(cx);
+        let term = core.terminals.get(&self.id);
+        let name = Name {
+            title: term.map(|t| t.title.clone()).unwrap_or_default(),
+            product: term.and_then(|t| t.product.clone()),
+        };
+        let host = core.remote.clone();
+        let id = self.id.clone();
+        center.update(cx, |c, cx| {
+            c.bell(host.as_deref(), &id, &|_| name.clone(), cx)
+        });
+    }
+
+    /// The state that makes this pane glow: a program that asks for the owner, else the
+    /// state of an alert that the owner did not open.
+    fn glow(&self, cx: &App) -> Option<WorkState> {
+        let core = self.core.read(cx);
+        glow_with_alert(
+            core.terminals.get(&self.id),
+            core.remote.as_deref(),
+            &self.id,
+            cx,
+        )
     }
 
     /// `focus.report`: dictated text goes to the focused pane. A window that loses
@@ -497,6 +552,11 @@ impl TerminalPanel {
         let core = self.core.clone();
         if focused {
             self.last_use = LAST_USE.fetch_add(1, Ordering::Relaxed) + 1;
+            if let Some(center) = Alerts::try_get(cx) {
+                let host = self.core.read(cx).remote.clone();
+                let id = self.id.clone();
+                center.update(cx, |c, cx| c.focused(host.as_deref(), &id, cx));
+            }
             core.update(cx, |s, _| s.focused = Some(id.clone()));
             let call = core
                 .read(cx)
@@ -779,12 +839,13 @@ impl Panel for TerminalPanel {
             None => shown.title,
         };
         let work = work_state_of(term);
+        let glow = glow_with_alert(term, core.remote.as_deref(), &self.id, cx);
         div()
             .flex()
             .items_center()
             .gap(space(2))
             .min_w_0()
-            .glow(format!("tab-glow:{}", self.id), glow_of(term))
+            .glow(format!("tab-glow:{}", self.id), glow)
             .when_some(shown.hue, |el, h| {
                 el.child(tab_bar(h, format!("tab-color:{}", self.id)))
             })
@@ -824,7 +885,7 @@ impl Panel for TerminalPanel {
 
 impl Render for TerminalPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let blocked = glow_of(self.core.read(cx).terminals.get(&self.id));
+        let blocked = self.glow(cx);
         div()
             .size_full()
             .flex()

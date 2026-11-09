@@ -6,6 +6,7 @@
 #![cfg_attr(test, recursion_limit = "256")]
 
 mod actions;
+mod alerts;
 mod appearance;
 mod atomic;
 mod bench;
@@ -97,6 +98,7 @@ fn main() -> ExitCode {
             if let Some(env) = screens::settings::DictationGlobal::detect() {
                 cx.set_global(env);
             }
+            alerts::Alerts::install(cx);
             let core = cx.new(|_| CoreState::new(link.clone()));
             let (remote, cores) = hosts::start(core, cx);
             cx.set_global(hosts::HostsGlobal(remote));
