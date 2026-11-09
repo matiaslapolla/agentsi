@@ -13,6 +13,7 @@ use std::thread::JoinHandle;
 pub const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../sql/0001_init.sql")),
     (2, include_str!("../sql/0002_tickets.sql")),
+    (3, include_str!("../sql/0003_desk.sql")),
 ];
 
 pub const DB_FILE: &str = "agentsi.db";

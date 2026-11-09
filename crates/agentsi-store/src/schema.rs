@@ -218,28 +218,51 @@ pub const TABLES: &[Table] = &[
 ];
 
 /// The tables that only SQLite has. A module that adds a local table adds it here.
-pub const LOCAL_TABLES: &[Table] = &[Table {
-    name: "tickets",
-    columns: &[
-        c("product", Text),
-        c("id", Text),
-        c("scope", Text),
-        c("kind", Text),
-        c("state", Text),
-        c("title", Text),
-        c("body", Text),
-        c("waiting_on", Text),
-        c("assignee", Text),
-        c("author", Json),
-        c("updated_by", Json),
-        c("links", Json),
-        c("objective", Text),
-        c("created_at", Time),
-        c("updated_at", Time),
-        c("closed_at", Time),
-    ],
-    key: &["product", "id"],
-}];
+pub const LOCAL_TABLES: &[Table] = &[
+    Table {
+        name: "tickets",
+        columns: &[
+            c("product", Text),
+            c("id", Text),
+            c("scope", Text),
+            c("kind", Text),
+            c("state", Text),
+            c("title", Text),
+            c("body", Text),
+            c("waiting_on", Text),
+            c("assignee", Text),
+            c("author", Json),
+            c("updated_by", Json),
+            c("links", Json),
+            c("objective", Text),
+            c("created_at", Time),
+            c("updated_at", Time),
+            c("closed_at", Time),
+        ],
+        key: &["product", "id"],
+    },
+    Table {
+        name: "desk_sessions",
+        columns: &[
+            c("product", Text),
+            c("session", Text),
+            c("created_at", Time),
+        ],
+        key: &["product"],
+    },
+    Table {
+        name: "desk_items",
+        columns: &[
+            c("product", Text),
+            c("seq", Int),
+            c("kind", Text),
+            c("body", Json),
+            c("sent", Bool),
+            c("at", Time),
+        ],
+        key: &["product", "seq"],
+    },
+];
 
 /// Each table of SQLite: the tables of Postgres, then the local tables.
 pub fn all() -> impl Iterator<Item = &'static Table> {

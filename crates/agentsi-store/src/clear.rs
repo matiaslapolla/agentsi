@@ -17,7 +17,7 @@ use std::time::SystemTime;
 pub const ALLOWED: [&str; 4] = ["workspace", "voice/transcripts", "logs", "backups"];
 
 /// Each table, children first.
-pub const TABLES: [&str; 18] = [
+pub const TABLES: [&str; 20] = [
     "priorities",
     "usage",
     "documents",
@@ -35,6 +35,8 @@ pub const TABLES: [&str; 18] = [
     "reflections",
     "archive_records",
     "tickets",
+    "desk_items",
+    "desk_sessions",
     "products",
 ];
 
@@ -356,6 +358,11 @@ fn apply(tx: &Connection, root: &Path, item: &Item) -> Result<ItemPlan> {
                     "delete from archive_records where product = ?1",
                 ),
                 ("tickets", "delete from tickets where product = ?1"),
+                ("desk_items", "delete from desk_items where product = ?1"),
+                (
+                    "desk_sessions",
+                    "delete from desk_sessions where product = ?1",
+                ),
                 ("products", "delete from products where id = ?1"),
             ] {
                 del(tx, t, table, sql, [product])?;
@@ -572,6 +579,7 @@ pub fn product_ids(conn: &Connection) -> Result<Vec<String>> {
         "select distinct product from memory",
         "select distinct product from decisions",
         "select distinct product from tickets",
+        "select product from desk_sessions",
     ] {
         ids.extend(strings(conn, sql, [])?);
     }
@@ -702,7 +710,9 @@ mod tests {
                ('{p}', 'minutes', '{m1}'), ('{p}', 'minutes', '{m2}'), ('{p}', 'story', 'S001'),
                ('{p}', 'story', 'S003'), ('{p}', 'decision', (select id from decisions where product = '{p}' and minutes_id = '{m1}'));
              insert into tickets (product, id, kind, state, title, author, updated_by, created_at, updated_at)
-               values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');"
+               values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');
+             insert into desk_sessions values ('{p}', 'u-{p}', 'x');
+             insert into desk_items (product, seq, kind, body, at) values ('{p}', 1, 'owner', '{{}}', 'x');"
         ))
         .unwrap();
     }

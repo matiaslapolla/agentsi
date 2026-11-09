@@ -5,6 +5,7 @@ pub mod backup;
 pub mod calls;
 pub mod clear;
 pub mod db;
+pub mod desk;
 pub mod error;
 pub mod import;
 pub mod meeting;
