@@ -421,6 +421,10 @@ pub struct AlertCenter {
     /// The newest alert first.
     log: VecDeque<Alert>,
     unseen: usize,
+    /// The alert that the owner just opened, for the fade of the tint. The id is the alert id.
+    fades: HashMap<AlertTarget, (WorkState, u64)>,
+    /// The pane that the microphone or the conversation listens to.
+    listening: Option<(Option<String>, String)>,
 }
 
 /// What the core knows about a pane: the center cannot read it.
@@ -527,9 +531,64 @@ impl AlertCenter {
         self.active.get(target).map(|a| a.state)
     }
 
-    /// The owner opened or focused `target`: the glow of its alert ends.
+    /// [`glow`](Self::glow) and the id of the alert. A new alert has a new id, so its glow
+    /// pulses again.
+    pub fn glow_id(&self, target: &AlertTarget) -> Option<(WorkState, u64)> {
+        self.active.get(target).map(|a| (a.state, a.id))
+    }
+
+    /// The alert that the owner opened last on `target`, while its tint fades.
+    pub fn fade(&self, target: &AlertTarget) -> Option<(WorkState, u64)> {
+        self.fades.get(target).copied()
+    }
+
+    /// The owner opened or focused `target`: the glow of its alert ends and its tint fades.
     pub fn opened(&mut self, target: &AlertTarget, cx: &mut Context<Self>) {
-        if self.active.remove(target).is_some() {
+        if let Some(alert) = self.active.get(target) {
+            self.fades.insert(target.clone(), (alert.state, alert.id));
+            // The glow of Blocked ends when the program state changes, not when the owner looks.
+            if alert.bell || alert.state != WorkState::Blocked {
+                self.active.remove(target);
+            }
+            cx.notify();
+        }
+    }
+
+    /// True while the microphone or the conversation listens to pane `id`.
+    pub fn is_listening(&self, host: Option<&str>, id: &str) -> bool {
+        self.listening
+            .as_ref()
+            .is_some_and(|(h, p)| h.as_deref() == host && p == id)
+    }
+
+    /// Reads the events that open or close the microphone. `focused` is the pane that the
+    /// owner uses, which `voice.mic` does not name.
+    pub fn hear(
+        &mut self,
+        host: Option<&str>,
+        n: &Notification,
+        focused: Option<&str>,
+        cx: &mut Context<Self>,
+    ) {
+        let now = match n.method.as_str() {
+            "voice.mic" => match n.params.get("open").and_then(|o| o.as_bool()) {
+                Some(true) => focused.map(str::to_string),
+                _ => None,
+            },
+            "converse.state" => match n.params.get("state").and_then(|s| s.as_str()) {
+                Some("started") => n
+                    .params
+                    .get("terminal")
+                    .and_then(|t| t.as_str())
+                    .map(str::to_string),
+                Some("stopped") => None,
+                _ => return,
+            },
+            _ => return,
+        };
+        let next = now.map(|id| (host.map(str::to_string), id));
+        if self.listening != next {
+            self.listening = next;
             cx.notify();
         }
     }
@@ -770,6 +829,145 @@ mod tests {
                     host: None,
                     id: format!("t{}", LOG_MAX + 4)
                 }
+            );
+        });
+    }
+
+    #[gpui::test]
+    fn opening_ends_the_glow_of_a_bell_and_fades_the_tint_but_a_blocked_glow_stays(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let center = cx.new(|_| AlertCenter::default());
+        let none = |_: &str| Name::default();
+        let bell = AlertTarget::Pane {
+            host: None,
+            id: "bell".into(),
+        };
+        let blocked = AlertTarget::Pane {
+            host: None,
+            id: "t1".into(),
+        };
+        center.update(cx, |c, cx| {
+            c.bell(None, "bell", &none, cx);
+            c.take(
+                None,
+                &note(
+                    "terminal.state",
+                    json!({"id": "t1", "state": "blocked", "kind": "auth"}),
+                ),
+                &none,
+                cx,
+            );
+        });
+        let (bell_id, blocked_id) = center.read_with(cx, |c, _| {
+            (c.glow_id(&bell).unwrap().1, c.glow_id(&blocked).unwrap().1)
+        });
+        assert_ne!(bell_id, blocked_id);
+        center.update(cx, |c, cx| {
+            c.opened(&bell, cx);
+            c.opened(&blocked, cx);
+        });
+        center.read_with(cx, |c, _| {
+            assert_eq!(c.glow(&bell), None, "a bell glow ends");
+            assert_eq!(
+                c.glow(&blocked),
+                Some(WorkState::Blocked),
+                "Blocked ends with the state"
+            );
+            assert_eq!(c.fade(&bell), Some((WorkState::Blocked, bell_id)));
+            assert_eq!(c.fade(&blocked), Some((WorkState::Blocked, blocked_id)));
+        });
+        // A second bell has a new id, so its glow pulses again.
+        center.update(cx, |c, cx| c.bell(None, "bell", &none, cx));
+        center.read_with(cx, |c, _| assert_ne!(c.glow_id(&bell).unwrap().1, bell_id));
+    }
+
+    #[gpui::test]
+    fn the_microphone_and_the_conversation_mark_the_pane_that_listens(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        let center = cx.new(|_| AlertCenter::default());
+        let hear = |cx: &mut gpui::TestAppContext, n: Notification, focused: Option<&str>| {
+            center.update(cx, |c, cx| c.hear(None, &n, focused, cx));
+        };
+        hear(cx, note("voice.mic", json!({"open": true})), Some("t1"));
+        center.read_with(cx, |c, _| assert!(c.is_listening(None, "t1")));
+        hear(cx, note("voice.mic", json!({"open": false})), Some("t1"));
+        center.read_with(cx, |c, _| assert!(!c.is_listening(None, "t1")));
+        hear(
+            cx,
+            note(
+                "converse.state",
+                json!({"state": "started", "terminal": "t2"}),
+            ),
+            None,
+        );
+        center.read_with(cx, |c, _| {
+            assert!(c.is_listening(None, "t2") && !c.is_listening(None, "t1"))
+        });
+        hear(
+            cx,
+            note(
+                "converse.state",
+                json!({"state": "silent_reply", "terminal": "t2"}),
+            ),
+            None,
+        );
+        center.read_with(cx, |c, _| {
+            assert!(c.is_listening(None, "t2"), "a silent reply keeps listening")
+        });
+        hear(
+            cx,
+            note(
+                "converse.state",
+                json!({"state": "stopped", "terminal": null}),
+            ),
+            None,
+        );
+        center.read_with(cx, |c, _| assert!(!c.is_listening(None, "t2")));
+        // A mic with no focused pane marks nothing.
+        hear(cx, note("voice.mic", json!({"open": true})), None);
+        center.read_with(cx, |c, _| assert!(!c.is_listening(None, "t2")));
+    }
+
+    #[test]
+    fn a_pane_that_finishes_work_makes_a_done_alert_for_the_tone_only() {
+        let mut st = AlertState::new(None);
+        apply(
+            &mut st,
+            &note("terminal.state", json!({"id": "t1", "state": "working"})),
+        );
+        let made = apply(
+            &mut st,
+            &note("terminal.state", json!({"id": "t1", "state": "done"})),
+        );
+        assert_eq!(made.len(), 1);
+        assert_eq!(made[0].state, WorkState::Done);
+        assert!(!Alert::is_alertable(made[0].state));
+    }
+
+    #[gpui::test]
+    fn a_done_alert_reaches_no_log_and_no_glow(cx: &mut gpui::TestAppContext) {
+        let center = cx.new(|_| AlertCenter::default());
+        let none = |_: &str| Name::default();
+        center.update(cx, |c, cx| {
+            for state in ["working", "done"] {
+                c.take(
+                    None,
+                    &note("terminal.state", json!({"id": "t1", "state": state})),
+                    &none,
+                    cx,
+                );
+            }
+        });
+        center.read_with(cx, |c, _| {
+            assert_eq!((c.log().count(), c.unseen()), (0, 0));
+            assert_eq!(
+                c.glow(&AlertTarget::Pane {
+                    host: None,
+                    id: "t1".into()
+                }),
+                None
             );
         });
     }

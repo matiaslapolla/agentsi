@@ -547,7 +547,7 @@ pub fn raise_alerts(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncAp
     let Some(center) = cx.update(|cx| Alerts::try_get(cx)) else {
         return;
     };
-    let (host, name) = core.read_with(cx, |s, _| {
+    let (host, name, focused) = core.read_with(cx, |s, _| {
         let term = n
             .params
             .get("id")
@@ -557,7 +557,10 @@ pub fn raise_alerts(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncAp
             title: term.map(|t| t.title.clone()).unwrap_or_default(),
             product: term.and_then(|t| t.product.clone()),
         };
-        (s.remote.clone(), name)
+        (s.remote.clone(), name, s.focused.clone())
+    });
+    center.update(cx, |c, cx| {
+        c.hear(host.as_deref(), n, focused.as_deref(), cx)
     });
     center.update(cx, |c, cx| {
         c.take(host.as_deref(), n, &|_| name.clone(), cx)

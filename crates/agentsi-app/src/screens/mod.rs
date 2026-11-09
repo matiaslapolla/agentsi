@@ -37,9 +37,11 @@ use gpui_kit::component::dock::{BasePanel, Panel, PanelEvent, PanelInfo, PanelSt
 use gpui_kit::*;
 use serde_json::{Value, json};
 
+use agentsi_ui::style;
 use agentsi_ui::tokens::space;
 use gpui_kit::prelude::FluentBuilder as _;
 
+use crate::alerts::{AlertTarget, Alerts};
 use crate::layout::{SCREEN_PANEL, host_of};
 use crate::look::LookGlobal;
 use crate::model::CoreState;
@@ -301,6 +303,8 @@ pub struct ScreenPanel {
     /// The dock displays this tab.
     pub shown: bool,
     _observe: Subscription,
+    /// A fade of the tint after the owner opened an alert redraws this screen.
+    _alerts: Option<Subscription>,
 }
 
 impl ScreenPanel {
@@ -313,12 +317,28 @@ impl ScreenPanel {
             host: core.read(cx).remote.clone(),
             // The tab title shows the product name, which `CoreState` knows.
             _observe: cx.observe(&core, |_, _, cx| cx.notify()),
+            _alerts: Alerts::try_get(cx).map(|c| cx.observe(&c, |_, _, cx| cx.notify())),
             product: spec.product,
             arg: spec.arg,
             core,
             view,
             focus: cx.focus_handle(),
             shown: false,
+        }
+    }
+
+    /// The target of the alerts about this screen: the meeting, the story or the decisions.
+    fn alert_target(&self) -> Option<AlertTarget> {
+        let (host, product) = (self.host.clone(), self.product.clone());
+        match self.kind {
+            ScreenKind::Meeting => Some(AlertTarget::Meeting { host, product }),
+            ScreenKind::Story => Some(AlertTarget::Story {
+                host,
+                product,
+                id: self.arg.clone()?,
+            }),
+            ScreenKind::Desk => Some(AlertTarget::Decisions { host, product }),
+            _ => None,
         }
     }
 
@@ -447,6 +467,9 @@ impl BasePanel for ScreenPanel {
 
     fn set_active(&mut self, active: bool, _: &mut Window, cx: &mut Context<Self>) {
         self.shown = active;
+        if active && let (Some(center), Some(target)) = (Alerts::try_get(cx), self.alert_target()) {
+            center.update(cx, |c, cx| c.opened(&target, cx));
+        }
         self.view.show(active, cx);
     }
 
@@ -510,13 +533,24 @@ impl Render for ScreenPanel {
         if let Some((line, why)) = self.core.read(cx).away() {
             return root.child(parts::notice(line, why));
         }
+        let fade = self
+            .alert_target()
+            .zip(Alerts::try_get(cx))
+            .and_then(|(t, c)| c.read(cx).fade(&t));
         // A cached view draws again only when it notifies itself: a terminal event
         // elsewhere must not rebuild a screen.
-        root.child(
-            self.view
-                .any()
-                .cached(StyleRefinement::default().size_full()),
-        )
+        root.relative()
+            .child(
+                self.view
+                    .any()
+                    .cached(StyleRefinement::default().size_full()),
+            )
+            .when_some(fade, |el, (state, alert)| {
+                el.child(style::tint_fade(
+                    format!("screen-tint:{}:{alert}", self.kind.name()),
+                    state,
+                ))
+            })
     }
 }
 

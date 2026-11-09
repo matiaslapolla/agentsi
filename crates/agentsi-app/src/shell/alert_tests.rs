@@ -67,7 +67,10 @@ fn the_bell_opens_the_log_and_open_shows_the_pane_and_ends_its_glow(cx: &mut Tes
     let look = folder("alert-log").join("look.toml");
     let (f, cx) = fixture(cx, Persist::None, &look);
     with_tabs(&f, cx);
-    raise(cx, blocked("t1-a"));
+    raise(
+        cx,
+        note("terminal.state", json!({"id": "t1-a", "state": "error"})),
+    );
     assert!(at(cx, "alert-log").is_none());
     click(cx, "button:alerts-bell");
     assert!(at(cx, "alert-log").is_some(), "the popover opens");

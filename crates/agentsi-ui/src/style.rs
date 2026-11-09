@@ -49,6 +49,39 @@ pub fn glow(key: impl Into<ElementId>, state: WorkState) -> Option<AnimationElem
     }))
 }
 
+/// The tint of `state` over its parent. It fades out in [`motion::DIALOG`] and takes no layout
+/// space. Use a new `key` for each opening, so that each opening fades again. With reduced
+/// motion the last frame shows at once, and that frame is clear.
+pub fn tint_fade(key: impl Into<ElementId>, state: WorkState) -> AnimationElement<Div> {
+    let tint = state.tint();
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .with_animation(key, Animation::new(motion::DIALOG), move |el, delta| {
+            el.bg(tint.alpha(TINT_PEAK * (1. - delta)))
+        })
+}
+
+/// The tint at the start of a fade.
+const TINT_PEAK: f32 = 0.35;
+
+/// A 1 px edge in the color of `state`, over its parent. It fades in during
+/// [`motion::HOVER`] and takes no layout space.
+pub fn edge(key: impl Into<ElementId>, state: WorkState) -> AnimationElement<Div> {
+    let color = state.color();
+    div()
+        .absolute()
+        .top_0()
+        .left_0()
+        .size_full()
+        .border_1()
+        .with_animation(key, Animation::new(motion::HOVER), move |el, delta| {
+            el.border_color(color.alpha(delta))
+        })
+}
+
 pub trait StyleExt: Styled + Sized {
     /// The same padding on the left and on the right.
     fn pad_x(self, v: Pixels) -> Self {

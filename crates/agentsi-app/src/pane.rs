@@ -25,7 +25,7 @@ use agentsi_proto::voice_api::{
 use agentsi_term_view::{PaneEvent, PaneOptions, PaneOutput, TerminalPane};
 use agentsi_ui::bench::Bench;
 use agentsi_ui::components::{StateMark, StatusDot, Switch, state_icon, status_tag};
-use agentsi_ui::style::StyleExt as _;
+use agentsi_ui::style::{self, StyleExt as _};
 use agentsi_ui::tokens::WorkState;
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{Status, control, line, radius, size, space, surface, text, weight};
@@ -98,22 +98,27 @@ pub fn glow_of(t: Option<&Term>) -> Option<WorkState> {
     t.and_then(Term::attention).map(|_| WorkState::Blocked)
 }
 
-/// [`glow_of`], else the glow of an alert on the pane `id`.
+/// The glow of pane `id` and the id of its alert: the state with the lowest rank of the
+/// program (id 0) and of the alert that the owner did not open. A new alert has a new id, so
+/// its glow pulses again.
 pub fn glow_with_alert(
     t: Option<&Term>,
     host: Option<&str>,
     id: &str,
     cx: &App,
-) -> Option<WorkState> {
-    glow_of(t).or_else(|| {
-        Alerts::glow(
-            cx,
-            &AlertTarget::Pane {
-                host: host.map(str::to_string),
-                id: id.to_string(),
-            },
-        )
-    })
+) -> Option<(WorkState, u64)> {
+    let alert = Alerts::try_get(cx).and_then(|c| c.read(cx).glow_id(&pane_target(host, id)));
+    [alert, glow_of(t).map(|s| (s, 0))]
+        .into_iter()
+        .flatten()
+        .min_by_key(|(s, _)| s.rank())
+}
+
+pub fn pane_target(host: Option<&str>, id: &str) -> AlertTarget {
+    AlertTarget::Pane {
+        host: host.map(str::to_string),
+        id: id.to_string(),
+    }
 }
 
 /// What the tab and the header of a pane show: the label of the owner, else the program title.
@@ -533,9 +538,9 @@ impl TerminalPanel {
         });
     }
 
-    /// The state that makes this pane glow: a program that asks for the owner, else the
-    /// state of an alert that the owner did not open.
-    fn glow(&self, cx: &App) -> Option<WorkState> {
+    /// The state that makes this pane glow: a program that asks for the owner, or the state of
+    /// an alert that the owner did not open.
+    fn glow(&self, cx: &App) -> Option<(WorkState, u64)> {
         let core = self.core.read(cx);
         glow_with_alert(
             core.terminals.get(&self.id),
@@ -840,12 +845,13 @@ impl Panel for TerminalPanel {
         };
         let work = work_state_of(term);
         let glow = glow_with_alert(term, core.remote.as_deref(), &self.id, cx);
+        let glow_key = format!("tab-glow:{}:{}", self.id, glow.map_or(0, |g| g.1));
         div()
             .flex()
             .items_center()
             .gap(space(2))
             .min_w_0()
-            .glow(format!("tab-glow:{}", self.id), glow)
+            .glow(glow_key, glow.map(|g| g.0))
             .when_some(shown.hue, |el, h| {
                 el.child(tab_bar(h, format!("tab-color:{}", self.id)))
             })
@@ -885,13 +891,26 @@ impl Panel for TerminalPanel {
 
 impl Render for TerminalPanel {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let blocked = self.glow(cx);
+        let glow = self.glow(cx);
+        let host = self.core.read(cx).remote.clone();
+        let (fade, listening) = match Alerts::try_get(cx) {
+            Some(c) => {
+                let c = c.read(cx);
+                (
+                    c.fade(&pane_target(host.as_deref(), &self.id)),
+                    c.is_listening(host.as_deref(), &self.id),
+                )
+            }
+            None => (None, false),
+        };
+        let key = glow.map_or(0, |g| g.1);
         div()
             .size_full()
+            .relative()
             .flex()
             .flex_col()
             .bg(surface::base())
-            .glow(format!("pane-glow:{}", self.id), blocked)
+            .glow(format!("pane-glow:{}:{key}", self.id), glow.map(|g| g.0))
             .child(
                 self.header.clone().cached(
                     StyleRefinement::default()
@@ -901,6 +920,18 @@ impl Render for TerminalPanel {
                 ),
             )
             .child(div().flex_1().min_h_0().child(self.pane.clone()))
+            .when_some(fade, |el, (state, alert)| {
+                el.child(style::tint_fade(
+                    format!("pane-tint:{}:{alert}", self.id),
+                    state,
+                ))
+            })
+            .when(listening, |el| {
+                el.child(style::edge(
+                    format!("pane-listen:{}", self.id),
+                    WorkState::Listening,
+                ))
+            })
     }
 }
 
