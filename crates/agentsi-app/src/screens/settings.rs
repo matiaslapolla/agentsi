@@ -1809,7 +1809,7 @@ mod tests {
                         .count()
                 })
             };
-            assert_eq!(count(&t, cx), 23);
+            assert_eq!(count(&t, cx), 24);
             t.screen.update_in(cx, |s, window, cx| {
                 let f = s.keys_filter.clone().unwrap();
                 f.update(cx, |i, cx| i.set_value("terminal", window, cx));

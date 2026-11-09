@@ -33,6 +33,8 @@ gpui_kit::actions!(
         OpenRoles,
         /// Opens the stories of the active product.
         OpenStories,
+        /// Opens the tickets of the active product.
+        OpenTickets,
         /// Opens the git screen of the active product.
         OpenGit,
         /// Opens the meeting of the active product.
@@ -249,6 +251,7 @@ key_table! {
     ("minutes", "Minutes", "secondary-shift-l", || Box::new(OpenMinutes)),
     ("roles", "Roles", "secondary-shift-r", || Box::new(OpenRoles)),
     ("stories", "Stories", "secondary-shift-s", || Box::new(OpenStories)),
+    ("tickets", "Tickets", "secondary-shift-i", || Box::new(OpenTickets)),
     ("git", "Git", "secondary-shift-b", || Box::new(OpenGit)),
     ("meeting", "Meeting", "secondary-shift-g", || Box::new(OpenMeeting)),
     ("memory", "Memory", "secondary-shift-y", || Box::new(OpenMemory)),
@@ -375,6 +378,14 @@ pub const ENTRIES: &[Entry] = &[
             "stories", "story", "task", "approve", "run", "review", "accept", "reject", "diff",
         ],
         action: || Box::new(OpenStories),
+    },
+    Entry {
+        label: "Open the tickets of the active product",
+        icon: IconName::Check,
+        keywords: &[
+            "tickets", "ticket", "note", "todo", "question", "pending", "waiting",
+        ],
+        action: || Box::new(OpenTickets),
     },
     Entry {
         label: "Open the git panel of the active product",
@@ -856,6 +867,7 @@ mod tests {
             "Open the minutes of the active product",
             "Open the roles of the active product",
             "Open the stories of the active product",
+            "Open the tickets of the active product",
             "Open the git panel of the active product",
             "Open the meeting of the active product",
             "Start the meeting in the question field (meeting)",

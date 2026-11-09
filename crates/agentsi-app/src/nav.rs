@@ -63,6 +63,34 @@ impl ScreenSpec {
         }
     }
 
+    pub fn tickets(product: &str) -> Self {
+        ScreenSpec {
+            kind: ScreenKind::Tickets,
+            host: None,
+            product: product.into(),
+            arg: None,
+        }
+    }
+
+    pub fn ticket(product: &str, id: &str) -> Self {
+        ScreenSpec {
+            kind: ScreenKind::Ticket,
+            host: None,
+            product: product.into(),
+            arg: Some(id.into()),
+        }
+    }
+
+    /// The front desk of a product of this device.
+    pub fn front_desk(product: &str) -> Self {
+        ScreenSpec {
+            kind: ScreenKind::Desk,
+            host: None,
+            product: product.into(),
+            arg: None,
+        }
+    }
+
     pub fn git(product: &str) -> Self {
         ScreenSpec {
             kind: ScreenKind::Git,
