@@ -22,7 +22,11 @@ fn hook(args: &[&str], stdin: &[u8]) -> Output {
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    child.stdin.take().unwrap().write_all(stdin).unwrap();
+    // A hook that refuses its arguments exits before it reads stdin.
+    match child.stdin.take().unwrap().write_all(stdin) {
+        Err(e) if e.kind() == std::io::ErrorKind::BrokenPipe => {}
+        other => other.unwrap(),
+    }
     child.wait_with_output().unwrap()
 }
 
