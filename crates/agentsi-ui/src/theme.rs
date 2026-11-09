@@ -22,6 +22,9 @@ const FONTS: [&[u8]; 5] = [
 ];
 
 /// Registers the bundled fonts with the text system.
+/// The toasts that show at once.
+pub const MAX_TOASTS: usize = 3;
+
 fn load_fonts(cx: &mut App) -> Result<(), String> {
     cx.text_system()
         .add_fonts(FONTS.iter().map(|f| Cow::Borrowed(*f)).collect())
@@ -147,6 +150,7 @@ pub(crate) fn apply(cx: &mut App, mode: ThemeMode) {
         t.slider_bar = c(accent::base());
         t.slider_thumb = c(text::primary());
         t.progress_bar = c(accent::base());
+        t.notification.max_items = MAX_TOASTS;
         t.skeleton = c(surface::overlay());
         t.drag_border = c(accent::base());
         t.drop_target = accent::base().alpha(0.12);

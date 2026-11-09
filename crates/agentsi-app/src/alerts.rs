@@ -67,6 +67,16 @@ impl AlertTarget {
         }
     }
 
+    pub fn host(&self) -> Option<&str> {
+        match self {
+            AlertTarget::Pane { host, .. }
+            | AlertTarget::Meeting { host, .. }
+            | AlertTarget::Story { host, .. }
+            | AlertTarget::Decisions { host, .. } => host.as_deref(),
+            AlertTarget::Model { .. } => None,
+        }
+    }
+
     pub fn product(&self) -> Option<&str> {
         match self {
             AlertTarget::Meeting { product, .. }
@@ -95,10 +105,6 @@ pub struct Alert {
 
 impl Alert {
     /// The word of the state and the reason: "Blocked: Claude asks for a permission".
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the log and the toast read it (U8)")
-    )]
     pub fn line(&self) -> String {
         format!("{}: {}", self.state.word(), self.text)
     }
@@ -133,10 +139,7 @@ impl AlertState {
     }
 
     /// The work state that the alert center knows for `target`.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the log and the toast read it (U8)")
-    )]
+    #[cfg(test)]
     pub fn state_of(&self, target: &AlertTarget) -> Option<WorkState> {
         self.states.get(target).copied()
     }
@@ -540,26 +543,14 @@ impl AlertCenter {
         self.opened(&target, cx);
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the log and the toast read it (U8)")
-    )]
     pub fn log(&self) -> impl Iterator<Item = &Alert> {
         self.log.iter()
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the log and the toast read it (U8)")
-    )]
     pub fn unseen(&self) -> usize {
         self.unseen
     }
 
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "the log and the toast read it (U8)")
-    )]
     pub fn mark_seen(&mut self, cx: &mut Context<Self>) {
         if self.unseen != 0 {
             self.unseen = 0;

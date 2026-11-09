@@ -14,7 +14,7 @@ use std::rc::Rc;
 
 use agentsi_proto::desk_api::ProductInfo;
 use agentsi_ui::components::{
-    GroupHeader, ItemRow, Kbd, ProductRow, StateMark, StatusDot, neutral_tag, running_chip,
+    Button, GroupHeader, ItemRow, Kbd, ProductRow, StateMark, StatusDot, neutral_tag, running_chip,
 };
 use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{
@@ -34,6 +34,7 @@ use crate::pane::{AttentionProbe, Marker};
 use crate::screens::minutes::cursor_after;
 use crate::shell::PaneRef;
 use crate::tree::{self, Item, ItemKey};
+use gpui_kit::component::IconName;
 
 /// The owner picked a product in the sidebar.
 pub struct SelectProduct(pub ProductRef);
@@ -43,6 +44,9 @@ pub struct OpenItem {
     pub product: ProductRef,
     pub item: ItemKey,
 }
+
+/// The owner pressed the bell: the shell shows the alert log.
+pub struct ShowAlerts;
 
 /// A product opened or closed: the shell saves the layout again.
 pub struct TreeChanged;
@@ -94,6 +98,7 @@ pub struct Sidebar {
 impl EventEmitter<SelectProduct> for Sidebar {}
 impl EventEmitter<OpenItem> for Sidebar {}
 impl EventEmitter<TreeChanged> for Sidebar {}
+impl EventEmitter<ShowAlerts> for Sidebar {}
 
 impl Sidebar {
     pub fn new(cores: Cores, probe: Option<AttentionProbe>, cx: &mut Context<Self>) -> Self {
@@ -739,6 +744,7 @@ impl Render for Sidebar {
             first += h.products.len();
         }
         let empty = rows.is_empty();
+        let unseen = Alerts::try_get(cx).map_or(0, |c| c.read(cx).unseen());
         let host_off = match &host_state {
             HostState::Off(why) => Some(why.clone()),
             _ => None,
@@ -770,7 +776,21 @@ impl Render for Sidebar {
                             .text_color(text::primary())
                             .child("AgentSI"),
                     )
-                    .child(keys::hint(cx, keys::PALETTE)),
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap(space(2))
+                            .child(
+                                Button::new("alerts-bell")
+                                    .icon(IconName::Bell)
+                                    .when(unseen > 0, |b| b.label(unseen.to_string()))
+                                    .ghost()
+                                    .small()
+                                    .on_click(cx.listener(|_, _, _, cx| cx.emit(ShowAlerts))),
+                            )
+                            .child(keys::hint(cx, keys::PALETTE)),
+                    ),
             )
             .child(
                 div()
