@@ -1,6 +1,7 @@
 //! The methods of `agentsi mark`, `decide`, `decision add`, `archive` and
 //! `restore` (U20): `mark.pending`, `mark.set`, `decision.decide`,
-//! `decision.add`, `archive.archive` and `archive.restore`.
+//! `decision.add`, `archive.archive` and `archive.restore`. `decision.archived` lists
+//! the archived decisions of a product.
 //!
 //! Each write runs in one transaction of the store and sends `data.changed`
 //! for each product that it changed. The field order of `PendingItem` is the
@@ -17,6 +18,7 @@ pub fn register(c: &mut Catalog) {
         .method::<MarkSet>()
         .method::<DecisionDecide>()
         .method::<DecisionAdd>()
+        .method::<DecisionArchived>()
         .method::<ArchiveArchive>()
         .method::<ArchiveRestore>();
 }
@@ -232,6 +234,43 @@ impl Method for DecisionAdd {
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
     type Params = DecisionAddParams;
     type Result = DecisionAddResult;
+}
+
+pub struct DecisionArchived;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DecisionArchivedParams {
+    pub product: String,
+}
+
+/// A decision that the archive record holds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ArchivedDecision {
+    pub id: i64,
+    /// `minutes`, `reflection` or `product`.
+    pub kind: String,
+    pub minutes_id: Option<String>,
+    pub text: Option<String>,
+    pub why: Option<String>,
+    /// What to run once the decision is approved.
+    pub action: Option<String>,
+    /// `pending`, `approved`, `rejected` or `stale`.
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DecisionArchivedResult {
+    /// Newest id first.
+    pub decisions: Vec<ArchivedDecision>,
+}
+
+impl Method for DecisionArchived {
+    const NAME: &'static str = "decision.archived";
+    const DESCRIPTION: &'static str = "Lists the decisions of a product that are archived, \
+        newest id first. `archive.restore` brings one back. It only reads.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = DecisionArchivedParams;
+    type Result = DecisionArchivedResult;
 }
 
 /// The kind of record that an archive record names.

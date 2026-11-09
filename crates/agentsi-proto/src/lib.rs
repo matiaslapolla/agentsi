@@ -10,6 +10,7 @@ pub mod client;
 pub mod compat;
 pub mod core_api;
 pub mod desk_api;
+pub mod doctor;
 pub mod events;
 pub mod frame;
 pub mod git_api;

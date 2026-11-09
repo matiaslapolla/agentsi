@@ -1,14 +1,18 @@
 //! `core.status`: what `agentsi up` and `agentsi migrate` print (U24). `data.backup`:
-//! the online backup of `agentsi backup` (U26b).
+//! the online backup of `agentsi backup` (U26b). `core.doctor`: the checks of
+//! `agentsi doctor`.
 
 use crate::core_api::Empty;
+use crate::doctor::{Level, Status};
 use crate::method::{Catalog, Method};
 use crate::rpc::ErrorKind;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 pub fn register(c: &mut Catalog) {
-    c.method::<CoreStatus>().method::<DataBackup>();
+    c.method::<CoreStatus>()
+        .method::<DataBackup>()
+        .method::<CoreDoctor>();
 }
 
 pub struct CoreStatus;
@@ -72,4 +76,35 @@ impl Method for DataBackup {
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::Invalid, ErrorKind::Unavailable];
     type Params = DataBackupParams;
     type Result = DataBackupResult;
+}
+
+pub struct CoreDoctor;
+
+/// One check of `agentsi doctor`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DoctorCheck {
+    pub name: String,
+    /// `required` checks decide the exit code of `agentsi doctor`.
+    pub level: Level,
+    pub status: Status,
+    /// The version or the found path when ok. Why it failed otherwise. Empty when missing.
+    pub detail: String,
+    /// The features that a failed check blocks.
+    pub blocks: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct CoreDoctorResult {
+    /// The checks in the order of `agentsi doctor`.
+    pub checks: Vec<DoctorCheck>,
+}
+
+impl Method for CoreDoctor {
+    const NAME: &'static str = "core.doctor";
+    const DESCRIPTION: &'static str = "Runs the checks of `agentsi doctor` on the host of the core \
+        and gives each row: the core, the data root, the tools and the voice. It writes nothing. \
+        A run takes up to 15 seconds for each tool.";
+    const ERRORS: &'static [ErrorKind] = &[];
+    type Params = Empty;
+    type Result = CoreDoctorResult;
 }

@@ -193,6 +193,56 @@
         ],
         "type": "object"
       },
+      "ArchivedDecision": {
+        "description": "A decision that the archive record holds.",
+        "properties": {
+          "action": {
+            "description": "What to run once the decision is approved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "kind": {
+            "description": "`minutes`, `reflection` or `product`.",
+            "type": "string"
+          },
+          "minutes_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "description": "`pending`, `approved`, `rejected` or `stale`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "why": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "type": "object"
+      },
       "AttachResult": {
         "properties": {
           "channel": {
@@ -877,6 +927,21 @@
           }
         ]
       },
+      "CoreDoctorResult": {
+        "properties": {
+          "checks": {
+            "description": "The checks in the order of `agentsi doctor`.",
+            "items": {
+              "$ref": "#/components/schemas/DoctorCheck"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "checks"
+        ],
+        "type": "object"
+      },
       "CoreStatusResult": {
         "properties": {
           "data_root": {
@@ -1169,6 +1234,21 @@
         ],
         "type": "object"
       },
+      "DecisionArchivedResult": {
+        "properties": {
+          "decisions": {
+            "description": "Newest id first.",
+            "items": {
+              "$ref": "#/components/schemas/ArchivedDecision"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "decisions"
+        ],
+        "type": "object"
+      },
       "DeskResult": {
         "properties": {
           "index": {
@@ -1257,6 +1337,37 @@
         "required": [
           "topic",
           "positions"
+        ],
+        "type": "object"
+      },
+      "DoctorCheck": {
+        "description": "One check of `agentsi doctor`.",
+        "properties": {
+          "blocks": {
+            "description": "The features that a failed check blocks.",
+            "type": "string"
+          },
+          "detail": {
+            "description": "The version or the found path when ok. Why it failed otherwise. Empty when missing.",
+            "type": "string"
+          },
+          "level": {
+            "$ref": "#/components/schemas/Level",
+            "description": "`required` checks decide the exit code of `agentsi doctor`."
+          },
+          "name": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "status",
+          "detail",
+          "blocks"
         ],
         "type": "object"
       },
@@ -2104,6 +2215,15 @@
           "rounds"
         ],
         "type": "object"
+      },
+      "Level": {
+        "description": "`required` checks decide the exit code. The others only name what they block.",
+        "enum": [
+          "required",
+          "stories",
+          "optional"
+        ],
+        "type": "string"
       },
       "Link": {
         "description": "A link of a ticket. `story`, `decision`, `minutes`, `priority` (`<minutes id>#<idx>`) and\n`ticket` must exist. `url` is an http(s) URL. `commit`, `path` and `issue` are free text.",
@@ -4602,6 +4722,14 @@
           "ref"
         ],
         "type": "object"
+      },
+      "Status": {
+        "enum": [
+          "ok",
+          "missing",
+          "fail"
+        ],
+        "type": "string"
       },
       "StatusResult": {
         "properties": {
@@ -7231,6 +7359,56 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DecisionAddResult"
+        }
+      }
+    },
+    {
+      "description": "Lists the decisions of a product that are archived, newest id first. `archive.restore` brings one back. It only reads.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "decision.archived",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DecisionArchivedResult"
         }
       }
     },
@@ -10003,6 +10181,34 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DataBackupResult"
+        }
+      }
+    },
+    {
+      "description": "Runs the checks of `agentsi doctor` on the host of the core and gives each row: the core, the data root, the tools and the voice. It writes nothing. A run takes up to 15 seconds for each tool.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        }
+      ],
+      "name": "core.doctor",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/CoreDoctorResult"
         }
       }
     },
