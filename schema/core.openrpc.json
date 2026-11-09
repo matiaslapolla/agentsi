@@ -3382,6 +3382,14 @@
         ],
         "type": "string"
       },
+      "PromoteTo": {
+        "description": "What `ticket.promote` makes of a ticket.",
+        "enum": [
+          "story",
+          "decision"
+        ],
+        "type": "string"
+      },
       "Proposal": {
         "description": "One prompt change that replay judged.",
         "properties": {
@@ -5310,6 +5318,36 @@
         },
         "required": [
           "tickets"
+        ],
+        "type": "object"
+      },
+      "TicketPromoteResult": {
+        "properties": {
+          "decision": {
+            "description": "The id of the new decision.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "story": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Story"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "ticket": {
+            "$ref": "#/components/schemas/Ticket",
+            "description": "The ticket in the state `done`, with a link to the new story or decision."
+          }
+        },
+        "required": [
+          "ticket"
         ],
         "type": "object"
       },
@@ -11480,6 +11518,84 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/TicketResult"
+        }
+      }
+    },
+    {
+      "description": "Turns an open ticket into a story or a decision. `story` runs the PM of `story.new` on the title and the body, and spends money. `decision` adds a pending decision with the title as its text. Then one transaction links the new record and moves the ticket to `done`. A failed `story.new` leaves the ticket as it was. Sends `data.changed` with the kind `tickets`, and `stories` or `decision`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "conflict"
+          },
+          "message": "conflict"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "ticket.promote",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "by",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/Author"
+          }
+        },
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "to",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/PromoteTo"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/TicketPromoteResult"
         }
       }
     }

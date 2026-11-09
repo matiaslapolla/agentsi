@@ -209,3 +209,69 @@ fn each_ticket_method_on_a_real_core() {
         json!({"product": "beta", "kind": "tickets"})
     );
 }
+
+#[test]
+fn a_promote_makes_a_decision_and_a_story_promote_needs_stories_mode() {
+    let dir = TempDir::new();
+    let home = setup(&dir);
+    let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", home.as_path())]);
+    let mut c = Framed::connect(&core.socket.path);
+    for title in ["Pick a name", "Ship it"] {
+        c.ok(
+            "ticket.add",
+            json!({"product": "alpha", "kind": "question", "title": title, "author": owner()}),
+        );
+    }
+    c.ok("core.subscribe", json!({"topics": ["data"]}));
+
+    let r = c.ok(
+        "ticket.promote",
+        json!({"product": "alpha", "id": "C001", "to": "decision", "by": owner()}),
+    );
+    let decision = r["decision"].as_i64().unwrap();
+    assert_eq!(r["ticket"]["state"], "done");
+    assert_eq!(
+        r["ticket"]["links"],
+        json!([{"type": "decision", "ref": decision.to_string()}])
+    );
+    assert!(r.get("story").is_none(), "{r}");
+    assert_eq!(c.next_event("data.changed")["kind"], "decision");
+    assert_eq!(c.next_event("data.changed")["kind"], "tickets");
+    let pending = c.ok("mark.pending", json!({"product": "alpha"}));
+    let item = &pending["items"][0];
+    assert_eq!(
+        (item["id"].as_i64(), item["text"].as_str()),
+        (Some(decision), Some("Pick a name"))
+    );
+    assert_eq!(item["why"], "From ticket C001.");
+
+    // A done ticket cannot be promoted again.
+    let r = c.call(
+        "ticket.promote",
+        json!({"product": "alpha", "id": "C001", "to": "decision", "by": owner()}),
+    );
+    assert_eq!(kind(&r), "invalid", "{r}");
+    // A session cannot promote a ticket of the owner.
+    let r = c.call(
+        "ticket.promote",
+        json!({"product": "alpha", "id": "C002", "to": "decision", "by": session("s1")}),
+    );
+    assert_eq!(kind(&r), "conflict", "{r}");
+
+    // Stories mode is off for alpha: no PM runs and the ticket stays open.
+    let r = c.call(
+        "ticket.promote",
+        json!({"product": "alpha", "id": "C002", "to": "story", "by": owner()}),
+    );
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert!(
+        r["error"]["message"]
+            .as_str()
+            .unwrap()
+            .starts_with("Stories mode is off for alpha"),
+        "{r}"
+    );
+    let r = c.ok("ticket.get", json!({"product": "alpha", "id": "C002"}));
+    assert_eq!(r["ticket"]["state"], "open");
+    assert_eq!(r["ticket"]["links"], json!([]));
+}

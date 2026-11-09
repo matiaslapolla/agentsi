@@ -4,18 +4,22 @@
 
 use super::{Ctx, Router};
 use agentsi_agency::registry::{Product, Registry};
+use agentsi_agency::story::config::story_config;
+use agentsi_agency::story::propose::ProposeCtx;
 use agentsi_agency::tickets::{self, Error, text, write};
 use agentsi_agency::{Error as AgencyError, clock};
 use agentsi_proto::RpcError;
 use agentsi_proto::events::{DataChanged, DataChangedParams};
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_proto::ticket_api::{
-    Author, AuthorBy, TicketAdd, TicketAddParams, TicketGet, TicketGetParams, TicketGetResult,
-    TicketList, TicketListParams, TicketListResult, TicketMove, TicketMoveParams, TicketResult,
-    TicketUpdate, TicketUpdateParams,
+    Author, AuthorBy, PromoteTo, TicketAdd, TicketAddParams, TicketGet, TicketGetParams,
+    TicketGetResult, TicketList, TicketListParams, TicketListResult, TicketMove, TicketMoveParams,
+    TicketPromote, TicketPromoteParams, TicketPromoteResult, TicketResult, TicketUpdate,
+    TicketUpdateParams,
 };
 use agentsi_store::Store;
 use rusqlite::Transaction;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 pub fn register(r: Router) -> Router {
@@ -24,12 +28,13 @@ pub fn register(r: Router) -> Router {
         .add(TicketAdd, ticket_add)
         .add(TicketUpdate, ticket_update)
         .add(TicketMove, ticket_move)
+        .add(TicketPromote, ticket_promote)
 }
 
 /// The name that the registry gives the owner when its block has none.
 const DEFAULT_OWNER_NAME: &str = "the owner";
 
-pub(super) fn rpc(e: Error) -> RpcError {
+fn rpc(e: Error) -> RpcError {
     match e {
         Error::NotFound(m) => RpcError::new(
             ErrorKind::NotFound,
@@ -69,28 +74,43 @@ fn open_store(core: &crate::state::Core) -> Result<Arc<Store>, RpcError> {
     })
 }
 
-/// The product of the registry, and the author with the name of the owner block as the
-/// id of the owner.
-pub(super) fn resolve(product: &str, by: &Author) -> Result<(Product, Author), RpcError> {
-    let root = agentsi_store::paths::data_root(None).map_err(|e| rpc(e.into()))?;
-    let registry = Registry::load(&root).map_err(agency)?;
-    let found = registry.product(product).map_err(agency)?.clone();
-    let author = match by.by {
-        AuthorBy::Owner => Author {
-            by: AuthorBy::Owner,
-            id: if registry.owner.name == DEFAULT_OWNER_NAME {
-                "owner".into()
-            } else {
-                registry.owner.name.clone()
+/// What a handler works with: the data root, the registry and the product.
+struct Place {
+    root: PathBuf,
+    registry: Registry,
+    product: Product,
+}
+
+impl Place {
+    fn of(product: &str) -> Result<Place, RpcError> {
+        let root = agentsi_store::paths::data_root(None).map_err(|e| rpc(e.into()))?;
+        let registry = Registry::load(&root).map_err(agency)?;
+        let product = registry.product(product).map_err(agency)?.clone();
+        Ok(Place {
+            root,
+            registry,
+            product,
+        })
+    }
+
+    /// The writer, with the name of the owner block as the id of the owner.
+    fn author(&self, by: &Author) -> Author {
+        match by.by {
+            AuthorBy::Owner => Author {
+                by: AuthorBy::Owner,
+                id: if self.registry.owner.name == DEFAULT_OWNER_NAME {
+                    "owner".into()
+                } else {
+                    self.registry.owner.name.clone()
+                },
             },
-        },
-        _ => by.clone(),
-    };
-    Ok((found, author))
+            _ => by.clone(),
+        }
+    }
 }
 
 /// Runs `f` in one transaction on the writer thread. A failure rolls it back.
-pub(super) fn write_blocking<T: Send + 'static>(
+fn write_blocking<T: Send + 'static>(
     core: &crate::state::Core,
     f: impl FnOnce(&Transaction) -> tickets::Result<T> + Send + 'static,
 ) -> Result<T, RpcError> {
@@ -100,22 +120,20 @@ pub(super) fn write_blocking<T: Send + 'static>(
         .map_err(rpc)
 }
 
-pub(super) fn changed(ctx: &Ctx, product: &str) {
+fn changed(ctx: &Ctx, product: &str) {
+    changed_kind(ctx, product, "tickets");
+}
+
+fn changed_kind(ctx: &Ctx, product: &str, kind: &str) {
     ctx.core.publish::<DataChanged>(&DataChangedParams {
         product: product.to_string(),
-        kind: "tickets".into(),
+        kind: kind.to_string(),
     });
 }
 
 async fn ticket_list(ctx: Ctx, p: TicketListParams) -> Result<TicketListResult, RpcError> {
     crate::blocking::spawn(move || {
-        resolve(
-            &p.product,
-            &Author {
-                by: AuthorBy::Owner,
-                id: String::new(),
-            },
-        )?;
+        Place::of(&p.product)?;
         let store = open_store(&ctx.core)?;
         let tickets = store
             .read(|c| Ok(tickets::list(c, &p)))
@@ -129,13 +147,7 @@ async fn ticket_list(ctx: Ctx, p: TicketListParams) -> Result<TicketListResult, 
 
 async fn ticket_get(ctx: Ctx, p: TicketGetParams) -> Result<TicketGetResult, RpcError> {
     crate::blocking::spawn(move || {
-        resolve(
-            &p.product,
-            &Author {
-                by: AuthorBy::Owner,
-                id: String::new(),
-            },
-        )?;
+        Place::of(&p.product)?;
         let store = open_store(&ctx.core)?;
         let ticket = store
             .read(|c| Ok(tickets::get(c, &p.product, &p.id)))
@@ -151,8 +163,11 @@ async fn ticket_get(ctx: Ctx, p: TicketGetParams) -> Result<TicketGetResult, Rpc
 async fn ticket_add(ctx: Ctx, mut p: TicketAddParams) -> Result<TicketResult, RpcError> {
     let core = ctx.core.clone();
     let ticket = crate::blocking::spawn(move || {
-        let (product, author) = resolve(&p.product, &p.author)?;
-        p.author = author;
+        let Place { product, .. } = {
+            let place = Place::of(&p.product)?;
+            p.author = place.author(&p.author);
+            place
+        };
         write_blocking(&core, move |tx| {
             write::add(tx, &product, &p, clock::now_ms())
         })
@@ -166,8 +181,11 @@ async fn ticket_add(ctx: Ctx, mut p: TicketAddParams) -> Result<TicketResult, Rp
 async fn ticket_update(ctx: Ctx, mut p: TicketUpdateParams) -> Result<TicketResult, RpcError> {
     let core = ctx.core.clone();
     let ticket = crate::blocking::spawn(move || {
-        let (product, by) = resolve(&p.product, &p.by)?;
-        p.by = by;
+        let Place { product, .. } = {
+            let place = Place::of(&p.product)?;
+            p.by = place.author(&p.by);
+            place
+        };
         write_blocking(&core, move |tx| {
             write::update(tx, &product, &p, clock::now_ms())
         })
@@ -181,8 +199,11 @@ async fn ticket_update(ctx: Ctx, mut p: TicketUpdateParams) -> Result<TicketResu
 async fn ticket_move(ctx: Ctx, mut p: TicketMoveParams) -> Result<TicketResult, RpcError> {
     let core = ctx.core.clone();
     let moved = crate::blocking::spawn(move || {
-        let (product, by) = resolve(&p.product, &p.by)?;
-        p.by = by;
+        let Place { product, .. } = {
+            let place = Place::of(&p.product)?;
+            p.by = place.author(&p.by);
+            place
+        };
         write_blocking(&core, move |tx| {
             write::move_to(tx, &product, &p, clock::now_ms())
         })
@@ -195,4 +216,51 @@ async fn ticket_move(ctx: Ctx, mut p: TicketMoveParams) -> Result<TicketResult, 
     Ok(TicketResult {
         ticket: moved.ticket,
     })
+}
+
+async fn ticket_promote(ctx: Ctx, p: TicketPromoteParams) -> Result<TicketPromoteResult, RpcError> {
+    let core = ctx.core.clone();
+    let (result, kind) = crate::blocking::spawn(move || {
+        let place = Place::of(&p.product)?;
+        let by = place.author(&p.by);
+        let id = p.id;
+        match p.to {
+            PromoteTo::Decision => {
+                let product = place.product.id.clone();
+                let (ticket, decision) = write_blocking(&core, move |tx| {
+                    write::promote_decision(tx, &product, &id, &by, clock::now_ms())
+                })?;
+                let result = TicketPromoteResult {
+                    ticket,
+                    story: None,
+                    decision: Some(decision),
+                };
+                Ok::<_, RpcError>((result, "decision"))
+            }
+            PromoteTo::Story => {
+                let config = story_config(&place.root, &place.product)
+                    .map_err(|e| rpc(write::story_error(e)))?;
+                let ctx = ProposeCtx::new(
+                    open_store(&core)?,
+                    place.root,
+                    place.product,
+                    config,
+                    place.registry.owner,
+                );
+                let (ticket, story) =
+                    write::promote_story(&ctx, &id, &by, clock::now_ms()).map_err(rpc)?;
+                let result = TicketPromoteResult {
+                    ticket,
+                    story: Some(story),
+                    decision: None,
+                };
+                Ok((result, "stories"))
+            }
+        }
+    })
+    .await
+    .map_err(join)??;
+    changed_kind(&ctx, &result.ticket.product, kind);
+    changed(&ctx, &result.ticket.product);
+    Ok(result)
 }

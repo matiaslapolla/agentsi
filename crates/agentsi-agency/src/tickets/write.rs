@@ -1,10 +1,13 @@
-//! `ticket.add`, `ticket.update` and `ticket.move`: the checks of each value, the move
-//! table, the session rule and the link checks.
+//! `ticket.add`, `ticket.update`, `ticket.move` and `ticket.promote`: the checks of each
+//! value, the move table, the session rule and the link checks.
 
 use super::{Error, Result, get};
 use crate::clock;
+use crate::marks::decide;
 use crate::registry::Product;
 use crate::roster;
+use crate::story::propose::{self, ProposeCtx};
+use agentsi_proto::story_api::Story;
 use agentsi_proto::ticket_api::{
     Author, AuthorBy, Link, LinkType, Ticket, TicketAddParams, TicketMoveParams, TicketState,
     TicketUpdateParams,
@@ -333,4 +336,108 @@ pub fn move_to(
         ticket: t,
         changed: true,
     })
+}
+
+/// The ticket that `ticket.promote` may turn into a story or a decision: an open ticket that
+/// the writer may change.
+pub fn promotable(c: &Connection, product: &str, id: &str, by: &Author) -> Result<Ticket> {
+    let by = author(by)?;
+    let t = get(c, product, id)?;
+    check_writer(&t, &by)?;
+    if !t.state.is_open() {
+        return Err(Error::Invalid(format!(
+            "Ticket {id} is {}. Only an open ticket becomes a story or a decision.",
+            t.state.as_str()
+        )));
+    }
+    Ok(t)
+}
+
+/// Adds the link to the new record and moves the ticket to `done`.
+fn close_with(
+    tx: &Transaction,
+    product: &str,
+    id: &str,
+    link: Link,
+    by: &Author,
+    now_ms: i64,
+) -> Result<Ticket> {
+    let mut t = promotable(tx, product, id, by)?;
+    let now = clock::iso(now_ms);
+    t.links.push(link);
+    t.state = TicketState::Done;
+    t.waiting_on = None;
+    t.closed_at = Some(now.clone());
+    t.updated_by = author(by)?;
+    t.updated_at = now;
+    save(tx, &t)?;
+    Ok(t)
+}
+
+/// The text that a promote gives `story.new`: the title, then the body.
+pub fn story_text(t: &Ticket) -> String {
+    match t.body.trim() {
+        "" => t.title.clone(),
+        body => format!("{}\n\n{body}", t.title),
+    }
+}
+
+pub fn story_error(e: crate::story::Error) -> Error {
+    use crate::story::Error as S;
+    match e {
+        S::Invalid(m) => Error::Invalid(m),
+        S::NotFound(m) => Error::NotFound(m),
+        S::Gone(m) => Error::Conflict(m),
+        S::Agency(crate::Error::NotFound(m)) => Error::NotFound(m),
+        S::Agency(crate::Error::Unavailable(m)) => Error::Unavailable(m),
+    }
+}
+
+/// `ticket.promote` with `to: "story"`: the PM shapes the ticket into one story, then one
+/// transaction links the story and closes the ticket. A failed PM call writes nothing.
+pub fn promote_story(
+    ctx: &ProposeCtx,
+    id: &str,
+    by: &Author,
+    now_ms: i64,
+) -> Result<(Ticket, Story)> {
+    let product = ctx.product.id.clone();
+    let t = ctx.store.read(|c| Ok(promotable(c, &product, id, by)))??;
+    let proposed = propose::propose_story(ctx, &story_text(&t), None, None).map_err(story_error)?;
+    let story = proposed
+        .stories
+        .into_iter()
+        .next()
+        .ok_or_else(|| Error::Unavailable("The PM proposed no story.".into()))?;
+    let link = Link {
+        kind: LinkType::Story,
+        reference: story.id.clone(),
+    };
+    let (id, by) = (id.to_string(), by.clone());
+    let ticket = ctx
+        .store
+        .try_write(move |tx| close_with(tx, &product, &id, link, &by, now_ms))??;
+    Ok((ticket, story))
+}
+
+/// `ticket.promote` with `to: "decision"`: a pending decision of the product, the link to it
+/// and the move to `done`, in the one transaction of the caller.
+pub fn promote_decision(
+    tx: &Transaction,
+    product: &str,
+    id: &str,
+    by: &Author,
+    now_ms: i64,
+) -> Result<(Ticket, i64)> {
+    let t = promotable(tx, product, id, by)?;
+    let why = match t.body.trim() {
+        "" => format!("From ticket {id}."),
+        body => body.to_string(),
+    };
+    let decision = decide::add(tx, product, &t.title, &why, None)?;
+    let link = Link {
+        kind: LinkType::Decision,
+        reference: decision.to_string(),
+    };
+    Ok((close_with(tx, product, id, link, by, now_ms)?, decision))
 }

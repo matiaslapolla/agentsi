@@ -289,7 +289,8 @@ pub fn register(c: &mut Catalog) {
         .method::<TicketGet>()
         .method::<TicketAdd>()
         .method::<TicketUpdate>()
-        .method::<TicketMove>();
+        .method::<TicketMove>()
+        .method::<TicketPromote>();
 }
 
 pub struct TicketList;
@@ -355,4 +356,49 @@ impl Method for TicketMove {
     ];
     type Params = TicketMoveParams;
     type Result = TicketResult;
+}
+
+/// What `ticket.promote` makes of a ticket.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PromoteTo {
+    Story,
+    Decision,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct TicketPromoteParams {
+    pub product: String,
+    pub id: String,
+    pub to: PromoteTo,
+    pub by: Author,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TicketPromoteResult {
+    /// The ticket in the state `done`, with a link to the new story or decision.
+    pub ticket: Ticket,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub story: Option<crate::story_api::Story>,
+    /// The id of the new decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision: Option<i64>,
+}
+
+pub struct TicketPromote;
+
+impl Method for TicketPromote {
+    const NAME: &'static str = "ticket.promote";
+    const DESCRIPTION: &'static str = "Turns an open ticket into a story or a decision. `story` \
+        runs the PM of `story.new` on the title and the body, and spends money. `decision` adds a \
+        pending decision with the title as its text. Then one transaction links the new record \
+        and moves the ticket to `done`. A failed `story.new` leaves the ticket as it was. Sends \
+        `data.changed` with the kind `tickets`, and `stories` or `decision`.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Conflict,
+        ErrorKind::Unavailable,
+    ];
+    type Params = TicketPromoteParams;
+    type Result = TicketPromoteResult;
 }
