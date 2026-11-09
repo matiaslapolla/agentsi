@@ -1,6 +1,6 @@
 # Install AgentSI from the tarball (Linux)
 
-This tarball holds the built programs. You need no Rust, no Zig and no build. `VERSION` gives the commit and the lowest glibc that the programs need.
+This tarball holds the built programs. You need no Rust, no Zig and no build. `VERSION` gives the commit and the lowest glibc that the programs need. The name of the tarball ends with the CPU it was built for: `x86_64` or `aarch64`. Run `uname -m` to see which one your machine needs.
 
 ## 1. Check the machine
 
@@ -23,7 +23,7 @@ This tarball holds the built programs. You need no Rust, no Zig and no build. `V
 
 ## 3. The Claude Code plugin
 
-1. Run `claude plugin marketplace add <the tarball folder>`.
+1. Go into the tarball folder, and run `claude plugin marketplace add ./`. Claude Code needs a path that starts with `./` or `/`, so `.` alone fails.
 2. Run `claude plugin install agentsi@agentsi`.
 3. Open Claude Code in the repo of a product, and run `/agentsi`. The setup registers the product in the registry.
 

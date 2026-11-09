@@ -48,15 +48,15 @@ The repo still holds the old TypeScript web app in `apps/` and `packages/`. The 
 
 ## Install from a release tarball
 
-Download the tarball and its `.sha256` file from [Releases](https://github.com/matiaslapolla/agentsi/releases). The tarball holds the built programs. You need no Rust and no build. [`packaging/INSTALL.md`](packaging/INSTALL.md) has the full steps and the fixes for common failures.
+Download the tarball and its `.sha256` file from [Releases](https://github.com/matiaslapolla/agentsi/releases). Pick the tarball whose name ends with the output of `uname -m`: `x86_64` or `aarch64`. The tarball holds the built programs. You need no Rust and no build. [`packaging/INSTALL.md`](packaging/INSTALL.md) has the full steps and the fixes for common failures.
 
 1. Install the runtime packages and Claude Code. `packaging/INSTALL.md` lists the packages for Arch and Ubuntu.
 2. Unpack the tarball and go into its folder.
 3. Run `./install.sh --enable`. It copies the programs to `~/.local/bin` and starts the core and the pill as systemd user services.
-4. Add the plugin to Claude Code:
+4. Add the plugin to Claude Code. Run these commands inside the tarball folder:
 
    ```sh
-   claude plugin marketplace add <the tarball folder>
+   claude plugin marketplace add ./
    claude plugin install agentsi@agentsi
    ```
 
@@ -91,7 +91,7 @@ make dist-portable
 
 - `make release` builds the four programs in `target/release`. The first build takes several minutes.
 - `make install ENABLE=1` copies the programs to `~/.local/bin` and starts the services.
-- `make dist-portable` builds in an `ubuntu:24.04` container and packs a tarball in `dist/`. The tarball runs on glibc 2.39 or newer.
+- `make dist-portable` builds in an `ubuntu:24.04` container and packs a tarball in `dist/`. The tarball runs on glibc 2.39 or newer. It has the CPU of the machine that builds it, so an aarch64 machine makes the aarch64 tarball.
 
 `make help` lists all targets. `CONTRIBUTING.md` has the details of the build.
 
