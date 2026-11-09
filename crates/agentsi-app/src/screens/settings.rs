@@ -37,6 +37,7 @@ mod data;
 mod dictation;
 mod git;
 mod guide;
+mod health;
 use crate::model::{CoreState, HostState};
 pub use dictation::DictationGlobal;
 use dictation::DictationKey;
@@ -188,6 +189,8 @@ pub struct SettingsScreen {
     dictation: Option<DictationKey>,
     /// The Data section: what the owner selected to delete, and the plan.
     clear: data::ClearState,
+    /// The Health section: the rows of `core.doctor`.
+    health: health::HealthState,
     /// The error of the last save of the Appearance section.
     appearance_error: Option<String>,
     /// The error of the last save of the Alerts section.
@@ -278,6 +281,7 @@ impl SettingsScreen {
                 .cloned()
                 .map(DictationKey::new),
             clear: data::ClearState::default(),
+            health: health::HealthState::default(),
             appearance_error: None,
             alerts_error: None,
             keys_note: None,
@@ -301,6 +305,7 @@ impl SettingsScreen {
         };
         screen.reload(cx);
         screen.load_root(cx);
+        screen.check_health(cx);
         screen.refresh_dictation(cx);
         screen
     }
@@ -1173,6 +1178,7 @@ impl Render for SettingsScreen {
         let dictation = self.dictation_section(cx);
         let appearance = self.appearance_section(cx);
         let alerts = self.alerts_section(cx);
+        let health = self.health_section(cx);
         let data = self.data_section(window, cx);
         let git = self.git_section();
         let guide = self.guide_section(cx);
@@ -1240,6 +1246,7 @@ impl Render for SettingsScreen {
                     )
                 })
                 .child(guide)
+                .child(health)
                 .child(data),
         )
     }

@@ -93,6 +93,7 @@ fn each_entry_of_the_product_menu_runs_its_action_and_the_costly_ones_ask_one_co
         Cmd::OpenDesk,
         Cmd::StartMeeting,
         Cmd::NewStory,
+        Cmd::Suggest,
         Cmd::NewTicket,
         Cmd::OpenTickets,
         Cmd::Reflect,
@@ -121,15 +122,19 @@ fn each_entry_of_the_product_menu_runs_its_action_and_the_costly_ones_ask_one_co
     run(&f, cx, b(), Cmd::OpenGit);
     assert_eq!(active_tab(&f, cx), "screen:git");
 
+    // New story opens the form of the stories screen in place of a prompt.
     run(&f, cx, b(), Cmd::NewStory);
+    assert!(!prompt_open(cx));
+    assert_eq!(active_tab(&f, cx), "screen:stories");
+    assert!(at(cx, "form:stories-new").is_some());
+    // Suggest asks one Confirm, then calls the PM.
+    let _ = sent(&mut f);
+    run(&f, cx, b(), Cmd::Suggest);
     assert!(prompt_open(cx));
-    cx.simulate_input("Add a login");
-    cx.simulate_keystrokes("enter");
-    redraw(cx);
-    let s = sent(&mut f);
-    let story = call(&s, "story.new").expect("the PM shapes the story");
-    assert_eq!(story["params"]["text"], "Add a login");
-    assert_eq!(story["params"]["product"], "b");
+    assert!(call(&sent(&mut f), "story.suggest").is_none());
+    click(cx, "prompt-choice:yes");
+    let suggest = call(&sent(&mut f), "story.suggest").expect("the PM suggests");
+    assert_eq!(suggest["params"]["product"], "b");
 
     run(&f, cx, b(), Cmd::NewTicket);
     assert!(prompt_open(cx));
@@ -365,7 +370,15 @@ fn the_story_meeting_reflection_and_group_menus_run_their_entries(cx: &mut TestA
     let story = || Target::Story(a(), "S1".into());
     assert_eq!(
         entries(&f, cx, &story()),
-        [Cmd::Open, Cmd::Review, Cmd::Reject, Cmd::StoryTerminal]
+        [
+            Cmd::Open,
+            Cmd::Review,
+            Cmd::Reject,
+            Cmd::StoryTerminal,
+            Cmd::ArchiveStory,
+            Cmd::RestoreStory,
+            Cmd::RecordMerge
+        ]
     );
     run(&f, cx, story(), Cmd::Open);
     assert_eq!(active_tab(&f, cx), "screen:story:S1");
@@ -649,4 +662,31 @@ fn the_ticket_menu_runs_its_entries_and_the_state_decides_which_are_on(cx: &mut 
     assert!(f.core.read_with(cx, |c, _| {
         c.notices.iter().any(|n| n.contains("No ticket is in view"))
     }));
+}
+
+#[gpui::test]
+fn an_archived_product_has_one_menu_entry_and_restore_calls_archive_restore(
+    cx: &mut TestAppContext,
+) {
+    use crate::menus::Facts;
+    let dir = folder("menu-archived");
+    let (mut f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    let archived = Facts {
+        archived: true,
+        ..Facts::default()
+    };
+    let only: Vec<Cmd> = crate::menus::items(&Target::Product(product("b")), &archived)
+        .into_iter()
+        .filter_map(|i| match i {
+            crate::menus::Item::Entry(e) => Some(e.cmd),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(only, [Cmd::RestoreProduct]);
+    let _ = sent(&mut f);
+    run(&f, cx, Target::Product(product("b")), Cmd::RestoreProduct);
+    let s = sent(&mut f);
+    let restore = call(&s, "archive.restore").expect("the product is restored");
+    assert_eq!(restore["params"]["product"], "b");
+    assert_eq!(restore["params"]["kind"], "product");
 }

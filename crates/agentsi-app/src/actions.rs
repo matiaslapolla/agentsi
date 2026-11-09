@@ -84,10 +84,26 @@ gpui_kit::actions!(
         OpenSettings,
         /// Opens the settings at the Data section, where the owner deletes data.
         OpenDataSettings,
+        /// Opens the settings and checks the health of the tools.
+        CheckHealth,
+        /// Opens the settings and backs up the data now.
+        BackUpData,
         /// Opens the guide of `docs/guide/` in the browser.
         OpenGuide,
         /// Opens the section "Install and start" of the guide in the browser.
         OpenGuideStart,
+        /// Shows the context of the next meeting of the active product.
+        ShowMeetingContext,
+        /// Opens the meeting of the active product at the field "Ask one role".
+        AskMeetingRole,
+        /// Updates the knowledge index of the active product from the front desk.
+        UpdateIndex,
+        /// Opens the form "New decision" on the front desk of the active product.
+        NewDecision,
+        /// Shows or hides the archived decisions of the front desk.
+        ShowArchivedDecisions,
+        /// Opens a Claude pane with the action of the decision approved last.
+        RunApprovedInClaude,
         /// Approves the pending decision under the cursor of the front desk.
         ApproveDecision,
         /// Rejects the pending decision under the cursor of the front desk.
@@ -140,6 +156,14 @@ gpui_kit::actions!(
         OpenContextMenu,
         /// Asks for the text of a new story of the active product.
         NewStory,
+        /// The PM suggests stories for the active product, after one Confirm.
+        SuggestStories,
+        /// Archives the story of the screen in view.
+        ArchiveStorySession,
+        /// Restores the archived story of the screen in view.
+        RestoreStorySession,
+        /// Opens the form that records a merge of the story.
+        RecordStoryMerge,
         /// Asks for the title of a new ticket of the active product.
         NewTicket,
         /// Opens the ticket under the cursor of the tickets, or the ticket in view.
@@ -160,6 +184,10 @@ gpui_kit::actions!(
         CopyTicketId,
         /// Runs the reflection of the active product.
         ReflectProduct,
+        /// Shows or hides the archived products in the sidebar.
+        ToggleArchivedProducts,
+        /// Stops the reflection of the active product.
+        CancelReflection,
         /// Copies the folder of the active product to the clipboard.
         CopyProductPath,
         /// Opens the folder of the active product in the file manager.
@@ -309,6 +337,10 @@ fn on_writes(cx: &mut App) {
         desk(cx, |s, cx| s.decide_selected(Verdict::Rejected, cx))
     });
     cx.on_action(|_: &ArchiveDecision, cx| desk(cx, |s, cx| s.archive_selected(cx)));
+    cx.on_action(|_: &UpdateIndex, cx| desk(cx, |s, cx| s.update_index(cx)));
+    cx.on_action(|_: &NewDecision, cx| desk(cx, |s, cx| s.new_decision(cx)));
+    cx.on_action(|_: &ShowArchivedDecisions, cx| desk(cx, |s, cx| s.toggle_archived(cx)));
+    cx.on_action(|_: &RunApprovedInClaude, cx| desk(cx, |s, cx| s.run_in_claude(cx)));
     cx.on_action(|_: &AcceptPriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Accepted, cx)));
     cx.on_action(|_: &ChangePriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Changed, cx)));
     cx.on_action(|_: &RejectPriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Rejected, cx)));
@@ -680,6 +712,30 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(CloseTabGroup),
     },
     Entry {
+        label: "Suggest stories for the active product",
+        icon: IconName::Bot,
+        keywords: &["story", "suggest", "pm", "propose"],
+        action: || Box::new(SuggestStories),
+    },
+    Entry {
+        label: "Archive the story",
+        icon: IconName::Folder,
+        keywords: &["story", "archive"],
+        action: || Box::new(ArchiveStorySession),
+    },
+    Entry {
+        label: "Restore the story",
+        icon: IconName::Folder,
+        keywords: &["story", "restore", "archive"],
+        action: || Box::new(RestoreStorySession),
+    },
+    Entry {
+        label: "Record a merge of the story",
+        icon: IconName::Check,
+        keywords: &["story", "merge", "commit", "result"],
+        action: || Box::new(RecordStoryMerge),
+    },
+    Entry {
         label: "New story in the active product",
         icon: IconName::Check,
         keywords: &["story", "task", "pm", "new", "propose"],
@@ -738,6 +794,18 @@ pub const ENTRIES: &[Entry] = &[
         icon: IconName::Copy,
         keywords: &["ticket", "copy", "id", "clipboard"],
         action: || Box::new(CopyTicketId),
+    },
+    Entry {
+        label: "Show the archived products",
+        icon: IconName::Folder,
+        keywords: &["archive", "restore", "products", "sidebar"],
+        action: || Box::new(ToggleArchivedProducts),
+    },
+    Entry {
+        label: "Cancel the reflection of the active product",
+        icon: IconName::Close,
+        keywords: &["reflect", "cancel", "stop"],
+        action: || Box::new(CancelReflection),
     },
     Entry {
         label: "Reflect on the active product",
@@ -909,6 +977,54 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(OpenDataSettings),
     },
     Entry {
+        label: "Show the context of the next meeting",
+        icon: IconName::FileText,
+        keywords: &["snapshot", "context", "meeting"],
+        action: || Box::new(ShowMeetingContext),
+    },
+    Entry {
+        label: "Ask one role of the active product",
+        icon: IconName::Bot,
+        keywords: &["ask", "role", "question", "meeting"],
+        action: || Box::new(AskMeetingRole),
+    },
+    Entry {
+        label: "Update the index of the active product",
+        icon: IconName::Folder,
+        keywords: &["index", "knowledge", "repos", "refresh"],
+        action: || Box::new(UpdateIndex),
+    },
+    Entry {
+        label: "New decision for the active product",
+        icon: IconName::Plus,
+        keywords: &["decision", "add", "owner"],
+        action: || Box::new(NewDecision),
+    },
+    Entry {
+        label: "Show the archived decisions",
+        icon: IconName::Folder,
+        keywords: &["archive", "restore", "decisions"],
+        action: || Box::new(ShowArchivedDecisions),
+    },
+    Entry {
+        label: "Run the action of the approved decision in Claude",
+        icon: IconName::Bot,
+        keywords: &["claude", "approve", "action", "run"],
+        action: || Box::new(RunApprovedInClaude),
+    },
+    Entry {
+        label: "Check the health of the tools",
+        icon: IconName::Check,
+        keywords: &["doctor", "health", "tools", "check"],
+        action: || Box::new(CheckHealth),
+    },
+    Entry {
+        label: "Back up the data now",
+        icon: IconName::Folder,
+        keywords: &["backup", "data", "save", "copy"],
+        action: || Box::new(BackUpData),
+    },
+    Entry {
         label: "Open the guide: how AgentSI works",
         icon: IconName::FileText,
         keywords: &["help", "guide", "how", "works"],
@@ -958,6 +1074,14 @@ mod tests {
             "Open the settings",
             "Talk to this pane",
             "Delete data: open the Data section of the settings",
+            "Show the context of the next meeting",
+            "Ask one role of the active product",
+            "Update the index of the active product",
+            "New decision for the active product",
+            "Show the archived decisions",
+            "Run the action of the approved decision in Claude",
+            "Check the health of the tools",
+            "Back up the data now",
             "Open the guide: how AgentSI works",
             "Open the guide: the first steps",
             "Approve the pending decision under the cursor (front desk)",
@@ -985,6 +1109,10 @@ mod tests {
             "Ungroup the tab group of the active tab",
             "Close the tab group of the active tab",
             "New story in the active product",
+            "Suggest stories for the active product",
+            "Archive the story",
+            "Restore the story",
+            "Record a merge of the story",
             "New ticket for the active product",
             "Open the ticket under the cursor (tickets)",
             "Mark the ticket done (tickets)",
@@ -995,6 +1123,8 @@ mod tests {
             "Promote the ticket to a decision (tickets)",
             "Copy the id of the ticket (tickets)",
             "Reflect on the active product",
+            "Cancel the reflection of the active product",
+            "Show the archived products",
             "Copy the folder of the active product",
             "Open the folder of the active product",
             "Delete the data of the active product",

@@ -261,6 +261,8 @@ These additions are also part of protocol 1. `knowledge.index` writes. The other
 
 These additions are also part of protocol 1. The methods write. Each write runs in one SQLite transaction on the writer thread of the store. An error rolls it back, so a failed write leaves no row. After the commit, the core sends `data.changed {product, kind}` for each product that changed. `kind` is `minutes` for a mark, `decision` for `decision.decide` and `decision.add` (also `minutes` when the decision is in a minutes), and the kind of the record for an archive change.
 
+- `core.doctor {}` returns `{checks}`. A check has `name`, `level` (`required`, `stories` or `optional`), `status` (`ok`, `missing` or `fail`), `detail` and `blocks`. The rows are those of `agentsi doctor`, in the same order. It runs on the host of the core and writes nothing.
+- `decision.archived {product}` returns `{decisions}` with `id`, `kind`, `minutes_id`, `text`, `why`, `action` and `status`, newest first. It only reads. An unknown product returns `not_found`.
 - `mark.pending {product}` returns `{items, decisions_error?}`, as `agentsi mark --pending --json` prints. An item has `kind` `priority` (`minutes_id`, `idx`, `title`, `why`, `owner_role`, `objective`, `sources`) or `decision` (`id`, `minutes_id`, `text`, `why`, `action`, `priorities`).
   - The priorities are the unmarked ones of the valid minutes, oldest minutes first. The pending decisions of a minutes follow its priorities. Product decisions come last.
   - A decision in `archive_records` is left out. The priorities of an archived minutes stay, as in TypeScript.

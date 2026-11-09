@@ -115,8 +115,6 @@ pub enum Ask {
     /// The one Confirm before tabs close while a program runs in some of them: the tabs, and the
     /// number that run a program.
     CloseTabs(Vec<PanelId>, usize),
-    /// The text of a new story for this product.
-    NewStory(ProductRef),
     /// The title of a new ticket for this product.
     NewTicket(ProductRef),
     /// What the ticket waits on: the product and the ticket id.
@@ -270,6 +268,8 @@ impl Shell {
         ));
         let (nav, requests) = Nav::channel();
         cx.set_global(nav);
+        let (runs, claude_runs) = crate::nav::Runs::channel();
+        cx.set_global(runs);
         let feed = cx.new(|_| ModelFeed);
         cx.set_global(ModelFeedGlobal(feed.clone()));
         if let Some(b) = &bench {
@@ -298,6 +298,7 @@ impl Shell {
         };
         shell.pump_events(events, feed, cx);
         shell.pump_requests(requests, window, cx);
+        shell.pump_claude_runs(claude_runs, window, cx);
         shell.start(window, cx);
         window.focus(&shell.focus, cx);
         shell
@@ -353,6 +354,27 @@ impl Shell {
         cx.spawn_in(window, async move |this, cx| {
             while let Some(r) = requests.next().await {
                 let _ = this.update_in(cx, |this, window, cx| this.show_screen(r, window, cx));
+            }
+        })
+        .detach();
+    }
+
+    /// Opens a Claude pane for each "Run in Claude" click of a screen.
+    fn pump_claude_runs(
+        &self,
+        mut runs: mpsc::UnboundedReceiver<crate::nav::ClaudeRun>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        cx.spawn_in(window, async move |this, cx| {
+            while let Some(r) = runs.next().await {
+                let _ = this.update_in(cx, |this, window, cx| {
+                    let product = ProductRef {
+                        host: r.host,
+                        id: r.product,
+                    };
+                    this.open_terminal_in(Some(product), vec!["claude".into(), crate::nav::claude_prompt(&r.text)], window, cx)
+                });
             }
         })
         .detach();
@@ -739,6 +761,24 @@ impl Shell {
             .and_then(|p| p.read(cx).memory());
         if let Some(s) = screen {
             s.update(cx, action);
+        }
+    }
+
+    /// Runs `f` on the meeting screen of the active product.
+    fn on_active_meeting(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        f: impl Fn(&mut ScreenPanel, &mut Window, &mut Context<ScreenPanel>),
+    ) {
+        let Some(p) = self.core.read(cx).active.clone() else {
+            return;
+        };
+        let spec = ScreenSpec::meeting(&p.id).on(p.host);
+        for panel in self.open_screens(cx) {
+            if panel.read(cx).is(&spec) {
+                panel.update(cx, |p, cx| f(p, window, cx));
+            }
         }
     }
 
@@ -1429,6 +1469,35 @@ impl Render for Shell {
                 for p in this.open_screens(cx) {
                     if p.read(cx).is(&ScreenSpec::settings()) {
                         p.update(cx, |p, cx| p.reveal_data(None, cx));
+                    }
+                }
+            }))
+            .on_action(cx.listener(|this, _: &actions::ShowMeetingContext, window, cx| {
+                this.show_active(ScreenSpec::meeting, window, cx);
+                this.on_active_meeting(window, cx, |p, _, cx| p.meeting_context(cx));
+            }))
+            .on_action(cx.listener(|this, _: &actions::AskMeetingRole, window, cx| {
+                this.show_active(ScreenSpec::meeting, window, cx);
+                this.on_active_meeting(window, cx, |p, window, cx| p.meeting_ask(window, cx));
+            }))
+            .on_action(cx.listener(|this, _: &actions::ToggleArchivedProducts, _, cx| {
+                let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
+                this.sidebar
+                    .update(cx, |s, cx| s.toggle_archived(host.as_deref(), cx));
+            }))
+            .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
+                this.show_screen(ScreenSpec::settings(), window, cx);
+                for p in this.open_screens(cx) {
+                    if p.read(cx).is(&ScreenSpec::settings()) {
+                        p.update(cx, |p, cx| p.check_health(cx));
+                    }
+                }
+            }))
+            .on_action(cx.listener(|this, _: &actions::BackUpData, window, cx| {
+                this.show_screen(ScreenSpec::settings(), window, cx);
+                for p in this.open_screens(cx) {
+                    if p.read(cx).is(&ScreenSpec::settings()) {
+                        p.update(cx, |p, cx| p.back_up_now(cx));
                     }
                 }
             }))

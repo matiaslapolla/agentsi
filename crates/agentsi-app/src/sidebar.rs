@@ -92,6 +92,8 @@ pub struct Sidebar {
     placed: Rc<RefCell<Placed>>,
     /// The products that the owner opened or closed, by `look::key`. Absent means open.
     open: BTreeMap<String, bool>,
+    /// The hosts whose archived products show. The empty name is this device. Not saved.
+    show_archived: std::collections::BTreeSet<String>,
     _observe: Vec<Subscription>,
 }
 
@@ -134,6 +136,7 @@ impl Sidebar {
             stops: Vec::new(),
             placed: Rc::default(),
             open: BTreeMap::new(),
+            show_archived: Default::default(),
             _observe: observe,
             core: cores.local.clone(),
             cores,
@@ -624,6 +627,73 @@ impl Sidebar {
                             .into_any_element(),
                     );
                 }
+            }
+        }
+        out.extend(self.archived_rows(&host, &scope, off, cx));
+        out
+    }
+
+    /// Shows or hides the archived products of a host. The choice is not saved.
+    pub fn toggle_archived(&mut self, host: Option<&str>, cx: &mut Context<Self>) {
+        let key = host.unwrap_or_default().to_string();
+        if !self.show_archived.remove(&key) {
+            self.show_archived.insert(key);
+        }
+        cx.notify();
+    }
+
+    /// The toggle at the end of a host group, and the archived products under it when it is on.
+    fn archived_rows(
+        &mut self,
+        host: &Option<String>,
+        scope: &str,
+        off: bool,
+        cx: &mut Context<Self>,
+    ) -> Vec<AnyElement> {
+        let Some(core) = self.cores.of(host.as_deref()).cloned() else {
+            return Vec::new();
+        };
+        let archived = core.read(cx).archived_products.clone();
+        let on = self.show_archived.contains(host.as_deref().unwrap_or_default());
+        if off || (archived.is_empty() && !on) {
+            return Vec::new();
+        }
+        let toggle_host = host.clone();
+        let mut out = vec![
+            div()
+                .id(ElementId::Name(format!("{scope}toggle-archived").into()))
+                .debug_selector({
+                    let id = format!("toggle-archived:{scope}");
+                    move || id
+                })
+                .cursor_pointer()
+                .pad_x(space(3))
+                .py(space(1))
+                .on_click(cx.listener(move |this, _, _, cx| {
+                    this.toggle_archived(toggle_host.as_deref(), cx)
+                }))
+                .child(caption(if on {
+                    "Hide archived products".to_string()
+                } else {
+                    format!("Show archived products ({})", archived.len())
+                }))
+                .into_any_element(),
+        ];
+        if on {
+            for p in &archived {
+                let product = ProductRef {
+                    host: host.clone(),
+                    id: p.id.clone(),
+                };
+                let key = RowKey::Product(product);
+                let menu = self.on_menu(key, cx);
+                let row = ProductRow::new(
+                    ElementId::Name(format!("{scope}archived-{}", p.id).into()),
+                    p.name.clone(),
+                )
+                .decorate(move |el| el.opacity(0.5).on_mouse_down(MouseButton::Right, menu))
+                .meta("archived");
+                out.push(row.into_any_element());
             }
         }
         out
@@ -1322,6 +1392,27 @@ mod tests {
             // Dropping it on a product of the group puts it in that group.
             drag(cx, "tree-row:product-b", "tree-row:product-a");
             assert_eq!(look::read(&t.file).0.group_of(None, "b"), Some("Work"));
+        }
+
+        #[gpui::test]
+        fn the_toggle_shows_the_archived_products_dimmed_and_they_are_not_saved(
+            cx: &mut TestAppContext,
+        ) {
+            let (t, cx) = tree(cx, "archived");
+            let old = ProductInfo {
+                archived: true,
+                ..product("old")
+            };
+            t.core.update(cx, |s, cx| {
+                s.set_products(vec![product("a"), product("b"), old.clone()], cx)
+            });
+            redraw(cx);
+            assert!(at(cx, "tree-row:archived-old").is_none(), "hidden at first");
+            click(cx, "toggle-archived:");
+            assert!(at(cx, "tree-row:archived-old").is_some());
+            assert!(at(cx, "tree-row:product-old").is_none());
+            click(cx, "toggle-archived:");
+            assert!(at(cx, "tree-row:archived-old").is_none());
         }
 
         #[gpui::test]

@@ -182,6 +182,8 @@ pub struct CoreState {
     pub remote: Option<String>,
     pub host: HostState,
     pub products: Vec<ProductInfo>,
+    /// The archived products of `product.list`. The sidebar shows them on request.
+    pub archived_products: Vec<ProductInfo>,
     /// Why the product list is missing, for the sidebar.
     pub products_error: Option<String>,
     pub terminals: BTreeMap<String, Term>,
@@ -213,6 +215,7 @@ impl CoreState {
             remote: None,
             host: HostState::Connecting,
             products: Vec::new(),
+            archived_products: Vec::new(),
             products_error: None,
             terminals: BTreeMap::new(),
             notices: Vec::new(),
@@ -364,6 +367,7 @@ impl CoreState {
 
     /// Takes a new product list, without the archived products, and tells the views.
     pub fn set_products(&mut self, products: Vec<ProductInfo>, cx: &mut Context<CoreState>) {
+        self.archived_products = products.iter().filter(|p| p.archived).cloned().collect();
         self.products = listed(products);
         self.products_error = None;
         cx.emit(CoreEvent::Products);
@@ -1014,6 +1018,25 @@ mod product_tests {
                 t.cores.keep_active(saved.as_ref(), cx),
                 Some(at(None, "demo"))
             );
+        });
+    }
+
+    #[gpui::test]
+    fn the_core_keeps_the_archived_products_apart_from_the_listed_ones(cx: &mut TestAppContext) {
+        let (end, _other) = std::os::unix::net::UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(std::sync::Arc::new(Link::for_tests(end))));
+        let info = |id: &str, archived| ProductInfo {
+            id: id.into(),
+            name: id.into(),
+            path: None,
+            archived,
+        };
+        core.update(cx, |s, cx| {
+            s.set_products(vec![info("a", false), info("old", true)], cx)
+        });
+        core.read_with(cx, |s, _| {
+            assert_eq!(s.products.len(), 1);
+            assert_eq!(s.archived_products[0].id, "old");
         });
     }
 

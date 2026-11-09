@@ -282,6 +282,16 @@ pub fn write_through<T: Writes, R: 'static>(
     done: String,
     cx: &mut Context<T>,
 ) {
+    write_through_with(this, call, move |_| done, cx)
+}
+
+/// The same, where the line to show comes from the reply of the core.
+pub fn write_through_with<T: Writes, R: 'static>(
+    this: &mut T,
+    call: impl std::future::Future<Output = Result<R, crate::link::CallError>> + 'static,
+    done: impl FnOnce(R) -> String + 'static,
+    cx: &mut Context<T>,
+) {
     let core = this.core().clone();
     let (busy, flash) = this.state();
     if *busy {
@@ -291,14 +301,14 @@ pub fn write_through<T: Writes, R: 'static>(
     *flash = None;
     cx.notify();
     cx.spawn(async move |this, cx| {
-        let result = call.await.map(|_| ()).map_err(|e| e.to_string());
+        let result = call.await.map(done).map_err(|e| e.to_string());
         let _ = this.update(cx, |this, cx| {
             let (busy, flash) = this.state();
             // After a write that the core accepted, the screen stays busy until it has read
             // the new data. A key before that would act on the row that the write changed.
             *busy = result.is_ok();
             *flash = Some(match result {
-                Ok(()) => Flash::Done(done),
+                Ok(line) => Flash::Done(line),
                 Err(e) => Flash::Failed(e),
             });
             cx.notify();

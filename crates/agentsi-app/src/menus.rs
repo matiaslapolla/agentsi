@@ -79,9 +79,11 @@ pub enum Cmd {
     OpenDesk,
     StartMeeting,
     NewStory,
+    Suggest,
     NewTicket,
     OpenTickets,
     Reflect,
+    CancelReflect,
     OpenGit,
     Label,
     Color,
@@ -90,6 +92,7 @@ pub enum Cmd {
     OpenFolder,
     DeleteData,
     Archive,
+    RestoreProduct,
     // A pane.
     Rename,
     ColorPane,
@@ -112,6 +115,9 @@ pub enum Cmd {
     Accept,
     Reject,
     StoryTerminal,
+    ArchiveStory,
+    RestoreStory,
+    RecordMerge,
     // A ticket.
     TicketDone,
     TicketWait,
@@ -156,6 +162,8 @@ pub struct Facts {
     pub grouped: bool,
     /// The state of the ticket.
     pub ticket: Option<TicketState>,
+    /// The product is archived: its menu holds Restore only.
+    pub archived: bool,
 }
 
 impl Facts {
@@ -174,6 +182,7 @@ impl Facts {
             tabbed: true,
             grouped: true,
             ticket: Some(TicketState::Open),
+            archived: false,
         }
     }
 }
@@ -214,14 +223,17 @@ fn when(cmd: Cmd, label: &'static str, enabled: bool) -> Item {
 pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
     use Cmd::*;
     match target {
+        Target::Product(_) if f.archived => vec![on(RestoreProduct, "Restore")],
         Target::Product(_) => vec![
             on(NewTerminal, "New terminal"),
             on(OpenDesk, "Open desk"),
             when(StartMeeting, "Start meeting", !f.meeting),
             on(NewStory, "New story"),
+            on(Suggest, "Suggest stories"),
             on(NewTicket, "New ticket"),
             on(OpenTickets, "Open tickets"),
             when(Reflect, "Reflect", !f.reflecting),
+            when(CancelReflect, "Cancel the reflection", f.reflecting),
             on(OpenGit, "Open the git panel"),
             Item::Separator,
             on(Label, "Label"),
@@ -272,6 +284,10 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
             when(Reject, "Reject", f.session),
             Item::Separator,
             when(StoryTerminal, "Open a terminal in the worktree", f.session),
+            Item::Separator,
+            on(ArchiveStory, "Archive"),
+            on(RestoreStory, "Restore"),
+            on(RecordMerge, "Record a merge"),
         ],
         Target::Meeting(_) => vec![on(Open, "Open"), when(CancelMeeting, "Cancel", f.meeting)],
         Target::Reflection(_) => vec![on(Open, "Open")],
@@ -323,9 +339,14 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, OpenDesk) => "Open the front desk of the active product",
         (_, StartMeeting) => "Start the meeting in the question field (meeting)",
         (_, NewStory) => "New story in the active product",
+        (_, Suggest) => "Suggest stories for the active product",
+        (_, ArchiveStory) => "Archive the story",
+        (_, RestoreStory) => "Restore the story",
+        (_, RecordMerge) => "Record a merge of the story",
         (_, NewTicket) => "New ticket for the active product",
         (_, OpenTickets) => "Open the tickets of the active product",
         (_, Reflect) => "Reflect on the active product",
+        (_, CancelReflect) => "Cancel the reflection of the active product",
         (_, OpenGit) => "Open the git panel of the active product",
         (_, Label) => "Label the active product",
         (_, Color) => "Color the active product",
@@ -334,6 +355,7 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, OpenFolder) => "Open the folder of the active product",
         (_, DeleteData) => "Delete the data of the active product",
         (_, Archive) => "Archive the active product",
+        (_, RestoreProduct) => "Restore the archived product",
         (_, Rename) => "Rename the active pane",
         (_, ColorPane) => "Color the active pane",
         (_, TalkToPane) => "Talk to this pane",
@@ -377,7 +399,7 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
 /// a product. Accept and Reject of a story keep the Confirm of the story screen.
 pub fn confirms(cmd: Cmd, f: &Facts) -> bool {
     match cmd {
-        Cmd::Archive | Cmd::Reflect | Cmd::CancelMeeting | Cmd::PromoteStory => true,
+        Cmd::Archive | Cmd::Reflect | Cmd::Suggest | Cmd::CancelMeeting | Cmd::PromoteStory => true,
         // A pane with a tab closes through the tab, which has its own Confirm.
         Cmd::ClosePane => f.running && !f.tabbed,
         _ => false,
@@ -394,6 +416,10 @@ pub fn confirm_text(cmd: Cmd, name: &str) -> (String, &'static str) {
         Cmd::Reflect => (
             format!("Reflect on {name}? Each agent calls the model, which costs money."),
             "Reflect",
+        ),
+        Cmd::Suggest => (
+            format!("Suggest stories for {name}? The PM calls the model, which costs money."),
+            "Suggest",
         ),
         Cmd::CancelMeeting => (
             format!("Cancel the meeting of {name}? The roles stop."),
@@ -522,9 +548,11 @@ mod tests {
                 "Open desk",
                 "Start meeting",
                 "New story",
+                "Suggest stories",
                 "New ticket",
                 "Open tickets",
                 "Reflect",
+                "Cancel the reflection",
                 "Open the git panel",
                 "Label",
                 "Color",
@@ -561,6 +589,9 @@ mod tests {
                 "Accept",
                 "Reject",
                 "Open a terminal in the worktree",
+                "Archive",
+                "Restore",
+                "Record a merge",
             ]
         );
         assert_eq!(labels(&t[2]), ["Open", "Cancel"]);

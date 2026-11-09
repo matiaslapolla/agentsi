@@ -20,6 +20,7 @@
 pub mod call;
 pub mod desk;
 pub mod desk_tickets;
+pub mod form;
 pub mod git;
 pub mod git_config;
 pub mod guide;
@@ -407,6 +408,23 @@ impl ScreenPanel {
         }
     }
 
+    /// Runs the checks of the Health section of a settings screen.
+    pub fn check_health(&self, cx: &mut App) {
+        if let ScreenView::Settings(v) = &self.view {
+            v.update(cx, |s, cx| s.check_health(cx));
+        }
+    }
+
+    /// Starts a backup from a settings screen, and scrolls its Data section into view.
+    pub fn back_up_now(&self, cx: &mut App) {
+        if let ScreenView::Settings(v) = &self.view {
+            v.update(cx, |s, cx| {
+                s.reveal_data(None, cx);
+                s.back_up_now(cx)
+            });
+        }
+    }
+
     /// Scrolls a guide screen to the section with this anchor.
     pub fn reveal_section(&self, anchor: &str, cx: &mut App) {
         if let ScreenView::Guide(v) = &self.view {
@@ -427,6 +445,34 @@ impl ScreenPanel {
     pub fn start_meeting(&self, cx: &mut App) {
         if let ScreenView::Meeting(v) = &self.view {
             v.update(cx, |s, cx| s.start(cx));
+        }
+    }
+
+    /// Opens the form "New story" on a stories screen.
+    pub fn stories_new(&self, cx: &mut App) {
+        if let ScreenView::Stories(v) = &self.view {
+            v.update(cx, |s, cx| s.new_story(cx));
+        }
+    }
+
+    /// Calls `story.suggest` from a stories screen, after the Confirm of the menu.
+    pub fn stories_suggest(&self, cx: &mut App) {
+        if let ScreenView::Stories(v) = &self.view {
+            v.update(cx, |s, cx| s.run_suggest(cx));
+        }
+    }
+
+    /// Shows or hides the context of the next meeting on a meeting screen.
+    pub fn meeting_context(&self, cx: &mut App) {
+        if let ScreenView::Meeting(v) = &self.view {
+            v.update(cx, |s, cx| s.show_context(cx));
+        }
+    }
+
+    /// Puts the focus in the "Ask one role" field of a meeting screen.
+    pub fn meeting_ask(&self, window: &mut Window, cx: &mut App) {
+        if let ScreenView::Meeting(v) = &self.view {
+            v.update(cx, |s, cx| s.focus_ask(window, cx));
         }
     }
 

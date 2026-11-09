@@ -8,7 +8,7 @@
 
 use agentsi_proto::marks_api::{ArchiveArchive, ArchiveKind, ArchiveParams};
 use agentsi_proto::reflect_api::{ReflectRun, ReflectRunParams};
-use agentsi_proto::story_api::{StoryGet, StoryIdParams, StoryNew, StoryNewParams};
+use agentsi_proto::story_api::{StoryGet, StoryIdParams};
 use agentsi_proto::terminal_api::{Kill, TerminalId};
 use agentsi_proto::ticket_api::{PromoteTo, TicketAdd, TicketAddParams, TicketKind, TicketState};
 use agentsi_ui::tokens::label::Hue;
@@ -68,6 +68,7 @@ impl Shell {
                     local: p.host.is_none(),
                     meeting: meeting(p),
                     reflecting: c.reflecting.contains(&p.id),
+                    archived: c.archived_products.iter().any(|x| x.id == p.id),
                     ..Facts::default()
                 }
             }
@@ -370,10 +371,20 @@ impl Shell {
                 self.show_screen(ScreenSpec::meeting(&p.id).on(p.host.clone()), window, cx);
                 self.start_meeting(&p, cx);
             }
-            Cmd::NewStory => self.ask(Ask::NewStory(p), window, cx),
+            Cmd::NewStory | Cmd::Suggest => {
+                self.show_screen(ScreenSpec::stories(&p.id).on(p.host.clone()), window, cx);
+                let spec = ScreenSpec::stories(&p.id).on(p.host);
+                if let Some(panel) = self.story_panel(&spec, cx) {
+                    panel.update(cx, |panel, cx| match cmd {
+                        Cmd::NewStory => panel.stories_new(cx),
+                        _ => panel.stories_suggest(cx),
+                    });
+                }
+            }
             Cmd::NewTicket => self.ask(Ask::NewTicket(p), window, cx),
             Cmd::OpenTickets => self.show_screen(ScreenSpec::tickets(&p.id).on(p.host), window, cx),
             Cmd::Reflect => self.reflect(p, cx),
+            Cmd::CancelReflect => self.cancel_reflect(p, cx),
             Cmd::OpenGit => self.show_screen(ScreenSpec::git(&p.id).on(p.host), window, cx),
             Cmd::Label => self.ask(Ask::ProductLabel(p), window, cx),
             Cmd::Color => self.ask(Ask::ProductColor(p), window, cx),
@@ -398,6 +409,7 @@ impl Shell {
                 }
             }
             Cmd::Archive => self.archive(p, cx),
+            Cmd::RestoreProduct => self.restore_product(p, cx),
             _ => {}
         }
     }
@@ -433,6 +445,53 @@ impl Shell {
         .detach();
     }
 
+    /// `archive.restore` for an archived product. The core tells the app when the list changes.
+    fn restore_product(&mut self, p: ProductRef, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
+            return;
+        };
+        let call = core
+            .read(cx)
+            .link
+            .call::<agentsi_proto::marks_api::ArchiveRestore>(&ArchiveParams {
+                product: p.id.clone(),
+                kind: ArchiveKind::Product,
+                id: None,
+            });
+        cx.spawn(async move |this, cx| {
+            let text = match call.await {
+                Ok(_) => format!("{} is restored.", p.id),
+                Err(e) => format!("{} was not restored: {e}", p.id),
+            };
+            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
+        })
+        .detach();
+    }
+
+    /// `reflect.cancel` for the product.
+    fn cancel_reflect(&mut self, p: ProductRef, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
+            return;
+        };
+        let call = core
+            .read(cx)
+            .link
+            .call::<agentsi_proto::reflect_api::ReflectCancel>(
+                &agentsi_proto::reflect_api::ReflectCancelParams {
+                    product: p.id.clone(),
+                },
+            );
+        cx.spawn(async move |this, cx| {
+            let text = match call.await {
+                Ok(r) if r.canceled => format!("The reflection of {} stops.", p.id),
+                Ok(_) => format!("No reflection of {} runs.", p.id),
+                Err(e) => format!("Could not cancel: {e}"),
+            };
+            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
+        })
+        .detach();
+    }
+
     /// `archive.archive` for the whole product. The core tells the app when the list changes.
     fn archive(&mut self, p: ProductRef, cx: &mut Context<Self>) {
         let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
@@ -449,30 +508,6 @@ impl Shell {
                     this.notice(&format!("{} was not archived: {e}", p.id), cx)
                 });
             }
-        })
-        .detach();
-    }
-
-    /// `story.new` with the text of the owner.
-    fn new_story(&mut self, p: ProductRef, text: String, cx: &mut Context<Self>) {
-        let Some(core) = self.cores.of(p.host.as_deref()).cloned() else {
-            return;
-        };
-        let call = core.read(cx).link.call::<StoryNew>(&StoryNewParams {
-            product: p.id.clone(),
-            text,
-            kind: None,
-            minutes: None,
-        });
-        cx.spawn(async move |this, cx| {
-            let text = match call.await {
-                Ok(r) => {
-                    let ids: Vec<_> = r.stories.iter().map(|s| s.id.as_str()).collect();
-                    format!("Story {} proposed for {}.", ids.join(", "), p.id)
-                }
-                Err(e) => format!("No story for {}: {e}", p.id),
-            };
-            let _ = this.update(cx, |this, cx| this.notice(&text, cx));
         })
         .detach();
     }
@@ -632,6 +667,21 @@ impl Shell {
                 }
             }
             Cmd::StoryTerminal => self.story_terminal(p, id, window, cx),
+            Cmd::ArchiveStory | Cmd::RestoreStory | Cmd::RecordMerge => {
+                self.show_screen(spec.clone(), window, cx);
+                if let Some(panel) = self.story_panel(&spec, cx) {
+                    panel.update(cx, |panel, cx| {
+                        panel.story_act(
+                            match cmd {
+                                Cmd::ArchiveStory => "archive",
+                                Cmd::RestoreStory => "restore",
+                                _ => "merge",
+                            },
+                            cx,
+                        )
+                    });
+                }
+            }
             _ => {}
         }
     }
@@ -762,19 +812,6 @@ impl Shell {
     ) -> Option<Entity<Prompt>> {
         let data = LookGlobal::with(cx, crate::look::LookData::clone).unwrap_or_default();
         match what {
-            Ask::NewStory(p) => {
-                let title = format!("New story for {}", self.product_name(p, cx));
-                Some(cx.new(|cx| {
-                    Prompt::text(
-                        title,
-                        "Describe the story. The PM shapes it, which costs money.",
-                        "",
-                        Vec::new(),
-                        window,
-                        cx,
-                    )
-                }))
-            }
             Ask::NewTicket(p) => {
                 let title = format!("New ticket for {}", self.product_name(p, cx));
                 Some(cx.new(|cx| {
@@ -858,12 +895,6 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> bool {
         match what {
-            Ask::NewStory(p) => {
-                let text = answer.trim();
-                if !text.is_empty() {
-                    self.new_story(p.clone(), text.to_string(), cx);
-                }
-            }
             Ask::NewTicket(p) => {
                 let title = answer.trim();
                 if !title.is_empty() {
@@ -922,6 +953,10 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         StartMeeting => (Product, StartMeeting),
         CancelMeeting => (Meeting, CancelMeeting),
         NewStory => (Product, NewStory),
+        SuggestStories => (Product, Suggest),
+        ArchiveStorySession => (Story, ArchiveStory),
+        RestoreStorySession => (Story, RestoreStory),
+        RecordStoryMerge => (Story, RecordMerge),
         NewTicket => (Product, NewTicket),
         OpenTicket => (Ticket, Open),
         TicketDone => (Ticket, TicketDone),
@@ -932,6 +967,7 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         PromoteTicketDecision => (Ticket, PromoteDecision),
         CopyTicketId => (Ticket, CopyId),
         ReflectProduct => (Product, Reflect),
+        CancelReflection => (Product, CancelReflect),
         CopyProductPath => (Product, CopyPath),
         OpenProductFolder => (Product, OpenFolder),
         DeleteProductData => (Product, DeleteData),

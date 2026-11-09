@@ -13,6 +13,7 @@ use agentsi_proto::clear_api::{
     ClearItem, ClearItemPlan, ClearKind, DataClear, DataClearParams, DataClearPlan,
     DataClearPlanParams, DataClearPlanResult, DataClearResult,
 };
+use agentsi_proto::ops_api::{DataBackup, DataBackupParams};
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_ui::components::Button;
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
@@ -165,6 +166,10 @@ pub(super) struct ClearState {
     dates: Option<Dates>,
     pub(super) phase: Phase,
     error: Option<String>,
+    /// A backup runs.
+    backing_up: bool,
+    /// The outcome of the last "Back up now": the lines to show, or the error.
+    pub(super) backup: Option<Result<Vec<String>, String>>,
     /// Set by the palette: the next draw scrolls the section into view.
     reveal: Rc<Cell<bool>>,
 }
@@ -178,6 +183,8 @@ impl Default for ClearState {
             dates: None,
             phase: Phase::Select,
             error: None,
+            backing_up: false,
+            backup: None,
             reveal: Rc::default(),
         }
     }
@@ -499,6 +506,45 @@ impl SettingsScreen {
         cx.notify();
     }
 
+    /// "Back up now": `data.backup` with the default number of backups to keep.
+    pub fn back_up_now(&mut self, cx: &mut Context<Self>) {
+        if self.clear.backing_up {
+            return;
+        }
+        self.clear.backing_up = true;
+        self.clear.backup = None;
+        let call = self
+            .core
+            .read(cx)
+            .link
+            .call::<DataBackup>(&DataBackupParams::default());
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.finish_backup(result, cx));
+        })
+        .detach();
+        cx.notify();
+    }
+
+    pub(super) fn finish_backup(
+        &mut self,
+        result: Result<agentsi_proto::ops_api::DataBackupResult, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        self.clear.backing_up = false;
+        self.clear.backup = Some(match result {
+            Ok(done) => {
+                let mut lines = vec![format!("Backup: {}", done.file)];
+                if let Some(r) = done.registry {
+                    lines.push(format!("Registry: {r}"));
+                }
+                Ok(lines)
+            }
+            Err(e) => Err(e.to_string()),
+        });
+        cx.notify();
+    }
+
     /// Scrolls the Data section into view on the next draw. With a product, it selects the
     /// "Product" row for it.
     pub fn reveal_data(&mut self, product: Option<String>, cx: &mut Context<Self>) {
@@ -689,6 +735,7 @@ impl SettingsScreen {
             .collect();
         let busy = matches!(self.clear.phase, Phase::Working);
         let reviewed = matches!(self.clear.phase, Phase::Review(_));
+        let backing_up = self.clear.backing_up;
         let head = match &self.clear.root {
             Some((root, used)) => format!("{root} · {}", bytes(*used)),
             None => "Reading the data root…".to_string(),
@@ -756,8 +803,25 @@ impl SettingsScreen {
                             .label("Delete")
                             .disabled(!reviewed)
                             .on_click(cx.listener(|this, _, _, cx| this.ask_delete(cx))),
+                    )
+                    .child(
+                        Button::new("backup-now")
+                            .secondary()
+                            .small()
+                            .label(if backing_up { "Backing up…" } else { "Back up now" })
+                            .disabled(backing_up)
+                            .on_click(cx.listener(|this, _, _, cx| this.back_up_now(cx))),
                     ),
             )
+            .when_some(self.clear.backup.clone(), |el, outcome| {
+                let lines = match outcome {
+                    Ok(lines) => lines,
+                    Err(e) => vec![format!("The backup failed: {e}")],
+                };
+                el.child(div().debug_selector(|| "backup-outcome".into()).children(
+                    lines.into_iter().map(mono),
+                ))
+            })
             .when_some(self.clear.error.clone(), |el, e| {
                 el.child(
                     div()
