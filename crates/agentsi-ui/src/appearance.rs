@@ -8,9 +8,11 @@
 //! then has its own.
 use std::cell::Cell;
 
-use gpui_kit::{App, Global};
+use gpui_kit::component::ThemeMode;
+use gpui_kit::{App, Global, WindowAppearance};
 
 use crate::theme;
+use crate::tokens::{Palette, current_palette, set_palette};
 
 macro_rules! choice {
     ($(#[$meta:meta])* $name:ident { $($(#[$vmeta:meta])* $variant:ident = $key:literal, $label:literal;)+ } default $default:ident) => {
@@ -78,6 +80,85 @@ choice! {
         Medium = "medium", "Medium";
         Large = "large", "Large";
     } default Medium
+}
+
+choice! {
+    /// The colors of the app. System follows the window appearance of the system.
+    ColorTheme {
+        System = "system", "System";
+        Dark = "dark", "Dark";
+        Light = "light", "Light";
+    } default Dark
+}
+
+choice! {
+    /// Whether animations run. System follows the reduced-motion setting of the system.
+    Motion {
+        System = "system", "System";
+        Reduced = "reduced", "Reduced";
+        Full = "full", "Full";
+    } default System
+}
+
+impl Global for ColorTheme {}
+impl Global for Motion {}
+
+impl ColorTheme {
+    pub fn get(cx: &App) -> ColorTheme {
+        cx.try_global::<ColorTheme>().copied().unwrap_or_default()
+    }
+
+    /// The palette that this choice gives now. System reads the window appearance.
+    pub fn palette(self, cx: &App) -> Palette {
+        match self {
+            ColorTheme::Dark => Palette::DARK,
+            ColorTheme::Light => Palette::LIGHT,
+            ColorTheme::System => match cx.window_appearance() {
+                WindowAppearance::Light | WindowAppearance::VibrantLight => Palette::LIGHT,
+                WindowAppearance::Dark | WindowAppearance::VibrantDark => Palette::DARK,
+            },
+        }
+    }
+
+    /// Makes `self` the color theme of the app. It asks one frame of each window, and only when
+    /// the palette or the choice changes, so the idle app draws nothing.
+    pub fn apply(self, cx: &mut App) {
+        let palette = self.palette(cx);
+        let same_choice = ColorTheme::get(cx) == self;
+        if same_choice && current_palette() == palette {
+            return;
+        }
+        cx.set_global(self);
+        if current_palette() == palette {
+            return;
+        }
+        set_palette(palette);
+        theme::apply(
+            cx,
+            if palette == Palette::LIGHT {
+                ThemeMode::Light
+            } else {
+                ThemeMode::Dark
+            },
+        );
+        theme::apply_metrics(cx);
+        cx.refresh_windows();
+    }
+}
+
+impl Motion {
+    pub fn get(cx: &App) -> Motion {
+        cx.try_global::<Motion>().copied().unwrap_or_default()
+    }
+
+    pub fn apply(self, cx: &mut App) {
+        cx.set_global(self);
+        match self {
+            Motion::Reduced => cx.set_reduce_motion(true),
+            Motion::Full => cx.set_reduce_motion(false),
+            Motion::System => gpui_kit::base::apply_system_reduce_motion(cx),
+        }
+    }
 }
 
 /// The three choices together. The default gives the look that the app had before the setting.

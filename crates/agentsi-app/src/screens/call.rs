@@ -583,7 +583,11 @@ fn speaker(role: &str, lit: bool) -> Div {
         .child(
             div()
                 .text_size(size::sm())
-                .text_color(if lit { text::primary() } else { text::tertiary() })
+                .text_color(if lit {
+                    text::primary()
+                } else {
+                    text::tertiary()
+                })
                 .child(role_label(role)),
         )
 }
@@ -816,7 +820,11 @@ impl Render for CallScreen {
                                     div()
                                         .text_size(size::sm())
                                         .font_weight(weight::SEMIBOLD)
-                                        .text_color(if now { accent::base() } else { text::primary() })
+                                        .text_color(if now {
+                                            accent::base()
+                                        } else {
+                                            text::primary()
+                                        })
                                         .child(role_label(&s.role)),
                                 )
                                 .when(c.timed, |el| el.child(mono(clock(s.start)))),

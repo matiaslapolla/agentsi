@@ -130,6 +130,11 @@ fn main() -> ExitCode {
             };
             let s = shell.clone();
             let _ = handle.update(cx, |_, window, cx| {
+                window
+                    .observe_window_appearance(|_, cx| {
+                        agentsi_ui::appearance::ColorTheme::get(cx).apply(cx)
+                    })
+                    .detach();
                 window.on_window_should_close(cx, move |_, cx| {
                     s.read(cx).before_quit(cx);
                     true

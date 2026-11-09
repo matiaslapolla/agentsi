@@ -3,13 +3,14 @@
 //! A click applies the choice to the whole app at once and saves it in `appearance.toml`
 //! (see `crate::appearance`).
 
-use agentsi_ui::appearance::{Appearance, Corners, Density, TextSize};
+use agentsi_ui::appearance::{ColorTheme, Corners, Density, Motion, TextSize};
 use agentsi_ui::components::{Button, ListRow, status_tag};
 use agentsi_ui::tokens::{Status, control, size, space};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::{SettingsScreen, pair};
+use crate::appearance::Look;
 use crate::screens::parts::section;
 
 /// The id of the element that holds the sample row, for the tests.
@@ -23,7 +24,7 @@ impl SettingsScreen {
         all: [T; 3],
         current: T,
         label: fn(T) -> &'static str,
-        set: fn(&mut Appearance, T),
+        set: fn(&mut Look, T),
         cx: &mut Context<Self>,
     ) -> Div {
         div()
@@ -49,7 +50,7 @@ impl SettingsScreen {
     }
 
     pub(super) fn appearance_section(&self, cx: &mut Context<Self>) -> Div {
-        let now = Appearance::get(cx);
+        let now = crate::appearance::current(cx);
         let note = self
             .appearance_error
             .clone()
@@ -64,9 +65,9 @@ impl SettingsScreen {
                 self.choices(
                     "appearance-density",
                     Density::ALL,
-                    now.density,
+                    now.appearance.density,
                     Density::label,
-                    |a, v| a.density = v,
+                    |a, v| a.appearance.density = v,
                     cx,
                 ),
             ))
@@ -75,9 +76,9 @@ impl SettingsScreen {
                 self.choices(
                     "appearance-corners",
                     Corners::ALL,
-                    now.corners,
+                    now.appearance.corners,
                     Corners::label,
-                    |a, v| a.corners = v,
+                    |a, v| a.appearance.corners = v,
                     cx,
                 ),
             ))
@@ -86,9 +87,31 @@ impl SettingsScreen {
                 self.choices(
                     "appearance-text",
                     TextSize::ALL,
-                    now.text,
+                    now.appearance.text,
                     TextSize::label,
-                    |a, v| a.text = v,
+                    |a, v| a.appearance.text = v,
+                    cx,
+                ),
+            ))
+            .child(pair(
+                "Color theme",
+                self.choices(
+                    "appearance-theme",
+                    ColorTheme::ALL,
+                    now.theme,
+                    ColorTheme::label,
+                    |a, v| a.theme = v,
+                    cx,
+                ),
+            ))
+            .child(pair(
+                "Motion",
+                self.choices(
+                    "appearance-motion",
+                    Motion::ALL,
+                    now.motion,
+                    Motion::label,
+                    |a, v| a.motion = v,
                     cx,
                 ),
             ))
@@ -290,7 +313,16 @@ mod tests {
         );
 
         // The file holds the choice, and a new start reads it.
-        assert_eq!(crate::appearance::read(&file), (want, None));
+        assert_eq!(
+            crate::appearance::read(&file),
+            (
+                crate::appearance::Look {
+                    appearance: want,
+                    ..Default::default()
+                },
+                None
+            )
+        );
         cx.update(|_, cx| {
             Appearance::default().apply(cx);
             assert_eq!(Appearance::get(cx), Appearance::default());
@@ -302,6 +334,30 @@ mod tests {
             f32::from(bounds(cx, "list-row:appearance-sample-row").size.height),
             32.
         );
+    }
+
+    #[gpui::test]
+    fn the_theme_and_motion_rows_apply_save_and_read_back(cx: &mut TestAppContext) {
+        use agentsi_ui::appearance::{ColorTheme, Motion};
+        use agentsi_ui::tokens::{Palette, current_palette};
+        let (t, cx) = setup(cx, None);
+        app_size(cx);
+        assert_eq!(current_palette(), Palette::DARK, "no file gives Dark");
+        click(cx, "button:appearance-theme-2");
+        assert_eq!(current_palette(), Palette::LIGHT);
+        click(cx, "button:appearance-motion-1");
+        assert_eq!(cx.update(|_, cx| Motion::get(cx)), Motion::Reduced);
+        assert!(cx.update(|_, cx| cx.reduce_motion()));
+        click(cx, "button:appearance-motion-2");
+        assert!(!cx.update(|_, cx| cx.reduce_motion()));
+        let file = appearance_file(&t);
+        let (look, note) = crate::appearance::read(&file);
+        assert_eq!(
+            (look.theme, look.motion, note),
+            (ColorTheme::Light, Motion::Full, None)
+        );
+        click(cx, "button:appearance-theme-1");
+        assert_eq!(current_palette(), Palette::DARK);
     }
 
     #[gpui::test]

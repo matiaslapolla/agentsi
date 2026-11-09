@@ -37,9 +37,9 @@ pub(crate) fn apply_metrics(cx: &mut App) {
     });
 }
 
-/// Sets the dark theme of `gpui-component` from the tokens.
-fn apply(cx: &mut App) {
-    Theme::change(ThemeMode::Dark, None, cx);
+/// Sets the theme of `gpui-component` from the tokens in effect.
+pub(crate) fn apply(cx: &mut App, mode: ThemeMode) {
+    Theme::change(mode, None, cx);
     Theme::update(cx, |t| {
         let c = |c: Color| c.hsla();
         t.font_family = font::UI.into();
@@ -158,7 +158,7 @@ pub(crate) fn init(cx: &mut App) {
     if let Err(e) = load_fonts(cx) {
         eprintln!("agentsi-ui: the bundled fonts did not load: {e}");
     }
-    apply(cx);
+    apply(cx, ThemeMode::Dark);
     // The app sets the saved appearance after this. A fresh app starts at the default.
     Appearance::default().apply(cx);
     apply_metrics(cx);

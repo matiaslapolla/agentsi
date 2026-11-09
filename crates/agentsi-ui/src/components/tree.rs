@@ -519,7 +519,9 @@ impl RenderOnce for GroupHeader {
                     .flex_none()
                     .size(control::icon_sm() / 2.)
                     .rounded(radius::sm())
-                    .bg(self.hue.map_or(text::tertiary().hsla(), |h| h.color().hsla())),
+                    .bg(self
+                        .hue
+                        .map_or(text::tertiary().hsla(), |h| h.color().hsla())),
             )
             .child(
                 div()
