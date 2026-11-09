@@ -159,6 +159,7 @@ Press `Ctrl+K`. The palette lists every action of the app. Type a few letters an
 | Memory | `Ctrl+Shift+Y` | What each agent learned, and the reflections |
 | Roles | `Ctrl+Shift+R` | The roster, the overlays and the specialists |
 | Git | `Ctrl+Shift+B` | Branch, changed files and diff. You stage files and commit here |
+| Setup | Palette: "Set up a new product" | Register a product or update its brief |
 | Settings | `Ctrl+,` | Look, voice, keys, hosts, guide, health of the tools, backup and data |
 
 Other keys: `Ctrl+T` opens a terminal in the active product. `Ctrl+Shift+T` opens `claude`. `Ctrl+1` to `Ctrl+9` select a product. On macOS, `Cmd` takes the place of `Ctrl`.
@@ -173,7 +174,7 @@ The Settings screen has a section "Appearance". It has three choices, and each a
 - Corners: Square, Subtle or Round.
 - Text size: Small, Medium or Large. A terminal pane keeps its own font size.
 
-The Settings screen also has the voice models, the vocabulary, the keys, the SSH hosts, the Git config, the Health section and the Data section. The line "Guide" opens this page.
+The Settings screen has a section "Owner" with your name and language. It also has the voice models, the vocabulary, the keys, the SSH hosts, the Git config, the Health section and the Data section. The line "Guide" opens this page.
 
 The Health section shows one row for each check of `agentsi doctor`: the tool, its status and what a failed check blocks. "Check again" runs the checks again. In the Data section, "Back up now" copies the database and the registry into the backups folder, and shows the paths of both copies.
 
@@ -225,6 +226,21 @@ The file `agentsi.config.example.json` in the checkout is a full example. Keep t
 Run `agentsi whoami` in any folder. It prints the product that owns the folder. Run `agentsi whoami --list` to list all products.
 
 ### Add a product
+
+In the app:
+
+1. Click "New product" at the end of the product list. The Setup screen opens.
+2. Type the absolute path of the repo, or click "Browse…". Click "Read the folder".
+3. Optional: click "Draft with Claude". The button shows the cap of 0.50 USD. Click it again to confirm. Claude reads up to 15 files and fills the forms.
+4. Check the five forms: Product, Objectives, Roster, Models and Stories mode. A field with the mark "no data" is empty because the files do not answer it.
+5. Click "Review". The screen shows the plan. Nothing is written yet.
+6. Click "Confirm". The app registers the product, writes the brief and the roster, and opens the front desk.
+
+The Setup screen writes nothing into your repo. In the Claude Code plugin, `/agentsi setup` does the same by interview.
+
+To change a product later, open the product menu and click "Update the brief". You can also edit the owner name and language in the section "Owner" of the Settings.
+
+You can also add the product by hand:
 
 1. Add the product to `agentsi.config.json`.
 2. Run `agentsi whoami` in its repo to check the match.
@@ -436,7 +452,7 @@ The Memory screen (`Ctrl+Shift+Y`) shows the items of each agent, newest first. 
 ### Brief, roster and audit
 
 - `/agentsi setup` in Claude Code interviews you and writes the brief and the roster of a product.
-- The Roles screen shows the roster, the specialists and the overlays. Validate checks them. "Definition" on a row shows the resolved definition of that agent. The reset plan has a box "Also delete the memory".
+- The Roles screen shows the roster, the specialists and the overlays. "Update the brief" opens the Setup screen. Validate checks them. "Definition" on a row shows the resolved definition of that agent. The reset plan has a box "Also delete the memory".
 - `agentsi roles` prints the roster. `agentsi reset <agent>` returns an agent to the global roles.
 - `agentsi audit` checks the config, the meetings, the marks and the memory. It makes no model call.
 

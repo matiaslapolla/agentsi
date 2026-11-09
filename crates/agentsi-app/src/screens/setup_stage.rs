@@ -427,6 +427,195 @@ impl Fields {
     }
 }
 
+use agentsi_proto::setup_api::FieldOutcome;
+
+fn text(v: &Value, key: &str) -> String {
+    v.get(key)
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_string()
+}
+
+fn strings(v: &Value, key: &str) -> Vec<String> {
+    v.get(key)
+        .and_then(Value::as_array)
+        .map(|a| {
+            a.iter()
+                .filter_map(Value::as_str)
+                .map(String::from)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn items<'a>(v: &'a Value, key: &str) -> impl Iterator<Item = &'a Value> {
+    v.get(key).and_then(Value::as_array).into_iter().flatten()
+}
+
+impl Fields {
+    /// The fields of a `setup.draft` result. The id, the name and the paths stay empty: the
+    /// folder decides them.
+    pub fn from_draft(d: &Value) -> Fields {
+        let (product, objectives, roster) = (&d["product"], &d["objectives"], &d["roster"]);
+        let mut f = Fields {
+            what: text(product, "what"),
+            audience: text(product, "audience"),
+            stage: text(product, "stage"),
+            out_of_scope: strings(product, "out_of_scope"),
+            north_stars: strings(objectives, "north_stars"),
+            ..Fields::default()
+        };
+        f.objectives = items(objectives, "objectives")
+            .map(|o| Objective {
+                text: text(o, "text"),
+                signal: text(o, "signal"),
+                due: text(o, "due"),
+            })
+            .collect();
+        f.sources = items(objectives, "sources_of_truth")
+            .map(|s| Source {
+                kind: text(s, "kind"),
+                reference: text(s, "ref"),
+                note: text(s, "note"),
+            })
+            .collect();
+        f.globals = strings(roster, "roles")
+            .into_iter()
+            .filter(|r| r != "pm" && GLOBAL_ROLES.contains(&r.as_str()))
+            .collect();
+        f.extras = items(roster, "specialists")
+            .map(|x| Extra {
+                id: text(x, "id"),
+                body: text(x, "overlay"),
+            })
+            .filter(|x| !x.id.is_empty())
+            .collect();
+        f.why = items(roster, "why")
+            .map(|w| (text(w, "agent"), text(w, "why")))
+            .filter(|(a, _)| !a.is_empty())
+            .collect();
+        f.models = items(d, "models")
+            .map(|m| {
+                (
+                    text(m, "agent"),
+                    Model {
+                        model: text(m, "model"),
+                        effort: text(m, "effort"),
+                    },
+                )
+            })
+            .filter(|(a, _)| !a.is_empty())
+            .collect();
+        let stories = &d["stories"];
+        f.stories = Stories {
+            on: stories.get("on").and_then(Value::as_bool).unwrap_or(false),
+            test: text(stories, "test"),
+            gate: strings(stories, "gate"),
+            ..Stories::default()
+        };
+        f
+    }
+
+    /// The same fields in the shape of a `setup.draft` result, for a repair call.
+    pub fn to_draft(&self) -> Value {
+        json!({
+            "product": {
+                "id": self.id, "name": self.name, "what": self.what,
+                "audience": self.audience, "stage": self.stage,
+                "out_of_scope": clean(&self.out_of_scope),
+            },
+            "objectives": {
+                "objectives": self.filled_objectives().iter()
+                    .map(|o| json!({"text": o.text.trim(), "signal": o.signal.trim(), "due": o.due.trim()}))
+                    .collect::<Vec<_>>(),
+                "north_stars": clean(&self.north_stars),
+                "sources_of_truth": self.sources.iter()
+                    .map(|s| json!({"kind": s.kind, "ref": s.reference, "note": s.note}))
+                    .collect::<Vec<_>>(),
+            },
+            "roster": {
+                "roles": self.roster().into_iter().filter(|r| !r.contains('.')
+                    && GLOBAL_ROLES.contains(&r.as_str())).collect::<Vec<_>>(),
+                "specialists": self.extras.iter()
+                    .map(|e| json!({
+                        "id": e.id.trim(),
+                        "role": e.id.split_once('.').map_or("", |(b, _)| b),
+                        "overlay": e.body.trim(),
+                    }))
+                    .collect::<Vec<_>>(),
+                "why": self.roster().iter()
+                    .map(|a| json!({"agent": a, "why": self.why.get(a).map_or("", |w| w.trim())}))
+                    .collect::<Vec<_>>(),
+            },
+            "models": self.models.iter()
+                .map(|(a, m)| json!({"agent": a, "model": m.model, "effort": m.effort}))
+                .collect::<Vec<_>>(),
+            "stories": {
+                "on": self.stories.on, "test": self.stories.test.trim(),
+                "gate": clean(&self.stories.gate),
+            },
+        })
+    }
+
+    /// What the owner did with each field that the draft filled: kept, edited or cleared.
+    /// A field that the draft left empty is not in the map.
+    pub fn outcomes(&self, last: &Fields) -> BTreeMap<String, FieldOutcome> {
+        let mut out = BTreeMap::new();
+        let mut note = |path: &str, drafted_empty: bool, same: bool, now_empty: bool| {
+            if drafted_empty {
+                return;
+            }
+            let o = if now_empty {
+                FieldOutcome::Cleared
+            } else if same {
+                FieldOutcome::Kept
+            } else {
+                FieldOutcome::Edited
+            };
+            out.insert(path.to_string(), o);
+        };
+        let one = |a: &str, b: &str| {
+            (
+                a.trim().is_empty(),
+                a.trim() == b.trim(),
+                b.trim().is_empty(),
+            )
+        };
+        let mut text_field = |path: &str, a: &str, b: &str| {
+            let (de, same, ne) = one(a, b);
+            note(path, de, same, ne)
+        };
+        text_field("product.what", &self.what, &last.what);
+        text_field("product.audience", &self.audience, &last.audience);
+        text_field("product.stage", &self.stage, &last.stage);
+        text_field("stories.test", &self.stories.test, &last.stories.test);
+        let (a, b) = (clean(&self.out_of_scope), clean(&last.out_of_scope));
+        note("product.out_of_scope", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (clean(&self.north_stars), clean(&last.north_stars));
+        note("objectives.north_stars", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (clean(&self.stories.gate), clean(&last.stories.gate));
+        note("stories.gate", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (self.filled_objectives(), last.filled_objectives());
+        note("objectives.objectives", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (&self.sources, &last.sources);
+        note(
+            "objectives.sources_of_truth",
+            a.is_empty(),
+            a == b,
+            b.is_empty(),
+        );
+        let (a, b) = (&self.extras, &last.extras);
+        note("roster.specialists", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (&self.models, &last.models);
+        note("models", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (&self.why, &last.why);
+        note("roster.why", a.is_empty(), a == b, b.is_empty());
+        let (a, b) = (&self.globals, &last.globals);
+        note("roster.roles", a.is_empty(), a == b, b.is_empty());
+        out
+    }
+}
+
 fn pretty(v: &Value) -> String {
     format!("{}\n", serde_json::to_string_pretty(v).unwrap_or_default())
 }
@@ -606,6 +795,65 @@ mod tests {
         ] {
             assert_eq!(Form::of_failure(text), form, "{text}");
         }
+    }
+
+    fn draft() -> Value {
+        json!({
+            "product": {"id": "x", "name": "X", "what": "A mail filter", "audience": "",
+                        "stage": "building", "out_of_scope": ["Billing"]},
+            "objectives": {
+                "objectives": [{"text": "Ship", "signal": "10 users", "due": "2026-12-31"}],
+                "north_stars": ["docs/product.md"],
+                "sources_of_truth": [{"kind": "issues", "ref": "gh", "note": "bugs"}]},
+            "roster": {
+                "roles": ["pm", "dev", "chef"],
+                "specialists": [{"id": "dev.api", "role": "dev", "overlay": "You cover the API."}],
+                "why": [{"agent": "pm", "why": "Ranks."}, {"agent": "dev", "why": "Judges."}]},
+            "models": [{"agent": "dev.api", "model": "opus", "effort": "high"}],
+            "stories": {"on": true, "test": "pnpm test {files}", "gate": ["pnpm lint"]}
+        })
+    }
+
+    #[test]
+    fn a_draft_fills_the_fields_and_reads_back_in_its_own_shape() {
+        let f = Fields::from_draft(&draft());
+        assert_eq!(
+            (f.what.as_str(), f.audience.as_str()),
+            ("A mail filter", "")
+        );
+        assert_eq!(
+            f.globals,
+            ["dev"],
+            "pm is implicit and an unknown role is dropped"
+        );
+        assert_eq!(f.extras[0].id, "dev.api");
+        assert_eq!(f.models["dev.api"].effort, "high");
+        assert!(f.stories.on && f.stories.gate == ["pnpm lint"]);
+        let back = f.to_draft();
+        assert_eq!(back["product"]["what"], "A mail filter");
+        assert_eq!(back["roster"]["specialists"][0]["role"], "dev");
+        assert_eq!(back["stories"]["test"], "pnpm test {files}");
+        assert_eq!(back["objectives"]["objectives"][0]["due"], "2026-12-31");
+    }
+
+    #[test]
+    fn the_outcome_of_each_drafted_field_is_kept_edited_or_cleared() {
+        use FieldOutcome::*;
+        let drafted = Fields::from_draft(&draft());
+        let mut last = drafted.clone();
+        last.what = "A spam filter".into();
+        last.out_of_scope.clear();
+        last.audience = "Teams".into();
+        let o = drafted.outcomes(&last);
+        assert_eq!(o["product.what"], Edited);
+        assert_eq!(o["product.out_of_scope"], Cleared);
+        assert_eq!(o["product.stage"], Kept);
+        assert_eq!(o["objectives.objectives"], Kept);
+        assert_eq!(o["stories.gate"], Kept);
+        assert!(
+            !o.contains_key("product.audience"),
+            "the draft left it empty"
+        );
     }
 
     #[test]

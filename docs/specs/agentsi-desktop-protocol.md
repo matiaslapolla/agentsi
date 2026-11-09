@@ -73,7 +73,9 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 | `meeting` | `start`, `ask`, `cancel` |
 | `knowledge` | `index`, `search`, `get_doc` |
 | `memory` | `list`, `retire` |
-| `roles` | `list`, `validate`, `apply`, `reset` |
+| `roles` | `list`, `validate`, `apply {stage_dir \| stage}`, `reset` |
+| `registry` | `get`, `update` |
+| `setup` | `scan`, `draft`, `outcome` |
 | `reflect` | `run`, `revert`, `cancel` |
 | `archive` | `archive`, `restore` |
 | `data` | `backup`, `audit`, `snapshot` |
@@ -236,8 +238,16 @@ These additions are also part of protocol 1. The methods only read.
 - `product.status`, `data.snapshot` and `data.audit` return `not_found` for an unknown product, and `unavailable` when `agentsi.db` does not exist.
 - The global role files are found by one rule (U21): `<data root>/plugin/agents/` when it exists, else `$AGENTSI_PLUGIN_DIR/agents/` when the variable is set, else the five role files that the build holds. After the switch-over the plugin stays in Claude Code and the programs are on the `PATH`, so a program has no checkout to read. The built-in files are the files of `plugin/agents/` of this repo at build time.
 - Roles (U21). `roles.list {product, agent?}` returns `{product, roster?, agent?, overlays, globals, warnings}`: the roster as `{id, role, source, model, effort, error}` for each agent, or the resolved definition of one agent, `source` being `global`, `overlay` or `custom`. `roles.validate {product}` returns `{product, valid, failures, agents, warnings}`. `warnings` holds what the TypeScript code prints on stderr: tools that a meeting does not allow.
-- `roles.apply {product, stage_dir, yes?, register?: {name, path}}` and `roles.reset {product, agent?, memory?, yes?}` plan first. Without `yes` they write nothing and return the plan. With `yes` they write the database in one transaction (a failed registry edit rolls it back), write the roster in `agentsi.config.json`, and commit that file alone with git. The result holds `applied` and `commit {committed, error?}`. A failed commit does not undo the write. `roles.apply` returns `plan: null` and `failures` for a stage that is not valid. `roles.reset` returns `invalid` for an unknown agent and for a reset that would empty the roster.
+- `roles.apply {product, stage_dir?, stage?, yes?, register?: {name, path}}` and `roles.reset {product, agent?, memory?, yes?}` plan first. Without `yes` they write nothing and return the plan. With `yes` they write the database in one transaction (a failed registry edit rolls it back), write the roster in `agentsi.config.json`, and commit that file alone with git. The result holds `applied` and `commit {committed, error?}`. A failed commit does not undo the write. `roles.apply` returns `plan: null` and `failures` for a stage that is not valid. `roles.reset` returns `invalid` for an unknown agent and for a reset that would empty the roster.
 - `roles.apply` and `roles.reset` write only these files: the rows of `briefs`, `agent_overlays` and `memory` of the product, and `agentsi.config.json` of the data root. The golden cases compare the registry, the commits of the data root and the list of files after each write.
+
+#### Setup and registry
+- `roles.apply` takes `stage`, a map from the name of a stage file to its text, in place of `stage_dir`. Send one of the two. Both or neither returns `invalid`. The keys are `brief.json`, `roster.json`, `stories.json` and `agents/<id>.md`. With `yes`, the call also writes the `products` row and sends `data.changed {product, kind: "product"}`.
+- `setup.scan {path}` reads a product folder with code only: the proposed id and name, the registered product, the manifest commands, the north-star docs and the tools on the `PATH`. It returns `invalid` for a path that is not an existing absolute folder.
+- `setup.draft {path, previous?, failures?}` drafts the five forms with one `claude -p` call: model `sonnet`, no tools, a cap of 0.50 USD. It returns `{draft, fields, no_data, cost_usd, seconds}`. The app asks one Confirm before it calls it. A repair sends `previous` and `failures` and asks its own Confirm.
+- `setup.outcome {draft, product, fields}` records `kept`, `edited` or `cleared` for each drafted field. The app calls it after an apply that a draft filled.
+- `registry.get {}` returns `{owner, products}`. `registry.update {owner?, product?}` changes the owner block, or the name and the paths of one product, keeps each other key of `agentsi.config.json`, and makes no commit.
+- The app sequence for a new product: `setup.scan`, then optionally `setup.draft`, then `roles.apply` without `yes` (the plan), then on Confirm `roles.apply` with `yes` and `register`, then `registry.update` for more paths, `decision.add` for the north-star decision and `setup.outcome`.
 
 #### Knowledge base (U19)
 
@@ -438,7 +448,7 @@ These rules add no method. Each screen and pane uses the methods above on the co
 - Limits:
   - The settings screen shows this device only.
   - The local pill cannot dictate into a pane of a host. `focus.report` of such a pane reaches the core of the host. That core does not reach the local pill.
-  - `roles.apply` reads the stage folder on the host. The roles screen says so.
+  - `roles.apply` with `stage_dir` reads the stage folder on the host. The setup screen sends the stage as text in `stage`, so it works for a product on a host too. Its folder dialog opens on this device only.
   - The app keeps the closed tabs of a host in memory. After a quit while the host is off, the terminal of such a tab keeps running.
 
 ### Hook bridge

@@ -5,7 +5,7 @@
 //! stage keeps the files off the product repo and off the clipboard. See
 //! `docs/specs/agentsi-desktop-setup.md`.
 
-use std::collections::{BTreeMap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use agentsi_proto::marks_api::{DecisionAdd, DecisionAddParams};
 use agentsi_proto::method::Method;
@@ -16,7 +16,10 @@ use agentsi_proto::roles_api::{
     ApplyPlan, BriefView, Registration, RoleDef, RoleSource, RolesApply, RolesApplyParams,
     RolesApplyResult, RolesBrief, RolesBriefParams, RolesList, RolesListParams, RolesListResult,
 };
-use agentsi_proto::setup_api::{SetupScan, SetupScanParams, SetupScanResult};
+use agentsi_proto::setup_api::{
+    SetupDraft, SetupDraftParams, SetupDraftResult, SetupOutcome, SetupOutcomeParams, SetupScan,
+    SetupScanParams, SetupScanResult,
+};
 use agentsi_proto::story_api::{StoryConfig, StoryConfigGet, StoryConfigParams};
 use agentsi_ui::components::{Button, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, status, surface, text, weight};
@@ -48,6 +51,51 @@ enum Write {
     Apply,
     Registry,
     Decision,
+    Outcome,
+}
+
+/// The cap of one `setup.draft` call, as the core sets it.
+const DRAFT_CAP: &str = "0.50";
+
+/// What the screen knows about the draft of Claude.
+#[derive(Default)]
+struct DraftState {
+    /// The owner clicked "Draft with Claude" once. The second click runs the call.
+    armed: bool,
+    repair_armed: bool,
+    running: bool,
+    error: Option<String>,
+    /// The id, the cost and the time of the last draft, and the fields that it gave.
+    last: Option<Drafted>,
+    /// A repair runs one time.
+    repaired: bool,
+    /// What `roles.apply` refused after the draft.
+    failures: Vec<String>,
+}
+
+struct Drafted {
+    id: String,
+    cost_usd: f64,
+    seconds: f64,
+    no_data: Vec<String>,
+    fields: Fields,
+}
+
+/// The input keys that a field path of a draft fills.
+fn keys_of(path: &str) -> &'static [&'static str] {
+    match path {
+        "product.id" => &["id"],
+        "product.name" => &["name"],
+        "product.what" => &["what"],
+        "product.audience" => &["audience"],
+        "product.out_of_scope" => &["out"],
+        "objectives.objectives" => &["o0.text"],
+        "objectives.north_stars" => &["north"],
+        "objectives.sources_of_truth" => &["sources"],
+        "stories.test" => &["test"],
+        "stories.gate" => &["gate"],
+        _ => &[],
+    }
 }
 
 /// What the screen reads from the core to fill the forms of a registered product.
@@ -106,6 +154,11 @@ pub struct SetupScreen {
     applied_id: Option<String>,
     fields: Fields,
     scroll: ScrollHandle,
+    draft: DraftState,
+    /// The keys of the fields that the draft could not answer.
+    no_data: BTreeSet<String>,
+    /// A fill from a draft keeps the marks against the stored brief.
+    keep_marks: bool,
 }
 
 impl SetupScreen {
@@ -135,6 +188,9 @@ impl SetupScreen {
             applied_id: None,
             fields: Fields::default(),
             scroll: ScrollHandle::new(),
+            draft: DraftState::default(),
+            no_data: BTreeSet::new(),
+            keep_marks: false,
         };
         screen.reload(cx);
         screen
@@ -253,7 +309,14 @@ impl SetupScreen {
             let i = self.input(key, "", window, cx);
             i.update(cx, |s, cx| s.set_value(value.to_string(), window, cx));
         }
-        self.base_vals.insert(key.into(), value.trim().to_string());
+        if !self.keep_marks {
+            self.base_vals.insert(key.into(), value.trim().to_string());
+        }
+    }
+
+    /// True when the draft could not answer the field and it is still empty.
+    fn no_data(&self, key: &str, cx: &App) -> bool {
+        self.no_data.contains(key) && self.val(key, cx).is_empty()
     }
 
     fn changed(&self, key: &str, cx: &App) -> bool {
@@ -272,7 +335,9 @@ impl SetupScreen {
         self.extras = (0..f.extras.len() as u32).collect();
         self.next_extra = f.extras.len() as u32;
         self.fields = f;
-        self.base_vals.clear();
+        if !self.keep_marks {
+            self.base_vals.clear();
+        }
         cx.notify();
     }
 
@@ -321,6 +386,7 @@ impl SetupScreen {
         self.put("gate", &f.stories.gate.join("\n"), window, cx);
         self.put("repo", &f.stories.repo, window, cx);
         self.put("budget", &f.stories.budget, window, cx);
+        self.keep_marks = false;
     }
 
     /// Reads the inputs into `Fields`.
@@ -608,6 +674,119 @@ impl SetupScreen {
         f
     }
 
+    // ---- step 2: the draft ----
+
+    /// The first click arms the button and shows the cap. The second click runs the call.
+    pub fn draft_click(&mut self, cx: &mut Context<Self>) {
+        if self.draft.running || self.scan.is_none() {
+            return;
+        }
+        if !self.draft.armed {
+            self.draft.armed = true;
+            cx.notify();
+            return;
+        }
+        self.draft.armed = false;
+        self.run_draft(None, cx);
+    }
+
+    /// A repair sends the failures of `roles.apply` and the forms as they are. It costs money
+    /// too, so it has its own Confirm, and it runs one time.
+    pub fn repair_click(&mut self, cx: &mut Context<Self>) {
+        if self.draft.running
+            || self.draft.repaired
+            || self.draft.failures.is_empty()
+            || self.scan.is_none()
+        {
+            return;
+        }
+        if !self.draft.repair_armed {
+            self.draft.repair_armed = true;
+            cx.notify();
+            return;
+        }
+        self.draft.repair_armed = false;
+        let previous = self.read_fields(cx).to_draft();
+        let failures = self.draft.failures.clone();
+        self.draft.repaired = true;
+        self.run_draft(Some((previous, failures)), cx);
+    }
+
+    fn cancel_draft_confirm(&mut self, cx: &mut Context<Self>) {
+        self.draft.armed = false;
+        self.draft.repair_armed = false;
+        cx.notify();
+    }
+
+    fn run_draft(
+        &mut self,
+        repair: Option<(serde_json::Value, Vec<String>)>,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(path) = self.scan.as_ref().map(|s| s.path.clone()) else {
+            return;
+        };
+        self.draft.running = true;
+        self.draft.error = None;
+        cx.notify();
+        let (previous, failures) = match repair {
+            Some((p, f)) => (Some(p), f),
+            None => (None, Vec::new()),
+        };
+        let params = SetupDraftParams {
+            path,
+            previous,
+            failures,
+        };
+        self.ask::<SetupDraft>(params, cx, |this, r, cx| this.drafted(r, cx));
+    }
+
+    /// Fills the forms from the draft. The id, the name, the paths, the repo and the budget
+    /// stay as they are: the folder and the owner decide them.
+    pub fn drafted(&mut self, r: Result<SetupDraftResult, String>, cx: &mut Context<Self>) {
+        self.draft.running = false;
+        let d = match r {
+            Ok(d) => d,
+            Err(e) => {
+                self.draft.error = Some(e);
+                cx.notify();
+                return;
+            }
+        };
+        let current = self.read_fields(cx);
+        let mut f = Fields::from_draft(&d.fields);
+        f.id = current.id;
+        f.name = current.name;
+        f.paths = current.paths;
+        f.stories.repo = current.stories.repo;
+        f.stories.budget = current.stories.budget;
+        for id in f.roster() {
+            if f.why.get(&id).is_none_or(|w| w.trim().is_empty())
+                && let Some((_, w)) = DEFAULT_WHY.iter().find(|(k, _)| *k == id)
+            {
+                f.why.insert(id, w.to_string());
+            }
+        }
+        self.no_data = d
+            .no_data
+            .iter()
+            .flat_map(|p| keys_of(p))
+            .map(|k| k.to_string())
+            .collect();
+        self.draft.last = Some(Drafted {
+            id: d.draft,
+            cost_usd: d.cost_usd,
+            seconds: d.seconds,
+            no_data: d.no_data,
+            fields: f.clone(),
+        });
+        self.draft.failures.clear();
+        self.problems.clear();
+        self.message = None;
+        self.keep_marks = true;
+        self.set_fields(f, cx);
+    }
+
     // ---- step 3: review ----
 
     /// Checks the forms and asks `roles.apply` for the plan. It writes nothing.
@@ -656,6 +835,7 @@ impl SetupScreen {
                 cx.notify();
             }
             Ok(r) => {
+                self.draft.failures = r.failures.clone();
                 self.problems = r
                     .failures
                     .iter()
@@ -686,6 +866,7 @@ impl SetupScreen {
         .into_iter()
         .flatten()
         .chain(self.north_star_decision.then_some(Write::Decision))
+        .chain(self.draft.last.is_some().then_some(Write::Outcome))
         .collect();
         self.notes.clear();
         self.message = None;
@@ -731,6 +912,19 @@ impl SetupScreen {
                     this.registry_done(r.map(|_| ()), f, cx)
                 });
             }
+            Write::Outcome => {
+                let Some(d) = &self.draft.last else {
+                    return self.next_write(f, cx);
+                };
+                let params = SetupOutcomeParams {
+                    draft: d.id.clone(),
+                    product: f.id.clone(),
+                    fields: d.fields.outcomes(&f),
+                };
+                self.ask::<SetupOutcome>(params, cx, move |this, r, cx| {
+                    this.outcome_done(r.map(|_| ()), f, cx)
+                });
+            }
             Write::Decision => {
                 let params = DecisionAddParams {
                     product: f.id.clone(),
@@ -743,6 +937,14 @@ impl SetupScreen {
                 });
             }
         }
+    }
+
+    pub fn outcome_done(&mut self, r: Result<(), String>, f: Fields, cx: &mut Context<Self>) {
+        if let Err(e) = r {
+            self.notes
+                .push(format!("The result of the draft was not logged: {e}"));
+        }
+        self.next_write(f, cx)
     }
 
     pub fn registry_done(&mut self, r: Result<(), String>, f: Fields, cx: &mut Context<Self>) {
@@ -834,7 +1036,7 @@ impl SetupScreen {
 
 // ---- drawing ----
 
-fn label(text: &str, changed: bool) -> Div {
+fn label(text: &str, changed: bool, no_data: bool) -> Div {
     div()
         .flex()
         .items_center()
@@ -847,6 +1049,7 @@ fn label(text: &str, changed: bool) -> Div {
                 .child(text.to_string()),
         )
         .when(changed, |el| el.child(status_tag("changed", Status::Info)))
+        .when(no_data, |el| el.child(status_tag("no data", Status::Warn)))
 }
 
 fn card() -> Div {
@@ -882,7 +1085,7 @@ impl SetupScreen {
             .flex()
             .flex_col()
             .gap(space(1))
-            .child(label(title, self.changed(key, cx)))
+            .child(label(title, self.changed(key, cx), self.no_data(key, cx)))
             .child(Input::new(&input))
     }
 
@@ -900,7 +1103,7 @@ impl SetupScreen {
             .flex()
             .flex_col()
             .gap(space(1))
-            .child(label(title, self.changed(key, cx)))
+            .child(label(title, self.changed(key, cx), self.no_data(key, cx)))
             .child(Textarea::new(&area).h(space(height)))
     }
 
@@ -1002,7 +1205,7 @@ impl SetupScreen {
                     .flex()
                     .flex_col()
                     .gap(space(1))
-                    .child(label("Id", false))
+                    .child(label("Id", false, false))
                     .child(Input::new(&id).disabled(fixed_id)),
             )
             .child(self.text_field("name", "Name", "My product", window, cx))
@@ -1027,7 +1230,7 @@ impl SetupScreen {
                     .flex()
                     .flex_col()
                     .gap(space(1))
-                    .child(label("Stage", stage_changed))
+                    .child(label("Stage", stage_changed, false))
                     .child(
                         div()
                             .flex()
@@ -1259,6 +1462,85 @@ impl SetupScreen {
             .child(self.problems_of(Form::Stories))
     }
 
+    fn draft_card(&mut self, cx: &mut Context<Self>) -> Div {
+        let (armed, running, repair_armed) = (
+            self.draft.armed,
+            self.draft.running,
+            self.draft.repair_armed,
+        );
+        let can_repair =
+            !self.draft.repaired && self.draft.last.is_some() && !self.draft.failures.is_empty();
+        let result = self.draft.last.as_ref().map(|d| {
+            let mut t = format!("Drafted for ${:.2} in {:.0} s.", d.cost_usd, d.seconds);
+            if !d.no_data.is_empty() {
+                t.push_str(&format!(
+                    " The files do not answer: {}.",
+                    d.no_data.join(", ")
+                ));
+            }
+            t
+        });
+        card()
+            .child(section("Draft with Claude (optional)", None))
+            .child(hint(format!(
+                "One call to Claude reads up to 15 files of the folder and fills the forms. It costs up to ${DRAFT_CAP} and the folder stays unchanged. You edit each field, and nothing is written before the Review."
+            )))
+            .child(
+                div()
+                    .flex()
+                    .gap(space(2))
+                    .child(
+                        Button::new("setup-draft")
+                            .secondary()
+                            .small()
+                            .label(if running {
+                                "Drafting…".to_string()
+                            } else if armed {
+                                format!("Confirm: spend up to ${DRAFT_CAP}")
+                            } else {
+                                "Draft with Claude".to_string()
+                            })
+                            .disabled(running)
+                            .on_click(cx.listener(|this, _, _, cx| this.draft_click(cx))),
+                    )
+                    .when(armed || repair_armed, |el| {
+                        el.child(
+                            Button::new("setup-draft-cancel")
+                                .ghost()
+                                .small()
+                                .label("Cancel")
+                                .on_click(cx.listener(|this, _, _, cx| this.cancel_draft_confirm(cx))),
+                        )
+                    }),
+            )
+            .children(result.map(mono))
+            .children(self.draft.error.clone().map(|e| {
+                div()
+                    .text_size(size::sm())
+                    .text_color(status::danger())
+                    .child(format!("The draft failed: {e}"))
+            }))
+            .when(can_repair, |el| {
+                el.child(hint(
+                    "The core refused the stage. Claude can repair the draft one time, from the reasons.",
+                ))
+                .child(
+                    div().child(
+                        Button::new("setup-repair")
+                            .secondary()
+                            .small()
+                            .label(if repair_armed {
+                                format!("Confirm: spend up to ${DRAFT_CAP}")
+                            } else {
+                                "Repair with Claude".to_string()
+                            })
+                            .disabled(running)
+                            .on_click(cx.listener(|this, _, _, cx| this.repair_click(cx))),
+                    ),
+                )
+            })
+    }
+
     fn forms_step(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let other = self.problems_of(Form::Other);
         let busy = self.busy;
@@ -1267,6 +1549,7 @@ impl SetupScreen {
             .flex_col()
             .gap(space(6))
             .children(self.scan_card())
+            .child(self.draft_card(cx))
             .child(self.product_form(window, cx))
             .child(self.objectives_form(window, cx))
             .child(self.roster_form(window, cx))
@@ -1676,5 +1959,139 @@ mod tests {
             !f.stage(base.as_ref(), "2026-11-09")
                 .contains_key("stories.json")
         );
+    }
+
+    fn drafted_result() -> agentsi_proto::setup_api::SetupDraftResult {
+        serde_json::from_value(json!({
+            "draft": "d1", "cost_usd": 0.12, "seconds": 14.0,
+            "no_data": ["product.audience"],
+            "fields": {
+                "product": {"id": "other", "name": "Other", "what": "A mail filter", "audience": "",
+                            "stage": "launched", "out_of_scope": ["Billing"]},
+                "objectives": {
+                    "objectives": [{"text": "Ship", "signal": "10 users", "due": "2026-12-31"}],
+                    "north_stars": ["docs/product.md"], "sources_of_truth": []},
+                "roster": {"roles": ["pm", "dev"], "specialists": [], "why": []},
+                "models": [],
+                "stories": {"on": false, "test": "", "gate": []}
+            }
+        }))
+        .unwrap()
+    }
+
+    #[gpui::test]
+    fn the_draft_asks_one_confirm_marks_no_data_and_logs_what_the_owner_kept_or_edited(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(agentsi_ui::init);
+        let (end, mut other) = UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
+        let (screen, cx) = cx.add_window_view(|_, cx| SetupScreen::new(String::new(), core, cx));
+        let draw = |cx: &mut gpui::VisualTestContext| cx.update(|w, cx| w.draw(cx).clear(cx));
+        screen.update(cx, |s, cx| s.scanned(Ok(scan(None)), cx));
+        draw(cx);
+        let _ = methods(&mut other);
+
+        // The first click shows the cap and sends nothing. The second click runs the call.
+        screen.update(cx, |s, cx| s.draft_click(cx));
+        assert!(methods(&mut other).is_empty(), "no call before the Confirm");
+        screen.update(cx, |s, cx| s.draft_click(cx));
+        let sent = methods(&mut other);
+        assert_eq!(sent.len(), 1);
+        assert_eq!(
+            (sent[0].0.as_str(), &sent[0].1),
+            ("setup.draft", &json!({"path": "/work/demo"}))
+        );
+        // A click while it runs does nothing.
+        screen.update(cx, |s, cx| {
+            s.draft_click(cx);
+            s.draft_click(cx)
+        });
+        assert!(methods(&mut other).is_empty());
+
+        screen.update(cx, |s, cx| s.drafted(Ok(drafted_result()), cx));
+        draw(cx);
+        let f = screen.read_with(cx, |s, cx| s.read_fields(cx));
+        assert_eq!(
+            (f.id.as_str(), f.what.as_str(), f.stage.as_str()),
+            ("demo", "A mail filter", "launched")
+        );
+        assert_eq!(f.paths, ["/work/demo"], "the folder decides the paths");
+        assert_eq!(f.why["pm"], "Ranks the work and writes the synthesis.");
+        assert!(screen.read_with(cx, |s, cx| s.no_data("audience", cx)));
+
+        // The owner edits `what`, fills the audience and clears the out of scope box.
+        screen.update_in(cx, |s, w, cx| {
+            s.put("what", "A spam filter", w, cx);
+            s.put("audience", "Teams", w, cx);
+            s.put("out", "", w, cx);
+        });
+        assert!(!screen.read_with(cx, |s, cx| s.no_data("audience", cx)));
+        screen.update(cx, |s, cx| s.review_now(cx));
+        let sent = methods(&mut other);
+        assert_eq!(sent[0].0, "roles.apply");
+        screen.update(cx, |s, cx| s.planned(Ok(plan()), cx));
+        screen.update(cx, |s, cx| s.confirm(cx));
+        let _ = methods(&mut other);
+        let f = screen.read_with(cx, |s, cx| s.read_fields(cx));
+        screen.update(cx, |s, cx| s.apply_done(Ok(applied()), f.clone(), cx));
+        let sent = methods(&mut other);
+        assert_eq!(sent[0].0, "setup.outcome");
+        assert_eq!(sent[0].1["draft"], "d1");
+        assert_eq!(sent[0].1["product"], "demo");
+        let fields = &sent[0].1["fields"];
+        assert_eq!(fields["product.what"], "edited");
+        assert_eq!(fields["product.out_of_scope"], "cleared");
+        assert_eq!(fields["product.stage"], "kept");
+        assert!(fields.get("product.audience").is_none());
+        screen.update(cx, |s, cx| s.outcome_done(Ok(()), f, cx));
+        assert_eq!(screen.read_with(cx, |s, _| s.step()), Step::Done);
+    }
+
+    #[gpui::test]
+    fn a_refused_stage_offers_one_repair_that_asks_its_own_confirm(cx: &mut TestAppContext) {
+        cx.update(agentsi_ui::init);
+        let (end, mut other) = UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
+        let (screen, cx) = cx.add_window_view(|_, cx| SetupScreen::new(String::new(), core, cx));
+        screen.update(cx, |s, cx| s.scanned(Ok(scan(None)), cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        screen.update(cx, |s, cx| {
+            s.draft_click(cx);
+            s.draft_click(cx);
+            s.drafted(Ok(drafted_result()), cx)
+        });
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        let _ = methods(&mut other);
+        screen.update(cx, |s, cx| s.review_now(cx));
+        let _ = methods(&mut other);
+        let mut refused = plan();
+        refused.plan = None;
+        refused.failures = vec![
+            "Brief: north_stars path \"docs/product.md\" does not exist under a product path."
+                .into(),
+        ];
+        screen.update(cx, |s, cx| s.planned(Ok(refused), cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+
+        screen.update(cx, |s, cx| s.repair_click(cx));
+        assert!(
+            methods(&mut other).is_empty(),
+            "the repair asks its own Confirm"
+        );
+        screen.update(cx, |s, cx| s.repair_click(cx));
+        let sent = methods(&mut other);
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].0, "setup.draft");
+        assert_eq!(sent[0].1["failures"].as_array().unwrap().len(), 1);
+        assert_eq!(sent[0].1["previous"]["product"]["what"], "A mail filter");
+        screen.update(cx, |s, cx| s.drafted(Ok(drafted_result()), cx));
+        // One repair only: a second round sends nothing.
+        screen.update(cx, |s, cx| {
+            s.draft.failures = vec!["x".into()];
+            s.repair_click(cx);
+            s.repair_click(cx)
+        });
+        assert!(methods(&mut other).is_empty());
     }
 }
