@@ -65,15 +65,17 @@ Each menu uses `PopupMenu` of `gpui-component`. Each entry also has a palette en
 
 | Object | Entries |
 |---|---|
-| Product | New terminal, Open desk, Start meeting, New story, Reflect, Open the git panel, Label and color, Move to group, Copy path, Open folder, Archive |
+| Product | New terminal, Open desk, Start meeting, New story, New ticket, Open tickets, Reflect, Open the git panel, Label and color, Move to group, Copy path, Open folder, Archive |
 | Pane (tab or item row) | Rename, Color, Add to tab group, Talk to this pane, Voice mode, Split right, Split down, Copy folder, Close, Close others, Close to the right |
 | Story session | Open, Review, Accept, Reject, Open a terminal in the worktree |
+| Ticket (a row of the Tickets screen, the Ticket screen) | Open, Done, Wait, Drop, Reopen, Promote to story, Promote to decision, Copy id |
 | Meeting | Open, Cancel |
 | Product group | Rename, Color, Remove group |
 | Tab group | Rename, Color, Ungroup, Close the group |
 
 - "Talk to this pane" belongs to `agentsi-desktop-hearing.md`. Until it ships, the entry is not shown.
-- The menu key (Shift+F10 or the Menu key) opens the menu of the focused row or tab.
+- The menu key (Shift+F10 or the Menu key) opens the menu of the focused row or tab, or of the ticket under the cursor of a Tickets or Ticket screen.
+- An entry that the state of the ticket does not permit is off. "Promote to story" asks one Confirm, because it spends money.
 
 ### Rules that stay
 

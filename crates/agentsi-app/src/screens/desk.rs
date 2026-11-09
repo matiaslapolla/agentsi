@@ -28,6 +28,7 @@ use crate::model::CoreState;
 use crate::nav::{Nav, ScreenRequest};
 
 pub struct DeskScreen {
+    tickets: Entity<super::desk_tickets::DeskTickets>,
     product: String,
     core: Entity<CoreState>,
     data: Load<DeskResult>,
@@ -55,7 +56,12 @@ fn applied(id: i64, reply: &DecideResult) -> Result<(), CallError> {
 
 impl DeskScreen {
     pub fn new(product: String, core: Entity<CoreState>, cx: &mut Context<Self>) -> Self {
+        let tickets = {
+            let (product, core) = (product.clone(), core.clone());
+            cx.new(|cx| super::desk_tickets::DeskTickets::new(product, core, cx))
+        };
         let mut screen = DeskScreen {
+            tickets,
             product,
             core,
             data: Load::Loading,
@@ -202,6 +208,8 @@ impl DeskScreen {
             .call::<ProductDesk>(&ProductDeskParams {
                 product: self.product.clone(),
             });
+        // The desk asks for its own data first.
+        self.tickets.update(cx, |t, cx| t.reload(cx));
         cx.spawn(async move |this, cx| {
             let result = call.await.map_err(|e| e.to_string());
             let _ = this.update(cx, |this, cx| {
@@ -557,6 +565,7 @@ impl Render for DeskScreen {
                 .child(header)
                 .child(stats(figures))
                 .child(decisions)
+                .child(self.tickets.clone())
                 .children(objectives)
                 .children(usage)
                 .child(minutes)
@@ -624,11 +633,25 @@ mod tests {
         screen(cx, Load::Ready(empty));
     }
 
-    /// The next request that the screen sent to the core, as JSON, or `None`.
+    /// The next request that the screen sent to the core, as JSON, or `None`. The read of the
+    /// tickets part of the desk (`desk_tickets.rs`) is not counted.
     fn sent(other: &mut std::os::unix::net::UnixStream) -> Option<serde_json::Value> {
         other.set_nonblocking(true).unwrap();
-        let frame = agentsi_proto::frame::read_frame(other).ok().flatten()?;
-        serde_json::from_slice(&frame.payload).ok()
+        loop {
+            let frame = agentsi_proto::frame::read_frame(other).ok().flatten()?;
+            let request: serde_json::Value = serde_json::from_slice(&frame.payload).ok()?;
+            if request["method"] != "ticket.list" {
+                return Some(request);
+            }
+        }
+    }
+
+    /// The methods that the core received, without the read of the tickets part.
+    fn methods(socket: &mut std::os::unix::net::UnixStream) -> Vec<String> {
+        crate::model::two_cores::methods(socket)
+            .into_iter()
+            .filter(|m| m != "ticket.list")
+            .collect()
     }
 
     #[gpui::test]
@@ -739,7 +762,7 @@ mod tests {
         Entity<DeskScreen>,
         &mut VisualTestContext,
     ) {
-        use crate::model::two_cores::{methods, two_cores};
+        use crate::model::two_cores::two_cores;
         cx.update(agentsi_ui::init);
         cx.update(crate::actions::bind);
         let mut t = two_cores(cx);
@@ -764,7 +787,7 @@ mod tests {
     fn a_decision_lands_on_the_core_of_the_screen_when_two_cores_have_the_same_product(
         cx: &mut TestAppContext,
     ) {
-        use crate::model::two_cores::{methods, received};
+        use crate::model::two_cores::received;
         let (mut t, local, remote, cx) = desks_of_the_same_id(cx);
         // The remote desk is the newest, so the palette action acts on it.
         cx.dispatch_action(crate::actions::ApproveDecision);
@@ -783,7 +806,7 @@ mod tests {
 
     #[gpui::test]
     fn a_palette_action_follows_the_tab_that_the_owner_selected(cx: &mut TestAppContext) {
-        use crate::model::two_cores::{methods, two_cores};
+        use crate::model::two_cores::two_cores;
         use crate::screens::{ScreenPanel, ScreenSpec};
         use gpui_kit::component::dock::BasePanel as _;
         cx.update(agentsi_ui::init);
@@ -828,7 +851,6 @@ mod tests {
 
     #[gpui::test]
     fn a_reload_after_a_write_stays_on_the_core_of_the_write(cx: &mut TestAppContext) {
-        use crate::model::two_cores::methods;
         let (mut t, _local, _remote, cx) = desks_of_the_same_id(cx);
         let studio = t.cores.of(Some("studio")).unwrap().clone();
         cx.update(|_, cx| Live::reload_core(&studio, cx));

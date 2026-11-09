@@ -118,6 +118,22 @@ _Avoid_: Chore, tech story
 One note, to-do or question of a product that the owner or Claude writes and the owner closes. It gates nothing and runs nothing. A ticket that becomes work turns into a story.
 _Avoid_: Card, issue, item, entry, task (when you mean a ticket)
 
+**Open ticket**:
+A ticket in the state `open` or `waiting`.
+_Avoid_: Active ticket, live ticket
+
+**Tickets screen**:
+The screen of kind `Tickets` that lists the tickets of one product. Its key is `Ctrl+Shift+I`.
+_Avoid_: Ticket list, board
+
+**Ticket screen**:
+The screen of kind `Ticket` that shows one ticket. Its id is the argument of the panel.
+_Avoid_: Ticket detail, ticket card
+
+**Ticket line**:
+The one-line text of a ticket: `<id> [<kind>[, waiting on <waiting_on>]] <title>[ (for <assignee>)]`.
+_Avoid_: Ticket summary
+
 **Criterion**:
 One "given, when, then" line of a story, with the user-facing test that QA writes for it before the work starts.
 _Avoid_: Requirement, acceptance check
@@ -313,7 +329,7 @@ The pill of a tab group in the tab bar. It shows the arrow, the color, the name 
 _Avoid_: Badge, header
 
 **Context menu**:
-The menu that opens with a right click, or with Shift+F10 or the Menu key, on a product row, an item row, a product group header, a tab, a chip, the story screen or the meeting screen. It lists the actions of its object (`menus.rs`). Each entry has a palette entry that acts on the active product, the focused pane, the story screen in view or the group of the active tab. A command that stops a program, spends money or hides a product asks one Confirm first. Accept and Reject of a story keep the Confirm of the story screen.
+The menu that opens with a right click, or with Shift+F10 or the Menu key, on a product row, an item row, a product group header, a tab, a chip, the story screen, the meeting screen, a ticket row or the Ticket screen. It lists the actions of its object (`menus.rs`). Each entry has a palette entry that acts on the active product, the focused pane, the story screen in view or the group of the active tab. A command that stops a program, spends money or hides a product asks one Confirm first. Accept and Reject of a story keep the Confirm of the story screen.
 _Avoid_: Right-click menu, popup, dropdown
 
 **Menu key**:

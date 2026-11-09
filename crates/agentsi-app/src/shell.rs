@@ -64,6 +64,8 @@ mod menu_actions;
 #[cfg(test)]
 mod menu_tests;
 mod tab_actions;
+#[cfg(test)]
+mod ticket_tests;
 
 /// The time between a change of the dock and the save of the layout.
 const SAVE_DELAY: Duration = Duration::from_millis(300);
@@ -115,6 +117,10 @@ pub enum Ask {
     CloseTabs(Vec<PanelId>, usize),
     /// The text of a new story for this product.
     NewStory(ProductRef),
+    /// The title of a new ticket for this product.
+    NewTicket(ProductRef),
+    /// What the ticket waits on: the product and the ticket id.
+    TicketWait(ProductRef, String),
     /// A new name for the product group of this host.
     GroupName(Option<String>, String),
     GroupColor(Option<String>, String),
@@ -1378,6 +1384,9 @@ impl Render for Shell {
             }))
             .on_action(cx.listener(|this, _: &actions::OpenStories, window, cx| {
                 this.show_active(ScreenSpec::stories, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::OpenTickets, window, cx| {
+                this.show_active(ScreenSpec::tickets, window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::OpenGit, window, cx| {
                 this.show_active(ScreenSpec::git, window, cx)

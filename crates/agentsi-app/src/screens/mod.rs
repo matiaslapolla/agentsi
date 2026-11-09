@@ -19,6 +19,7 @@
 
 pub mod call;
 pub mod desk;
+pub mod desk_tickets;
 pub mod git;
 pub mod git_config;
 pub mod guide;
@@ -32,6 +33,8 @@ pub mod roles_report;
 pub mod settings;
 pub mod stories;
 pub mod story;
+pub mod ticket;
+pub mod tickets;
 
 use gpui_kit::component::dock::{BasePanel, Panel, PanelEvent, PanelInfo, PanelState};
 use gpui_kit::*;
@@ -72,6 +75,10 @@ pub enum ScreenKind {
     Git,
     /// The guide of the program. It belongs to no product: its product is "".
     Guide,
+    /// The tickets of a product.
+    Tickets,
+    /// One ticket. Its id is the argument of the panel.
+    Ticket,
 }
 
 impl ScreenKind {
@@ -89,6 +96,8 @@ impl ScreenKind {
             ScreenKind::Call => "call",
             ScreenKind::Git => "git",
             ScreenKind::Guide => "guide",
+            ScreenKind::Tickets => "tickets",
+            ScreenKind::Ticket => "ticket",
         }
     }
 
@@ -106,6 +115,8 @@ impl ScreenKind {
             "call" => Some(ScreenKind::Call),
             "git" => Some(ScreenKind::Git),
             "guide" => Some(ScreenKind::Guide),
+            "tickets" => Some(ScreenKind::Tickets),
+            "ticket" => Some(ScreenKind::Ticket),
             _ => None,
         }
     }
@@ -129,6 +140,8 @@ impl ScreenKind {
             ScreenKind::Call => "Call".into(),
             ScreenKind::Git => "Git".into(),
             ScreenKind::Guide => "Guide".into(),
+            ScreenKind::Tickets => "Tickets".into(),
+            ScreenKind::Ticket => arg.unwrap_or("Ticket").into(),
         }
     }
 }
@@ -165,7 +178,7 @@ pub fn screen_of(state: &PanelState) -> Option<ScreenSpec> {
     let arg = v.get("arg").and_then(Value::as_str).map(String::from);
     if matches!(
         kind,
-        ScreenKind::Minute | ScreenKind::Story | ScreenKind::Call
+        ScreenKind::Minute | ScreenKind::Story | ScreenKind::Call | ScreenKind::Ticket
     ) && arg.is_none()
     {
         return None;
@@ -192,6 +205,8 @@ enum ScreenView {
     Call(Entity<call::CallScreen>),
     Git(Entity<git::GitScreen>),
     Guide(Entity<guide::GuideScreen>),
+    Tickets(Entity<tickets::TicketsScreen>),
+    Ticket(Entity<ticket::TicketScreen>),
 }
 
 impl ScreenView {
@@ -237,6 +252,13 @@ impl ScreenView {
             }
             ScreenKind::Git => ScreenView::Git(cx.new(|cx| git::GitScreen::new(product, core, cx))),
             ScreenKind::Guide => ScreenView::Guide(cx.new(guide::GuideScreen::new)),
+            ScreenKind::Tickets => {
+                ScreenView::Tickets(cx.new(|cx| tickets::TicketsScreen::new(product, core, cx)))
+            }
+            ScreenKind::Ticket => {
+                let id = spec.arg.clone().unwrap_or_default();
+                ScreenView::Ticket(cx.new(|cx| ticket::TicketScreen::new(product, id, core, cx)))
+            }
         }
     }
 
@@ -254,6 +276,8 @@ impl ScreenView {
             ScreenView::Call(v) => v.clone().into(),
             ScreenView::Git(v) => v.clone().into(),
             ScreenView::Guide(v) => v.clone().into(),
+            ScreenView::Tickets(v) => v.clone().into(),
+            ScreenView::Ticket(v) => v.clone().into(),
         }
     }
 
@@ -283,6 +307,8 @@ impl ScreenView {
             ScreenView::Memory(v) => v.update(cx, |s, cx| s.reload(cx)),
             ScreenView::Call(v) => v.update(cx, |s, cx| s.reload(cx)),
             ScreenView::Git(v) => v.update(cx, |s, cx| s.reload(cx)),
+            ScreenView::Tickets(v) => v.update(cx, |s, cx| s.reload(cx)),
+            ScreenView::Ticket(v) => v.update(cx, |s, cx| s.reload(cx)),
             // The events keep this screen current.
             ScreenView::Meeting(_) => {}
             // The page is in the program.
@@ -433,6 +459,19 @@ impl ScreenPanel {
         }
     }
 
+    /// The id and the state of the ticket that this screen shows: the ticket screen's own,
+    /// or the ticket under the cursor of the tickets screen.
+    pub fn ticket_in_view(
+        &self,
+        cx: &App,
+    ) -> Option<(String, agentsi_proto::ticket_api::TicketState)> {
+        match &self.view {
+            ScreenView::Ticket(v) => v.read(cx).ticket().map(|t| (t.id.clone(), t.state)),
+            ScreenView::Tickets(v) => v.read(cx).cursor_ticket().map(|t| (t.id.clone(), t.state)),
+            _ => None,
+        }
+    }
+
     /// Reads the screen from the core again.
     pub fn reload(&self, cx: &mut App) {
         self.view.reload(cx);
@@ -455,6 +494,8 @@ impl Focusable for ScreenPanel {
             ScreenView::Settings(v) => v.read(cx).focus_handle(),
             ScreenView::Guide(v) => v.read(cx).focus_handle(),
             ScreenView::Meeting(v) => v.read(cx).focus_handle(),
+            ScreenView::Tickets(v) => v.read(cx).focus_handle(),
+            ScreenView::Ticket(v) => v.read(cx).focus_handle(),
             _ => self.focus.clone(),
         }
     }
@@ -616,6 +657,7 @@ mod tests {
         assert!(screen_of(&state(json!({"kind": "minute", "product": "demo"}))).is_none());
         assert!(screen_of(&state(json!({"kind": "story", "product": "demo"}))).is_none());
         assert!(screen_of(&state(json!({"kind": "call", "product": "demo"}))).is_none());
+        assert!(screen_of(&state(json!({"kind": "ticket", "product": "demo"}))).is_none());
     }
 
     #[test]
@@ -660,6 +702,8 @@ mod tests {
             ScreenKind::Call,
             ScreenKind::Git,
             ScreenKind::Guide,
+            ScreenKind::Tickets,
+            ScreenKind::Ticket,
         ] {
             assert_eq!(ScreenKind::parse(k.name()), Some(k));
         }

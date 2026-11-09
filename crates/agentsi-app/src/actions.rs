@@ -33,6 +33,8 @@ gpui_kit::actions!(
         OpenRoles,
         /// Opens the stories of the active product.
         OpenStories,
+        /// Opens the tickets of the active product.
+        OpenTickets,
         /// Opens the git screen of the active product.
         OpenGit,
         /// Opens the meeting of the active product.
@@ -138,6 +140,24 @@ gpui_kit::actions!(
         OpenContextMenu,
         /// Asks for the text of a new story of the active product.
         NewStory,
+        /// Asks for the title of a new ticket of the active product.
+        NewTicket,
+        /// Opens the ticket under the cursor of the tickets, or the ticket in view.
+        OpenTicket,
+        /// Marks the ticket in view done.
+        TicketDone,
+        /// Asks what the ticket in view waits on.
+        TicketWait,
+        /// Drops the ticket in view.
+        TicketDrop,
+        /// Opens the ticket in view again.
+        TicketReopen,
+        /// Promotes the ticket in view to a story, after one Confirm.
+        PromoteTicketStory,
+        /// Promotes the ticket in view to a decision.
+        PromoteTicketDecision,
+        /// Copies the id of the ticket in view.
+        CopyTicketId,
         /// Runs the reflection of the active product.
         ReflectProduct,
         /// Copies the folder of the active product to the clipboard.
@@ -249,6 +269,7 @@ key_table! {
     ("minutes", "Minutes", "secondary-shift-l", || Box::new(OpenMinutes)),
     ("roles", "Roles", "secondary-shift-r", || Box::new(OpenRoles)),
     ("stories", "Stories", "secondary-shift-s", || Box::new(OpenStories)),
+    ("tickets", "Tickets", "secondary-shift-i", || Box::new(OpenTickets)),
     ("git", "Git", "secondary-shift-b", || Box::new(OpenGit)),
     ("meeting", "Meeting", "secondary-shift-g", || Box::new(OpenMeeting)),
     ("memory", "Memory", "secondary-shift-y", || Box::new(OpenMemory)),
@@ -375,6 +396,14 @@ pub const ENTRIES: &[Entry] = &[
             "stories", "story", "task", "approve", "run", "review", "accept", "reject", "diff",
         ],
         action: || Box::new(OpenStories),
+    },
+    Entry {
+        label: "Open the tickets of the active product",
+        icon: IconName::Check,
+        keywords: &[
+            "tickets", "ticket", "note", "todo", "question", "pending", "waiting",
+        ],
+        action: || Box::new(OpenTickets),
     },
     Entry {
         label: "Open the git panel of the active product",
@@ -657,6 +686,60 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(NewStory),
     },
     Entry {
+        label: "New ticket for the active product",
+        icon: IconName::Plus,
+        keywords: &["ticket", "note", "todo", "question", "new", "add"],
+        action: || Box::new(NewTicket),
+    },
+    Entry {
+        label: "Open the ticket under the cursor (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "open", "cursor"],
+        action: || Box::new(OpenTicket),
+    },
+    Entry {
+        label: "Mark the ticket done (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "done", "close", "finish"],
+        action: || Box::new(TicketDone),
+    },
+    Entry {
+        label: "Mark the ticket waiting (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "wait", "waiting", "pending", "blocked"],
+        action: || Box::new(TicketWait),
+    },
+    Entry {
+        label: "Drop the ticket (tickets)",
+        icon: IconName::Close,
+        keywords: &["ticket", "drop", "discard", "hide"],
+        action: || Box::new(TicketDrop),
+    },
+    Entry {
+        label: "Reopen the ticket (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "reopen", "open", "undo"],
+        action: || Box::new(TicketReopen),
+    },
+    Entry {
+        label: "Promote the ticket to a story (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "promote", "story", "pm", "cost"],
+        action: || Box::new(PromoteTicketStory),
+    },
+    Entry {
+        label: "Promote the ticket to a decision (tickets)",
+        icon: IconName::Check,
+        keywords: &["ticket", "promote", "decision"],
+        action: || Box::new(PromoteTicketDecision),
+    },
+    Entry {
+        label: "Copy the id of the ticket (tickets)",
+        icon: IconName::Copy,
+        keywords: &["ticket", "copy", "id", "clipboard"],
+        action: || Box::new(CopyTicketId),
+    },
+    Entry {
         label: "Reflect on the active product",
         icon: IconName::BookOpen,
         keywords: &["reflect", "reflection", "memory", "learn", "cost"],
@@ -856,6 +939,7 @@ mod tests {
             "Open the minutes of the active product",
             "Open the roles of the active product",
             "Open the stories of the active product",
+            "Open the tickets of the active product",
             "Open the git panel of the active product",
             "Open the meeting of the active product",
             "Start the meeting in the question field (meeting)",
@@ -901,6 +985,15 @@ mod tests {
             "Ungroup the tab group of the active tab",
             "Close the tab group of the active tab",
             "New story in the active product",
+            "New ticket for the active product",
+            "Open the ticket under the cursor (tickets)",
+            "Mark the ticket done (tickets)",
+            "Mark the ticket waiting (tickets)",
+            "Drop the ticket (tickets)",
+            "Reopen the ticket (tickets)",
+            "Promote the ticket to a story (tickets)",
+            "Promote the ticket to a decision (tickets)",
+            "Copy the id of the ticket (tickets)",
             "Reflect on the active product",
             "Copy the folder of the active product",
             "Open the folder of the active product",

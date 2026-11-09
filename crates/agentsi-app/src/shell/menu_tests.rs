@@ -93,6 +93,8 @@ fn each_entry_of_the_product_menu_runs_its_action_and_the_costly_ones_ask_one_co
         Cmd::OpenDesk,
         Cmd::StartMeeting,
         Cmd::NewStory,
+        Cmd::NewTicket,
+        Cmd::OpenTickets,
         Cmd::Reflect,
         Cmd::OpenGit,
         Cmd::Label,
@@ -128,6 +130,20 @@ fn each_entry_of_the_product_menu_runs_its_action_and_the_costly_ones_ask_one_co
     let story = call(&s, "story.new").expect("the PM shapes the story");
     assert_eq!(story["params"]["text"], "Add a login");
     assert_eq!(story["params"]["product"], "b");
+
+    run(&f, cx, b(), Cmd::NewTicket);
+    assert!(prompt_open(cx));
+    cx.simulate_input("Try the tracker");
+    cx.simulate_keystrokes("enter");
+    redraw(cx);
+    let s = sent(&mut f);
+    let ticket = call(&s, "ticket.add").expect("the ticket is added");
+    assert_eq!(ticket["params"]["title"], "Try the tracker");
+    assert_eq!(ticket["params"]["kind"], "note");
+    assert_eq!(ticket["params"]["product"], "b");
+    assert_eq!(ticket["params"]["author"]["by"], "owner");
+    run(&f, cx, b(), Cmd::OpenTickets);
+    assert_eq!(active_tab(&f, cx), "screen:tickets");
 
     for cmd in [Cmd::Label, Cmd::Color, Cmd::MoveToGroup] {
         run(&f, cx, b(), cmd);
@@ -527,4 +543,110 @@ fn shift_f10_and_the_menu_key_open_the_menu_of_the_row_or_the_pane(cx: &mut Test
     cx.simulate_keystrokes("down enter");
     redraw(cx);
     assert_eq!(active_tab(&f, cx), "terminal:t2-a");
+}
+
+#[gpui::test]
+fn the_ticket_menu_runs_its_entries_and_the_state_decides_which_are_on(cx: &mut TestAppContext) {
+    use agentsi_proto::ticket_api::TicketState;
+    let dir = folder("menu-ticket");
+    let (mut f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    let ticket = |state| Target::Ticket(product("a"), "C001".into(), state);
+    let _ = sent(&mut f);
+    assert_eq!(
+        entries(&f, cx, &ticket(TicketState::Open)),
+        [
+            Cmd::Open,
+            Cmd::TicketDone,
+            Cmd::TicketWait,
+            Cmd::TicketDrop,
+            Cmd::PromoteStory,
+            Cmd::PromoteDecision,
+            Cmd::CopyId,
+        ]
+    );
+    assert_eq!(
+        entries(&f, cx, &ticket(TicketState::Waiting)),
+        [
+            Cmd::Open,
+            Cmd::TicketDone,
+            Cmd::TicketDrop,
+            Cmd::TicketReopen,
+            Cmd::PromoteStory,
+            Cmd::PromoteDecision,
+            Cmd::CopyId,
+        ]
+    );
+    assert_eq!(
+        entries(&f, cx, &ticket(TicketState::Dropped)),
+        [Cmd::Open, Cmd::TicketReopen, Cmd::CopyId]
+    );
+
+    run(&f, cx, ticket(TicketState::Open), Cmd::Open);
+    assert_eq!(active_tab(&f, cx), "screen:ticket:C001");
+    run(&f, cx, ticket(TicketState::Open), Cmd::CopyId);
+    let copied = cx.read_from_clipboard().and_then(|c| c.text());
+    assert_eq!(copied.as_deref(), Some("C001"));
+    let _ = sent(&mut f);
+
+    run(&f, cx, ticket(TicketState::Open), Cmd::TicketDone);
+    let s = sent(&mut f);
+    let moved = call(&s, "ticket.move").expect("the ticket moves");
+    assert_eq!(moved["params"]["state"], "done");
+    assert_eq!(moved["params"]["by"]["by"], "owner");
+    run(&f, cx, ticket(TicketState::Dropped), Cmd::TicketReopen);
+    assert_eq!(
+        call(&sent(&mut f), "ticket.move").unwrap()["params"]["state"],
+        "open"
+    );
+    run(&f, cx, ticket(TicketState::Open), Cmd::PromoteDecision);
+    let s = sent(&mut f);
+    assert_eq!(
+        call(&s, "ticket.promote").unwrap()["params"]["to"],
+        "decision"
+    );
+
+    // Wait asks for its target first.
+    run(&f, cx, ticket(TicketState::Open), Cmd::TicketWait);
+    assert!(prompt_open(cx));
+    assert!(call(&sent(&mut f), "ticket.move").is_none());
+    cx.simulate_input("Matias");
+    cx.simulate_keystrokes("enter");
+    redraw(cx);
+    let s = sent(&mut f);
+    let wait = call(&s, "ticket.move").expect("the ticket waits");
+    assert_eq!(
+        (
+            wait["params"]["state"].as_str(),
+            wait["params"]["waiting_on"].as_str()
+        ),
+        (Some("waiting"), Some("Matias"))
+    );
+
+    // Promote to story spends money: one Confirm, and nothing before it.
+    run(&f, cx, ticket(TicketState::Open), Cmd::PromoteStory);
+    assert!(prompt_open(cx));
+    assert!(call(&sent(&mut f), "ticket.promote").is_none());
+    click(cx, "prompt-choice:no");
+    assert!(call(&sent(&mut f), "ticket.promote").is_none());
+    run(&f, cx, ticket(TicketState::Open), Cmd::PromoteStory);
+    click(cx, "prompt-choice:yes");
+    let s = sent(&mut f);
+    assert_eq!(call(&s, "ticket.promote").unwrap()["params"]["to"], "story");
+
+    // The palette entries run the same code on the active product and on the ticket in view.
+    cx.dispatch_action(crate::actions::NewTicket);
+    redraw(cx);
+    assert!(prompt_open(cx));
+    leave_prompt(cx);
+    cx.simulate_keystrokes("ctrl-shift-i");
+    redraw(cx);
+    assert_eq!(active_tab(&f, cx), "screen:tickets");
+    // The new Tickets screen has no ticket yet, so a ticket entry says so and sends nothing.
+    let _ = sent(&mut f);
+    cx.dispatch_action(crate::actions::TicketDone);
+    redraw(cx);
+    assert!(call(&sent(&mut f), "ticket.move").is_none());
+    assert!(f.core.read_with(cx, |c, _| {
+        c.notices.iter().any(|n| n.contains("No ticket is in view"))
+    }));
 }

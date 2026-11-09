@@ -88,10 +88,10 @@ The plugin runs `agentsi` commands and reads their JSON. The owner uses the web 
 
 ### MCP tools
 
-`agentsi mcp` keeps the 5 tools with the same names and input schemas: `search`, `get_doc`, `list_minutes`, `pending_decisions` and `role_memory`.
+`agentsi mcp` keeps the 5 tools with the same names and input schemas: `search`, `get_doc`, `list_minutes`, `pending_decisions` and `role_memory`. The tracker adds 4 tools after them: `list_tickets`, `get_ticket`, `add_ticket` and `update_ticket` (`agentsi-desktop-tracker.md`).
 
 - It speaks MCP on stdio and answers `initialize`, `ping`, `tools/list` and `tools/call`, as the TypeScript server does. An argument that breaks the schema gets the message of `zod`.
-- The golden test `mcp-*` runs the same requests against both servers, and compares each answer, the `tools/list` result included. `crates/agentsi-cli/tests/golden/README.md` lists the parts that it removes.
+- The golden test `mcp-*` runs the same requests against both servers, and compares each answer. The `tools/list` result compares only the 5 tools of the TypeScript server. `crates/agentsi-cli/tests/golden/README.md` lists the parts that it removes.
 - `agentsi search` does not exist in the TypeScript CLI, so it is not a new command. The search is the MCP tool `search` and the core method `knowledge.search`.
 
 ### Plugin
@@ -146,7 +146,7 @@ The owner runs these steps, with a worker session as help:
 
 - [ ] Each golden test in `crates/agentsi-cli/tests/golden/` passes: `cargo test -p agentsi-cli --test golden`.
 - [ ] The Rust core runs a meeting on each of the 23 stored snapshots, and each minutes passes `agentsi check`.
-- [ ] `agentsi mcp` lists the 5 tools, with input schemas equal to those of today.
+- [ ] `agentsi mcp` lists the 5 tools, with input schemas equal to those of today, then the 4 tools of the tracker.
 - [ ] The plugin skill `/agentsi` opens the front desk with the Rust CLI on the `PATH`. `plugin/skills/` has only the edits that "Plugin" names: the voice skill and the web text.
 - [ ] `/agentsi:voice on` in a plain Claude Code session turns voice mode on, and the next reply is spoken and saved.
 - [ ] Each web route of the table opens its screen in the app, as the owner sees.
