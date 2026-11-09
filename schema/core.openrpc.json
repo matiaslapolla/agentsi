@@ -2300,6 +2300,34 @@
         ],
         "type": "object"
       },
+      "Manifest": {
+        "description": "The commands that the manifest of the folder proposes for Stories mode.",
+        "properties": {
+          "file": {
+            "description": "`package.json`, `Cargo.toml`, `pyproject.toml` or `composer.json`: the first one found.",
+            "type": "string"
+          },
+          "gate": {
+            "description": "The typecheck and lint commands that the manifest has.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "test": {
+            "description": "A test command with `{files}`. Null when the manifest names no runner that takes files.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "file",
+          "gate"
+        ],
+        "type": "object"
+      },
       "Mark": {
         "description": "The verdict of the owner on one priority.",
         "enum": [
@@ -4682,6 +4710,24 @@
         ],
         "type": "object"
       },
+      "ScanTools": {
+        "description": "The tools of the host that the forms need.",
+        "properties": {
+          "bwrap": {
+            "description": "True when `bwrap` is on the `PATH`. Without it, Stories mode cannot run.",
+            "type": "boolean"
+          },
+          "codebase_memory_mcp": {
+            "description": "True when `codebase-memory-mcp` is on the `PATH`.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "bwrap",
+          "codebase_memory_mcp"
+        ],
+        "type": "object"
+      },
       "Segment": {
         "description": "One segment of the script, with its place in the audio. The names are the keys of `timings.json`.",
         "properties": {
@@ -4728,6 +4774,56 @@
         "required": [
           "session",
           "on"
+        ],
+        "type": "object"
+      },
+      "SetupScanResult": {
+        "properties": {
+          "id": {
+            "description": "The folder name in lowercase, with `-` for each character that an id does not permit.",
+            "type": "string"
+          },
+          "manifest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Manifest"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "description": "The folder name.",
+            "type": "string"
+          },
+          "north_stars": {
+            "description": "The north-star candidates that exist, relative to the folder: `docs/product.md`,\n`docs/vision*` and `ROADMAP*`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "path": {
+            "type": "string"
+          },
+          "registered": {
+            "description": "The product of the registry that holds the folder, as `product.whoami` finds it.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tools": {
+            "$ref": "#/components/schemas/ScanTools"
+          }
+        },
+        "required": [
+          "path",
+          "id",
+          "name",
+          "north_stars",
+          "tools"
         ],
         "type": "object"
       },
@@ -12020,6 +12116,44 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/RegistryResult"
+        }
+      }
+    },
+    {
+      "description": "Reads a product folder for the setup screen: a proposed id and name, the registered product, the commands of the manifest, the north-star docs and the tools on the PATH. It writes nothing and calls no model.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        }
+      ],
+      "name": "setup.scan",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "An existing absolute folder on the host of the core.",
+          "name": "path",
+          "required": true,
+          "schema": {
+            "description": "An existing absolute folder on the host of the core.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SetupScanResult"
         }
       }
     }

@@ -128,3 +128,61 @@ fn register_writes_the_products_row_and_sends_data_changed_of_kind_product() {
     let registry = std::fs::read_to_string(e.root.join("agentsi.config.json")).unwrap();
     assert!(registry.contains("\"id\": \"beta\""), "{registry}");
 }
+
+#[test]
+fn scan_reads_the_id_the_manifest_commands_and_the_north_stars_of_a_folder() {
+    let e = env();
+    let core = start(&e);
+    let mut c = Framed::connect(&core.socket.path);
+    let app = e.dir.0.join("My App");
+    std::fs::create_dir_all(app.join("docs")).unwrap();
+    std::fs::write(
+        app.join("package.json"),
+        r#"{"scripts":{"test":"node --test","typecheck":"tsc","lint":"eslint ."}}"#,
+    )
+    .unwrap();
+    std::fs::write(app.join("pnpm-lock.yaml"), "").unwrap();
+    std::fs::write(app.join("docs/product.md"), "# Product").unwrap();
+    std::fs::write(app.join("docs/vision-2027.md"), "# Vision").unwrap();
+    std::fs::write(app.join("ROADMAP.md"), "# Roadmap").unwrap();
+    std::fs::write(app.join("docs/notes.md"), "# Notes").unwrap();
+
+    let r = c.ok("setup.scan", json!({"path": app.display().to_string()}));
+    assert_eq!(r["id"], "my-app");
+    assert_eq!(r["name"], "My App");
+    assert_eq!(r["registered"], Value::Null);
+    assert_eq!(
+        r["manifest"],
+        json!({"file": "package.json", "test": "pnpm test {files}",
+               "gate": ["pnpm typecheck", "pnpm lint"]})
+    );
+    assert_eq!(
+        r["north_stars"],
+        json!(["ROADMAP.md", "docs/product.md", "docs/vision-2027.md"])
+    );
+    assert!(r["tools"]["bwrap"].is_boolean());
+    let left = std::fs::read_dir(&app).unwrap().count();
+    assert_eq!(left, 4, "the scan writes nothing");
+}
+
+#[test]
+fn scan_finds_a_registered_folder_and_refuses_a_bad_path() {
+    let e = env();
+    let work = e.dir.0.join("alpha");
+    std::fs::create_dir_all(work.join("src")).unwrap();
+    let registry = REGISTRY.replace("/work/alpha", &work.display().to_string());
+    std::fs::write(e.root.join("agentsi.config.json"), registry).unwrap();
+    let core = start(&e);
+    let mut c = Framed::connect(&core.socket.path);
+    let r = c.ok(
+        "setup.scan",
+        json!({"path": work.join("src").display().to_string()}),
+    );
+    assert_eq!(r["registered"], "alpha");
+    assert_eq!(r["manifest"], Value::Null);
+    assert_eq!(r["north_stars"], json!([]));
+    for bad in ["relative/path", "/no/such/folder"] {
+        let r = c.call("setup.scan", json!({"path": bad}));
+        assert_eq!(kind(&r), "invalid", "{bad} gave {r}");
+    }
+}

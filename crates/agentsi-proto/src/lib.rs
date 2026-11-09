@@ -26,6 +26,7 @@ pub mod registry_api;
 pub mod roles_api;
 pub mod rpc;
 pub mod schema;
+pub mod setup_api;
 pub mod socket;
 pub mod story_api;
 pub mod terminal_api;
