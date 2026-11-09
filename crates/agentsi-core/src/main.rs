@@ -120,7 +120,7 @@ async fn run(socket: &SocketPath) -> (ExitCode, Option<server::HeldLock>) {
     let stopped_at = Instant::now();
     // A request in flight gets its grace to answer, while the work stops.
     let (work_ended, ()) = tokio::join!(
-        stop_work(stopped_at),
+        stop_work(&core, stopped_at),
         core.links_ended(server::STOP_GRACE + LINK_FLUSH)
     );
     if !work_ended {
@@ -136,13 +136,18 @@ async fn run(socket: &SocketPath) -> (ExitCode, Option<server::HeldLock>) {
     }
 }
 
-/// Cancels each meeting and story session, and waits for them and for the blocking threads
+/// Cancels each meeting, story session and desk process, and waits for them and for the blocking threads
 /// of the requests, which no cancel reaches. The client links are closed already, so a
 /// client does not wait for this. Returns false when work still runs after `STOP_WAIT`.
-async fn stop_work(stopped_at: Instant) -> bool {
+async fn stop_work(core: &Core, stopped_at: Instant) -> bool {
     meetings::stop_all();
     stories::stop_all();
-    while !(meetings::idle() && stories::idle() && agentsi_core::blocking::running() == 0) {
+    core.desks.stop_all();
+    while !(meetings::idle()
+        && stories::idle()
+        && agentsi_core::desk::idle()
+        && agentsi_core::blocking::running() == 0)
+    {
         if stopped_at.elapsed() >= STOP_WAIT {
             return false;
         }

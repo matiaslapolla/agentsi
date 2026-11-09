@@ -101,6 +101,8 @@ pub struct Core {
     focus: Mutex<Option<String>>,
     /// A dictation runs: the last `voice.dictate` start has no stop yet. `toggle` reads it.
     dictating: AtomicBool,
+    /// The desk session of each product.
+    pub desks: crate::desk::Desks,
     /// The conversation mode that runs, if any.
     pub(crate) converse: Mutex<Option<crate::converse::Active>>,
     /// The prompt of the running turn of each session outside the app that has voice mode on.
@@ -126,6 +128,7 @@ impl Core {
             store: Mutex::default(),
             focus: Mutex::default(),
             dictating: AtomicBool::new(false),
+            desks: crate::desk::Desks::default(),
             converse: Mutex::default(),
             session_prompts: Mutex::default(),
             subscribers: Mutex::default(),

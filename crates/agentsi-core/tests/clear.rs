@@ -10,7 +10,7 @@ use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-const TABLES: [&str; 18] = [
+const TABLES: [&str; 20] = [
     "priorities",
     "usage",
     "documents",
@@ -28,6 +28,8 @@ const TABLES: [&str; 18] = [
     "reflections",
     "archive_records",
     "tickets",
+    "desk_items",
+    "desk_sessions",
     "products",
 ];
 
@@ -71,7 +73,9 @@ fn seed(c: &Connection, p: &str) {
          insert into archive_records values
            ('{p}', 'minutes', '{m1}'), ('{p}', 'story', 'S001'), ('{p}', 'story', 'S003');
          insert into tickets (product, id, kind, state, title, author, updated_by, created_at, updated_at)
-           values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');"
+           values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');
+         insert into desk_sessions values ('{p}', 'u-{p}', 'x');
+         insert into desk_items (product, seq, kind, body, at) values ('{p}', 1, 'owner', '{{}}', 'x');"
     ))
     .unwrap();
 }
@@ -248,6 +252,10 @@ fn each_item_deletes_its_data_and_the_other_product_keeps_every_row_and_file() {
             "{name}: alpha changed"
         );
         assert_eq!(counts(&w.home, "beta"), beta_rows, "{name}: beta rows");
+        if name == "product" {
+            let alpha = counts(&w.home, "alpha");
+            assert_eq!((alpha["desk_sessions"], alpha["desk_items"]), (0, 0));
+        }
         assert_eq!(
             tree(&w.home.join("workspace/beta")),
             beta_files,

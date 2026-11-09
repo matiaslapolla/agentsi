@@ -1,17 +1,20 @@
 //! `agentsi mcp`: the MCP server on stdio, for Claude Code. It serves the 5
 //! tools of `packages/mcp` with the same names and input schemas, then the 4
-//! ticket tools. The server is a small JSON-RPC loop, because the protocol of a
+//! ticket tools. In a desk session (`AGENTSI_DESK_SESSION`), the `show_*` tools
+//! follow, and the tools that write are refused. The server is a small JSON-RPC loop, because the protocol of a
 //! server with tools needs four methods. Each tool asks the core, which owns
 //! the database. A ticket tool writes as the session `{by: "session", id}`.
 //!
 //! The core is joined on the first call that needs data, so `initialize` and
 //! `tools/list` work when no core runs. Stdout holds the protocol only.
 
+mod desk;
 mod format;
 mod tools;
 
 use crate::core::Core;
 use agentsi_proto::agency_api::{ProductWhoami, WhoamiParams};
+use agentsi_proto::desk_session_api::{DeskShow, DeskShowParams};
 use agentsi_proto::knowledge_api::{
     KbGetDocParams, KbPendingParams, KbRecentMinutesParams, KbRoleMemoryParams, KbSearchParams,
     KnowledgeGetDoc, KnowledgePendingDecisions, KnowledgeRecentMinutes, KnowledgeRoleMemory,
@@ -45,6 +48,8 @@ struct Server {
     session: String,
     /// The current tool sent a write request to the core.
     sent: bool,
+    /// The uuid of the desk session, from `AGENTSI_DESK_SESSION`.
+    desk: Option<String>,
 }
 
 /// `AGENTSI_TERMINAL`, else `CLAUDE_CODE_SESSION_ID`, else `unknown`.
@@ -54,6 +59,13 @@ fn session_id(var: impl Fn(&str) -> Option<String>) -> String {
         .filter_map(|k| var(k).map(|v| v.trim().to_string()))
         .find(|v| !v.is_empty())
         .unwrap_or_else(|| "unknown".into())
+}
+
+/// `AGENTSI_DESK_SESSION`, when it holds more than spaces.
+fn desk_session(var: impl Fn(&str) -> Option<String>) -> Option<String> {
+    var("AGENTSI_DESK_SESSION")
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
 }
 
 impl Server {
@@ -262,21 +274,51 @@ impl Server {
         }
     }
 
+    /// A `show_*` tool: sends `desk.show` for the desk session.
+    fn show(&mut self, session: &str, kind: &str, given: &Value) -> Result<String, String> {
+        let args = given.as_object().cloned().unwrap_or_default();
+        let view = desk::view(kind, &args)?;
+        let params = DeskShowParams {
+            session: session.to_string(),
+            view,
+        };
+        self.sent = true;
+        self.core()?.call::<DeskShow>(&params)?;
+        Ok("The view is in the desk conversation.".into())
+    }
+
     fn call_tool(&mut self, params: &Value) -> Value {
         let name = params.get("name").and_then(Value::as_str).unwrap_or("");
         let given = params
             .get("arguments")
             .cloned()
             .unwrap_or_else(|| json!({}));
-        let result = match tools::tool(name) {
-            None => Err(format!("MCP error -32602: Tool {name} not found")),
-            Some(tool) => tool
-                .validate(&given)
-                .and_then(|args| self.run_tool(name, &args)),
+        let desk = self.desk.clone();
+        let show = desk.as_ref().and_then(|_| desk::kind(name));
+        let result = match (tools::tool(name), desk, show) {
+            (_, Some(session), Some(kind)) => self.show(&session, &kind, &given),
+            (Some(tool), Some(_), _) if tool.writes => Err(format!(
+                "The desk session only reads. It cannot run {name}."
+            )),
+            (tool, _, _) => self.base_tool(tool, name, &given),
         };
         match result {
             Ok(text) => json!({"content": [{"type": "text", "text": text}]}),
             Err(text) => json!({"content": [{"type": "text", "text": text}], "isError": true}),
+        }
+    }
+
+    fn base_tool(
+        &mut self,
+        tool: Option<&tools::Tool>,
+        name: &str,
+        given: &Value,
+    ) -> Result<String, String> {
+        match tool {
+            None => Err(format!("MCP error -32602: Tool {name} not found")),
+            Some(tool) => tool
+                .validate(given)
+                .and_then(|args| self.run_tool(name, &args)),
         }
     }
 
@@ -299,7 +341,11 @@ impl Server {
             }
             "ping" => json!({}),
             "tools/list" => {
-                json!({"tools": tools::TOOLS.iter().map(tools::Tool::schema).collect::<Vec<_>>()})
+                let mut list: Vec<Value> = tools::TOOLS.iter().map(tools::Tool::schema).collect();
+                if self.desk.is_some() {
+                    list.extend(desk::tool_schemas());
+                }
+                json!({"tools": list})
             }
             "tools/call" => self.call_tool(&params),
             _ => {
@@ -327,6 +373,7 @@ pub fn run(_argv: &[String]) -> Result<i32, crate::commands::Fail> {
             core: None,
             session: session_id(|k| std::env::var(k).ok()),
             sent: false,
+            desk: desk_session(|k| std::env::var(k).ok()),
         },
     )
     .map_err(|e| e.to_string())?;
@@ -361,6 +408,7 @@ mod tests {
             core: None,
             session: "unknown".into(),
             sent: false,
+            desk: None,
         };
         server
             .handle(&json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}))
@@ -418,6 +466,68 @@ mod tests {
         assert_eq!(ask("resources/list", Value::Null)["error"]["code"], -32601);
     }
 
+    fn desk_server() -> Server {
+        Server {
+            cwd: "/nowhere".into(),
+            core: None,
+            session: "unknown".into(),
+            sent: false,
+            desk: Some("u1".into()),
+        }
+    }
+
+    #[test]
+    fn a_desk_session_lists_the_show_tools_after_the_base_tools_and_refuses_writes() {
+        let mut server = desk_server();
+        let r = server
+            .handle(&json!({"jsonrpc": "2.0", "id": 1, "method": "tools/list"}))
+            .unwrap();
+        let names: Vec<&str> = r["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap())
+            .collect();
+        assert_eq!(names.len(), 10);
+        assert_eq!(names[8..], ["update_ticket", "show_decisions"]);
+        for (name, args) in [
+            ("add_ticket", json!({"kind": "note", "title": "x"})),
+            ("update_ticket", json!({"id": "C001", "state": "done"})),
+        ] {
+            let r = server
+                .handle(&json!({"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                                "params": {"name": name, "arguments": args}}))
+                .unwrap();
+            assert_eq!(r["result"]["isError"], true);
+            assert_eq!(
+                r["result"]["content"][0]["text"],
+                format!("The desk session only reads. It cannot run {name}.")
+            );
+        }
+        let r = server
+            .handle(&json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call",
+                            "params": {"name": "show_decisions", "arguments": {"ids": "x"}}}))
+            .unwrap();
+        assert_eq!(r["result"]["isError"], true);
+        let r = ask(
+            "tools/call",
+            json!({"name": "show_decisions", "arguments": {"ids": [1]}}),
+        );
+        assert_eq!(
+            r["result"]["content"][0]["text"],
+            "MCP error -32602: Tool show_decisions not found"
+        );
+    }
+
+    #[test]
+    fn the_desk_session_comes_from_its_variable_when_it_is_not_blank() {
+        let env =
+            |v: &'static str| move |k: &str| (k == "AGENTSI_DESK_SESSION").then(|| v.to_string());
+        assert_eq!(desk_session(env(" u1 ")).as_deref(), Some("u1"));
+        assert_eq!(desk_session(env("  ")), None);
+        assert_eq!(desk_session(|_| None), None);
+    }
+
     #[test]
     fn the_session_id_is_the_terminal_then_the_claude_session_then_unknown() {
         let env = |pairs: &'static [(&'static str, &'static str)]| {
@@ -472,6 +582,7 @@ mod tests {
                 core: None,
                 session: "unknown".into(),
                 sent: false,
+                desk: None,
             },
         )
         .unwrap();

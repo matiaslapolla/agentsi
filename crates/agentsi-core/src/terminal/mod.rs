@@ -128,6 +128,11 @@ impl Terminals {
         let _ = self.socket.set(path);
     }
 
+    /// The socket of the core, once `serve` set it.
+    pub fn socket(&self) -> Option<PathBuf> {
+        self.socket.get().cloned()
+    }
+
     pub fn get(&self, id: &str) -> Result<Arc<Term>, RpcError> {
         id.strip_prefix('t')
             .and_then(|rest| rest.split_once('-'))

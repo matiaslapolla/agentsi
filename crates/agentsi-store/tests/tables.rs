@@ -49,7 +49,10 @@ macro_rules! table_tests {
             let tables: BTreeSet<&str> = all().map(|t| t.name).collect();
             assert_eq!(tested, tables);
             assert_eq!(TABLES.len(), 17);
-            assert_eq!(LOCAL_TABLES.iter().map(|t| t.name).collect::<Vec<_>>(), ["tickets"]);
+            assert_eq!(
+                LOCAL_TABLES.iter().map(|t| t.name).collect::<Vec<_>>(),
+                ["tickets", "desk_sessions", "desk_items"]
+            );
         }
     };
 }
@@ -73,6 +76,8 @@ table_tests!(
     reflections,
     archive_records,
     tickets,
+    desk_sessions,
+    desk_items,
 );
 
 #[test]
@@ -166,6 +171,9 @@ fn the_checks_of_the_type_map_reject_bad_values() {
         ("tickets", "id", t("S001")),
         ("tickets", "author", t("{not json")),
         ("tickets", "links", t("{not json")),
+        ("desk_items", "kind", t("other")),
+        ("desk_items", "body", t("{not json")),
+        ("desk_items", "sent", Value::Integer(2)),
     ];
     for (name, col, value) in bad {
         let table = table(name).unwrap();
@@ -199,7 +207,7 @@ fn the_store_sets_wal_foreign_keys_and_the_migration_number() {
             ))
         })
         .unwrap();
-    assert_eq!((mode.as_str(), version, fk), ("wal", 2, 1));
+    assert_eq!((mode.as_str(), version, fk), ("wal", 3, 1));
     drop(store);
     // A second open applies nothing and keeps the rows.
     let again = Store::open(&dir.path().join("agentsi.db")).unwrap();
@@ -207,32 +215,34 @@ fn the_store_sets_wal_foreign_keys_and_the_migration_number() {
         again
             .read(|c| Ok(c.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))?))
             .unwrap(),
-        2
+        3
     );
 }
 
 #[test]
-fn a_database_of_the_first_migration_opens_with_the_tracker_migration() {
+fn a_database_of_the_first_migration_opens_with_the_later_migrations() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("agentsi.db");
     {
         let conn = rusqlite::Connection::open(&path).unwrap();
-        conn.execute_batch(agentsi_store::db::MIGRATIONS[0].1).unwrap();
+        conn.execute_batch(agentsi_store::db::MIGRATIONS[0].1)
+            .unwrap();
         conn.pragma_update(None, "user_version", 1).unwrap();
         conn.execute("insert into products (id) values ('p')", [])
             .unwrap();
     }
     let store = Store::open(&path).unwrap();
-    let (version, tickets, products): (i64, i64, i64) = store
+    let (version, tickets, desk, products): (i64, i64, i64, i64) = store
         .read(|c| {
             Ok((
                 c.pragma_query_value(None, "user_version", |r| r.get(0))?,
                 c.query_row("select count(*) from tickets", [], |r| r.get(0))?,
+                c.query_row("select count(*) from desk_items", [], |r| r.get(0))?,
                 c.query_row("select count(*) from products", [], |r| r.get(0))?,
             ))
         })
         .unwrap();
-    assert_eq!((version, tickets, products), (2, 0, 1));
+    assert_eq!((version, tickets, desk, products), (3, 0, 0, 1));
 }
 
 #[test]

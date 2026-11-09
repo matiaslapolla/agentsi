@@ -60,6 +60,7 @@ pub enum Topic {
     Voice,
     Dictation,
     Models,
+    Desk,
 }
 
 impl Topic {

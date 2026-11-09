@@ -105,6 +105,7 @@ pub fn catalog() -> Catalog {
     crate::terminal_api::register(&mut c);
     crate::voice_api::register(&mut c);
     crate::desk_api::register(&mut c);
+    crate::desk_session_api::register(&mut c);
     crate::agency_api::register(&mut c);
     crate::marks_api::register(&mut c);
     crate::knowledge_api::register(&mut c);

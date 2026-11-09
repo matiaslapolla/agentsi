@@ -5,6 +5,7 @@ pub mod backup;
 pub mod blocking;
 pub mod clock;
 pub mod converse;
+pub mod desk;
 pub mod desk_data;
 pub mod dictate;
 pub mod hook;

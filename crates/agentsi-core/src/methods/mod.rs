@@ -9,6 +9,7 @@ mod call;
 mod core_api;
 mod data;
 mod desk;
+mod desk_session;
 mod git;
 mod hosts;
 mod knowledge;
@@ -42,6 +43,7 @@ pub fn router() -> Router {
         .group(voice::register)
         .group(vocabulary::register)
         .group(desk::register)
+        .group(desk_session::register)
         .group(agency::register)
         .group(marks::register)
         .group(knowledge::register)
