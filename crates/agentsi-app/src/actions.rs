@@ -106,6 +106,8 @@ gpui_kit::actions!(
         UpdateIndex,
         /// Opens the form "New decision" on the front desk of the active product.
         NewDecision,
+        /// Puts the focus in the input of the desk conversation of the front desk.
+        AskDesk,
         /// Shows or hides the archived decisions of the front desk.
         ShowArchivedDecisions,
         /// Opens a Claude pane with the action of the decision approved last.
@@ -345,6 +347,7 @@ fn on_writes(cx: &mut App) {
     cx.on_action(|_: &ArchiveDecision, cx| desk(cx, |s, cx| s.archive_selected(cx)));
     cx.on_action(|_: &UpdateIndex, cx| desk(cx, |s, cx| s.update_index(cx)));
     cx.on_action(|_: &NewDecision, cx| desk(cx, |s, cx| s.new_decision(cx)));
+    cx.on_action(|_: &AskDesk, cx| desk(cx, |s, cx| s.ask(cx)));
     cx.on_action(|_: &ShowArchivedDecisions, cx| desk(cx, |s, cx| s.toggle_archived(cx)));
     cx.on_action(|_: &RunApprovedInClaude, cx| desk(cx, |s, cx| s.run_in_claude(cx)));
     cx.on_action(|_: &AcceptPriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Accepted, cx)));
@@ -1025,6 +1028,12 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(NewDecision),
     },
     Entry {
+        label: "Ask the front desk",
+        icon: IconName::Bot,
+        keywords: &["ask", "claude", "conversation", "chat", "desk", "question"],
+        action: || Box::new(AskDesk),
+    },
+    Entry {
         label: "Show the archived decisions",
         icon: IconName::Folder,
         keywords: &["archive", "restore", "decisions"],
@@ -1102,6 +1111,7 @@ mod tests {
             "Ask one role of the active product",
             "Update the index of the active product",
             "New decision for the active product",
+            "Ask the front desk",
             "Show the archived decisions",
             "Run the action of the approved decision in Claude",
             "Check the health of the tools",

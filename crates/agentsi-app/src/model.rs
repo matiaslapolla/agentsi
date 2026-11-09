@@ -174,6 +174,13 @@ pub enum CoreEvent {
 
 impl EventEmitter<CoreEvent> for CoreState {}
 
+/// A `desk.*`, `data.changed` or `lagged` notification, for the desk conversations of this
+/// core. Each conversation keeps the events of its own product.
+#[derive(Debug, Clone)]
+pub struct DeskNotice(pub Notification);
+
+impl EventEmitter<DeskNotice> for CoreState {}
+
 pub struct CoreState {
     /// The link of this core. A core of an SSH host gets a new link at each connection, so
     /// read it at each call.
@@ -498,7 +505,14 @@ pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp)
     if decisions && let Some(product) = n.params.get("product").and_then(|p| p.as_str()) {
         read_desk(core, product, cx);
     }
+    let desk = n.method.starts_with("desk.");
     let refresh = core.update(cx, |s, cx| {
+        if desk || n.method == DataChanged::NAME || n.method == Lagged::NAME {
+            cx.emit(DeskNotice(n.clone()));
+        }
+        if desk {
+            return None;
+        }
         if (meeting || n.method == Lagged::NAME)
             && let Some(feed) = &s.meetings
         {

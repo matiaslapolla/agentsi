@@ -58,6 +58,8 @@ These 17 tables keep their names, columns and primary keys: `products`, `documen
 
 A local table is a table that Postgres never had. The tracker adds `tickets` and its index `tickets_product_state_idx` (`agentsi-desktop-tracker.md`). `schema::LOCAL_TABLES` lists it. The import reads only the 17 tables, and `read::counts`, the restore drill and the schema tests read both lists.
 
+The desk conversation adds two more local tables (`agentsi-desktop-conversation.md`): `desk_sessions (product, session, created_at)` holds the Claude session id of one product, and `desk_items (product, seq, kind, body, sent, at)` holds the items of its desk conversation. `body` is JSON. `sent` is 0 for a desk note that no owner message carried yet.
+
 ### Search
 
 - `documents.tsv` becomes an FTS5 table `documents_fts(title, body)` with `content='documents'`. Three triggers keep it current.
@@ -96,7 +98,7 @@ The import without `--fresh` only inserts. Thus it does not copy a later change 
 
 ## Acceptance criteria
 
-- [ ] `cargo test -p agentsi-store` passes, with one test for each of the 17 tables and each local table that writes and reads one row.
+- [ ] `cargo test -p agentsi-store` passes, with one test for each of the 17 tables and each local table (`tickets`, `desk_sessions`, `desk_items`) that writes and reads one row.
 - [ ] `sqlite3 agentsi.db .schema` lists the 17 tables, the local tables, `documents_fts` and each b-tree index of the Postgres schema.
 - [ ] `agentsi-core import-postgres postgres://…` on the owner's database prints `ok` for each table and stops with exit code 0.
 - [ ] After the import, `select id from decisions` gives the same ids on both sides.

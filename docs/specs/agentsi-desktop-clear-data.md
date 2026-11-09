@@ -27,7 +27,7 @@ A "Data" section in the settings screen lets the owner select what to delete, se
 
 | Item | Scope | What goes |
 |---|---|---|
-| Product | one product | each row of the 17 tables and of the local tables (`tickets`) with that product, its `workspace/<product>/` folder, its registry entry |
+| Product | one product | each row of the 17 tables and of the local tables (`tickets`, `desk_sessions`, `desk_items`) with that product, its `workspace/<product>/` folder, its registry entry |
 | Meetings | one product, all or older than a date | minutes, their priorities, decisions, usage, snapshots, listens, meeting log lines, minutes documents, archive records, call folders |
 | Stories | one product, done or rejected only | stories, story logs, their archive records. Worktrees and branches stay |
 | Role learning | one product | memory, agent overlays, briefs, reflections. This is the existing `roles.reset` with memory |

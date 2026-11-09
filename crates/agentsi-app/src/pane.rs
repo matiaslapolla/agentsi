@@ -278,7 +278,7 @@ impl TerminalPanel {
             cx.subscribe_in(&pane, window, |this, _, event, window, cx| {
                 this.on_pane(event, window, cx)
             }),
-            cx.subscribe_in(&core, window, |this, _, event, window, cx| {
+            cx.subscribe_in(&core, window, |this, _, event: &CoreEvent, window, cx| {
                 if *event == CoreEvent::Up && matches!(this.stream, Stream::Lost) {
                     this.attach(window, cx);
                     this.read_voice(cx);

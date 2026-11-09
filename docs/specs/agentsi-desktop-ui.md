@@ -95,6 +95,15 @@ A bench run is valid only when no input and no change of focus reach the window 
 
 #### Front desk and minutes (U13)
 
+The front desk has two columns. The left column is the state of the product. The right column, 380 px wide, is the desk conversation (`screens/desk_conversation.rs`, `agentsi-desktop-conversation.md`). It draws the items of `desk.history` and the events of the topic `desk`:
+
+- A reply streams into a Markdown view, and the `reply` item then replaces the streamed text. A tool use and a desk note are one muted line. An `end` item with an error and an `error` item are failure lines.
+- The decisions view reads the stored decisions with `decision.get` and reads them again on `data.changed` of kind `decision` or `minutes`. Approve and Reject ask a Confirm in the card, then call `decision.decide`. The card then shows the stored status. The owner sends no new message.
+- The input is off while the state is `starting` or `working`. "Stop" calls `desk.stop`. "New conversation" asks a Confirm, then calls `desk.reset`.
+- The state `auth` replaces the input with the message of the core and a "Check again" button, which calls `desk.auth {recheck: true}`. The state `failed` shows its message above the input.
+- When the input has the focus, the letter keys of the front desk do nothing. The palette entry "Ask the front desk" focuses the input.
+- The idle conversation draws 0 frames. It has no animation of its own.
+
 - The front desk reads `product.desk` and shows, from top to bottom: the name, the id, the status and the roles of the product, a row of figures, the pending decisions, the objectives of the brief, the usage, the last 3 minutes with a button to the list, and the index line. A pending decision shows its text, its why, its action, the command `agentsi decide <id>` and a button to its minutes. U20 adds the decide buttons (below).
 - The minutes list reads `minutes.list` and draws a virtual list. A row shows the question, the id, the date, the marks (`3/5 marked`), `heard` and the status. A click or `Enter` opens the minutes.
 - One minutes reads `minutes.get` and shows the id, the status, the check result, the question, four figures and five tabs: Priorities (with marks, objective, sources), Disagreements, Decisions (with their status), Roles (answer, concerns, notes) and Usage. An empty Disagreements or Roles tab is left out.
