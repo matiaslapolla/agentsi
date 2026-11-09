@@ -373,7 +373,7 @@ impl Shell {
                         host: r.host,
                         id: r.product,
                     };
-                    this.open_terminal_in(Some(product), vec!["claude".into(), r.text], window, cx)
+                    this.open_terminal_in(Some(product), vec!["claude".into(), crate::nav::claude_prompt(&r.text)], window, cx)
                 });
             }
         })

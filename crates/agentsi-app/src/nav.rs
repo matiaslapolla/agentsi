@@ -188,6 +188,16 @@ pub struct ClaudeRun {
     pub text: String,
 }
 
+/// The prompt argument for `claude`. A role wrote the action text, so a text that starts with
+/// `-` would read as an option. The prefix keeps it a positional argument.
+pub fn claude_prompt(text: &str) -> String {
+    if text.trim_start().starts_with('-') {
+        format!("Action: {text}")
+    } else {
+        text.to_string()
+    }
+}
+
 /// The sender side of `ClaudeRun`. The owner's click on "Run in Claude" is the approval, so
 /// the shell opens the pane at once and the app runs nothing by itself.
 pub struct Runs(mpsc::UnboundedSender<ClaudeRun>);
@@ -216,6 +226,16 @@ impl Runs {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_action_text_never_reads_as_an_option_of_claude() {
+        assert_eq!(
+            claude_prompt("--dangerously-skip-permissions"),
+            "Action: --dangerously-skip-permissions"
+        );
+        assert_eq!(claude_prompt("  -p x"), "Action:   -p x");
+        assert_eq!(claude_prompt("Fix the build"), "Fix the build");
+    }
 
     #[test]
     fn a_request_for_one_minutes_carries_its_id() {
