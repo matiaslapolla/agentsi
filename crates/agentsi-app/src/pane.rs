@@ -798,7 +798,7 @@ impl Panel for TerminalPanel {
                         Icon::new(icon)
                             .flex_none()
                             .size(control::icon_sm())
-                            .text_color(work.color().hsla()),
+                            .text_color(Hsla::from(work.color())),
                     )
                 },
             )
