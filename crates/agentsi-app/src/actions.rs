@@ -92,6 +92,10 @@ gpui_kit::actions!(
         OpenGuide,
         /// Opens the section "Install and start" of the guide in the browser.
         OpenGuideStart,
+        /// Shows the context of the next meeting of the active product.
+        ShowMeetingContext,
+        /// Opens the meeting of the active product at the field "Ask one role".
+        AskMeetingRole,
         /// Updates the knowledge index of the active product from the front desk.
         UpdateIndex,
         /// Opens the form "New decision" on the front desk of the active product.
@@ -925,6 +929,18 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(OpenDataSettings),
     },
     Entry {
+        label: "Show the context of the next meeting",
+        icon: IconName::FileText,
+        keywords: &["snapshot", "context", "meeting"],
+        action: || Box::new(ShowMeetingContext),
+    },
+    Entry {
+        label: "Ask one role of the active product",
+        icon: IconName::Bot,
+        keywords: &["ask", "role", "question", "meeting"],
+        action: || Box::new(AskMeetingRole),
+    },
+    Entry {
         label: "Update the index of the active product",
         icon: IconName::Folder,
         keywords: &["index", "knowledge", "repos", "refresh"],
@@ -1010,6 +1026,8 @@ mod tests {
             "Open the settings",
             "Talk to this pane",
             "Delete data: open the Data section of the settings",
+            "Show the context of the next meeting",
+            "Ask one role of the active product",
             "Update the index of the active product",
             "New decision for the active product",
             "Show the archived decisions",

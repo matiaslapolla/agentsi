@@ -10,15 +10,19 @@ use std::collections::{HashMap, VecDeque};
 
 use agentsi_proto::call_api::{CallGet, CallGetParams, CallGetResult};
 use agentsi_proto::events::{Lagged, MeetingEvent};
+use agentsi_proto::agency_api::{DataSnapshot, SnapshotParams};
 use agentsi_proto::meeting_api::{
-    MeetingCancel, MeetingCancelParams, MeetingProgress, MeetingProgressParams, MeetingStart,
+    MeetingAsk, MeetingAskParams, MeetingAskResult, MeetingCancel, MeetingCancelParams, MeetingProgress, MeetingProgressParams, MeetingStart,
     MeetingStartParams, MeetingStartResult,
 };
+use agentsi_proto::roles_api::{RolesList, RolesListParams};
 use agentsi_proto::rpc::Notification;
 use agentsi_ui::components::{Button, Tag, status_tag};
 use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{Status, control, font, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::IconName;
+use gpui_kit::component::Disableable as _;
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -428,6 +432,19 @@ pub struct MeetingScreen {
     call: Option<(String, CallInfo)>,
     /// The minutes whose call is being read.
     asking: Option<String>,
+    /// The agents of the roster and whether each attends. `pm` always attends.
+    roster: Vec<(String, bool)>,
+    /// The question field of "Ask one role", and the role it asks.
+    ask_input: Option<Entity<InputState>>,
+    ask_role: usize,
+    /// The owner clicked "Ask" and the screen waits for the Confirm.
+    ask_confirm: bool,
+    /// A `meeting.ask` runs.
+    ask_running: bool,
+    /// The answer of the last `meeting.ask`, or its error.
+    answer: Option<(String, Result<String, String>)>,
+    /// The Markdown of `data.snapshot`, while the panel shows.
+    context: Option<Result<String, String>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -454,14 +471,129 @@ impl MeetingScreen {
             scrolls: HashMap::new(),
             call: None,
             asking: None,
+            roster: Vec::new(),
+            ask_input: None,
+            ask_role: 0,
+            ask_confirm: false,
+            ask_running: false,
+            answer: None,
+            context: None,
             _subscriptions: subscriptions,
         };
+        screen.load_roster(cx);
         screen.check_call(cx);
         screen
     }
 
     pub fn focus_handle(&self) -> FocusHandle {
         self.focus.clone()
+    }
+
+    fn load_roster(&mut self, cx: &mut Context<Self>) {
+        let call = self.core.read(cx).link.call::<RolesList>(&RolesListParams {
+            product: self.product.clone(),
+            agent: None,
+        });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.roster_loaded(result, cx));
+        })
+        .detach();
+    }
+
+    pub(super) fn roster_loaded(
+        &mut self,
+        result: Result<agentsi_proto::roles_api::RolesListResult, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Ok(r) = result {
+            let old = std::mem::take(&mut self.roster);
+            self.roster = r
+                .roster
+                .unwrap_or_default()
+                .into_iter()
+                .map(|e| {
+                    let on = old.iter().find(|(id, _)| *id == e.id).is_none_or(|(_, on)| *on);
+                    (e.id, on)
+                })
+                .collect();
+            self.ask_role = self.ask_role.min(self.roster.len().saturating_sub(1));
+            cx.notify();
+        }
+    }
+
+    fn toggle_attendee(&mut self, i: usize, on: bool, cx: &mut Context<Self>) {
+        // The PM writes the synthesis, so the PM always attends.
+        if let Some((id, attends)) = self.roster.get_mut(i)
+            && id != "pm"
+        {
+            *attends = on;
+            cx.notify();
+        }
+    }
+
+    /// `meeting.ask`: the first click asks for the Confirm, the second one asks the role.
+    pub fn ask_role(&mut self, cx: &mut Context<Self>) {
+        let Some(input) = &self.ask_input else {
+            return;
+        };
+        let question = input.read(cx).value().trim().to_string();
+        if question.is_empty() || self.ask_running || self.roster.is_empty() {
+            return;
+        }
+        if !self.ask_confirm {
+            self.ask_confirm = true;
+            cx.notify();
+            return;
+        }
+        self.ask_confirm = false;
+        let role = self.roster[self.ask_role.min(self.roster.len() - 1)].0.clone();
+        let call = self.core.read(cx).link.call::<MeetingAsk>(&MeetingAskParams {
+            product: self.product.clone(),
+            scope: None,
+            role: role.clone(),
+            question,
+            meeting: None,
+        });
+        self.ask_running = true;
+        self.answer = None;
+        cx.notify();
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.asked(role, result, cx));
+        })
+        .detach();
+    }
+
+    pub(super) fn asked(
+        &mut self,
+        role: String,
+        result: Result<MeetingAskResult, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        self.ask_running = false;
+        self.answer = Some((role, result.map(|r| r.answer).map_err(|e| e.to_string())));
+        cx.notify();
+    }
+
+    /// `data.snapshot`: shows the context of the next meeting.
+    pub fn show_context(&mut self, cx: &mut Context<Self>) {
+        if self.context.take().is_some() {
+            cx.notify();
+            return;
+        }
+        let call = self.core.read(cx).link.call::<DataSnapshot>(&SnapshotParams {
+            product: self.product.clone(),
+            scope: None,
+        });
+        cx.spawn(async move |this, cx| {
+            let result = call.await.map(|r| r.markdown).map_err(|e| e.to_string());
+            let _ = this.update(cx, |this, cx| {
+                this.context = Some(result);
+                cx.notify();
+            });
+        })
+        .detach();
     }
 
     /// The minutes of the meeting on screen, once it is done.
@@ -544,6 +676,47 @@ impl MeetingScreen {
         input
     }
 
+    /// The checked agents, or none when each agent attends: the roster of the product then holds.
+    fn attendees(&self) -> Option<Vec<String>> {
+        if self.roster.iter().all(|(_, on)| *on) {
+            return None;
+        }
+        Some(
+            self.roster
+                .iter()
+                .filter(|(_, on)| *on)
+                .map(|(id, _)| id.clone())
+                .collect(),
+        )
+    }
+
+    /// Moves the focus to the question field of "Ask one role".
+    pub fn focus_ask(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.ask_field(window, cx);
+        if let Some(input) = &self.ask_input {
+            let focus = input.focus_handle(cx);
+            window.defer(cx, move |window, cx| window.focus(&focus, cx));
+        }
+    }
+
+    fn ask_field(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.ask_input.is_some() {
+            return;
+        }
+        let input =
+            cx.new(|cx| InputState::new(window, cx).placeholder("Ask one role a question"));
+        self._subscriptions
+            .push(cx.subscribe(&input, |this, _, e: &InputEvent, cx| match e {
+                InputEvent::PressEnter { .. } => this.ask_role(cx),
+                InputEvent::Change => {
+                    this.ask_confirm = false;
+                    cx.notify();
+                }
+                _ => {}
+            }));
+        self.ask_input = Some(input);
+    }
+
     pub fn start(&mut self, cx: &mut Context<Self>) {
         let Some(input) = &self.input else {
             return;
@@ -566,6 +739,7 @@ impl MeetingScreen {
                 product: self.product.clone(),
                 question,
                 meeting: Some(name.clone()),
+                roles: self.attendees(),
                 ..MeetingStartParams::default()
             });
         self.starting = Some(name.clone());
@@ -723,6 +897,124 @@ impl MeetingScreen {
             .when_some(self.message.clone(), |el, m| {
                 el.child(div().text_size(size::sm()).text_color(text::secondary()).child(m))
             })
+            .child(self.attendees_row(cx))
+            .child(self.ask_row(cx))
+            .child(
+                div().child(
+                    Button::new("meeting-context")
+                        .ghost()
+                        .small()
+                        .label(if self.context.is_some() { "Hide the context" } else { "Show the context" })
+                        .on_click(cx.listener(|this, _, _, cx| this.show_context(cx))),
+                ),
+            )
+            .when_some(self.context.clone(), |el, c| el.child(self.panel("meeting-context-panel", c)))
+            .when_some(self.answer.clone(), |el, (role, a)| {
+                el.child(self.panel("meeting-answer", a.map(|a| format!("{role}: {a}"))))
+            })
+    }
+
+    fn attendees_row(&self, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex()
+            .flex_wrap()
+            .items_center()
+            .gap(space(3))
+            .child(
+                div()
+                    .text_size(size::sm())
+                    .text_color(text::secondary())
+                    .child("Roles that attend"),
+            )
+            .children(self.roster.iter().enumerate().map(|(i, (id, on))| {
+                let pm = id == "pm";
+                Checkbox::new(("meeting-attends", i))
+                    .label(super::parts::role_label(id))
+                    .checked(*on)
+                    .disabled(pm)
+                    .on_click(cx.listener(move |this, c: &bool, _, cx| {
+                        this.toggle_attendee(i, *c, cx)
+                    }))
+            }))
+    }
+
+    fn ask_row(&self, cx: &mut Context<Self>) -> Div {
+        let Some(input) = &self.ask_input else {
+            return div();
+        };
+        div()
+            .flex()
+            .flex_col()
+            .gap(space(2))
+            .child(
+                div()
+                    .flex()
+                    .flex_wrap()
+                    .items_center()
+                    .gap(space(2))
+                    .child(
+                        div()
+                            .text_size(size::sm())
+                            .text_color(text::secondary())
+                            .child("Ask one role"),
+                    )
+                    .children(self.roster.iter().enumerate().map(|(i, (id, _))| {
+                        let b = Button::new(("meeting-ask-role", i))
+                            .small()
+                            .label(super::parts::role_label(id))
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.ask_role = i;
+                                this.ask_confirm = false;
+                                cx.notify();
+                            }));
+                        if i == self.ask_role { b.primary() } else { b.secondary() }
+                    })),
+            )
+            .child(
+                div()
+                    .flex()
+                    .items_center()
+                    .gap(space(2))
+                    .child(div().flex_1().min_w_0().child(Input::new(input)))
+                    .child(
+                        Button::new("meeting-ask")
+                            .secondary()
+                            .small()
+                            .label(if self.ask_confirm { "Confirm" } else { "Ask" })
+                            .disabled(self.ask_running)
+                            .on_click(cx.listener(|this, _, _, cx| this.ask_role(cx))),
+                    ),
+            )
+            .when(self.ask_confirm, |el| {
+                el.child(
+                    div()
+                        .text_size(size::sm())
+                        .text_color(Status::Warn.color())
+                        .child("This is one Claude call. It costs money. Click Confirm to ask."),
+                )
+            })
+    }
+
+    /// A bordered text panel that scrolls: the context or the answer of one role.
+    fn panel(&self, id: &'static str, body: Result<String, String>) -> Stateful<Div> {
+        let (text_color, body) = match body {
+            Ok(b) => (text::primary(), b),
+            Err(e) => (Status::Danger.color(), e),
+        };
+        div()
+            .id(id)
+            .debug_selector(move || id.to_string())
+            .max_h(space(80))
+            .overflow_y_scroll()
+            .p(space(3))
+            .rounded(radius::md())
+            .border_1()
+            .border_color(line::border())
+            .bg(surface::raised())
+            .font_family(font::MONO)
+            .text_size(size::xs())
+            .text_color(text_color)
+            .child(body)
     }
 
     fn pane(&mut self, pane: &Pane, i: usize) -> Stateful<Div> {
@@ -819,6 +1111,7 @@ impl Render for MeetingScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let run = self.live(cx).cloned();
         let input = self.input(window, cx);
+        self.ask_field(window, cx);
         let running = run.as_ref().is_some_and(LiveMeeting::running);
         if running {
             // The form hides while a meeting runs. A focused field that is not drawn takes every
@@ -894,7 +1187,7 @@ mod tests {
     use agentsi_proto::Event as _;
     use agentsi_proto::call_api::CallGetResult;
     use agentsi_proto::events::MeetingEventParams;
-    use agentsi_proto::meeting_api::MeetingStartResult;
+    use agentsi_proto::meeting_api::{MeetingAskResult, MeetingStartResult};
     use agentsi_proto::rpc::V2;
     use gpui::{AppContext as _, Entity, Focusable as _, TestAppContext, VisualTestContext};
     use serde_json::json;
@@ -954,6 +1247,8 @@ mod tests {
         let (screen, cx) =
             cx.add_window_view(|_, cx| MeetingScreen::new("alpha".into(), for_view, cx));
         cx.update(|window, cx| window.draw(cx).clear(cx));
+        let mut fake = fake;
+        assert_eq!(fake.request()["method"], "roles.list");
         Ui {
             screen,
             core,
@@ -1231,7 +1526,7 @@ mod tests {
             input.update(cx, |i, cx| i.set_value("What next?", window, cx));
             s.start(cx);
         });
-        assert_eq!(methods(&mut t.studio), ["meeting.start"]);
+        assert_eq!(methods(&mut t.studio), ["roles.list", "meeting.start"]);
         assert_eq!(methods(&mut t.local), Vec::<String>::new());
     }
 
@@ -1417,5 +1712,89 @@ mod tests {
         let run = m.live("alpha").unwrap();
         assert!(!run.running());
         assert!(matches!(run.panes[0].state, PaneState::Failed(_)));
+    }
+
+    fn roster_of(ids: &[&str]) -> agentsi_proto::roles_api::RolesListResult {
+        let roster: Vec<_> = ids
+            .iter()
+            .map(|id| json!({"id": id, "role": null, "source": null, "model": null,
+                             "effort": null, "error": null}))
+            .collect();
+        serde_json::from_value(json!({"product": "alpha", "roster": roster, "overlays": [],
+                                      "globals": [], "warnings": []}))
+        .unwrap()
+    }
+
+    #[gpui::test]
+    fn the_checked_roles_go_to_the_start_and_the_pm_stays_on(cx: &mut TestAppContext) {
+        let mut ui = ui(cx);
+        ui.screen
+            .update(ui.cx, |s, cx| s.roster_loaded(Ok(roster_of(&["pm", "dev", "qa"])), cx));
+        ui.screen.update(ui.cx, |s, cx| {
+            s.toggle_attendee(0, false, cx);
+            s.toggle_attendee(1, false, cx);
+        });
+        ui.ask("Why?");
+        let req = ui.fake.request();
+        assert_eq!(req["params"]["roles"], json!(["pm", "qa"]));
+    }
+
+    #[gpui::test]
+    fn ask_one_role_waits_for_one_confirm_then_sends_the_call(cx: &mut TestAppContext) {
+        let mut ui = ui(cx);
+        ui.screen
+            .update(ui.cx, |s, cx| s.roster_loaded(Ok(roster_of(&["pm", "dev"])), cx));
+        ui.cx.update(|window, cx| window.draw(cx).clear(cx));
+        ui.screen.update_in(ui.cx, |s, window, cx| {
+            s.ask_role = 1;
+            let input = s.ask_input.clone().unwrap();
+            input.update(cx, |i, cx| i.set_value("Is it safe?", window, cx));
+            s.ask_role(cx);
+        });
+        assert!(ui.screen.read_with(ui.cx, |s, _| s.ask_confirm));
+        ui.fake.0.set_nonblocking(true).unwrap();
+        assert!(
+            agentsi_proto::frame::read_frame(&mut ui.fake.0).ok().flatten().is_none(),
+            "nothing is sent before the Confirm"
+        );
+        ui.fake.0.set_nonblocking(false).unwrap();
+        ui.screen.update(ui.cx, |s, cx| s.ask_role(cx));
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "meeting.ask");
+        assert_eq!(req["params"]["role"], "dev");
+        assert_eq!(req["params"]["question"], "Is it safe?");
+        let reply = MeetingAskResult {
+            answer: "Yes.".into(),
+            usage: agentsi_proto::story_api::StoryUsage {
+                role: "dev".into(),
+                model: "m".into(),
+                input_tokens: 0,
+                output_tokens: 0,
+                cache_read: 0,
+                cache_write: 0,
+                cost_usd: 0.0,
+                duration_ms: 0,
+            },
+            warnings: Vec::new(),
+        };
+        ui.screen
+            .update(ui.cx, |s, cx| s.asked("dev".into(), Ok(reply), cx));
+        ui.cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert!(ui.cx.debug_bounds("meeting-answer").is_some());
+    }
+
+    #[gpui::test]
+    fn show_the_context_calls_data_snapshot_and_shows_the_markdown(cx: &mut TestAppContext) {
+        let mut ui = ui(cx);
+        ui.screen.update(ui.cx, |s, cx| s.show_context(cx));
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "data.snapshot");
+        assert_eq!(req["params"]["product"], "alpha");
+        ui.screen.update(ui.cx, |s, cx| {
+            s.context = Some(Ok("# Context".into()));
+            cx.notify();
+        });
+        ui.cx.update(|window, cx| window.draw(cx).clear(cx));
+        assert!(ui.cx.debug_bounds("meeting-context-panel").is_some());
     }
 }

@@ -766,6 +766,24 @@ impl Shell {
         }
     }
 
+    /// Runs `f` on the meeting screen of the active product.
+    fn on_active_meeting(
+        &self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        f: impl Fn(&mut ScreenPanel, &mut Window, &mut Context<ScreenPanel>),
+    ) {
+        let Some(p) = self.core.read(cx).active.clone() else {
+            return;
+        };
+        let spec = ScreenSpec::meeting(&p.id).on(p.host);
+        for panel in self.open_screens(cx) {
+            if panel.read(cx).is(&spec) {
+                panel.update(cx, |p, cx| f(p, window, cx));
+            }
+        }
+    }
+
     fn open_screens(&self, cx: &App) -> Vec<Entity<ScreenPanel>> {
         self.open
             .borrow()
@@ -1455,6 +1473,14 @@ impl Render for Shell {
                         p.update(cx, |p, cx| p.reveal_data(None, cx));
                     }
                 }
+            }))
+            .on_action(cx.listener(|this, _: &actions::ShowMeetingContext, window, cx| {
+                this.show_active(ScreenSpec::meeting, window, cx);
+                this.on_active_meeting(window, cx, |p, _, cx| p.meeting_context(cx));
+            }))
+            .on_action(cx.listener(|this, _: &actions::AskMeetingRole, window, cx| {
+                this.show_active(ScreenSpec::meeting, window, cx);
+                this.on_active_meeting(window, cx, |p, window, cx| p.meeting_ask(window, cx));
             }))
             .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
                 this.show_screen(ScreenSpec::settings(), window, cx);

@@ -448,6 +448,20 @@ impl ScreenPanel {
         }
     }
 
+    /// Shows or hides the context of the next meeting on a meeting screen.
+    pub fn meeting_context(&self, cx: &mut App) {
+        if let ScreenView::Meeting(v) = &self.view {
+            v.update(cx, |s, cx| s.show_context(cx));
+        }
+    }
+
+    /// Puts the focus in the "Ask one role" field of a meeting screen.
+    pub fn meeting_ask(&self, window: &mut Window, cx: &mut App) {
+        if let ScreenView::Meeting(v) = &self.view {
+            v.update(cx, |s, cx| s.focus_ask(window, cx));
+        }
+    }
+
     /// Starts a review action on a story screen: `accept` and `reject` show their Confirm.
     pub fn story_act(&self, action: &str, cx: &mut App) {
         if let ScreenView::Story(v) = &self.view {
