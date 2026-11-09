@@ -8,12 +8,13 @@ use std::time::{Duration, Instant};
 
 use agentsi_ui::bench::Bench;
 use agentsi_ui::components::{
-    AttentionMarker, Button, Card, Force, GroupHeader, ItemRow, ListRow, ProductRow, StatusDot,
-    Switch, TabChip, key_hint, neutral_tag, running_chip, status_tag,
+    Button, Card, Force, GroupHeader, ItemRow, ListRow, ProductRow, StateMark, StatusDot, Switch,
+    TabChip, key_hint, neutral_tag, running_chip, status_tag,
 };
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{
-    self, Color, Status, accent, control, font, line, radius, size, space, surface, text, weight,
+    self, Color, Status, WorkState, accent, control, font, line, radius, size, space, surface,
+    text, weight,
 };
 use gpui_kit::component::IconName;
 use gpui_kit::component::input::{Input, InputState};
@@ -410,8 +411,12 @@ impl StatesPanel {
                                         .child("macbook · device off"),
                                 ),
                         )
-                        .child(AttentionMarker::new("Claude asks for a permission"))
-                        .child(AttentionMarker::new("").compact())
+                        .child(
+                            StateMark::new(WorkState::Blocked)
+                                .reason("Claude asks for a permission"),
+                        )
+                        .child(StateMark::new(WorkState::Blocked).compact())
+                        .children(WorkState::ALL.into_iter().skip(1).map(StateMark::new))
                         .child(key_hint("ctrl-k")),
                 ),
         )

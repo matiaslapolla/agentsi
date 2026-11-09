@@ -13,8 +13,11 @@ use super::{
     ClickHandler, Force, Look, fade, focus_ring, look, neutral_tag, use_interaction, wire,
 };
 use crate::components::label_tag;
+use crate::style::StyleExt as _;
 use crate::tokens::label::Hue;
-use crate::tokens::{accent, control, radius, size, space, state, surface, text, weight};
+use crate::tokens::{
+    WorkState, accent, control, radius, size, space, state, surface, text, weight,
+};
 
 /// A change to the element of a row, for example drag and drop. The sidebar knows its
 /// products, so it adds the handlers here and the component stays free of them.
@@ -69,6 +72,7 @@ pub struct ProductRow {
     trailing: Option<AnyElement>,
     selected: bool,
     focused: bool,
+    work: Option<WorkState>,
     on_click: Option<ClickHandler>,
     on_toggle: Option<ClickHandler>,
 }
@@ -87,6 +91,7 @@ impl ProductRow {
             trailing: None,
             selected: false,
             focused: false,
+            work: None,
             on_click: None,
             on_toggle: None,
         }
@@ -128,6 +133,11 @@ impl ProductRow {
     /// The keyboard cursor of the sidebar is on this row.
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+    /// The work state of the row. Blocked, Failed and Review make the row glow.
+    pub fn state(mut self, work: Option<WorkState>) -> Self {
+        self.work = work;
         self
     }
     pub fn on_click(mut self, f: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
@@ -267,6 +277,7 @@ impl RenderOnce for ProductRow {
                         .child(t),
                 )
             });
+        let el = el.glow(format!("{selector}:glow"), self.work);
         let el = match self.decorate {
             Some(f) => f(el),
             None => el,
@@ -288,6 +299,7 @@ pub struct ItemRow {
     tooltip: Option<SharedString>,
     selected: bool,
     focused: bool,
+    work: Option<WorkState>,
     on_click: Option<ClickHandler>,
 }
 
@@ -304,6 +316,7 @@ impl ItemRow {
             tooltip: None,
             selected: false,
             focused: false,
+            work: None,
             on_click: None,
         }
     }
@@ -341,6 +354,11 @@ impl ItemRow {
     }
     pub fn focused(mut self, focused: bool) -> Self {
         self.focused = focused;
+        self
+    }
+    /// The work state of the row. Blocked, Failed and Review make the row glow.
+    pub fn state(mut self, work: Option<WorkState>) -> Self {
+        self.work = work;
         self
     }
     pub fn on_click(mut self, f: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
@@ -406,6 +424,7 @@ impl RenderOnce for ItemRow {
             .when_some(tooltip, |el, t| {
                 el.tooltip(move |window, cx| Tooltip::new(t.clone()).build(window, cx))
             });
+        let el = el.glow(format!("{selector}:glow"), self.work);
         let el = match self.decorate {
             Some(f) => f(el),
             None => el,

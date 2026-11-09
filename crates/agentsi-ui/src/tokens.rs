@@ -370,6 +370,92 @@ impl Status {
     }
 }
 
+/// The one state that the app shows for a pane, a meeting role, a story session or an agent.
+/// `rank()` keeps the order of the state map: when two states apply, the lower rank wins.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum WorkState {
+    Blocked,
+    Failed,
+    Review,
+    Repairing,
+    Speaking,
+    Listening,
+    Working,
+    Done,
+    Off,
+}
+
+impl WorkState {
+    pub const ALL: [WorkState; 9] = [
+        WorkState::Blocked,
+        WorkState::Failed,
+        WorkState::Review,
+        WorkState::Repairing,
+        WorkState::Speaking,
+        WorkState::Listening,
+        WorkState::Working,
+        WorkState::Done,
+        WorkState::Off,
+    ];
+
+    /// 0 for Blocked, up to 8 for Off.
+    pub const fn rank(self) -> u8 {
+        self as u8
+    }
+
+    /// The edge, the icon and the text color of this state.
+    pub fn color(self) -> Color {
+        match self {
+            WorkState::Blocked | WorkState::Repairing => status::warn(),
+            WorkState::Failed => status::danger(),
+            WorkState::Review | WorkState::Listening => accent::base(),
+            WorkState::Speaking | WorkState::Done => status::ok(),
+            WorkState::Working => status::info(),
+            WorkState::Off => status::off(),
+        }
+    }
+
+    /// The opaque fill of this state over a raised surface.
+    pub fn tint(self) -> Color {
+        self.color().over(surface::raised(), status::TINT_ALPHA)
+    }
+
+    /// The word of this state. A screen may add a reason after it.
+    pub const fn word(self) -> &'static str {
+        match self {
+            WorkState::Blocked => "Blocked",
+            WorkState::Failed => "Failed",
+            WorkState::Review => "Review",
+            WorkState::Repairing => "Repairing the minutes",
+            WorkState::Speaking => "Speaking",
+            WorkState::Listening => "Listening",
+            WorkState::Working => "Working",
+            WorkState::Done => "Done",
+            WorkState::Off => "Off",
+        }
+    }
+
+    /// The status of the plain dot for this state.
+    pub const fn status(self) -> Status {
+        match self {
+            WorkState::Blocked | WorkState::Repairing => Status::Warn,
+            WorkState::Failed => Status::Danger,
+            WorkState::Review | WorkState::Listening | WorkState::Working => Status::Info,
+            WorkState::Speaking | WorkState::Done => Status::Ok,
+            WorkState::Off => Status::Off,
+        }
+    }
+
+    /// How many times the glow pulses after it fades in. Zero means this state has no glow.
+    pub const fn pulses(self) -> usize {
+        match self {
+            WorkState::Blocked => motion::PULSES,
+            WorkState::Failed | WorkState::Review => 1,
+            _ => 0,
+        }
+    }
+}
+
 /// The fill of a danger button when hovered.
 pub fn danger_fill_hover() -> Color {
     status::danger().over(surface::raised(), status::DANGER_HOVER_ALPHA)
@@ -634,6 +720,9 @@ pub mod control {
         by_text(14., 16., 18.)
     }
     pub const FOCUS_RING: Pixels = px(2.);
+    /// The edge of a glow, and the blur of its shadow.
+    pub const GLOW_EDGE: Pixels = px(2.);
+    pub const GLOW_BLUR: Pixels = px(8.);
     /// Gap between an icon and its label.
     pub const ICON_GAP: Pixels = px(6.);
     /// Horizontal padding of a small and of a normal button.
@@ -682,6 +771,14 @@ pub mod motion {
     pub const CARET_IDLE: Duration = Duration::from_secs(5);
     /// The ease-out cubic curve, as cubic-bezier points. It is the default curve
     /// of `gpui_kit::base::motion::Transition`.
+    /// One rise and fall of the glow shadow.
+    pub const PULSE: Duration = Duration::from_millis(1200);
+    /// The pulses of a Blocked glow. The glow of another state pulses once.
+    pub const PULSES: usize = 3;
+    /// A pulse redraws at most this many times per second.
+    pub const PULSE_FPS: f32 = 30.;
+    /// The glow fades in during this time.
+    pub const GLOW_IN: Duration = Duration::from_millis(180);
     pub const EASE_OUT: (f32, f32, f32, f32) = (0.33, 1.0, 0.68, 1.0);
 }
 
@@ -865,6 +962,42 @@ mod tests {
 
     fn status_colors() -> Vec<u32> {
         Status::ALL.iter().map(|s| s.color().0).collect()
+    }
+
+    #[test]
+    fn each_work_state_color_reaches_3_to_1_on_each_surface_of_both_palettes() {
+        for (name, palette) in [("dark", Palette::DARK), ("light", Palette::LIGHT)] {
+            set_palette_for_test(palette);
+            for w in WorkState::ALL {
+                for (sn, s) in [
+                    ("base", surface::base()),
+                    ("panel", surface::panel()),
+                    ("raised", surface::raised()),
+                    ("overlay", surface::overlay()),
+                ] {
+                    assert!(
+                        contrast(w.color(), s) >= 3.0,
+                        "{name}: {w:?} on {sn} is {:.2}",
+                        contrast(w.color(), s)
+                    );
+                }
+            }
+        }
+        set_palette_for_test(Palette::DARK);
+    }
+
+    #[test]
+    fn each_work_state_has_a_word_a_rank_and_the_glow_of_the_state_map() {
+        let words: std::collections::BTreeSet<_> =
+            WorkState::ALL.iter().map(|w| w.word()).collect();
+        assert_eq!(words.len(), 9);
+        for (i, w) in WorkState::ALL.into_iter().enumerate() {
+            assert_eq!(w.rank() as usize, i);
+        }
+        assert_eq!(WorkState::Blocked.pulses(), 3);
+        assert_eq!(WorkState::Failed.pulses(), 1);
+        assert_eq!(WorkState::Review.pulses(), 1);
+        assert_eq!(WorkState::Working.pulses(), 0);
     }
 
     #[test]

@@ -14,10 +14,12 @@ use std::rc::Rc;
 
 use agentsi_proto::desk_api::ProductInfo;
 use agentsi_ui::components::{
-    AttentionMarker, GroupHeader, ItemRow, Kbd, ProductRow, StatusDot, neutral_tag, running_chip,
+    GroupHeader, ItemRow, Kbd, ProductRow, StateMark, StatusDot, neutral_tag, running_chip,
 };
 use agentsi_ui::style::StyleExt as _;
-use agentsi_ui::tokens::{Status, accent, control, line, size, space, surface, text, weight};
+use agentsi_ui::tokens::{
+    Status, WorkState, accent, control, line, size, space, surface, text, weight,
+};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -444,7 +446,7 @@ impl Sidebar {
                 let mark: Option<AnyElement> = if attention.contains(&p.id) {
                     Some(
                         div()
-                            .child(AttentionMarker::new("").compact())
+                            .child(StateMark::new(WorkState::Blocked).compact())
                             .children(
                                 (host.is_none())
                                     .then(|| {
@@ -495,6 +497,7 @@ impl Sidebar {
                 .label(style.label.map(SharedString::from))
                 .hue(style.hue)
                 .open(open)
+                .state(attention.contains(&p.id).then_some(WorkState::Blocked))
                 .selected(active.as_ref() == Some(&product))
                 .focused(focused && this.cursor.as_ref() == Some(&key))
                 .trailing(trailing)
@@ -527,6 +530,7 @@ impl Sidebar {
                     )
                     .decorate(move |el| el.on_mouse_down(MouseButton::Right, menu))
                     .leading(StatusDot(item.status))
+                    .state(item.work)
                     .meta(item.meta.clone())
                     .hue(item.hue)
                     .tooltip(item.tooltip.clone().map(SharedString::from))

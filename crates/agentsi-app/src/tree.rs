@@ -5,12 +5,12 @@
 //! This module only turns them into rows. The sidebar draws the rows.
 
 use agentsi_proto::events::ProgramState;
-use agentsi_ui::tokens::Status;
 use agentsi_ui::tokens::label::Hue;
+use agentsi_ui::tokens::{Status, WorkState};
 
 use crate::look::LookData;
 use crate::model::{CoreState, StorySessionItem, Term};
-use crate::pane::status_of;
+use crate::pane::{glow_of, status_of};
 use crate::screens::meeting::{LiveMeeting, Meetings};
 
 /// What an item row opens.
@@ -42,6 +42,8 @@ impl ItemKey {
 pub struct Item {
     pub key: ItemKey,
     pub status: Status,
+    /// The work state that makes the row glow.
+    pub work: Option<WorkState>,
     pub title: String,
     /// The program title that a pane label replaced.
     pub tooltip: Option<String>,
@@ -92,6 +94,7 @@ fn pane(t: &Term, look: &LookData, host: Option<&str>) -> Item {
     Item {
         key: ItemKey::Pane(t.id.clone()),
         status: status_of(Some(t)),
+        work: glow_of(Some(t)),
         title,
         tooltip,
         meta: state_word(t).into(),
@@ -105,6 +108,7 @@ fn meeting(m: &LiveMeeting) -> Item {
     Item {
         key: ItemKey::Meeting,
         status: Status::Info,
+        work: None,
         title: if question.is_empty() {
             "Meeting".into()
         } else {
@@ -126,6 +130,7 @@ fn story(s: &StorySessionItem) -> Item {
     Item {
         key: ItemKey::Story(s.id.clone()),
         status,
+        work: None,
         title: format!("{} {}", s.id, s.title),
         tooltip: None,
         meta: s.state.clone(),
@@ -163,6 +168,7 @@ pub fn items(
         out.push(Item {
             key: ItemKey::Reflection,
             status: Status::Info,
+            work: None,
             title: "Reflection".into(),
             tooltip: None,
             meta: "running".into(),

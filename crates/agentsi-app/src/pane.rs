@@ -24,11 +24,13 @@ use agentsi_proto::voice_api::{
 };
 use agentsi_term_view::{PaneEvent, PaneOptions, PaneOutput, TerminalPane};
 use agentsi_ui::bench::Bench;
-use agentsi_ui::components::{AttentionMarker, StatusDot, Switch, status_tag};
+use agentsi_ui::components::{StateMark, StatusDot, Switch, state_icon, status_tag};
 use agentsi_ui::style::StyleExt as _;
+use agentsi_ui::tokens::WorkState;
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{Status, control, line, radius, size, space, surface, text, weight};
 use futures::StreamExt;
+use gpui_kit::component::Icon;
 use gpui_kit::component::dock::{BasePanel, Panel, PanelEvent, PanelState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -69,20 +71,30 @@ pub static QUITTING: AtomicBool = AtomicBool::new(false);
 /// The order of use of the panels, across all hosts.
 static LAST_USE: AtomicU64 = AtomicU64::new(0);
 
-/// The status color of a program state.
-pub fn status_of(t: Option<&Term>) -> Status {
+/// The work state of a program state.
+pub fn work_state_of(t: Option<&Term>) -> WorkState {
     match t {
-        None => Status::Off,
-        Some(t) if !t.running => Status::Off,
-        Some(t) if t.attention().is_some() => Status::Warn,
+        None => WorkState::Off,
+        Some(t) if !t.running => WorkState::Off,
+        Some(t) if t.attention().is_some() => WorkState::Blocked,
         Some(t) => match t.state {
-            Some(ProgramState::Working) => Status::Info,
-            Some(ProgramState::Done) => Status::Ok,
-            Some(ProgramState::Blocked) => Status::Warn,
-            Some(ProgramState::Error) => Status::Danger,
-            Some(ProgramState::Idle) | None => Status::Off,
+            Some(ProgramState::Working) => WorkState::Working,
+            Some(ProgramState::Done) => WorkState::Done,
+            Some(ProgramState::Blocked) => WorkState::Blocked,
+            Some(ProgramState::Error) => WorkState::Failed,
+            Some(ProgramState::Idle) | None => WorkState::Off,
         },
     }
+}
+
+/// The status color of a program state.
+pub fn status_of(t: Option<&Term>) -> Status {
+    work_state_of(t).status()
+}
+
+/// The state that makes a pane glow: only a program that asks for the owner.
+pub fn glow_of(t: Option<&Term>) -> Option<WorkState> {
+    t.and_then(Term::attention).map(|_| WorkState::Blocked)
 }
 
 /// What the tab and the header of a pane show: the label of the owner, else the program title.
@@ -670,7 +682,7 @@ impl Render for PaneHeader {
             .child(div().flex_1())
             .when_some(closed, |el, why| el.child(status_tag(why, Status::Off)))
             .when_some(attention, |el, msg| {
-                el.child(AttentionMarker::new(msg))
+                el.child(StateMark::new(WorkState::Blocked).reason(msg))
                     .when_some(probe, |el, probe| el.child(probe.element(Marker::Pane)))
             })
             .child(
@@ -766,15 +778,30 @@ impl Panel for TerminalPanel {
             Some(host) => format!("{host} · {}", shown.title),
             None => shown.title,
         };
+        let work = work_state_of(term);
         div()
             .flex()
             .items_center()
             .gap(space(2))
             .min_w_0()
+            .glow(format!("tab-glow:{}", self.id), glow_of(term))
             .when_some(shown.hue, |el, h| {
                 el.child(tab_bar(h, format!("tab-color:{}", self.id)))
             })
             .child(StatusDot(status_of(term)))
+            .when_some(
+                matches!(work, WorkState::Blocked | WorkState::Failed)
+                    .then(|| state_icon(work))
+                    .flatten(),
+                |el, icon| {
+                    el.child(
+                        Icon::new(icon)
+                            .flex_none()
+                            .size(control::icon_sm())
+                            .text_color(work.color().hsla()),
+                    )
+                },
+            )
             .child(
                 div()
                     .id(SharedString::from(format!("tab-title:{}", self.id)))
@@ -796,12 +823,14 @@ impl Panel for TerminalPanel {
 }
 
 impl Render for TerminalPanel {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let blocked = glow_of(self.core.read(cx).terminals.get(&self.id));
         div()
             .size_full()
             .flex()
             .flex_col()
             .bg(surface::base())
+            .glow(format!("pane-glow:{}", self.id), blocked)
             .child(
                 self.header.clone().cached(
                     StyleRefinement::default()
