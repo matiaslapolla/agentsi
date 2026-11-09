@@ -1,0 +1,13 @@
+{"stories":{"product":"demo","items":[{"id":"S1","title":"Login","state":"work"}]},"alerts":[]}
+{"notify":{"method":"meeting.progress","params":{"meeting":"m1","product":"demo","stage":"start","phase":"start"}},"alerts":[]}
+{"notify":{"method":"meeting.progress","params":{"meeting":"m1","product":"demo","stage":"check","phase":"end","note":"2 failures: no source for P1"}},"alerts":[]}
+{"notify":{"method":"meeting.progress","params":{"meeting":"m1","product":"demo","stage":"role","phase":"end","role":"qa","error":"claude exited with 1"}},"alerts":[{"state":"Failed","icon":"icons/circle-x.svg","line":"Failed: qa: claude exited with 1"}]}
+{"notify":{"method":"meeting.progress","params":{"meeting":"m1","product":"demo","stage":"done","phase":"end","error":"canceled"}},"alerts":[{"state":"Failed","icon":"icons/circle-x.svg","line":"Failed: The meeting ended: canceled"}]}
+{"stories":{"product":"demo","items":[{"id":"S1","title":"Login","state":"checks"}]},"alerts":[]}
+{"stories":{"product":"demo","items":[{"id":"S1","title":"Login","state":"ready"}]},"alerts":[{"state":"Review","icon":"icons/eye.svg","line":"Review: S1 Login is ready for review"}]}
+{"stories":{"product":"demo","items":[{"id":"S1","title":"Login","state":"ready"}]},"alerts":[]}
+{"notify":{"method":"terminal.state","params":{"id":"t1-a","state":"working"}},"alerts":[]}
+{"notify":{"method":"terminal.state","params":{"id":"t1-a","state":"blocked","kind":"permission","msg":"Run rm -rf build?"}},"alerts":[{"state":"Blocked","icon":"icons/triangle-alert.svg","line":"Blocked: Run rm -rf build?"}]}
+{"notify":{"method":"terminal.state","params":{"id":"t1-a","state":"blocked","kind":"permission","msg":"Run rm -rf build?"}},"alerts":[]}
+{"bell":"t2-a","alerts":[{"state":"Blocked","icon":"icons/triangle-alert.svg","line":"Blocked: Bell"}]}
+{"notify":{"method":"meeting.progress","params":{"meeting":"m2","product":"demo","stage":"done","phase":"end","note":"M-7"}},"alerts":[{"state":"Review","icon":"icons/eye.svg","line":"Review: Minutes M-7 written"}]}

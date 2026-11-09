@@ -31,6 +31,7 @@ use super::parts::{Load, column, mono, notice, section};
 use crate::hosts::{Hosts, HostsGlobal, RemoteHost};
 use crate::keys::{self, Captured};
 
+mod alerts;
 mod appearance;
 mod data;
 mod dictation;
@@ -189,6 +190,8 @@ pub struct SettingsScreen {
     clear: data::ClearState,
     /// The error of the last save of the Appearance section.
     appearance_error: Option<String>,
+    /// The error of the last save of the Alerts section.
+    alerts_error: Option<String>,
     /// The shared table of the git config file: the section "Git".
     git: Entity<GitConfigEditor>,
     /// The refusal of the last change, with the row it belongs to.
@@ -276,6 +279,7 @@ impl SettingsScreen {
                 .map(DictationKey::new),
             clear: data::ClearState::default(),
             appearance_error: None,
+            alerts_error: None,
             keys_note: None,
             models: Load::Loading,
             voices: Load::Loading,
@@ -1168,6 +1172,7 @@ impl Render for SettingsScreen {
         let keys_section = self.keys_section(window, cx);
         let dictation = self.dictation_section(cx);
         let appearance = self.appearance_section(cx);
+        let alerts = self.alerts_section(cx);
         let data = self.data_section(window, cx);
         let git = self.git_section();
         let guide = self.guide_section(cx);
@@ -1199,6 +1204,7 @@ impl Render for SettingsScreen {
                         ),
                 )
                 .child(appearance)
+                .child(alerts)
                 .child(
                     div()
                         .flex()

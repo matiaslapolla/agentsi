@@ -5,7 +5,7 @@
 
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{FromSample, SampleFormat, SizedSample, StreamConfig};
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex, MutexGuard, Weak};
 
 /// The rate of the samples that the core sends.
 pub const RATE: u32 = agentsi_proto::call_api::SAMPLE_RATE;
@@ -145,6 +145,19 @@ impl Shared {
     }
 }
 
+fn calls() -> MutexGuard<'static, Vec<Weak<Shared>>> {
+    static CALLS: Mutex<Vec<Weak<Shared>>> = Mutex::new(Vec::new());
+    CALLS.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// True while a call screen plays.
+pub fn call_playing() -> bool {
+    calls()
+        .iter()
+        .filter_map(Weak::upgrade)
+        .any(|s| s.snapshot().playing)
+}
+
 /// An open output device.
 pub trait Output {
     fn play(&mut self) -> Result<(), String>;
@@ -169,9 +182,25 @@ impl Player {
         }
     }
 
-    /// The player of the app: the default output device.
+    /// The player of a call screen: the default output device. [`call_playing`] sees it.
     pub fn device() -> Player {
+        let player = Player::tones();
+        let mut calls = calls();
+        calls.retain(|c| c.strong_count() > 0);
+        calls.push(Arc::downgrade(&player.shared));
+        player
+    }
+
+    /// A player on the default output device that [`call_playing`] does not see: the tones
+    /// of the alerts use it.
+    pub fn tones() -> Player {
         Player::new(Box::new(open_default))
+    }
+
+    /// Closes the device. The next `play` opens it again.
+    pub fn close(&mut self) {
+        self.pause();
+        self.output = None;
     }
 
     /// Starts or resumes. The device opens on the first call, so a screen that is only

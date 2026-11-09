@@ -23,6 +23,8 @@ gpui_kit::actions!(
         NewTerminal,
         /// Opens `claude` in the folder of the active product.
         NewClaude,
+        /// Opens the log of the alerts of this run.
+        ShowAlerts,
         /// Opens the front desk of the active product.
         OpenDesk,
         /// Opens the minutes of the active product.
@@ -761,6 +763,19 @@ pub const ENTRIES: &[Entry] = &[
         icon: IconName::Settings,
         keywords: &["menu", "context", "right", "click", "actions"],
         action: || Box::new(OpenContextMenu),
+    },
+    Entry {
+        label: "Show alerts",
+        icon: IconName::Bell,
+        keywords: &[
+            "alerts",
+            "notifications",
+            "log",
+            "bell",
+            "blocked",
+            "failed",
+        ],
+        action: || Box::new(ShowAlerts),
     },
     Entry {
         label: "Turn voice mode of the focused pane on or off",

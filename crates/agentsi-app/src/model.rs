@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use agentsi_proto::Event as _;
 use agentsi_proto::core_api::Empty;
-use agentsi_proto::desk_api::{ProductInfo, ProductList};
+use agentsi_proto::desk_api::{ProductDesk, ProductDeskParams, ProductInfo, ProductList};
 use agentsi_proto::events::{
     DataChanged, Lagged, ProgramState, TerminalExit, TerminalState, TerminalStateParams,
     TerminalTitle,
@@ -21,6 +21,7 @@ use futures::FutureExt as _;
 use futures::future::LocalBoxFuture;
 use gpui_kit::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter};
 
+use crate::alerts::{Alerts, Name};
 use crate::link::{CallError, Link};
 use crate::screens::meeting::MeetingFeed;
 
@@ -64,16 +65,20 @@ impl Term {
         if self.state != Some(ProgramState::Blocked) {
             return None;
         }
-        let kind = self.kind.as_deref()?;
-        if !ATTENTION_KINDS.contains(&kind) {
-            return None;
-        }
-        Some(self.msg.clone().unwrap_or_else(|| match kind {
-            "question" => "Claude asks a question".to_string(),
-            "auth" => "Claude needs a login".to_string(),
-            _ => "Claude asks for a permission".to_string(),
-        }))
+        attention_text(self.kind.as_deref()?, self.msg.as_deref())
     }
+}
+
+/// The text of a `blocked` state of kind `kind`, or none when the kind does not wait for the owner.
+pub fn attention_text(kind: &str, msg: Option<&str>) -> Option<String> {
+    if !ATTENTION_KINDS.contains(&kind) {
+        return None;
+    }
+    Some(msg.map(str::to_string).unwrap_or_else(|| match kind {
+        "question" => "Claude asks a question".to_string(),
+        "auth" => "Claude needs a login".to_string(),
+        _ => "Claude asks for a permission".to_string(),
+    }))
 }
 
 /// A story that has a session, for the sidebar tree.
@@ -450,6 +455,7 @@ impl Cores {
 /// its own task, so a slow host holds up no other event. A `meeting.*` event goes to the
 /// meetings of that core only, so no other view draws.
 pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp) {
+    raise_alerts(core, n, cx);
     let meeting = n.method.starts_with("meeting.");
     // An archive, a restore or a clear of a product changes the list of the sidebar.
     let products = (n.method == DataChanged::NAME
@@ -480,6 +486,14 @@ pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp)
         }
     });
     take_sessions(core, sessions, cx);
+    let decisions = n.method == DataChanged::NAME
+        && matches!(
+            n.params.get("kind").and_then(|k| k.as_str()),
+            Some("decision" | "minutes")
+        );
+    if decisions && let Some(product) = n.params.get("product").and_then(|p| p.as_str()) {
+        read_desk(core, product, cx);
+    }
     let refresh = core.update(cx, |s, cx| {
         if (meeting || n.method == Lagged::NAME)
             && let Some(feed) = &s.meetings
@@ -522,6 +536,61 @@ pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp)
     .detach();
 }
 
+/// Gives one event of a core to the alert center.
+pub fn raise_alerts(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp) {
+    if let Some(chime) = cx.update(|cx| {
+        cx.try_global::<crate::chime::ChimeGlobal>()
+            .map(|g| g.0.clone())
+    }) {
+        chime.borrow_mut().hear(std::time::Instant::now(), n);
+    }
+    let Some(center) = cx.update(|cx| Alerts::try_get(cx)) else {
+        return;
+    };
+    let (host, name, focused) = core.read_with(cx, |s, _| {
+        let term = n
+            .params
+            .get("id")
+            .and_then(|i| i.as_str())
+            .and_then(|id| s.terminals.get(id));
+        let name = Name {
+            title: term.map(|t| t.title.clone()).unwrap_or_default(),
+            product: term.and_then(|t| t.product.clone()),
+        };
+        (s.remote.clone(), name, s.focused.clone())
+    });
+    center.update(cx, |c, cx| {
+        c.hear(host.as_deref(), n, focused.as_deref(), cx)
+    });
+    center.update(cx, |c, cx| {
+        c.take(host.as_deref(), n, &|_| name.clone(), cx)
+    });
+}
+
+/// Reads the pending decisions of `product` and tells the alert center.
+fn read_desk(core: &Entity<CoreState>, product: &str, cx: &mut AsyncApp) {
+    let Some(center) = cx.update(|cx| Alerts::try_get(cx)) else {
+        return;
+    };
+    let (host, call) = core.read_with(cx, |s, _| {
+        (
+            s.remote.clone(),
+            s.link.call::<ProductDesk>(&ProductDeskParams {
+                product: product.to_string(),
+            }),
+        )
+    });
+    let product = product.to_string();
+    cx.spawn(async move |cx| {
+        if let Ok(desk) = call.await {
+            center.update(cx, |c, cx| {
+                c.take_desk(host.as_deref(), &product, &desk.pending_decisions, cx)
+            });
+        }
+    })
+    .detach();
+}
+
 /// Takes the answers of `read_sessions`. A product for which stories mode is off, or that the
 /// core does not know, has no sessions. A broken link keeps what the app knows.
 pub fn take_sessions(core: &Entity<CoreState>, reads: Vec<SessionRead>, cx: &mut AsyncApp) {
@@ -536,11 +605,17 @@ pub fn take_sessions(core: &Entity<CoreState>, reads: Vec<SessionRead>, cx: &mut
                 Err(CallError::Rpc(_)) => Vec::new(),
                 Err(CallError::Link(_)) => continue,
             };
-            core.update(cx, |s, cx| {
-                if s.set_sessions(&product, items) {
+            let host = core.update(cx, |s, cx| {
+                if s.set_sessions(&product, items.clone()) {
                     cx.notify();
                 }
+                s.remote.clone()
             });
+            if let Some(center) = cx.update(|cx| Alerts::try_get(cx)) {
+                center.update(cx, |c, cx| {
+                    c.take_stories(host.as_deref(), &product, &items, cx)
+                });
+            }
         }
     })
     .detach();

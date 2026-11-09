@@ -5,7 +5,8 @@
 
 use agentsi_ui::appearance::{ColorTheme, Corners, Density, Motion, TextSize};
 use agentsi_ui::components::{Button, ListRow, status_tag};
-use agentsi_ui::tokens::{Status, control, size, space};
+use agentsi_ui::style::StyleExt as _;
+use agentsi_ui::tokens::{Status, WorkState, control, size, space};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -137,11 +138,14 @@ fn sample() -> Stateful<Div> {
         .items_center()
         .gap(space(3))
         .child(
-            div().w(control::SIDEBAR_WIDTH).child(
-                ListRow::new("appearance-sample-row", "Product name")
-                    .meta("~/dev/product")
-                    .selected(true),
-            ),
+            div()
+                .w(control::SIDEBAR_WIDTH)
+                .glow("appearance-sample-glow", Some(WorkState::Blocked))
+                .child(
+                    ListRow::new("appearance-sample-row", "Product name")
+                        .meta("~/dev/product")
+                        .selected(true),
+                ),
         )
         .child(
             Button::new("appearance-sample-button")

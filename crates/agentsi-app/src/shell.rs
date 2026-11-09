@@ -34,6 +34,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::actions::{self, ENTRIES};
+use crate::alerts::{AlertTarget, Alerts, Raised};
 use crate::bench::{BenchHandle, BenchPlan};
 use crate::hosts::HostsGlobal;
 use crate::keys;
@@ -50,12 +51,15 @@ use crate::screens::memory::MemoryScreen;
 use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
 use crate::screens::settings::{ModelFeed, ModelFeedGlobal};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec, screen_of};
-use crate::sidebar::{OpenItem, SelectProduct, Sidebar, TreeChanged};
+use crate::sidebar::{OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged};
 use crate::tab_bar;
 use crate::tabs::{self, GroupId, TabGroups, TabsChanged};
 use crate::tree::ItemKey;
 use agentsi_ui::tokens::label::Hue;
 
+mod alert_actions;
+#[cfg(test)]
+mod alert_tests;
 mod menu_actions;
 #[cfg(test)]
 mod menu_tests;
@@ -138,6 +142,8 @@ pub struct Shell {
     /// The labels, the colors and the product groups, when the window has a look file.
     look: Option<Entity<Look>>,
     asking: Option<Asking>,
+    /// The alert log is open.
+    alerts_open: bool,
     /// The context menu that is open.
     menu: Option<menu_actions::OpenMenu>,
     persist: Persist,
@@ -216,6 +222,9 @@ impl Shell {
             cx.subscribe_in(&sidebar, window, |this, _, e: &OpenItem, window, cx| {
                 this.open_item(&e.product, &e.item, window, cx)
             }),
+            cx.subscribe(&sidebar, |this, _, _: &ShowAlerts, cx| {
+                this.toggle_alert_log(cx)
+            }),
             cx.subscribe(&sidebar, |this, _, _: &TreeChanged, cx| {
                 this.schedule_save(cx)
             }),
@@ -239,6 +248,13 @@ impl Shell {
                     this.reload_host(host.as_deref(), cx)
                 }
             }));
+        }
+        if let Some(center) = Alerts::try_get(cx) {
+            subscriptions.push(cx.subscribe_in(
+                &center,
+                window,
+                |this, _, raised: &Raised, window, cx| this.alert_raised(&raised.0, window, cx),
+            ));
         }
         let hub = menus::install(cx);
         subscriptions.push(cx.subscribe_in(
@@ -264,6 +280,7 @@ impl Shell {
             palette: None,
             look,
             asking: None,
+            alerts_open: false,
             menu: None,
             persist,
             restored: false,
@@ -303,7 +320,9 @@ impl Shell {
                         if models || n.method == Lagged::NAME {
                             feed.update(cx, |_, cx| cx.emit(n.clone()));
                         }
-                        if !models {
+                        if models {
+                            crate::model::raise_alerts(&core, &n, cx);
+                        } else {
                             take_event(&core, &n, cx);
                         }
                     }
@@ -337,7 +356,13 @@ impl Shell {
     fn start(&self, window: &mut Window, cx: &mut Context<Self>) {
         let link = self.link(cx);
         let subscribed = link.call::<Subscribe>(&SubscribeParams {
-            topics: vec![Topic::Terminal, Topic::Data, Topic::Models, Topic::Meeting],
+            topics: vec![
+                Topic::Terminal,
+                Topic::Data,
+                Topic::Models,
+                Topic::Meeting,
+                Topic::Voice,
+            ],
         });
         let products = link.call::<ProductList>(&Empty {});
         let terminals = link.call::<List>(&Empty {});
@@ -977,6 +1002,12 @@ impl Shell {
         cx: &mut Context<Self>,
     ) {
         let host = product.host.clone();
+        if let (Some(center), Some(target)) = (
+            Alerts::try_get(cx),
+            AlertTarget::of_item(host.as_deref(), &product.id, item),
+        ) {
+            center.update(cx, |c, cx| c.opened(&target, cx));
+        }
         match item {
             ItemKey::Pane(id) => self.focus_terminal(host, id, window, cx),
             ItemKey::Meeting => {
@@ -1456,6 +1487,9 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::CloseTabGroup, window, cx| {
                 this.on_active_group(window, cx, Self::close_group)
             }))
+            .on_action(cx.listener(|this, _: &actions::ShowAlerts, _, cx| {
+                this.toggle_alert_log(cx)
+            }))
             .on_action(cx.listener(|this, _: &actions::ToggleVoice, window, cx| {
                 if let Some(p) = this.focused_terminal(window, cx) {
                     p.update(cx, |p, cx| p.toggle_voice(cx));
@@ -1537,6 +1571,7 @@ impl Render for Shell {
                     }),
             )
             .children(palette)
+            .children(self.alert_log(cx))
             .children(self.asking.as_ref().map(|a| a.prompt.clone()))
             .children(self.menu_layer())
     }
@@ -1636,6 +1671,9 @@ mod tests {
         look_file: &std::path::Path,
     ) -> (Fixture, &'a mut VisualTestContext) {
         cx.update(agentsi_ui::init);
+        cx.update(|cx| {
+            crate::alerts::Alerts::install(cx);
+        });
         cx.update(crate::actions::bind);
         let look = cx.update(|cx| look::install(cx, Some(look_file.to_path_buf())));
         let (end, core_end) = UnixStream::pair().unwrap();
@@ -1673,9 +1711,16 @@ mod tests {
         cx.update(|cx| register_panels(&cores, &open, cx));
         let (tx, rx) = mpsc::unbounded();
         let o = open.clone();
-        let (shell, cx) = cx.add_window_view(move |window, cx| {
-            Shell::new(cores, rx, o, persist, None, None, window, cx)
+        // The window has a Root, as the real window has: the toasts need it.
+        let mut built = None;
+        let window = cx.add_window(|window, cx| {
+            let shell = cx.new(|cx| Shell::new(cores, rx, o, persist, None, None, window, cx));
+            built = Some(shell.clone());
+            gpui_kit::base::Root::new(shell, window, cx)
         });
+        let shell = built.expect("the window builds the shell");
+        let cx = VisualTestContext::from_window(*std::ops::Deref::deref(&window), cx).into_mut();
+        cx.run_until_parked();
         cx.simulate_resize(gpui::size(control::WINDOW_WIDTH, control::WINDOW_HEIGHT));
         (
             Fixture {
