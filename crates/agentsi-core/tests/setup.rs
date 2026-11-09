@@ -186,3 +186,108 @@ fn scan_finds_a_registered_folder_and_refuses_a_bad_path() {
         assert_eq!(kind(&r), "invalid", "{bad} gave {r}");
     }
 }
+
+fn fake_claude(e: &Env, body: &str) -> String {
+    use std::os::unix::fs::PermissionsExt;
+    let bin = e.dir.0.join("bin");
+    std::fs::create_dir_all(&bin).unwrap();
+    let file = bin.join("claude");
+    std::fs::write(&file, format!("#!/bin/sh\n{body}\n")).unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+    format!("{}:/usr/bin:/bin", bin.display())
+}
+
+fn log_lines(e: &Env) -> Vec<Value> {
+    std::fs::read_to_string(e.root.join("logs/setup.jsonl"))
+        .unwrap_or_default()
+        .lines()
+        .map(|l| serde_json::from_str(l).unwrap())
+        .collect()
+}
+
+#[test]
+fn draft_runs_one_capped_call_with_no_tools_and_logs_one_line() {
+    let e = env();
+    let path = fake_claude(
+        &e,
+        r#"cat > "$(dirname "$0")/prompt.txt"; printf '%s\n' "$@" > "$(dirname "$0")/args.txt"
+echo '{"is_error":false,"total_cost_usd":0.07,"duration_ms":2100,"structured_output":{"fields":{"product":{"id":"app","name":"App","what":"A mail filter","audience":"","stage":"","out_of_scope":[]},"objectives":{"objectives":[],"north_stars":[],"sources_of_truth":[]},"roster":{"roles":["pm"],"specialists":[],"why":[]},"models":[],"stories":{"on":false,"test":"","gate":[]}},"no_data":["product.audience","product.stage"]}}'"#,
+    );
+    let core = CoreProc::start_with(
+        &e.dir,
+        &[
+            ("AGENTSI_HOME", e.root.as_path()),
+            ("TMPDIR", e.tmp.as_path()),
+            ("PATH", Path::new(&path)),
+        ],
+    );
+    let mut c = Framed::connect(&core.socket.path);
+    let app = e.dir.0.join("app");
+    std::fs::create_dir_all(&app).unwrap();
+    std::fs::write(app.join("README.md"), "# App\nA mail filter.").unwrap();
+
+    let r = c.ok("setup.draft", json!({"path": app.display().to_string()}));
+    assert_eq!(r["fields"]["product"]["what"], "A mail filter");
+    assert_eq!(r["no_data"], json!(["product.audience", "product.stage"]));
+    assert_eq!(r["cost_usd"], 0.07);
+    let draft = r["draft"].as_str().unwrap().to_string();
+
+    let args = std::fs::read_to_string(e.dir.0.join("bin/args.txt")).unwrap();
+    let args: Vec<&str> = args.lines().collect();
+    let after = |flag: &str| args[args.iter().position(|a| *a == flag).unwrap() + 1];
+    assert_eq!(after("--max-budget-usd"), "0.5");
+    assert_eq!(after("--model"), "sonnet");
+    assert!(args.contains(&"--tools="), "{args:?}");
+    assert!(args.contains(&"--json-schema"), "{args:?}");
+    let prompt = std::fs::read_to_string(e.dir.0.join("bin/prompt.txt")).unwrap();
+    assert!(prompt.contains("## File README.md"), "{prompt}");
+
+    let lines = log_lines(&e);
+    assert_eq!(lines.len(), 1);
+    assert_eq!(lines[0]["kind"], "draft");
+    assert_eq!(lines[0]["draft"], draft.as_str());
+    assert_eq!(lines[0]["cost_usd"], 0.07);
+    assert_eq!(lines[0]["files"], 1);
+
+    c.ok(
+        "setup.outcome",
+        json!({"draft": draft, "product": "app",
+               "fields": {"product.what": "kept", "product.name": "edited", "roster.roles": "cleared"}}),
+    );
+    let lines = log_lines(&e);
+    assert_eq!(lines.len(), 2);
+    assert_eq!(
+        (
+            &lines[1]["kind"],
+            &lines[1]["kept"],
+            &lines[1]["edited"],
+            &lines[1]["cleared"]
+        ),
+        (&json!("outcome"), &json!(1), &json!(1), &json!(1))
+    );
+}
+
+#[test]
+fn a_failed_draft_call_is_internal_and_logs_nothing() {
+    let e = env();
+    let path = fake_claude(
+        &e,
+        r#"cat >/dev/null; echo '{"is_error":true,"subtype":"error_max_budget_usd","total_cost_usd":0.51}'; exit 1"#,
+    );
+    let core = CoreProc::start_with(
+        &e.dir,
+        &[
+            ("AGENTSI_HOME", e.root.as_path()),
+            ("PATH", Path::new(&path)),
+        ],
+    );
+    let mut c = Framed::connect(&core.socket.path);
+    let r = c.call(
+        "setup.draft",
+        json!({"path": e.dir.0.display().to_string()}),
+    );
+    assert_eq!(kind(&r), "internal", "{r}");
+    assert!(log_lines(&e).is_empty());
+    let r = c.call("setup.draft", json!({"path": "not/absolute"}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+}

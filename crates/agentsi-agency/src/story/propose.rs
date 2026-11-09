@@ -523,6 +523,7 @@ fn propose(
             repair,
         });
         let call = Call {
+            budget_usd: None,
             prompt: text,
             model: pm.model.clone(),
             effort: pm.effort.clone(),

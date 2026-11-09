@@ -1391,6 +1391,15 @@
         "description": "The params or the result of a method that has none.",
         "type": "object"
       },
+      "FieldOutcome": {
+        "description": "What the owner did with a drafted field before the apply.",
+        "enum": [
+          "kept",
+          "edited",
+          "cleared"
+        ],
+        "type": "string"
+      },
       "FileChange": {
         "description": "A file of the stage that differs from what the database holds.",
         "properties": {
@@ -4774,6 +4783,40 @@
         "required": [
           "session",
           "on"
+        ],
+        "type": "object"
+      },
+      "SetupDraftResult": {
+        "properties": {
+          "cost_usd": {
+            "format": "double",
+            "type": "number"
+          },
+          "draft": {
+            "description": "The id of the draft, for `setup.outcome`.",
+            "type": "string"
+          },
+          "fields": {
+            "description": "The values of the five forms: `product`, `objectives`, `roster`, `models` and `stories`."
+          },
+          "no_data": {
+            "description": "The paths of the fields that the files do not answer, for example `product.audience`.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "seconds": {
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "draft",
+          "fields",
+          "no_data",
+          "cost_usd",
+          "seconds"
         ],
         "type": "object"
       },
@@ -12154,6 +12197,137 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/SetupScanResult"
+        }
+      }
+    },
+    {
+      "description": "Drafts the forms of the setup screen with one Claude call: model sonnet, no tools, a cap of 0.50 USD. It reads at most 15 files and 60 KiB of the folder and `git log --oneline -30`. `previous` and `failures` ask for a repair. It appends one line to `logs/setup.jsonl` of the data root. It writes nothing else.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "setup.draft",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "Why `roles.apply` refused the stage of the earlier draft.",
+          "name": "failures",
+          "required": false,
+          "schema": {
+            "description": "Why `roles.apply` refused the stage of the earlier draft.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "description": "An existing absolute folder on the host of the core.",
+          "name": "path",
+          "required": true,
+          "schema": {
+            "description": "An existing absolute folder on the host of the core.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "An earlier draft to repair: the `fields` of its result.",
+          "name": "previous",
+          "required": false,
+          "schema": {
+            "description": "An earlier draft to repair: the `fields` of its result."
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/SetupDraftResult"
+        }
+      }
+    },
+    {
+      "description": "Records what the owner did with each drafted field: kept, edited or cleared. It appends one line to `logs/setup.jsonl` of the data root. The app calls it after an apply.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "setup.outcome",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The id of the draft.",
+          "name": "draft",
+          "required": true,
+          "schema": {
+            "description": "The id of the draft.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "The path of each drafted field, for example `product.what`, to its outcome.",
+          "name": "fields",
+          "required": true,
+          "schema": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/FieldOutcome"
+            },
+            "description": "The path of each drafted field, for example `product.what`, to its outcome.",
+            "type": "object"
+          }
+        },
+        {
+          "description": "The product that the apply wrote.",
+          "name": "product",
+          "required": true,
+          "schema": {
+            "description": "The product that the apply wrote.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/Empty"
         }
       }
     }

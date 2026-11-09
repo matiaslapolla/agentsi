@@ -214,6 +214,7 @@ mod tests {
 
     fn call(dir: &Path, schema: Option<Value>, tools: &[&str]) -> Call {
         Call {
+            budget_usd: None,
             prompt: "the prompt".into(),
             model: "haiku".into(),
             system: "the system".into(),

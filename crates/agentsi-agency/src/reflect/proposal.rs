@@ -603,6 +603,7 @@ fn propose(
         .run(
             i.call,
             &Call {
+                budget_usd: None,
                 prompt,
                 model: PROPOSAL_MODEL.into(),
                 system: proposal_system(target.global, i.owner),
