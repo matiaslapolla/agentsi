@@ -270,6 +270,8 @@ impl Shell {
         ));
         let (nav, requests) = Nav::channel();
         cx.set_global(nav);
+        let (runs, claude_runs) = crate::nav::Runs::channel();
+        cx.set_global(runs);
         let feed = cx.new(|_| ModelFeed);
         cx.set_global(ModelFeedGlobal(feed.clone()));
         if let Some(b) = &bench {
@@ -298,6 +300,7 @@ impl Shell {
         };
         shell.pump_events(events, feed, cx);
         shell.pump_requests(requests, window, cx);
+        shell.pump_claude_runs(claude_runs, window, cx);
         shell.start(window, cx);
         window.focus(&shell.focus, cx);
         shell
@@ -353,6 +356,27 @@ impl Shell {
         cx.spawn_in(window, async move |this, cx| {
             while let Some(r) = requests.next().await {
                 let _ = this.update_in(cx, |this, window, cx| this.show_screen(r, window, cx));
+            }
+        })
+        .detach();
+    }
+
+    /// Opens a Claude pane for each "Run in Claude" click of a screen.
+    fn pump_claude_runs(
+        &self,
+        mut runs: mpsc::UnboundedReceiver<crate::nav::ClaudeRun>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        cx.spawn_in(window, async move |this, cx| {
+            while let Some(r) = runs.next().await {
+                let _ = this.update_in(cx, |this, window, cx| {
+                    let product = ProductRef {
+                        host: r.host,
+                        id: r.product,
+                    };
+                    this.open_terminal_in(Some(product), vec!["claude".into(), r.text], window, cx)
+                });
             }
         })
         .detach();

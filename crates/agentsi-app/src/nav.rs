@@ -180,6 +180,39 @@ impl Nav {
     }
 }
 
+/// A request to open a Claude pane with a text, in the first path of a product.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ClaudeRun {
+    pub host: Option<String>,
+    pub product: String,
+    pub text: String,
+}
+
+/// The sender side of `ClaudeRun`. The owner's click on "Run in Claude" is the approval, so
+/// the shell opens the pane at once and the app runs nothing by itself.
+pub struct Runs(mpsc::UnboundedSender<ClaudeRun>);
+
+impl Global for Runs {}
+
+impl Runs {
+    pub fn channel() -> (Runs, mpsc::UnboundedReceiver<ClaudeRun>) {
+        let (tx, rx) = mpsc::unbounded();
+        (Runs(tx), rx)
+    }
+
+    /// Asks the shell to open `claude <text>` for `product` on the host of `core`.
+    pub fn run(cx: &App, core: &Entity<CoreState>, product: &str, text: &str) {
+        if let Some(runs) = cx.try_global::<Runs>() {
+            let host = core.read(cx).remote.clone();
+            let _ = runs.0.unbounded_send(ClaudeRun {
+                host,
+                product: product.into(),
+                text: text.into(),
+            });
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -20,6 +20,7 @@
 pub mod call;
 pub mod desk;
 pub mod desk_tickets;
+pub mod form;
 pub mod git;
 pub mod git_config;
 pub mod guide;

@@ -92,6 +92,14 @@ gpui_kit::actions!(
         OpenGuide,
         /// Opens the section "Install and start" of the guide in the browser.
         OpenGuideStart,
+        /// Updates the knowledge index of the active product from the front desk.
+        UpdateIndex,
+        /// Opens the form "New decision" on the front desk of the active product.
+        NewDecision,
+        /// Shows or hides the archived decisions of the front desk.
+        ShowArchivedDecisions,
+        /// Opens a Claude pane with the action of the decision approved last.
+        RunApprovedInClaude,
         /// Approves the pending decision under the cursor of the front desk.
         ApproveDecision,
         /// Rejects the pending decision under the cursor of the front desk.
@@ -313,6 +321,10 @@ fn on_writes(cx: &mut App) {
         desk(cx, |s, cx| s.decide_selected(Verdict::Rejected, cx))
     });
     cx.on_action(|_: &ArchiveDecision, cx| desk(cx, |s, cx| s.archive_selected(cx)));
+    cx.on_action(|_: &UpdateIndex, cx| desk(cx, |s, cx| s.update_index(cx)));
+    cx.on_action(|_: &NewDecision, cx| desk(cx, |s, cx| s.new_decision(cx)));
+    cx.on_action(|_: &ShowArchivedDecisions, cx| desk(cx, |s, cx| s.toggle_archived(cx)));
+    cx.on_action(|_: &RunApprovedInClaude, cx| desk(cx, |s, cx| s.run_in_claude(cx)));
     cx.on_action(|_: &AcceptPriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Accepted, cx)));
     cx.on_action(|_: &ChangePriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Changed, cx)));
     cx.on_action(|_: &RejectPriority, cx| minute(cx, |s, cx| s.mark_selected(Mark::Rejected, cx)));
@@ -913,6 +925,30 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(OpenDataSettings),
     },
     Entry {
+        label: "Update the index of the active product",
+        icon: IconName::Folder,
+        keywords: &["index", "knowledge", "repos", "refresh"],
+        action: || Box::new(UpdateIndex),
+    },
+    Entry {
+        label: "New decision for the active product",
+        icon: IconName::Plus,
+        keywords: &["decision", "add", "owner"],
+        action: || Box::new(NewDecision),
+    },
+    Entry {
+        label: "Show the archived decisions",
+        icon: IconName::Folder,
+        keywords: &["archive", "restore", "decisions"],
+        action: || Box::new(ShowArchivedDecisions),
+    },
+    Entry {
+        label: "Run the action of the approved decision in Claude",
+        icon: IconName::Bot,
+        keywords: &["claude", "approve", "action", "run"],
+        action: || Box::new(RunApprovedInClaude),
+    },
+    Entry {
         label: "Check the health of the tools",
         icon: IconName::Check,
         keywords: &["doctor", "health", "tools", "check"],
@@ -974,6 +1010,10 @@ mod tests {
             "Open the settings",
             "Talk to this pane",
             "Delete data: open the Data section of the settings",
+            "Update the index of the active product",
+            "New decision for the active product",
+            "Show the archived decisions",
+            "Run the action of the approved decision in Claude",
             "Check the health of the tools",
             "Back up the data now",
             "Open the guide: how AgentSI works",
