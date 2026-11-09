@@ -34,7 +34,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::actions::{self, ENTRIES};
-use crate::alerts::{AlertTarget, Alerts};
+use crate::alerts::{AlertTarget, Alerts, Raised};
 use crate::bench::{BenchHandle, BenchPlan};
 use crate::hosts::HostsGlobal;
 use crate::keys;
@@ -57,6 +57,7 @@ use crate::tabs::{self, GroupId, TabGroups, TabsChanged};
 use crate::tree::ItemKey;
 use agentsi_ui::tokens::label::Hue;
 
+mod alert_actions;
 mod menu_actions;
 #[cfg(test)]
 mod menu_tests;
@@ -240,6 +241,13 @@ impl Shell {
                     this.reload_host(host.as_deref(), cx)
                 }
             }));
+        }
+        if let Some(center) = Alerts::try_get(cx) {
+            subscriptions.push(cx.subscribe_in(
+                &center,
+                window,
+                |this, _, raised: &Raised, window, cx| this.alert_raised(&raised.0, window, cx),
+            ));
         }
         let hub = menus::install(cx);
         subscriptions.push(cx.subscribe_in(

@@ -298,6 +298,8 @@ pub struct ScreenPanel {
     core: Entity<CoreState>,
     view: ScreenView,
     focus: FocusHandle,
+    /// The dock displays this tab.
+    pub shown: bool,
     _observe: Subscription,
 }
 
@@ -316,6 +318,7 @@ impl ScreenPanel {
             core,
             view,
             focus: cx.focus_handle(),
+            shown: false,
         }
     }
 
@@ -443,6 +446,7 @@ impl BasePanel for ScreenPanel {
     }
 
     fn set_active(&mut self, active: bool, _: &mut Window, cx: &mut Context<Self>) {
+        self.shown = active;
         self.view.show(active, cx);
     }
 

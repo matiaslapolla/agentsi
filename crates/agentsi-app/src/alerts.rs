@@ -184,6 +184,13 @@ impl AlertState {
         if Alert::is_alertable(state) && (force || old != Some(state)) {
             return Some(self.alert(target, state, text(), label));
         }
+        // A pane that finishes its work makes a Done alert, for the tone only.
+        if state == WorkState::Done
+            && old == Some(WorkState::Working)
+            && matches!(target, AlertTarget::Pane { .. })
+        {
+            return Some(self.alert(target, state, "Done".into(), label));
+        }
         None
     }
 
@@ -422,7 +429,7 @@ pub struct Name {
 
 /// A new alert, for the views that show it: the toast, the tone and the system notice.
 #[derive(Debug, Clone)]
-pub struct Raised(#[expect(dead_code, reason = "the toast reads it (U8)")] pub Alert);
+pub struct Raised(pub Alert);
 
 impl EventEmitter<Raised> for AlertCenter {}
 
@@ -492,16 +499,19 @@ impl AlertCenter {
             changed |= self.active.remove(&target).is_some();
         }
         for mut alert in alerts {
+            let silent = alert.state == WorkState::Done;
             if let AlertTarget::Pane { id, .. } = &alert.target {
                 let name = names(id);
                 alert.label = name.title;
                 alert.product = name.product;
             }
-            self.active.insert(alert.target.clone(), alert.clone());
-            self.log.push_front(alert.clone());
-            self.log.truncate(LOG_MAX);
-            self.unseen += 1;
-            changed = true;
+            if !silent {
+                self.active.insert(alert.target.clone(), alert.clone());
+                self.log.push_front(alert.clone());
+                self.log.truncate(LOG_MAX);
+                self.unseen += 1;
+                changed = true;
+            }
             cx.emit(Raised(alert));
         }
         if changed {

@@ -10,7 +10,7 @@
 //! palette has an entry for each action, and `Ctrl+Shift+P` opens the call of the open
 //! minutes. A call that plays to its end gets the listened mark.
 
-mod player;
+pub(crate) mod player;
 
 use agentsi_proto::call_api::{
     CallAudio, CallAudioParams, CallCancel, CallCancelParams, CallGet, CallGetParams,

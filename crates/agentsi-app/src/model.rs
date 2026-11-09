@@ -538,6 +538,12 @@ pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp)
 
 /// Gives one event of a core to the alert center.
 pub fn raise_alerts(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp) {
+    if let Some(chime) = cx.update(|cx| {
+        cx.try_global::<crate::chime::ChimeGlobal>()
+            .map(|g| g.0.clone())
+    }) {
+        chime.borrow_mut().hear(std::time::Instant::now(), n);
+    }
     let Some(center) = cx.update(|cx| Alerts::try_get(cx)) else {
         return;
     };

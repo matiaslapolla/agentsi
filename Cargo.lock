@@ -143,6 +143,7 @@ dependencies = [
  "gpui-kit",
  "gpui-pre",
  "gpui-pre-platform",
+ "libc",
  "serde",
  "serde_json",
  "toml 0.8.23",
