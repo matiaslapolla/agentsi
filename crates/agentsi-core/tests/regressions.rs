@@ -103,9 +103,15 @@ fn a_framed_client_that_never_reads_cannot_fill_the_memory_of_the_core() {
         sent += 1;
     }
     let after = rss_kib(pid);
+    // By design the core keeps up to 256 replies for a client that does not read (`OUTBOX`
+    // in `server.rs`), and one more in its writer. Each reply of `rpc.discover` is the
+    // catalog, so the limit grows with the catalog. The pretty schema file is larger than a
+    // reply. A core that kept the request frames would hold more than 291 MiB.
+    let catalog = include_str!("../../../schema/core.openrpc.json").len() as u64;
+    let limit = 257 * catalog / 1024 + 32 * 1024;
     assert!(
-        after < before + 100 * 1024,
-        "RSS {before} KiB became {after} KiB after {sent} frames of 1 MiB"
+        after < before + limit,
+        "RSS {before} KiB became {after} KiB after {sent} frames of 1 MiB (limit +{limit} KiB)"
     );
 }
 

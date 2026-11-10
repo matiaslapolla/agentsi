@@ -698,6 +698,16 @@
         ],
         "type": "string"
       },
+      "ChartKind": {
+        "description": "The kind of a chart view.",
+        "enum": [
+          "bar",
+          "line",
+          "area",
+          "pie"
+        ],
+        "type": "string"
+      },
       "ClearFailure": {
         "properties": {
           "error": {
@@ -1485,6 +1495,24 @@
           {
             "description": "A view that Claude showed.",
             "properties": {
+              "checked": {
+                "description": "The items of a checklist that the owner checked, from 0, in order.",
+                "items": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "html_len": {
+                "description": "The characters of the HTML of a page. `desk.item` and `desk.history` give a page\nwith an empty `html` and this length. `desk.page` gives the HTML.",
+                "format": "uint64",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
               "kind": {
                 "const": "view",
                 "type": "string"
@@ -1565,6 +1593,21 @@
             "type": "object"
           }
         ]
+      },
+      "DeskPageResult": {
+        "properties": {
+          "html": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "html"
+        ],
+        "type": "object"
       },
       "DeskResetResult": {
         "properties": {
@@ -1647,6 +1690,18 @@
         "properties": {
           "seq": {
             "description": "The `seq` of the owner item.",
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "seq"
+        ],
+        "type": "object"
+      },
+      "DeskSeqResult": {
+        "properties": {
+          "seq": {
             "format": "int64",
             "type": "integer"
           }
@@ -6305,6 +6360,200 @@
               "ids"
             ],
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows the priorities of one minutes with their marks, and Accept, Accept with changes\nand Reject buttons for each unmarked priority. Call it when the owner asks about the\npriorities of a meeting. The minutes id comes from list_minutes.",
+            "properties": {
+              "kind": {
+                "const": "priorities",
+                "type": "string"
+              },
+              "minutes_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "minutes_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows one story with its state and its acceptance criteria, and a button that opens\nthe story screen. Call it when your reply is about one story. The id looks like S014\nor T003.",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "const": "story",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows the diff of the branch of a story, and a button that opens the story screen.\nCall it when the owner asks what a story changed in the code.",
+            "properties": {
+              "kind": {
+                "const": "diff",
+                "type": "string"
+              },
+              "story_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "story_id"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows a small table. Call it when your answer compares a few items on a few fields.\n1 to 12 columns, at most 200 rows, each row as long as columns, at most 200 characters\nin each cell. The data is a copy: it does not change later.",
+            "properties": {
+              "columns": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "const": "table",
+                "type": "string"
+              },
+              "rows": {
+                "items": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "type": "array"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "title",
+              "columns",
+              "rows"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows a chart of one series: bar, line, area or pie. Call it when numbers read better\nas a picture, such as cost by week. 1 to 50 points, labels as long as values, each\nvalue finite. A pie takes no negative value.",
+            "properties": {
+              "chart": {
+                "$ref": "#/components/schemas/ChartKind"
+              },
+              "kind": {
+                "const": "chart",
+                "type": "string"
+              },
+              "labels": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "title": {
+                "type": "string"
+              },
+              "values": {
+                "items": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "kind",
+              "chart",
+              "title",
+              "labels",
+              "values"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows a checklist that the owner can check. Call it for steps that the owner does\nby hand, such as launch steps. 1 to 30 items, at most 200 characters in each. The next\nowner message tells you what the owner checked.",
+            "properties": {
+              "items": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "const": "checklist",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "title",
+              "items"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows one HTML page as a title and an Open in browser button. The app never draws the\npage. Call it only for a rich report that Markdown cannot hold. At most 120 characters\nin title and 512000 characters in html. Put all styles and scripts inline.",
+            "properties": {
+              "html": {
+                "type": "string"
+              },
+              "kind": {
+                "const": "page",
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "title",
+              "html"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows tickets of the tracker with their kind and state. A click opens the Ticket\nscreen. Call it when your reply names tickets. The ids, such as C007, come from\nlist_tickets. 1 to 30 ids.",
+            "properties": {
+              "ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "const": "tickets",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ids"
+            ],
+            "type": "object"
           }
         ]
       },
@@ -7864,6 +8113,140 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DeskAuthResult"
+        }
+      }
+    },
+    {
+      "description": "Stores the checked items of a checklist view and a desk note that the next owner message carries. It writes no product data. `not_found` for an unknown item, `invalid` for an item that is not a checklist or an index out of range.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "desk.check",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "All the items that are checked now, from 0. An item that is not here is not checked.",
+          "name": "checked",
+          "required": true,
+          "schema": {
+            "description": "All the items that are checked now, from 0. An item that is not here is not checked.",
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The `seq` of the `view` item of a checklist.",
+          "name": "seq",
+          "required": true,
+          "schema": {
+            "description": "The `seq` of the `view` item of a checklist.",
+            "format": "int64",
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskSeqResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the title and the HTML of a page view. The app writes it to a file and opens the file in the browser. `not_found` for an unknown item, `invalid` for an item that is not a page.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "desk.page",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The `seq` of the `view` item of a page.",
+          "name": "seq",
+          "required": true,
+          "schema": {
+            "description": "The `seq` of the `view` item of a page.",
+            "format": "int64",
+            "type": "integer"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskPageResult"
         }
       }
     },

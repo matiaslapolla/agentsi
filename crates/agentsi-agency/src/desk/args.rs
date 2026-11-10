@@ -11,13 +11,15 @@ use serde_json::json;
 pub const READ_TOOLS: [&str; 3] = ["Read", "Grep", "Glob"];
 
 /// The tools of `agentsi mcp` that the desk session may use, apart from the show tools.
-/// They only read. The ticket tools are not here: `add_ticket` and `update_ticket` write.
-pub const MCP_READ_TOOLS: [&str; 5] = [
+/// They only read. `add_ticket` and `update_ticket` are not here, because they write.
+pub const MCP_READ_TOOLS: [&str; 7] = [
     "search",
     "get_doc",
     "list_minutes",
     "pending_decisions",
     "role_memory",
+    "list_tickets",
+    "get_ticket",
 ];
 
 /// The name of the AgentSI server in `--mcp-config`.
@@ -210,7 +212,11 @@ mod tests {
             at("--allowedTools"),
             "Read,Grep,Glob,mcp__agentsi__search,mcp__agentsi__get_doc,\
              mcp__agentsi__list_minutes,mcp__agentsi__pending_decisions,\
-             mcp__agentsi__role_memory,mcp__agentsi__show_decisions"
+             mcp__agentsi__role_memory,mcp__agentsi__list_tickets,mcp__agentsi__get_ticket,\
+             mcp__agentsi__show_decisions,\
+             mcp__agentsi__show_priorities,mcp__agentsi__show_story,mcp__agentsi__show_diff,\
+             mcp__agentsi__show_table,mcp__agentsi__show_chart,mcp__agentsi__show_checklist,\
+             mcp__agentsi__show_page,mcp__agentsi__show_tickets"
         );
         let mcp: Value = serde_json::from_str(at("--mcp-config")).unwrap();
         assert_eq!(
@@ -245,6 +251,24 @@ mod tests {
             ] {
                 assert!(!text.contains(banned), "{banned} in {text}");
             }
+        }
+    }
+
+    #[test]
+    fn the_desk_session_reads_tickets_and_names_no_tool_that_writes_them() {
+        let allowed = allowed_tools();
+        for read in ["mcp__agentsi__list_tickets", "mcp__agentsi__get_ticket"] {
+            assert!(allowed.iter().any(|t| t == read), "{read}");
+        }
+        assert!(allowed.iter().any(|t| t == "mcp__agentsi__show_tickets"));
+        let args = desk_args(&call(false)).join(" ");
+        for write in [
+            "add_ticket",
+            "update_ticket",
+            "ticket.move",
+            "ticket.promote",
+        ] {
+            assert!(!args.contains(write), "{write} in {args}");
         }
     }
 

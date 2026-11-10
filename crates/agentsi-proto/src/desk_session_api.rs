@@ -15,6 +15,8 @@ pub fn register(c: &mut Catalog) {
         .method::<DeskReset>()
         .method::<DeskShow>()
         .method::<DeskAuth>()
+        .method::<DeskCheck>()
+        .method::<DeskPage>()
         .event::<DeskStateEvent>()
         .event::<DeskDelta>()
         .event::<DeskItemEvent>();
@@ -29,6 +31,56 @@ pub enum View {
     /// the owner asks what waits for them, or when your reply names decisions. The ids come
     /// from pending_decisions.
     Decisions { ids: Vec<i64> },
+    /// Shows the priorities of one minutes with their marks, and Accept, Accept with changes
+    /// and Reject buttons for each unmarked priority. Call it when the owner asks about the
+    /// priorities of a meeting. The minutes id comes from list_minutes.
+    Priorities { minutes_id: String },
+    /// Shows one story with its state and its acceptance criteria, and a button that opens
+    /// the story screen. Call it when your reply is about one story. The id looks like S014
+    /// or T003.
+    Story { id: String },
+    /// Shows the diff of the branch of a story, and a button that opens the story screen.
+    /// Call it when the owner asks what a story changed in the code.
+    Diff { story_id: String },
+    /// Shows a small table. Call it when your answer compares a few items on a few fields.
+    /// 1 to 12 columns, at most 200 rows, each row as long as columns, at most 200 characters
+    /// in each cell. The data is a copy: it does not change later.
+    Table {
+        title: String,
+        columns: Vec<String>,
+        rows: Vec<Vec<String>>,
+    },
+    /// Shows a chart of one series: bar, line, area or pie. Call it when numbers read better
+    /// as a picture, such as cost by week. 1 to 50 points, labels as long as values, each
+    /// value finite. A pie takes no negative value.
+    Chart {
+        chart: ChartKind,
+        title: String,
+        labels: Vec<String>,
+        values: Vec<f64>,
+    },
+    /// Shows a checklist that the owner can check. Call it for steps that the owner does
+    /// by hand, such as launch steps. 1 to 30 items, at most 200 characters in each. The next
+    /// owner message tells you what the owner checked.
+    Checklist { title: String, items: Vec<String> },
+    /// Shows one HTML page as a title and an Open in browser button. The app never draws the
+    /// page. Call it only for a rich report that Markdown cannot hold. At most 120 characters
+    /// in title and 512000 characters in html. Put all styles and scripts inline.
+    Page { title: String, html: String },
+    /// Shows tickets of the tracker with their kind and state. A click opens the Ticket
+    /// screen. Call it when your reply names tickets. The ids, such as C007, come from
+    /// list_tickets. 1 to 30 ids.
+    Tickets { ids: Vec<String> },
+}
+
+/// The kind of a chart view.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChartKind {
+    Bar,
+    Line,
+    Area,
+    Pie,
 }
 
 impl View {
@@ -36,6 +88,14 @@ impl View {
     pub fn kind(&self) -> &'static str {
         match self {
             View::Decisions { .. } => "decisions",
+            View::Priorities { .. } => "priorities",
+            View::Story { .. } => "story",
+            View::Diff { .. } => "diff",
+            View::Table { .. } => "table",
+            View::Chart { .. } => "chart",
+            View::Checklist { .. } => "checklist",
+            View::Page { .. } => "page",
+            View::Tickets { .. } => "tickets",
         }
     }
 }
@@ -156,7 +216,16 @@ pub enum DeskItem {
     /// One tool use of Claude, as one line such as `Read: docs/a.md`.
     Tool { line: String },
     /// A view that Claude showed.
-    View { view: View },
+    View {
+        view: View,
+        /// The items of a checklist that the owner checked, from 0, in order.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        checked: Vec<u32>,
+        /// The characters of the HTML of a page. `desk.item` and `desk.history` give a page
+        /// with an empty `html` and this length. `desk.page` gives the HTML.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        html_len: Option<u64>,
+    },
     /// A desk note: one line about a write of product data. The next owner message carries it.
     Note { text: String },
     /// The end of a reply.
@@ -321,6 +390,57 @@ impl Method for DeskShow {
     type Result = DeskShowResult;
 }
 
+pub struct DeskCheck;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeskCheckParams {
+    pub product: String,
+    /// The `seq` of the `view` item of a checklist.
+    pub seq: i64,
+    /// All the items that are checked now, from 0. An item that is not here is not checked.
+    pub checked: Vec<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeskSeqResult {
+    pub seq: i64,
+}
+
+impl Method for DeskCheck {
+    const NAME: &'static str = "desk.check";
+    const DESCRIPTION: &'static str = "Stores the checked items of a checklist view and a desk \
+        note that the next owner message carries. It writes no product data. `not_found` for \
+        an unknown item, `invalid` for an item that is not a checklist or an index out of range.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = DeskCheckParams;
+    type Result = DeskSeqResult;
+}
+
+pub struct DeskPage;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeskPageParams {
+    pub product: String,
+    /// The `seq` of the `view` item of a page.
+    pub seq: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeskPageResult {
+    pub title: String,
+    pub html: String,
+}
+
+impl Method for DeskPage {
+    const NAME: &'static str = "desk.page";
+    const DESCRIPTION: &'static str = "Gives the title and the HTML of a page view. The app \
+        writes it to a file and opens the file in the browser. `not_found` for an unknown \
+        item, `invalid` for an item that is not a page.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = DeskPageParams;
+    type Result = DeskPageResult;
+}
+
 pub struct DeskAuth;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -405,7 +525,29 @@ mod tests {
     fn each_view_gives_a_show_tool_with_a_description_and_no_kind() {
         let tools = view_tools();
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_str()).collect();
-        assert_eq!(names, ["show_decisions"]);
+        assert_eq!(
+            names,
+            [
+                "show_decisions",
+                "show_priorities",
+                "show_story",
+                "show_diff",
+                "show_table",
+                "show_chart",
+                "show_checklist",
+                "show_page",
+                "show_tickets"
+            ]
+        );
+        let chart = &tools[5];
+        assert_eq!(
+            chart.input_schema["properties"]["chart"]["enum"],
+            json!(["bar", "line", "area", "pie"])
+        );
+        let story = &tools[2];
+        assert_eq!(story.input_schema["required"], json!(["id"]));
+        assert!(story.description.contains("story screen"), "{story:?}");
+        assert_eq!(tools[3].input_schema["required"], json!(["story_id"]));
         let t = &tools[0];
         assert!(
             t.description.starts_with("Shows pending decisions"),
@@ -443,6 +585,8 @@ mod tests {
     fn an_item_is_tagged_by_kind() {
         let item = DeskItem::View {
             view: View::Decisions { ids: vec![1] },
+            checked: Vec::new(),
+            html_len: None,
         };
         assert_eq!(
             serde_json::to_value(&item).unwrap(),

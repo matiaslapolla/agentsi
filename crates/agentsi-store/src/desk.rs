@@ -84,6 +84,25 @@ pub fn items(
     Ok(rows)
 }
 
+/// The body of one item, or `None` when the product has no item with this `seq`.
+pub fn body(c: &Connection, product: &str, seq: i64) -> Result<Option<String>> {
+    Ok(c.query_row(
+        "select body from desk_items where product = ?1 and seq = ?2",
+        params![product, seq],
+        |r| r.get(0),
+    )
+    .optional()?)
+}
+
+/// Replaces the body of one item. False when the product has no item with this `seq`.
+pub fn set_body(c: &Connection, product: &str, seq: i64, body: &str) -> Result<bool> {
+    let n = c.execute(
+        "update desk_items set body = ?3 where product = ?1 and seq = ?2",
+        params![product, seq, body],
+    )?;
+    Ok(n == 1)
+}
+
 /// True when the conversation has an item of this kind.
 pub fn has_kind(c: &Connection, product: &str, kind: &str) -> Result<bool> {
     Ok(c.query_row(
@@ -182,6 +201,21 @@ mod tests {
                 .map(|r| r.sent)
                 .collect();
             assert_eq!(sent, [true, false, true]);
+            Ok(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn the_body_of_one_item_reads_and_changes_by_product_and_seq() {
+        let (_d, s) = store();
+        s.write(|tx| {
+            add_item(tx, "alpha", "view", r#"{"a":1}"#, "t")?;
+            assert_eq!(body(tx, "alpha", 1)?.as_deref(), Some(r#"{"a":1}"#));
+            assert_eq!(body(tx, "beta", 1)?, None);
+            assert!(set_body(tx, "alpha", 1, r#"{"a":2}"#)?);
+            assert!(!set_body(tx, "alpha", 2, "{}")?);
+            assert_eq!(body(tx, "alpha", 1)?.as_deref(), Some(r#"{"a":2}"#));
             Ok(())
         })
         .unwrap();

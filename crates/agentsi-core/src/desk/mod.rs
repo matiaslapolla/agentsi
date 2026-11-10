@@ -14,6 +14,7 @@ use agentsi_agency::roles::files::RoleFiles;
 use agentsi_agency::roles::load::load_role;
 use agentsi_proto::desk_session_api::{
     AuthState, DeskItem, DeskItemEvent, DeskItemParams, DeskState, DeskStateEvent, DeskStateParams,
+    View,
 };
 use agentsi_proto::rpc::{ErrorKind, RpcError};
 use agentsi_store::{Store, desk};
@@ -197,6 +198,26 @@ pub(crate) fn unknown_product(id: &str) -> RpcError {
     )
 }
 
+/// The item as `desk.item` and `desk.history` give it: a page has its length in place of its
+/// HTML, so a large page never rides on each event and each history read.
+pub(crate) fn outbound(item: DeskItem) -> DeskItem {
+    match item {
+        DeskItem::View {
+            view: View::Page { title, html },
+            checked,
+            ..
+        } => DeskItem::View {
+            view: View::Page {
+                title,
+                html: String::new(),
+            },
+            checked,
+            html_len: Some(html.chars().count() as u64),
+        },
+        other => other,
+    }
+}
+
 /// Stores an item of a product and sends `desk.item`. Gives its `seq`.
 pub(crate) fn store_item(core: &Core, product: &str, item: DeskItem) -> Result<i64, RpcError> {
     let store = open_store(core)?;
@@ -210,7 +231,7 @@ pub(crate) fn store_item(core: &Core, product: &str, item: DeskItem) -> Result<i
         product: product.to_string(),
         seq,
         at,
-        item,
+        item: outbound(item),
     });
     Ok(seq)
 }

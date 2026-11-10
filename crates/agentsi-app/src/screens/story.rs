@@ -22,7 +22,7 @@ use crate::menus::{self, Target};
 use crate::model::{CoreState, ProductRef};
 
 /// The lines of a diff that the screen draws. The rest is counted.
-const DIFF_LINES: usize = 400;
+pub(crate) const DIFF_LINES: usize = 400;
 /// The last lines of the log that the screen draws.
 const LOG_LINES: usize = 80;
 

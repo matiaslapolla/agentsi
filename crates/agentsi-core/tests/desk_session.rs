@@ -56,7 +56,14 @@ fn setup(dir: &TempDir, auth: &str) -> World {
          insert into decisions (id, product, minutes_id, text, why, status, kind, action)
            values (1, 'alpha', null, 'Ship it', 'It is ready', 'pending', 'product', 'Run the release'),
                   (2, 'alpha', null, 'Old one', 'w', 'pending', 'product', null);
-         insert into archive_records values ('alpha', 'decision', '2');",
+         insert into archive_records values ('alpha', 'decision', '2');
+         insert into products (id, name, paths, status) values ('beta', 'Beta', '[]', 'active');
+         insert into minutes (id, product, question, status, created_at, data) values
+           ('m1', 'alpha', 'What now?', 'valid', '2026-11-02T10:00:00.000Z',
+            '{\"id\":\"m1\",\"question\":\"What now?\",\"priorities\":[{\"title\":\"P0\",\"why\":\"w\",\"sources\":[]}]}'),
+           ('mb', 'beta', 'Other?', 'valid', '2026-11-02T10:00:00.000Z', '{\"id\":\"mb\"}');
+         insert into priorities (minutes_id, idx, title, why) values ('m1', 0, 'P0', 'w');
+         insert into stories (product, id, data) values ('alpha', 'S001', '{\"id\":\"S001\"}');",
     )
     .unwrap();
     let fake = bin.join("claude");
@@ -387,6 +394,204 @@ fn a_view_names_decisions_of_the_product_and_decision_get_reads_them() {
     );
     let r = c.call("decision.get", json!({"product": "nope", "ids": [1]}));
     assert_eq!(kind(&r), "not_found", "{r}");
+}
+
+#[test]
+fn object_views_name_objects_of_the_product_and_accept_on_a_priority_writes_no_owner_message() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let show = |c: &mut Framed, view: Value| {
+        c.call("desk.show", json!({"session": session, "view": view}))
+    };
+
+    // An unknown id, or an object of another product, stores no view item.
+    for (view, word) in [
+        (json!({"kind": "story", "id": "S999"}), "S999"),
+        (json!({"kind": "diff", "story_id": "S404"}), "S404"),
+        (json!({"kind": "priorities", "minutes_id": "nope"}), "nope"),
+        (json!({"kind": "priorities", "minutes_id": "mb"}), "mb"),
+    ] {
+        let r = show(&mut c, view);
+        assert_eq!(kind(&r), "not_found", "{r}");
+        assert!(r["error"]["message"].as_str().unwrap().contains(word), "{r}");
+    }
+    let r = show(&mut c, json!({"kind": "story"}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+
+    for view in [
+        json!({"kind": "story", "id": "S001"}),
+        json!({"kind": "diff", "story_id": "S001"}),
+        json!({"kind": "priorities", "minutes_id": "m1"}),
+    ] {
+        let r = show(&mut c, view.clone());
+        assert!(r.get("error").is_none(), "{r}");
+        assert_eq!(c.next_event("desk.item")["item"]["view"], view);
+    }
+
+    // The priorities view sets a mark with mark.set. The core stores it and a desk note, and
+    // no owner message.
+    c.ok(
+        "mark.set",
+        json!({"entries": [{"minutes_id": "m1", "idx": 0, "mark": "accepted"}], "unmarked_only": true}),
+    );
+    let r = c.ok("minutes.get", json!({"id": "m1"}));
+    assert_eq!(r["priorities"][0]["mark"], "accepted");
+    let h = history(&mut c);
+    assert_eq!(
+        kinds(&h),
+        ["owner", "reply", "end", "view", "view", "view", "note"]
+    );
+    let n = &h["items"].as_array().unwrap()[6]["item"]["text"];
+    assert!(n.as_str().unwrap().contains("accepted"), "{n}");
+}
+
+#[test]
+fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_its_length() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let show = |c: &mut Framed, view: Value| {
+        c.call("desk.show", json!({"session": session, "view": view}))
+    };
+
+    // A bad input is `invalid` with a text for Claude, and no item is stored.
+    for (view, word) in [
+        (
+            json!({"kind": "table", "title": "T", "columns": ["a", "b"],
+                   "rows": [["1", "2"], ["1", "2", "3"]]}),
+            "Row 2 has 3 cells",
+        ),
+        (
+            json!({"kind": "table", "title": "T", "columns": [], "rows": []}),
+            "columns has 0",
+        ),
+        (
+            json!({"kind": "chart", "chart": "bar", "title": "C", "labels": ["a"], "values": [1, 2]}),
+            "one label for each value",
+        ),
+        (
+            json!({"kind": "chart", "chart": "pie", "title": "C", "labels": ["a"], "values": [-1]}),
+            "negative",
+        ),
+        (
+            json!({"kind": "checklist", "title": "L", "items": ["x".repeat(201)]}),
+            "Item 1 has 201 characters",
+        ),
+        (
+            json!({"kind": "page", "title": "P", "html": "x".repeat(512_001)}),
+            "html has 512001",
+        ),
+    ] {
+        let r = show(&mut c, view);
+        assert_eq!(kind(&r), "invalid", "{r}");
+        let m = r["error"]["message"].as_str().unwrap();
+        assert!(m.contains(word), "{m}");
+    }
+    let r = show(&mut c, json!({"kind": "chart", "chart": "donut", "title": "C", "labels": [], "values": []}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+
+    let table = json!({"kind": "table", "title": "T", "columns": ["a"], "rows": [["1"]]});
+    assert_eq!(show(&mut c, table.clone())["result"]["view_id"], 4);
+    assert_eq!(c.next_event("desk.item")["item"]["view"], table);
+
+    // A checklist: the check is stored in the item and becomes a desk note.
+    let list = json!({"kind": "checklist", "title": "Launch", "items": ["tag", "post", "mail"]});
+    assert_eq!(show(&mut c, list)["result"]["view_id"], 5);
+    c.next_event("desk.item");
+    let r = c.ok(
+        "desk.check",
+        json!({"product": "alpha", "seq": 5, "checked": [1, 0, 1]}),
+    );
+    assert_eq!(r, json!({"seq": 5}));
+    let note = c.next_event("desk.item");
+    assert_eq!(
+        note["item"],
+        json!({"kind": "note", "text": "The owner checked 2 of 3 items of Launch: tag, post."})
+    );
+    for (params, want) in [
+        (json!({"product": "alpha", "seq": 5, "checked": [3]}), "invalid"),
+        (json!({"product": "alpha", "seq": 4, "checked": [0]}), "invalid"),
+        (json!({"product": "alpha", "seq": 99, "checked": []}), "not_found"),
+        (json!({"product": "nope", "seq": 5, "checked": []}), "not_found"),
+    ] {
+        let r = c.call("desk.check", params);
+        assert_eq!(kind(&r), want, "{r}");
+    }
+
+    // A page: the events and the history give its length. desk.page gives the HTML.
+    let html = "<h1>Report</h1>";
+    let r = show(&mut c, json!({"kind": "page", "title": "Report", "html": html}));
+    assert_eq!(r["result"]["view_id"], 7);
+    let e = c.next_event("desk.item");
+    assert_eq!(
+        e["item"],
+        json!({"kind": "view", "view": {"kind": "page", "title": "Report", "html": ""},
+               "html_len": 15})
+    );
+    let h = history(&mut c);
+    let items = h["items"].as_array().unwrap();
+    assert_eq!(items[4]["item"]["checked"], json!([0, 1]));
+    assert_eq!(items[6]["item"], e["item"]);
+    let r = c.ok("desk.page", json!({"product": "alpha", "seq": 7}));
+    assert_eq!(r, json!({"title": "Report", "html": html}));
+    let r = c.call("desk.page", json!({"product": "alpha", "seq": 5}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+
+    // The next owner message carries the note of the check.
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    items_until(&mut c, "end");
+    let stdin = read(&w.bin.join("stdin"));
+    let last: Value = serde_json::from_str(stdin.lines().last().unwrap()).unwrap();
+    assert_eq!(
+        last["message"]["content"],
+        "Desk notes:\n- The owner checked 2 of 3 items of Launch: tag, post.\n\ntwo"
+    );
+}
+
+#[test]
+fn a_tickets_view_names_tickets_of_the_product() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    let t = c.ok(
+        "ticket.add",
+        json!({"product": "alpha", "kind": "todo", "title": "Tag the release",
+               "author": {"by": "owner", "id": ""}}),
+    );
+    let id = t["ticket"]["id"].as_str().unwrap().to_string();
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let show = |c: &mut Framed, ids: Value| {
+        c.call(
+            "desk.show",
+            json!({"session": session, "view": {"kind": "tickets", "ids": ids}}),
+        )
+    };
+    let r = show(&mut c, json!([id, "C999"]));
+    assert_eq!(kind(&r), "not_found", "{r}");
+    assert!(r["error"]["message"].as_str().unwrap().contains("C999"), "{r}");
+    let r = show(&mut c, json!([]));
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+    let r = show(&mut c, json!([id]));
+    assert!(r.get("error").is_none(), "{r}");
+    assert_eq!(
+        c.next_event("desk.item")["item"]["view"],
+        json!({"kind": "tickets", "ids": [id]})
+    );
 }
 
 #[test]

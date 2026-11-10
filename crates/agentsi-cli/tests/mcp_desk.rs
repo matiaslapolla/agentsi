@@ -1,5 +1,5 @@
 //! The show tools of `agentsi mcp` on a real core. With `AGENTSI_DESK_SESSION`, the server
-//! lists `show_decisions` after the ticket tools, sends `desk.show`, and gives an error result
+//! lists the `show_*` tools after the ticket tools, sends `desk.show`, and gives an error result
 //! for a bad call. A desk session cannot write tickets. Without the variable, nothing changes.
 
 use agentsi_proto::client::Client;
@@ -24,6 +24,19 @@ const BASE: [&str; 9] = [
     "get_ticket",
     "add_ticket",
     "update_ticket",
+];
+
+/// The show tools, in the order of `View`.
+const SHOW: [&str; 9] = [
+    "show_decisions",
+    "show_priorities",
+    "show_story",
+    "show_diff",
+    "show_table",
+    "show_chart",
+    "show_checklist",
+    "show_page",
+    "show_tickets",
 ];
 
 struct Work {
@@ -169,6 +182,11 @@ fn a_desk_session_shows_a_view_and_a_bad_call_is_an_error_result() {
                 "add_ticket",
                 json!({"product": "alpha", "kind": "todo", "title": "No"}),
             ),
+            ("show_story", json!({"id": "S999"})),
+            (
+                "show_table",
+                json!({"title": "T", "columns": ["a"], "rows": [["1", "2"]]}),
+            ),
         ],
     );
     assert_eq!(
@@ -187,10 +205,16 @@ fn a_desk_session_shows_a_view_and_a_bad_call_is_an_error_result() {
     let (refused, err) = text(&a[5]);
     assert!(err && refused.contains("only reads"), "{refused}");
 
-    let list = names(&a[6]);
+    let (story, err) = text(&a[6]);
+    assert!(err && story.contains("S999"), "{story}");
+
+    let (row, err) = text(&a[7]);
+    assert!(err && row.contains("Row 1 has 2 cells"), "{row}");
+
+    let list = names(&a[8]);
     assert_eq!(list[..9], BASE);
-    assert_eq!(list[9..], ["show_decisions"]);
-    let show = &a[6]["result"]["tools"][9];
+    assert_eq!(list[9..], SHOW);
+    let show = &a[8]["result"]["tools"][9];
     assert_eq!(show["inputSchema"]["required"], json!(["ids"]));
     assert!(
         show["description"]

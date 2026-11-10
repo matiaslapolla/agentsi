@@ -19,7 +19,7 @@ use agentsi_proto::desk_session_api::{
 };
 use agentsi_proto::events::{DataChanged, Lagged};
 use agentsi_proto::marks_api::{
-    DecideParams, DecideResult, DecisionDecide, DecisionGet, DecisionGetParams, DecisionInfo,
+    DecideParams, DecideResult, DecisionDecide, DecisionGet, DecisionGetParams, DecisionInfo, Mark,
     Verdict,
 };
 use agentsi_proto::rpc::Notification;
@@ -37,6 +37,10 @@ use crate::format;
 use crate::link::CallError;
 use crate::model::{CoreEvent, CoreState, DeskNotice};
 
+#[path = "desk_views.rs"]
+mod desk_views;
+use desk_views as views;
+
 /// The text of the first suggestion in an empty conversation.
 const ASK_PENDING: &str = "What waits for me?";
 
@@ -49,7 +53,7 @@ enum Row {
         text: Entity<TextViewState>,
     },
     Tool(String),
-    View(View),
+    View(View, views::Shown),
     Note(String),
     End {
         cost_usd: f64,
@@ -60,9 +64,11 @@ enum Row {
 }
 
 /// What waits for the Confirm of the owner.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Confirm {
     Decide(i64, Verdict),
+    /// A mark on the priority `idx` of a minutes.
+    Mark(String, u32, Mark),
     NewConversation,
 }
 
@@ -94,6 +100,10 @@ pub struct DeskConversation {
     /// The decisions of the views, as the core stored them.
     decisions: HashMap<i64, DecisionInfo>,
     decisions_read: bool,
+    /// The objects of the other object views, as the core stores them.
+    objects: views::Objects,
+    /// The folder of the page files. `None` when the device has no runtime folder.
+    pages: Option<std::path::PathBuf>,
     confirm: Option<Confirm>,
     /// A write or a login check waits for the core.
     busy: bool,
@@ -129,6 +139,8 @@ impl DeskConversation {
             clear_input: false,
             decisions: HashMap::new(),
             decisions_read: false,
+            objects: views::Objects::default(),
+            pages: views::pages_dir(),
             confirm: None,
             busy: false,
             sending: false,
@@ -206,6 +218,7 @@ impl DeskConversation {
             }
         }
         self.read_decisions(cx);
+        self.read_objects(views::Reads::All, cx);
         cx.notify();
     }
 
@@ -215,7 +228,7 @@ impl DeskConversation {
             .rows
             .iter()
             .filter_map(|r| match r {
-                Row::View(View::Decisions { ids }) => Some(ids.iter().copied()),
+                Row::View(View::Decisions { ids }, _) => Some(ids.iter().copied()),
                 _ => None,
             })
             .flatten()
@@ -274,7 +287,13 @@ impl DeskConversation {
         }
         if n.method == DataChanged::NAME {
             match n.params.get("kind").and_then(|k| k.as_str()) {
-                Some("decision" | "minutes") => self.read_decisions(cx),
+                Some("decision") => self.read_decisions(cx),
+                Some("minutes") => {
+                    self.read_decisions(cx);
+                    self.read_objects(views::Reads::Minutes, cx);
+                }
+                Some("stories") => self.read_objects(views::Reads::Stories, cx),
+                Some("tickets") => self.read_objects(views::Reads::Tickets, cx),
                 // A clear deleted the desk rows of the product.
                 Some("clear") => self.reload(cx),
                 _ => {}
@@ -372,11 +391,16 @@ impl DeskConversation {
             other => {
                 // A reply that never got its item stays as it streamed.
                 self.open = None;
-                let is_view = matches!(other, DeskItem::View { .. });
+                let view = match &other {
+                    DeskItem::View { view, .. } => Some(view.clone()),
+                    _ => None,
+                };
                 let row = self.row_of(seq, other, cx);
                 self.push(row, cx);
-                if is_view {
-                    self.read_decisions(cx);
+                match view {
+                    Some(View::Decisions { .. }) => self.read_decisions(cx),
+                    Some(view) => self.read_view(&view, cx),
+                    None => {}
                 }
             }
         }
@@ -391,7 +415,18 @@ impl DeskConversation {
                 text: cx.new(|cx| TextViewState::markdown(&text, cx)),
             },
             DeskItem::Tool { line } => Row::Tool(line),
-            DeskItem::View { view } => Row::View(view),
+            DeskItem::View {
+                view,
+                checked,
+                html_len,
+            } => Row::View(
+                view,
+                views::Shown {
+                    seq,
+                    checked,
+                    html_len,
+                },
+            ),
             DeskItem::Note { text } => Row::Note(text),
             DeskItem::End {
                 cost_usd,
@@ -522,6 +557,7 @@ impl DeskConversation {
     pub fn confirmed(&mut self, cx: &mut Context<Self>) {
         match self.confirm.take() {
             Some(Confirm::Decide(id, verdict)) => self.decide(id, verdict, cx),
+            Some(Confirm::Mark(minutes_id, idx, mark)) => self.set_mark(minutes_id, idx, mark, cx),
             Some(Confirm::NewConversation) => self.reset(cx),
             None => {}
         }
@@ -597,6 +633,7 @@ impl DeskConversation {
             Ok(_) => {
                 self.decisions.clear();
                 self.decisions_read = false;
+                self.objects = views::Objects::default();
                 self.flash = None;
                 self.reload(cx);
             }
@@ -633,7 +670,7 @@ impl DeskConversation {
 
     // ---- Drawing ----------------------------------------------------------------------
 
-    fn row_element(&self, i: usize, weak: &WeakEntity<Self>) -> AnyElement {
+    fn row_element(&self, i: usize, weak: &WeakEntity<Self>, cx: &App) -> AnyElement {
         match &self.rows[i] {
             Row::Owner(t) => div()
                 .flex()
@@ -692,7 +729,7 @@ impl DeskConversation {
                 .text_color(WorkState::Failed.color())
                 .child(m.clone())
                 .into_any_element(),
-            Row::View(View::Decisions { ids }) => div()
+            Row::View(View::Decisions { ids }, _) => div()
                 .flex()
                 .flex_col()
                 .gap(space(3))
@@ -702,6 +739,7 @@ impl DeskConversation {
                         .map(|(n, id)| self.decision_card(i, n, *id, weak)),
                 )
                 .into_any_element(),
+            Row::View(view, shown) => self.view_element(i, view, shown, weak, cx),
         }
     }
 
@@ -991,7 +1029,7 @@ impl Render for DeskConversation {
             Load::Ready(()) => {
                 let w = weak.clone();
                 MessageScroller::new("deskc-list", self.scroller.clone(), move |i, _, cx| {
-                    w.read_with(cx, |this, _| this.row_element(i, &w))
+                    w.read_with(cx, |this, cx| this.row_element(i, &w, cx))
                         .unwrap_or_else(|_| div().into_any_element())
                 })
                 .size_full()
@@ -1115,7 +1153,7 @@ mod tests {
 
     impl DeskConversation {
         /// One word for each row, with the seq of a reply: `reply:3`, `reply:-` while it streams.
-        fn kinds(&self) -> Vec<String> {
+        pub(super) fn kinds(&self) -> Vec<String> {
             self.rows
                 .iter()
                 .map(|r| match r {
@@ -1124,7 +1162,7 @@ mod tests {
                         format!("reply:{}", seq.map_or("-".into(), |s| s.to_string()))
                     }
                     Row::Tool(_) => "tool".into(),
-                    Row::View(_) => "view".into(),
+                    Row::View(..) => "view".into(),
                     Row::Note(_) => "note".into(),
                     Row::End { .. } => "end".into(),
                     Row::Error(_) => "error".into(),
@@ -1133,7 +1171,7 @@ mod tests {
         }
     }
 
-    fn setup(
+    pub(super) fn setup(
         cx: &mut TestAppContext,
     ) -> (Entity<DeskConversation>, UnixStream, &mut VisualTestContext) {
         cx.update(agentsi_ui::init);
@@ -1144,11 +1182,11 @@ mod tests {
         (conv, other, cx)
     }
 
-    fn draw(cx: &mut VisualTestContext) {
+    pub(super) fn draw(cx: &mut VisualTestContext) {
         cx.update(|window, cx| window.draw(cx).clear(cx));
     }
 
-    fn methods_sent(other: &mut UnixStream) -> Vec<(String, Value)> {
+    pub(super) fn methods_sent(other: &mut UnixStream) -> Vec<(String, Value)> {
         received(other)
             .into_iter()
             .map(|r| {
@@ -1160,7 +1198,7 @@ mod tests {
             .collect()
     }
 
-    fn history(state: &str, message: Option<&str>, items: Value) -> DeskHistoryResult {
+    pub(super) fn history(state: &str, message: Option<&str>, items: Value) -> DeskHistoryResult {
         serde_json::from_value(json!({
             "session": "s1", "state": state, "message": message, "items": items
         }))
@@ -1183,15 +1221,15 @@ mod tests {
             .collect()
     }
 
-    fn entry(seq: i64, item: Value) -> Value {
+    pub(super) fn entry(seq: i64, item: Value) -> Value {
         json!({"seq": seq, "at": "2026-11-09T10:00:00.000Z", "item": item})
     }
 
-    fn note<E: agentsi_proto::Event>(params: &E::Params) -> Notification {
+    pub(super) fn note<E: agentsi_proto::Event>(params: &E::Params) -> Notification {
         Notification::of::<E>(params)
     }
 
-    fn item_event(seq: i64, item: DeskItem) -> Notification {
+    pub(super) fn item_event(seq: i64, item: DeskItem) -> Notification {
         note::<DeskItemEvent>(&DeskItemParams {
             product: "demo".into(),
             seq,
