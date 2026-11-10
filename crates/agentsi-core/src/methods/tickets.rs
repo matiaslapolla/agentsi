@@ -247,8 +247,16 @@ async fn ticket_promote(ctx: Ctx, p: TicketPromoteParams) -> Result<TicketPromot
                     config,
                     place.registry.owner,
                 );
-                let (ticket, story) =
-                    write::promote_story(&ctx, &id, &by, clock::now_ms()).map_err(rpc)?;
+                let (ticket, story) = write::promote_story(&ctx, &id, &by, clock::now_ms())
+                    .map_err(|e| {
+                        if e.story.is_some() {
+                            core.publish::<DataChanged>(&DataChangedParams {
+                                product: ctx.product.id.clone(),
+                                kind: "stories".into(),
+                            });
+                        }
+                        rpc(e.error)
+                    })?;
                 let result = TicketPromoteResult {
                     ticket,
                     story: Some(story),

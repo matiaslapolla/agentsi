@@ -393,14 +393,35 @@ pub fn story_error(e: crate::story::Error) -> Error {
     }
 }
 
+/// A failed story promote. `story` is the id of a story that the PM call saved before the
+/// failure, so the caller still tells the clients that the stories changed.
+#[derive(Debug, PartialEq)]
+pub struct PromoteError {
+    pub error: Error,
+    pub story: Option<String>,
+}
+
+impl From<Error> for PromoteError {
+    fn from(error: Error) -> Self {
+        PromoteError { error, story: None }
+    }
+}
+
+impl From<agentsi_store::Error> for PromoteError {
+    fn from(e: agentsi_store::Error) -> Self {
+        Error::from(e).into()
+    }
+}
+
 /// `ticket.promote` with `to: "story"`: the PM shapes the ticket into one story, then one
-/// transaction links the story and closes the ticket. A failed PM call writes nothing.
+/// transaction links the story and closes the ticket. A failed PM call writes nothing. A
+/// ticket that changed during the PM call stays as it is, and the error names the new story.
 pub fn promote_story(
     ctx: &ProposeCtx,
     id: &str,
     by: &Author,
     now_ms: i64,
-) -> Result<(Ticket, Story)> {
+) -> std::result::Result<(Ticket, Story), PromoteError> {
     let product = ctx.product.id.clone();
     let t = ctx.store.read(|c| Ok(promotable(c, &product, id, by)))??;
     let proposed = propose::propose_story(ctx, &story_text(&t), None, None).map_err(story_error)?;
@@ -413,11 +434,29 @@ pub fn promote_story(
         kind: LinkType::Story,
         reference: story.id.clone(),
     };
-    let (id, by) = (id.to_string(), by.clone());
-    let ticket = ctx
+    let (ticket_id, by) = (id.to_string(), by.clone());
+    let closed = ctx
         .store
-        .try_write(move |tx| close_with(tx, &product, &id, link, &by, now_ms))??;
-    Ok((ticket, story))
+        .try_write(move |tx| close_with(tx, &product, &ticket_id, link, &by, now_ms))
+        .map_err(Error::from)
+        .and_then(|r| r);
+    match closed {
+        Ok(ticket) => Ok((ticket, story)),
+        Err(e) => Err(PromoteError {
+            error: Error::Conflict(format!(
+                "Story {} was saved, but ticket {id} was not closed: {}",
+                story.id,
+                message(&e)
+            )),
+            story: Some(story.id),
+        }),
+    }
+}
+
+fn message(e: &Error) -> &str {
+    match e {
+        Error::NotFound(m) | Error::Invalid(m) | Error::Conflict(m) | Error::Unavailable(m) => m,
+    }
 }
 
 /// `ticket.promote` with `to: "decision"`: a pending decision of the product, the link to it
