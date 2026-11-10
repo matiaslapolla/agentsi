@@ -619,3 +619,65 @@ fn a_reset_starts_a_new_conversation_with_a_new_session() {
     let r = c.call("desk.send", json!({"product": "nope", "text": "x"}));
     assert_eq!(kind(&r), "not_found", "{r}");
 }
+
+#[test]
+fn a_product_clear_stops_its_desk_process_before_it_deletes_the_rows() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let pid: i32 = read(&w.bin.join("pids")).trim().parse().unwrap();
+
+    let items = json!([{"item": "product", "product": "alpha"}]);
+    let plan = c.ok("data.clear_plan", json!({"items": items}));
+    c.ok(
+        "data.clear",
+        json!({"items": items, "plan_id": plan["plan_id"]}),
+    );
+    while c.next_event("desk.state")["state"] != "stopped" {}
+    wait_until("the process is gone", || !common::alive(pid));
+    let db = rusqlite::Connection::open(w.home.join("agentsi.db")).unwrap();
+    let rows: i64 = db
+        .query_row(
+            "select (select count(*) from desk_items where product = 'alpha')
+                  + (select count(*) from desk_sessions where product = 'alpha')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(rows, 0);
+}
+
+#[test]
+fn a_desk_note_stays_unsent_when_the_process_does_not_start() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    c.ok("desk.stop", json!({"product": "alpha"}));
+    c.ok(
+        "decision.decide",
+        json!({"decision": 1, "status": "approved"}),
+    );
+    assert_eq!(c.next_event("desk.item")["item"]["kind"], "note");
+
+    // A program that the kernel cannot run: the start fails.
+    let fake = w.bin.join("claude");
+    std::fs::write(&fake, "#!/nonexistent/interpreter\n").unwrap();
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    assert_eq!(items_until(&mut c, "error"), ["owner", "error"]);
+
+    std::fs::write(&fake, FAKE).unwrap();
+    c.ok("desk.send", json!({"product": "alpha", "text": "three"}));
+    items_until(&mut c, "end");
+    let stdin = read(&w.bin.join("stdin"));
+    let last: Value = serde_json::from_str(stdin.lines().last().unwrap()).unwrap();
+    assert_eq!(
+        last["message"]["content"],
+        "Desk notes:\n- The owner approved decision 1.\n\nthree"
+    );
+}

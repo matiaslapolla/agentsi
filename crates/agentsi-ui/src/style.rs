@@ -3,20 +3,22 @@
 
 use gpui_kit::*;
 
-use crate::tokens::{WorkState, control, motion, radius, status};
+use crate::tokens::{WorkState, control, motion, radius};
 
-/// The peak opacity of the glow shadow in a pulse.
-const PULSE_PEAK: f32 = 0.8;
+/// The alpha of the glow edge at the top of a pulse.
+const PULSE_PEAK: f32 = 1.0;
 
-/// The glow of `state` as a child that covers its parent and takes no layout space. `key`
-/// names the animation: use a new key for each alert, so that a new alert pulses again.
-/// Returns nothing for a state that has no glow.
+/// The glow of `state`: an edge in the state color that covers its parent, with no fill and no
+/// shadow, and takes no layout space. It fades in, then each pulse raises the alpha of the edge
+/// and lowers it to rest. `key` names the animation: use a new key for each alert, so that a
+/// new alert pulses again. Returns nothing for a state that has no glow.
 pub fn glow(key: impl Into<ElementId>, state: WorkState) -> Option<AnimationElement<Div>> {
     let pulses = state.pulses();
     if pulses == 0 {
         return None;
     }
     let color = state.color();
+    let rest = control::GLOW_REST_ALPHA;
     let mut chain = vec![Animation::new(motion::GLOW_IN)];
     chain
         .extend((0..pulses).map(|_| Animation::new(motion::PULSE).with_max_fps(motion::PULSE_FPS)));
@@ -28,24 +30,14 @@ pub fn glow(key: impl Into<ElementId>, state: WorkState) -> Option<AnimationElem
         .rounded(radius::md())
         .border(control::GLOW_EDGE);
     Some(overlay.with_animations(key, chain, move |el, ix, delta| {
-        // Fade in once, then rise and fall to the resting shadow. The last frame is the resting
-        // glow, which is also what reduced motion shows.
-        let (edge, shadow) = if ix == 0 {
-            (delta, status::BORDER_ALPHA * delta)
+        // The last frame is the resting edge, which is also what reduced motion shows.
+        let alpha = if ix == 0 {
+            rest * delta
         } else {
             let tri = 1. - (2. * delta - 1.).abs();
-            (
-                1.,
-                status::BORDER_ALPHA + (PULSE_PEAK - status::BORDER_ALPHA) * tri,
-            )
+            rest + (PULSE_PEAK - rest) * tri
         };
-        el.border_color(color.alpha(edge)).shadow(vec![BoxShadow {
-            color: color.alpha(shadow),
-            offset: point(px(0.), px(0.)),
-            blur_radius: control::GLOW_BLUR,
-            spread_radius: px(0.),
-            inset: false,
-        }])
+        el.border_color(color.alpha(alpha))
     }))
 }
 

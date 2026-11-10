@@ -576,8 +576,13 @@ impl BasePanel for ScreenPanel {
 
     fn set_active(&mut self, active: bool, _: &mut Window, cx: &mut Context<Self>) {
         self.shown = active;
-        if active && let (Some(center), Some(target)) = (Alerts::try_get(cx), self.alert_target()) {
-            center.update(cx, |c, cx| c.opened(&target, cx));
+        if active && let Some(center) = Alerts::try_get(cx) {
+            if let Some(target) = self.alert_target() {
+                center.update(cx, |c, cx| c.opened(&target, cx));
+            }
+            if self.kind == ScreenKind::Settings {
+                center.update(cx, |c, cx| c.opened_models(cx));
+            }
         }
         self.view.show(active, cx);
     }

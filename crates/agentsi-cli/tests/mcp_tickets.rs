@@ -250,3 +250,34 @@ fn a_session_writes_its_tickets_and_cannot_drop_a_ticket_of_the_owner() {
         json!({"by": "session", "id": "unknown"})
     );
 }
+
+#[test]
+fn a_refused_move_with_fields_changes_nothing() {
+    let w = work();
+    let a = session(
+        &w,
+        &[("AGENTSI_TERMINAL", "t-7")],
+        &[
+            (
+                "add_ticket",
+                json!({"product": "alpha", "kind": "todo", "title": "Before"}),
+            ),
+            (
+                "update_ticket",
+                json!({"product": "alpha", "id": "C002", "state": "done"}),
+            ),
+            (
+                "update_ticket",
+                json!({"product": "alpha", "id": "C002", "title": "After", "state": "waiting"}),
+            ),
+            ("get_ticket", json!({"product": "alpha", "id": "C002"})),
+        ],
+    );
+    assert_eq!(text(&a[2]), ("C002 [todo] Before", false));
+    assert_eq!(
+        text(&a[3]),
+        ("Ticket C002 cannot move from done to waiting.", true)
+    );
+    let (md, err) = text(&a[4]);
+    assert!(!err && md.starts_with("# C002 Before\n"), "{md}");
+}

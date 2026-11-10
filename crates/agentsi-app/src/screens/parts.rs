@@ -6,7 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use agentsi_ui::components::{neutral_tag, status_tag};
 use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{
-    Status, control, font, line, radius, size, space, status, surface, text, weight,
+    Status, WorkState, control, font, line, radius, size, space, status, surface, text, weight,
 };
 use gpui_kit::component::tag::Tag;
 use gpui_kit::prelude::FluentBuilder as _;
@@ -264,6 +264,14 @@ pub fn flash_line(flash: &Flash) -> Div {
         .text_size(size::sm())
         .text_color(text_color)
         .child(message.clone())
+}
+
+/// A line that tells the owner what failed, in the color of `WorkState::Failed`.
+pub fn failed_text(message: impl Into<SharedString>) -> Div {
+    div()
+        .text_size(size::sm())
+        .text_color(WorkState::Failed.color())
+        .child(message.into())
 }
 
 /// A screen that writes through the core: it keeps the line of the last write and

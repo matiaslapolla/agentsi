@@ -347,6 +347,20 @@ fn running_work(core: &Core, items: &[Item]) -> Vec<String> {
     out
 }
 
+/// Stops the desk processes whose rows a delete of `items` removes. A stopped actor stores
+/// no more items, so no row comes back after the delete.
+fn stop_desks(core: &Core, items: &[Item]) {
+    let everything = items.iter().any(|i| i.kind == Kind::Everything);
+    for product in core.desks.running() {
+        let covered = items
+            .iter()
+            .any(|i| i.kind == Kind::Product && i.product.as_deref() == Some(product.as_str()));
+        if everything || covered {
+            crate::desk::stop(core, &product);
+        }
+    }
+}
+
 enum Outcome {
     /// The data differs from the plan.
     Changed,
@@ -378,6 +392,7 @@ async fn clear_data(ctx: Ctx, p: DataClearParams) -> Result<DataClearResult, Rpc
             "Stop that work or wait until it ends, then delete again.",
         ));
     }
+    stop_desks(&ctx.core, &items);
     let core = ctx.core.clone();
     let done = crate::blocking::spawn(move || run_clear(&core, items, planned))
         .await

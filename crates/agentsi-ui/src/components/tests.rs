@@ -389,3 +389,29 @@ fn only_a_speaking_card_with_a_level_grows_a_ring() {
     assert_eq!(ring_spread(WorkState::Speaking, Some(9.)), 4.);
     assert_eq!(ring_spread(WorkState::Working, Some(1.)), 0.);
 }
+
+struct Agent;
+
+impl Render for Agent {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        div().child(
+            super::AgentCard::new("Dev", crate::tokens::WorkState::Working).activity("Writing"),
+        )
+    }
+}
+
+#[gpui::test]
+fn the_activity_line_of_an_agent_card_has_its_full_height(cx: &mut TestAppContext) {
+    cx.update(crate::init);
+    let (_, cx) = cx.add_window_view(|_, _| Agent);
+    cx.update(|window, cx| window.draw(cx).clear(cx));
+    let line = cx
+        .debug_bounds("agent-card-activity")
+        .expect("the activity is drawn");
+    assert_eq!(line.size.height, crate::tokens::size::xs_line());
+    assert!(
+        line.size.height >= crate::tokens::size::xs() * 1.4,
+        "the line is {:?} high, so it clips the text",
+        line.size.height
+    );
+}

@@ -91,8 +91,13 @@ pub fn is_show_tool(name: &str) -> bool {
         .is_some_and(|t| t.starts_with("show_"))
 }
 
-/// One line for a tool use, as the meeting screen writes it: `Read: docs/a.md`.
+/// One line for a tool use, as the meeting screen writes it: `Read: docs/a.md`. A tool of the
+/// AgentSI server shows its words: `mcp__agentsi__pending_decisions` gives `Pending decisions`.
 pub fn tool_line(name: &str, input: &Value) -> String {
+    let name = match name.strip_prefix(&format!("mcp__{MCP_SERVER}__")) {
+        Some(tool) => words(tool),
+        None => name.to_string(),
+    };
     let arg = ["file_path", "pattern", "query", "path"]
         .iter()
         .find_map(|k| input.get(*k).and_then(Value::as_str));
@@ -100,6 +105,15 @@ pub fn tool_line(name: &str, input: &Value) -> String {
         Some(arg) => format!("{name}: {arg}"),
         None => name.to_string(),
     }
+}
+
+/// `pending_decisions` gives `Pending decisions`.
+fn words(tool: &str) -> String {
+    let text = tool.replace('_', " ");
+    let mut chars = text.chars();
+    chars.next().map_or(String::new(), |first| {
+        first.to_uppercase().chain(chars).collect()
+    })
 }
 
 /// True for the error text of a reply that Claude Code could not authenticate.
@@ -140,6 +154,7 @@ mod tests {
             {"type": "text", "text": "Two decisions wait."},
             {"type": "tool_use", "name": "Read", "input": {"file_path": "docs/a.md"}},
             {"type": "tool_use", "name": "mcp__agentsi__pending_decisions", "input": {}},
+            {"type": "tool_use", "name": "mcp__agentsi__search", "input": {"query": "pricing"}},
             {"type": "tool_use", "name": "mcp__agentsi__show_decisions", "input": {"ids": [1]}},
             {"type": "text", "text": "  "},
         ]}});
@@ -153,7 +168,10 @@ mod tests {
                     line: "Read: docs/a.md".into()
                 }),
                 Out::Item(DeskItem::Tool {
-                    line: "mcp__agentsi__pending_decisions".into()
+                    line: "Pending decisions".into()
+                }),
+                Out::Item(DeskItem::Tool {
+                    line: "Search: pricing".into()
                 }),
             ]
         );

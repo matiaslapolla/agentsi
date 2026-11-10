@@ -66,6 +66,31 @@ impl TicketState {
     pub fn is_open(self) -> bool {
         matches!(self, TicketState::Open | TicketState::Waiting)
     }
+
+    /// Why ticket `id` cannot move from this state to `to`, or `None` for a legal move.
+    /// `waiting_on` tells whether the move names who or what the ticket waits on.
+    pub fn move_refusal(self, id: &str, to: TicketState, waiting_on: bool) -> Option<String> {
+        use TicketState::*;
+        if waiting_on && to != Waiting {
+            return Some(format!(
+                "waiting_on goes only with the state waiting, not {}.",
+                to.as_str()
+            ));
+        }
+        match (self, to) {
+            (from, to) if from == to => None,
+            (Open, Waiting) if !waiting_on => Some(format!(
+                "Ticket {id} needs waiting_on to wait: who or what it waits on."
+            )),
+            (Open, Waiting) | (Waiting, Open) | (Open | Waiting, Done | Dropped) => None,
+            (Done | Dropped, Open) => None,
+            (from, to) => Some(format!(
+                "Ticket {id} cannot move from {} to {}.",
+                from.as_str(),
+                to.as_str()
+            )),
+        }
+    }
 }
 
 /// Who wrote a ticket.

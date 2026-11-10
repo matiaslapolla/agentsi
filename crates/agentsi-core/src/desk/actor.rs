@@ -1,7 +1,9 @@
 //! The thread of one desk process. It owns the process, gives it the owner messages, stores
 //! what it writes and applies the time limits. The process gets SIGKILL when this thread ends.
 
-use super::{CLAUDE, Cmd, Limits, RUNNING, check_auth, set_auth, set_state, store_item};
+use super::{
+    CLAUDE, Cmd, Delivery, Limits, RUNNING, check_auth, mark_sent, set_auth, set_state, store_item,
+};
 use crate::state::{Core, lock};
 use agentsi_agency::desk::args::user_line;
 use agentsi_agency::desk::auth::Auth;
@@ -23,7 +25,7 @@ pub(crate) struct Start {
     pub args: Vec<String>,
     pub cwd: PathBuf,
     /// The first owner message, with its desk notes.
-    pub first: String,
+    pub first: Delivery,
     pub inbox: Receiver<Cmd>,
     pub limits: Limits,
 }
@@ -139,8 +141,15 @@ impl Actor {
         self.state(end.state, end.message);
     }
 
+    /// Writes one owner line to the process, then marks its notes sent.
+    fn deliver(&self, p: &mut DeskProcess, d: &Delivery) -> std::io::Result<()> {
+        p.send(&user_line(&d.text))?;
+        mark_sent(&self.core, &self.s.product, &d.notes);
+        Ok(())
+    }
+
     fn serve(&self, mut p: DeskProcess) -> End {
-        if let Err(e) = p.send(&user_line(&self.s.first)) {
+        if let Err(e) = self.deliver(&mut p, &self.s.first) {
             let message = format!("AgentSI cannot write to claude: {e}");
             self.error(&message);
             return End {
@@ -193,8 +202,8 @@ impl Actor {
                 None => {}
             }
             match self.s.inbox.try_recv() {
-                Ok(Cmd::Send(text)) => {
-                    if let Err(e) = p.send(&user_line(&text)) {
+                Ok(Cmd::Send(delivery)) => {
+                    if let Err(e) = self.deliver(&mut p, &delivery) {
                         let message = format!("AgentSI cannot write to claude: {e}");
                         self.error(&message);
                         break End {

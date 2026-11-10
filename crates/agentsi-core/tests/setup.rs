@@ -268,7 +268,7 @@ echo '{"is_error":false,"total_cost_usd":0.07,"duration_ms":2100,"structured_out
 }
 
 #[test]
-fn a_failed_draft_call_is_internal_and_logs_nothing() {
+fn a_failed_draft_call_is_internal_and_logs_one_line_with_the_error() {
     let e = env();
     let path = fake_claude(
         &e,
@@ -287,7 +287,14 @@ fn a_failed_draft_call_is_internal_and_logs_nothing() {
         json!({"path": e.dir.0.display().to_string()}),
     );
     assert_eq!(kind(&r), "internal", "{r}");
-    assert!(log_lines(&e).is_empty());
+    let lines = log_lines(&e);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert_eq!(lines[0]["kind"], "draft");
+    assert!(lines[0]["draft"].is_null());
+    let error = lines[0]["error"].as_str().unwrap();
+    assert_eq!(error, r["error"]["message"].as_str().unwrap());
+    // A refused folder makes no call and writes no line.
     let r = c.call("setup.draft", json!({"path": "not/absolute"}));
     assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(log_lines(&e).len(), 1);
 }

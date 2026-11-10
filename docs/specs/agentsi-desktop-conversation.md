@@ -66,7 +66,7 @@ The core reads each stdout line:
 |---|---|
 | `stream_event` with a text delta | event `desk.delta` |
 | `assistant`, text block | item `reply` |
-| `assistant`, `tool_use` block | item `tool`, with one line such as `Read: docs/a.md`, as the meeting screen writes it. A `show_*` tool makes no item |
+| `assistant`, `tool_use` block | item `tool`, with one line such as `Read: docs/a.md`, as the meeting screen writes it. A tool of the AgentSI server shows its words, such as `Pending decisions`. A `show_*` tool makes no item |
 | `result` | item `end`, with `cost_usd`, `duration_ms` and `error` |
 
 ### Protocol

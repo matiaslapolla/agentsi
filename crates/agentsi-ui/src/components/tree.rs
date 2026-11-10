@@ -73,6 +73,7 @@ pub struct ProductRow {
     selected: bool,
     focused: bool,
     work: Option<WorkState>,
+    alert: u64,
     on_click: Option<ClickHandler>,
     on_toggle: Option<ClickHandler>,
 }
@@ -92,6 +93,7 @@ impl ProductRow {
             selected: false,
             focused: false,
             work: None,
+            alert: 0,
             on_click: None,
             on_toggle: None,
         }
@@ -138,6 +140,11 @@ impl ProductRow {
     /// The work state of the row. Blocked, Failed and Review make the row glow.
     pub fn state(mut self, work: Option<WorkState>) -> Self {
         self.work = work;
+        self
+    }
+    /// The id of the alert that makes the row glow. A new alert pulses again.
+    pub fn alert(mut self, id: u64) -> Self {
+        self.alert = id;
         self
     }
     pub fn on_click(mut self, f: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
@@ -277,7 +284,7 @@ impl RenderOnce for ProductRow {
                         .child(t),
                 )
             });
-        let el = el.glow(format!("{selector}:glow"), self.work);
+        let el = el.glow(format!("{selector}:glow:{}", self.alert), self.work);
         let el = match self.decorate {
             Some(f) => f(el),
             None => el,
@@ -300,6 +307,7 @@ pub struct ItemRow {
     selected: bool,
     focused: bool,
     work: Option<WorkState>,
+    alert: u64,
     on_click: Option<ClickHandler>,
 }
 
@@ -317,6 +325,7 @@ impl ItemRow {
             selected: false,
             focused: false,
             work: None,
+            alert: 0,
             on_click: None,
         }
     }
@@ -359,6 +368,11 @@ impl ItemRow {
     /// The work state of the row. Blocked, Failed and Review make the row glow.
     pub fn state(mut self, work: Option<WorkState>) -> Self {
         self.work = work;
+        self
+    }
+    /// The id of the alert that makes the row glow. A new alert pulses again.
+    pub fn alert(mut self, id: u64) -> Self {
+        self.alert = id;
         self
     }
     pub fn on_click(mut self, f: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> Self {
@@ -424,7 +438,7 @@ impl RenderOnce for ItemRow {
             .when_some(tooltip, |el, t| {
                 el.tooltip(move |window, cx| Tooltip::new(t.clone()).build(window, cx))
             });
-        let el = el.glow(format!("{selector}:glow"), self.work);
+        let el = el.glow(format!("{selector}:glow:{}", self.alert), self.work);
         let el = match self.decorate {
             Some(f) => f(el),
             None => el,

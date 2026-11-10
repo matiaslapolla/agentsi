@@ -69,7 +69,7 @@ The settings screen gets a section "Owner". It shows the name and the language o
 
 ### Learn from use
 
-`setup.draft` and `setup.outcome` each append one JSON line to `<data root>/logs/setup.jsonl`: the cost and the seconds of a draft, or the field results. The stop conditions of the brief read this file.
+`setup.draft` and `setup.outcome` each append one JSON line to `<data root>/logs/setup.jsonl`: the cost and the seconds of a draft, or the field results. A failed draft also appends one line, with the error and the seconds. The stop conditions of the brief read this file.
 
 ### Defaults taken
 

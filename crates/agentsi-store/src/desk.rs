@@ -112,19 +112,27 @@ pub fn has_kind(c: &Connection, product: &str, kind: &str) -> Result<bool> {
     )?)
 }
 
-/// Marks the unsent notes sent, and gives their bodies, oldest first.
-pub fn take_notes(c: &Connection, product: &str) -> Result<Vec<String>> {
+/// The unsent notes, oldest first: their seqs and bodies.
+pub fn unsent_notes(c: &Connection, product: &str) -> Result<Vec<(i64, String)>> {
     let mut stmt = c.prepare(
-        "update desk_items set sent = 1 where product = ?1 and kind = 'note' and sent = 0
-         returning seq, body",
+        "select seq, body from desk_items where product = ?1 and kind = 'note' and sent = 0
+         order by seq",
     )?;
-    let mut notes = stmt
-        .query_map([product], |r| {
-            Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?))
-        })?
+    let notes = stmt
+        .query_map([product], |r| Ok((r.get(0)?, r.get(1)?)))?
         .collect::<rusqlite::Result<Vec<_>>>()?;
-    notes.sort();
-    Ok(notes.into_iter().map(|(_, body)| body).collect())
+    Ok(notes)
+}
+
+/// Marks these notes sent, after their owner message reached the process.
+pub fn mark_sent(c: &Connection, product: &str, seqs: &[i64]) -> Result<()> {
+    let mut stmt = c.prepare(
+        "update desk_items set sent = 1 where product = ?1 and seq = ?2 and kind = 'note'",
+    )?;
+    for seq in seqs {
+        stmt.execute(params![product, seq])?;
+    }
+    Ok(())
 }
 
 /// Deletes the items of a product and gives it the session `session`.
@@ -187,15 +195,18 @@ mod tests {
     }
 
     #[test]
-    fn the_unsent_notes_go_out_once_in_order() {
+    fn the_unsent_notes_stay_unsent_until_they_are_marked() {
         let (_d, s) = store();
         s.write(|tx| {
             add_item(tx, "alpha", "note", r#""a""#, "t")?;
             add_item(tx, "alpha", "owner", "{}", "t")?;
             add_item(tx, "alpha", "note", r#""b""#, "t")?;
             add_item(tx, "beta", "note", r#""c""#, "t")?;
-            assert_eq!(take_notes(tx, "alpha")?, [r#""a""#, r#""b""#]);
-            assert!(take_notes(tx, "alpha")?.is_empty());
+            let notes = unsent_notes(tx, "alpha")?;
+            assert_eq!(notes, [(1, r#""a""#.into()), (3, r#""b""#.into())]);
+            assert_eq!(unsent_notes(tx, "alpha")?, notes, "a read marks nothing");
+            mark_sent(tx, "alpha", &[1, 3])?;
+            assert!(unsent_notes(tx, "alpha")?.is_empty());
             let sent: Vec<bool> = items(tx, "alpha", None, 9)?
                 .iter()
                 .map(|r| r.sent)

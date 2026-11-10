@@ -22,14 +22,14 @@ use agentsi_proto::setup_api::{
 };
 use agentsi_proto::story_api::{StoryConfig, StoryConfigGet, StoryConfigParams};
 use agentsi_ui::components::{Button, neutral_tag, status_tag};
-use agentsi_ui::tokens::{Status, line, radius, size, space, status, surface, text, weight};
+use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::input::{Input, InputState, Textarea, TextareaState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::ScreenSpec;
-use super::parts::{column, mono, section};
+use super::parts::{column, failed_text, mono, section};
 use super::roles::apply_lines;
 use super::setup_stage::{
     Extra, Fields, Form, GLOBAL_ROLES, Model, Objective, Problem, STAGES, Source, Stories,
@@ -1118,12 +1118,10 @@ impl SetupScreen {
 
     fn problems_of(&self, form: Form) -> Div {
         div().flex().flex_col().gap(space(1)).children(
-            self.problems.iter().filter(|p| p.form == form).map(|p| {
-                div()
-                    .text_size(size::sm())
-                    .text_color(status::danger())
-                    .child(p.text.clone())
-            }),
+            self.problems
+                .iter()
+                .filter(|p| p.form == form)
+                .map(|p| failed_text(p.text.clone())),
         )
     }
 
@@ -1534,12 +1532,12 @@ impl SetupScreen {
                     }),
             )
             .children(result.map(mono))
-            .children(self.draft.error.clone().map(|e| {
-                div()
-                    .text_size(size::sm())
-                    .text_color(status::danger())
-                    .child(format!("The draft failed: {e}"))
-            }))
+            .children(
+                self.draft
+                    .error
+                    .clone()
+                    .map(|e| failed_text(format!("The draft failed: {e}"))),
+            )
             .when(can_repair, |el| {
                 el.child(hint(
                     "The core refused the stage. Claude can repair the draft one time, from the reasons.",

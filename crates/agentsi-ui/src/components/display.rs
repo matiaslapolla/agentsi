@@ -251,14 +251,23 @@ impl RenderOnce for AgentCard {
                     .truncate()
                     .text_size(size::sm())
                     .font_weight(weight::MEDIUM)
-                    .text_color(if on { text::primary() } else { text::tertiary() }.hsla())
+                    .text_color(
+                        if on {
+                            text::primary()
+                        } else {
+                            text::tertiary()
+                        }
+                        .hsla(),
+                    )
                     .child(self.name),
             )
             .child(StateMark::new(s))
             .child(
                 div()
+                    .debug_selector(|| "agent-card-activity".into())
                     .max_w_full()
-                    .h(size::xs())
+                    .h(size::xs_line())
+                    .line_height(size::xs_line())
                     .truncate()
                     .text_size(size::xs())
                     .text_color(text::tertiary().hsla())

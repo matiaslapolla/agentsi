@@ -150,3 +150,24 @@ fn a_crash_closes_the_stream_with_the_stderr() {
     std::thread::sleep(Duration::from_millis(100));
     assert_eq!(p.exit_code(), Some(3));
 }
+
+#[test]
+fn a_spawn_waits_while_the_program_file_is_busy() {
+    use std::io::Write;
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("prog");
+    let mut open = std::fs::File::create(&file).unwrap();
+    open.write_all(b"#!/bin/sh\nexit 0\n").unwrap();
+    std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o755)).unwrap();
+    // An open write handle makes exec fail with ETXTBSY until it closes.
+    let busy = std::process::Command::new(&file).spawn().unwrap_err();
+    assert_eq!(busy.raw_os_error(), Some(libc::ETXTBSY), "{busy}");
+    let closer = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(40));
+        drop(open);
+    });
+    let mut child = agentsi_agency::desk::process::spawn(&mut std::process::Command::new(&file))
+        .expect("the spawn tries again");
+    assert!(child.wait().unwrap().success());
+    closer.join().unwrap();
+}

@@ -46,10 +46,10 @@ struct Server {
     core: Option<Core>,
     /// The id of the session that writes tickets.
     session: String,
-    /// The current tool sent a write request to the core.
-    sent: bool,
     /// The uuid of the desk session, from `AGENTSI_DESK_SESSION`.
     desk: Option<String>,
+    /// Opens a new connection to the core.
+    connect: fn() -> Result<Core, String>,
 }
 
 /// `AGENTSI_TERMINAL`, else `CLAUDE_CODE_SESSION_ID`, else `unknown`.
@@ -71,7 +71,7 @@ fn desk_session(var: impl Fn(&str) -> Option<String>) -> Option<String> {
 impl Server {
     fn core(&mut self) -> Result<&mut Core, String> {
         if self.core.is_none() {
-            self.core = Some(Core::connect()?);
+            self.core = Some((self.connect)()?);
         }
         Ok(self.core.as_mut().expect("just connected"))
     }
@@ -115,9 +115,12 @@ impl Server {
     /// because the core can restart while this server runs. A write tries again only
     /// when it failed before its request went out.
     fn run_tool(&mut self, name: &str, args: &Map<String, Value>) -> Result<String, String> {
-        self.sent = false;
+        if let Some(core) = &mut self.core {
+            core.take_wrote();
+        }
         let first = self.ask_core(name, args);
-        if first.is_err() && !self.sent && self.core.take().is_some() {
+        let wrote = self.core.as_mut().is_some_and(Core::take_wrote);
+        if first.is_err() && !wrote && self.core.take().is_some() {
             return self.ask_core(name, args);
         }
         first
@@ -131,9 +134,6 @@ impl Server {
             by: AuthorBy::Session,
             id: self.session.clone(),
         };
-        if tools::tool(name).is_some_and(|t| t.writes) {
-            self.sent = true;
-        }
         let core = self.core()?;
         let links = || -> Result<Option<Vec<Link>>, String> {
             args.get("links")
@@ -213,7 +213,7 @@ impl Server {
                 })?
                 .markdown),
             "add_ticket" => {
-                let added = core.call::<TicketAdd>(&TicketAddParams {
+                let added = core.write::<TicketAdd>(&TicketAddParams {
                     product,
                     kind: text("kind")
                         .and_then(TicketKind::parse)
@@ -254,12 +254,24 @@ impl Server {
                 if !fields && state.is_none() {
                     return Err(format!("Nothing to change in ticket {id}."));
                 }
+                if let (true, Some(to)) = (fields, state) {
+                    let now = core
+                        .call::<TicketGet>(&TicketGetParams {
+                            product: product.clone(),
+                            id: id.clone(),
+                        })?
+                        .ticket;
+                    let named = waiting_on.as_deref().is_some_and(|w| !w.trim().is_empty());
+                    if let Some(refusal) = now.state.move_refusal(&id, to, named) {
+                        return Err(refusal);
+                    }
+                }
                 let mut ticket = None;
                 if fields {
-                    ticket = Some(core.call::<TicketUpdate>(&update)?.ticket);
+                    ticket = Some(core.write::<TicketUpdate>(&update)?.ticket);
                 }
                 if let Some(state) = state {
-                    let moved = core.call::<TicketMove>(&TicketMoveParams {
+                    let moved = core.write::<TicketMove>(&TicketMoveParams {
                         product,
                         id,
                         state,
@@ -282,8 +294,7 @@ impl Server {
             session: session.to_string(),
             view,
         };
-        self.sent = true;
-        self.core()?.call::<DeskShow>(&params)?;
+        self.core()?.write::<DeskShow>(&params)?;
         Ok("The view is in the desk conversation.".into())
     }
 
@@ -372,8 +383,8 @@ pub fn run(_argv: &[String]) -> Result<i32, crate::commands::Fail> {
             cwd,
             core: None,
             session: session_id(|k| std::env::var(k).ok()),
-            sent: false,
             desk: desk_session(|k| std::env::var(k).ok()),
+            connect: Core::connect,
         },
     )
     .map_err(|e| e.to_string())?;
@@ -407,8 +418,8 @@ mod tests {
             cwd: "/nowhere".into(),
             core: None,
             session: "unknown".into(),
-            sent: false,
             desk: None,
+            connect: Core::connect,
         };
         server
             .handle(&json!({"jsonrpc": "2.0", "id": 1, "method": method, "params": params}))
@@ -471,8 +482,8 @@ mod tests {
             cwd: "/nowhere".into(),
             core: None,
             session: "unknown".into(),
-            sent: false,
             desk: Some("u1".into()),
+            connect: Core::connect,
         }
     }
 
@@ -595,13 +606,84 @@ mod tests {
                 cwd: "/".into(),
                 core: None,
                 session: "unknown".into(),
-                sent: false,
                 desk: None,
+                connect: Core::connect,
             },
         )
         .unwrap();
         let lines: Vec<&str> = std::str::from_utf8(&out).unwrap().lines().collect();
         assert_eq!(lines.len(), 1);
         assert_eq!(serde_json::from_str::<Value>(lines[0]).unwrap()["id"], 7);
+    }
+
+    /// A fake core on one end of a socket pair. It answers `product.whoami` and the methods
+    /// of `answers`, and closes the connection at the method `close_at`.
+    fn fake_core(answers: Value, close_at: &'static str) -> Core {
+        use std::io::{BufRead as _, BufReader, Write as _};
+        let (ours, theirs) = std::os::unix::net::UnixStream::pair().unwrap();
+        std::thread::spawn(move || {
+            let mut writer = theirs.try_clone().unwrap();
+            for line in BufReader::new(theirs).lines() {
+                let request: Value = serde_json::from_str(&line.unwrap()).unwrap();
+                let method = request["method"].as_str().unwrap();
+                if method == close_at {
+                    return;
+                }
+                let result = match method {
+                    "product.whoami" => json!({"product": null, "products": [
+                        {"id": "alpha", "name": "Alpha", "status": "active", "paths": [],
+                         "archived": false}]}),
+                    other => answers[other].clone(),
+                };
+                let reply = json!({"jsonrpc": "2.0", "id": request["id"], "result": result});
+                if writeln!(writer, "{reply}").is_err() {
+                    return;
+                }
+            }
+        });
+        Core::over(ours)
+    }
+
+    fn done_ticket() -> Value {
+        json!({"ticket": {"product": "alpha", "id": "C002", "scope": null, "kind": "todo",
+            "state": "done", "title": "Before", "body": "", "waiting_on": null, "assignee": null,
+            "author": {"by": "session", "id": "unknown"},
+            "updated_by": {"by": "session", "id": "unknown"}, "links": [], "objective": null,
+            "created_at": "x", "updated_at": "x", "closed_at": "x"},
+            "markdown": "# C002 Before"})
+    }
+
+    fn server(core: Core, connect: fn() -> Result<Core, String>) -> Server {
+        Server {
+            cwd: "/nowhere".into(),
+            core: Some(core),
+            session: "unknown".into(),
+            desk: None,
+            connect,
+        }
+    }
+
+    #[test]
+    fn a_write_tool_tries_again_when_the_connection_broke_before_its_write() {
+        let mut s = server(fake_core(json!({}), "ticket.get"), || {
+            Ok(fake_core(json!({"ticket.get": done_ticket()}), ""))
+        });
+        let args = json!({"product": "alpha", "id": "C002", "title": "After", "state": "waiting"});
+        let r = s.run_tool("update_ticket", args.as_object().unwrap());
+        assert_eq!(
+            r,
+            Err("Ticket C002 cannot move from done to waiting.".into()),
+            "the second connection answered"
+        );
+    }
+
+    #[test]
+    fn a_write_tool_does_not_try_again_after_its_write_went_out() {
+        let mut s = server(fake_core(json!({}), "ticket.add"), || {
+            panic!("a second connection would send the write again")
+        });
+        let args = json!({"product": "alpha", "kind": "todo", "title": "Once"});
+        let r = s.run_tool("add_ticket", args.as_object().unwrap());
+        assert!(r.is_err(), "{r:?}");
     }
 }

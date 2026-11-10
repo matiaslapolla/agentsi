@@ -52,12 +52,13 @@ pub fn parse_status(stdout: &str, stderr: &str) -> Auth {
 
 /// Runs `<program> auth status --json`, with a limit of `timeout`.
 pub fn check(program: &str, timeout: Duration) -> Auth {
-    let spawned = Command::new(program)
-        .args(["auth", "status", "--json"])
-        .stdin(Stdio::null())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn();
+    let spawned = super::process::spawn(
+        Command::new(program)
+            .args(["auth", "status", "--json"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped()),
+    );
     let mut child = match spawned {
         Ok(c) => c,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Auth::of(AuthState::Missing),

@@ -288,11 +288,8 @@ pub fn move_to(
     let mut t = get(tx, &product.id, &p.id)?;
     check_writer(&t, &by)?;
     let waiting_on = p.waiting_on.as_deref().and_then(trimmed);
-    if waiting_on.is_some() && p.state != Waiting {
-        return Err(Error::Invalid(format!(
-            "waiting_on goes only with the state waiting, not {}.",
-            p.state.as_str()
-        )));
+    if let Some(m) = t.state.move_refusal(&t.id, p.state, waiting_on.is_some()) {
+        return Err(Error::Invalid(m));
     }
     let now = clock::iso(now_ms);
     match (t.state, p.state) {
@@ -305,28 +302,13 @@ pub fn move_to(
             }
             t.waiting_on = waiting_on;
         }
-        (Open, Waiting) => {
-            t.waiting_on = Some(waiting_on.ok_or_else(|| {
-                Error::Invalid(format!(
-                    "Ticket {} needs waiting_on to wait: who or what it waits on.",
-                    t.id
-                ))
-            })?);
-        }
+        (Open, Waiting) => t.waiting_on = waiting_on,
         (Waiting, Open) => t.waiting_on = None,
-        (Open | Waiting, Done | Dropped) => {
+        (Open | Waiting, _) => {
             t.waiting_on = None;
             t.closed_at = Some(now.clone());
         }
-        (Done | Dropped, Open) => t.closed_at = None,
-        (from, to) => {
-            return Err(Error::Invalid(format!(
-                "Ticket {} cannot move from {} to {}.",
-                t.id,
-                from.as_str(),
-                to.as_str()
-            )));
-        }
+        (Done | Dropped, _) => t.closed_at = None,
     }
     t.state = p.state;
     t.updated_by = by;
@@ -393,14 +375,35 @@ pub fn story_error(e: crate::story::Error) -> Error {
     }
 }
 
+/// A failed story promote. `story` is the id of a story that the PM call saved before the
+/// failure, so the caller still tells the clients that the stories changed.
+#[derive(Debug, PartialEq)]
+pub struct PromoteError {
+    pub error: Error,
+    pub story: Option<String>,
+}
+
+impl From<Error> for PromoteError {
+    fn from(error: Error) -> Self {
+        PromoteError { error, story: None }
+    }
+}
+
+impl From<agentsi_store::Error> for PromoteError {
+    fn from(e: agentsi_store::Error) -> Self {
+        Error::from(e).into()
+    }
+}
+
 /// `ticket.promote` with `to: "story"`: the PM shapes the ticket into one story, then one
-/// transaction links the story and closes the ticket. A failed PM call writes nothing.
+/// transaction links the story and closes the ticket. A failed PM call writes nothing. A
+/// ticket that changed during the PM call stays as it is, and the error names the new story.
 pub fn promote_story(
     ctx: &ProposeCtx,
     id: &str,
     by: &Author,
     now_ms: i64,
-) -> Result<(Ticket, Story)> {
+) -> std::result::Result<(Ticket, Story), PromoteError> {
     let product = ctx.product.id.clone();
     let t = ctx.store.read(|c| Ok(promotable(c, &product, id, by)))??;
     let proposed = propose::propose_story(ctx, &story_text(&t), None, None).map_err(story_error)?;
@@ -413,11 +416,29 @@ pub fn promote_story(
         kind: LinkType::Story,
         reference: story.id.clone(),
     };
-    let (id, by) = (id.to_string(), by.clone());
-    let ticket = ctx
+    let (ticket_id, by) = (id.to_string(), by.clone());
+    let closed = ctx
         .store
-        .try_write(move |tx| close_with(tx, &product, &id, link, &by, now_ms))??;
-    Ok((ticket, story))
+        .try_write(move |tx| close_with(tx, &product, &ticket_id, link, &by, now_ms))
+        .map_err(Error::from)
+        .and_then(|r| r);
+    match closed {
+        Ok(ticket) => Ok((ticket, story)),
+        Err(e) => Err(PromoteError {
+            error: Error::Conflict(format!(
+                "Story {} was saved, but ticket {id} was not closed: {}",
+                story.id,
+                message(&e)
+            )),
+            story: Some(story.id),
+        }),
+    }
+}
+
+fn message(e: &Error) -> &str {
+    match e {
+        Error::NotFound(m) | Error::Invalid(m) | Error::Conflict(m) | Error::Unavailable(m) => m,
+    }
 }
 
 /// `ticket.promote` with `to: "decision"`: a pending decision of the product, the link to it

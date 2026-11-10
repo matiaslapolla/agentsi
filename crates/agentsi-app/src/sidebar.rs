@@ -438,28 +438,11 @@ impl Sidebar {
                 tree::items(core.read(cx), meetings, &data, &p.id)
             })
             .collect();
-        // The state of a product row: its items with the lowest rank, and the decisions.
-        let mut product_work: Vec<Option<WorkState>> = Vec::new();
-        for (p, list) in products.iter().zip(lists.iter_mut()) {
-            for item in list.iter_mut() {
-                let alert = AlertTarget::of_item(host.as_deref(), &p.id, &item.key)
-                    .and_then(|t| Alerts::glow(cx, &t));
-                item.work = item.work.or(alert);
-            }
-            let decisions = Alerts::glow(
-                cx,
-                &AlertTarget::Decisions {
-                    host: host.clone(),
-                    product: p.id.clone(),
-                },
-            );
-            product_work.push(
-                list.iter()
-                    .filter_map(|i| i.work)
-                    .chain(decisions)
-                    .min_by_key(|w| w.rank()),
-            );
-        }
+        let product_work: Vec<(Option<WorkState>, u64)> = products
+            .iter()
+            .zip(lists.iter_mut())
+            .map(|(p, list)| mark_alerts(host.as_deref(), &p.id, list, cx))
+            .collect();
         let arranged = data.arrange(host.as_deref(), products);
         let numbers: Vec<usize> = arranged.flat();
         let scope = slot.map_or_else(String::new, |i| format!("host-{i}-"));
@@ -538,8 +521,10 @@ impl Sidebar {
                 .open(open)
                 .state(
                     product_work[i]
+                        .0
                         .or_else(|| attention.contains(&p.id).then_some(WorkState::Blocked)),
                 )
+                .alert(product_work[i].1)
                 .selected(active.as_ref() == Some(&product))
                 .focused(focused && this.cursor.as_ref() == Some(&key))
                 .trailing(trailing)
@@ -573,6 +558,7 @@ impl Sidebar {
                     .decorate(move |el| el.on_mouse_down(MouseButton::Right, menu))
                     .leading(StatusDot(item.status))
                     .state(item.work)
+                    .alert(item.alert)
                     .meta(item.meta.clone())
                     .hue(item.hue)
                     .tooltip(item.tooltip.clone().map(SharedString::from))
@@ -684,7 +670,9 @@ impl Sidebar {
             return Vec::new();
         };
         let archived = core.read(cx).archived_products.clone();
-        let on = self.show_archived.contains(host.as_deref().unwrap_or_default());
+        let on = self
+            .show_archived
+            .contains(host.as_deref().unwrap_or_default());
         if off || (archived.is_empty() && !on) {
             return Vec::new();
         }
@@ -930,6 +918,42 @@ impl Render for Sidebar {
     }
 }
 
+/// Gives each item row the state and the id of its alert, and gives the state and the alert
+/// id of the product row: its items with the lowest rank and the decisions, and the newest
+/// alert of the product.
+fn mark_alerts(
+    host: Option<&str>,
+    product: &str,
+    list: &mut [Item],
+    cx: &App,
+) -> (Option<WorkState>, u64) {
+    for item in list.iter_mut() {
+        let alert =
+            AlertTarget::of_item(host, product, &item.key).and_then(|t| Alerts::glow_id(cx, &t));
+        item.work = item.work.or(alert.map(|a| a.0));
+        item.alert = alert.map_or(0, |a| a.1);
+    }
+    let decisions = Alerts::glow_id(
+        cx,
+        &AlertTarget::Decisions {
+            host: host.map(str::to_string),
+            product: product.to_string(),
+        },
+    );
+    let work = list
+        .iter()
+        .filter_map(|i| i.work)
+        .chain(decisions.map(|d| d.0))
+        .min_by_key(|w| w.rank());
+    let alert = list
+        .iter()
+        .map(|i| i.alert)
+        .chain(decisions.map(|d| d.1))
+        .max()
+        .unwrap_or(0);
+    (work, alert)
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -940,9 +964,11 @@ mod tests {
     use gpui::{Bounds, Pixels, TestAppContext, VisualTestContext};
     use gpui_kit::AppContext as _;
 
-    use super::Sidebar;
+    use super::{Sidebar, mark_alerts};
+    use crate::alerts::{Alerts, Name};
     use crate::link::Link;
     use crate::model::{CoreState, Cores};
+    use crate::tree::{Item, ItemKey};
 
     fn bounds(cx: &mut VisualTestContext, selector: &str) -> Bounds<Pixels> {
         // The tests are short-lived, so a leaked name costs nothing.
@@ -980,6 +1006,58 @@ mod tests {
         let (_, cx) = cx.add_window_view(|_, cx| Sidebar::new(Cores::new(core), None, cx));
         cx.simulate_resize(gpui::size(control::WINDOW_WIDTH, control::WINDOW_HEIGHT));
         (core_end, cx)
+    }
+
+    #[gpui::test]
+    fn a_repeat_alert_gives_the_item_row_and_the_product_row_a_new_alert_id(
+        cx: &mut TestAppContext,
+    ) {
+        let center = cx.update(Alerts::install);
+        let failed = || {
+            serde_json::from_value(serde_json::json!({"jsonrpc": "2.0",
+                "method": "meeting.progress",
+                "params": {"meeting": "m", "product": "a", "stage": "done", "phase": "end",
+                           "error": "boom"}}))
+            .unwrap()
+        };
+        let again = || {
+            serde_json::from_value(serde_json::json!({"jsonrpc": "2.0",
+                "method": "meeting.progress",
+                "params": {"meeting": "m2", "product": "a", "stage": "plan", "phase": "start"}}))
+            .unwrap()
+        };
+        let row = || Item {
+            key: ItemKey::Meeting,
+            status: agentsi_ui::tokens::Status::Off,
+            work: None,
+            alert: 0,
+            title: "Meeting".into(),
+            tooltip: None,
+            meta: String::new(),
+            hue: None,
+            running: false,
+        };
+        let none = |_: &str| Name::default();
+        let ids = |cx: &mut TestAppContext| {
+            cx.update(|cx| {
+                let mut list = [row()];
+                let product = mark_alerts(None, "a", &mut list, cx);
+                (list[0].alert, product.1)
+            })
+        };
+        center.update(cx, |c, cx| {
+            c.take(None, &failed(), &none, cx);
+        });
+        let first = ids(cx);
+        assert_ne!(first.0, 0);
+        assert_eq!(first.0, first.1);
+        center.update(cx, |c, cx| {
+            c.take(None, &again(), &none, cx);
+            c.take(None, &failed(), &none, cx);
+        });
+        let second = ids(cx);
+        assert_ne!(second.0, first.0, "a new key pulses the glow again");
+        assert_eq!(second.0, second.1);
     }
 
     #[gpui::test]

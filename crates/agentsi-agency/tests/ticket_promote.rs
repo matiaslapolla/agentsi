@@ -9,7 +9,7 @@ use agentsi_agency::tickets::{self, Error, write};
 use agentsi_proto::agency_api::Owner;
 use agentsi_proto::story_api::{StoryConfig, StoryUsage};
 use agentsi_proto::ticket_api::{
-    Author, AuthorBy, Link, LinkType, TicketAddParams, TicketKind, TicketState,
+    Author, AuthorBy, Link, LinkType, TicketAddParams, TicketKind, TicketMoveParams, TicketState,
 };
 use agentsi_store::Store;
 use serde_json::{Value, json};
@@ -146,7 +146,8 @@ fn a_story_promote_links_the_new_story_and_closes_the_ticket() {
     // A closed ticket cannot become a story again.
     drop(prompts);
     let again = write::promote_story(&f.ctx, "C001", &owner(), T0 + 2000).unwrap_err();
-    assert!(matches!(again, Error::Invalid(_)), "{again:?}");
+    assert!(matches!(again.error, Error::Invalid(_)), "{again:?}");
+    assert_eq!(again.story, None);
 }
 
 #[test]
@@ -154,7 +155,8 @@ fn a_failed_story_new_leaves_the_ticket_as_it_was() {
     let f = fixture(None);
     let before = ticket(&f);
     let err = write::promote_story(&f.ctx, "C001", &owner(), T0 + 1000).unwrap_err();
-    assert!(!matches!(err, Error::Conflict(_)), "{err:?}");
+    assert!(!matches!(err.error, Error::Conflict(_)), "{err:?}");
+    assert_eq!(err.story, None);
     assert_eq!(ticket(&f), before);
     let stories: i64 = f
         .ctx
@@ -162,6 +164,48 @@ fn a_failed_story_new_leaves_the_ticket_as_it_was() {
         .read(|c| Ok(c.query_row("select count(*) from stories", [], |r| r.get(0))?))
         .unwrap();
     assert_eq!(stories, 0);
+}
+
+#[test]
+fn a_ticket_moved_during_the_pm_call_stays_and_the_error_names_the_new_story() {
+    let mut f = fixture(Some(story("Show the result")));
+    let (store, product, pm) = (
+        f.ctx.store.clone(),
+        f.ctx.product.clone(),
+        f.ctx.caller.clone(),
+    );
+    f.ctx.caller = Arc::new(move |c: &Call, role: &str| {
+        let product = product.clone();
+        store
+            .try_write(move |tx| {
+                let p = TicketMoveParams {
+                    product: "p".into(),
+                    id: "C001".into(),
+                    state: TicketState::Dropped,
+                    waiting_on: None,
+                    by: owner(),
+                };
+                write::move_to(tx, &product, &p, T0 + 500)
+            })
+            .unwrap()
+            .unwrap();
+        pm(c, role)
+    });
+    let err = write::promote_story(&f.ctx, "C001", &owner(), T0 + 1000).unwrap_err();
+    let story = err.story.clone().expect("the PM call saved a story");
+    match &err.error {
+        Error::Conflict(m) => assert!(m.contains(&format!("Story {story} was saved")), "{m}"),
+        other => panic!("{other:?}"),
+    }
+    let t = ticket(&f);
+    assert_eq!(t.state, TicketState::Dropped);
+    assert!(t.links.is_empty(), "{:?}", t.links);
+    let stories: i64 = f
+        .ctx
+        .store
+        .read(|c| Ok(c.query_row("select count(*) from stories", [], |r| r.get(0))?))
+        .unwrap();
+    assert_eq!(stories, 1);
 }
 
 #[test]
@@ -173,7 +217,7 @@ fn a_session_cannot_promote_a_ticket_of_the_owner_and_no_pm_runs() {
     };
     let err = write::promote_story(&f.ctx, "C001", &s1, T0).unwrap_err();
     assert_eq!(
-        err,
+        err.error,
         Error::Conflict("Ticket C001 belongs to the owner.".into())
     );
     assert!(f.prompts.lock().unwrap().is_empty());
