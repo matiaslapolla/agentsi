@@ -6,7 +6,11 @@ use agentsi_proto::method::Method;
 use agentsi_proto::rpc::{ErrorKind, Notification};
 use agentsi_proto::socket::socket_path;
 
-pub struct Core(Client);
+pub struct Core {
+    client: Client,
+    /// A write request went out on this connection since the last `take_wrote`.
+    wrote: bool,
+}
 
 impl Core {
     pub fn connect() -> Result<Core, String> {
@@ -21,11 +25,35 @@ impl Core {
                 client: Some("agentsi-cli".into()),
             })
             .map_err(message)?;
-        Ok(Core(client))
+        Ok(Core {
+            client,
+            wrote: false,
+        })
+    }
+
+    /// A connection over a stream that a test serves.
+    #[cfg(test)]
+    pub fn over(stream: std::os::unix::net::UnixStream) -> Core {
+        Core {
+            client: Client::new(stream).expect("the stream clones"),
+            wrote: false,
+        }
     }
 
     pub fn call<M: Method>(&mut self, params: &M::Params) -> Result<M::Result, String> {
-        self.0.call::<M>(params).map_err(message)
+        self.client.call::<M>(params).map_err(message)
+    }
+
+    /// Like `call`, for a request that changes data: the connection remembers that it went
+    /// out, so the caller does not send it a second time.
+    pub fn write<M: Method>(&mut self, params: &M::Params) -> Result<M::Result, String> {
+        self.wrote = true;
+        self.call::<M>(params)
+    }
+
+    /// True when a write request went out since the last call, and resets it.
+    pub fn take_wrote(&mut self) -> bool {
+        std::mem::take(&mut self.wrote)
     }
 
     /// Like `call`, and the error keeps the kind that the core gave it, for a
@@ -34,7 +62,7 @@ impl Core {
         &mut self,
         params: &M::Params,
     ) -> Result<M::Result, (Option<ErrorKind>, String)> {
-        self.0.call::<M>(params).map_err(|e| {
+        self.client.call::<M>(params).map_err(|e| {
             let kind = match &e {
                 ClientError::Rpc(r) => Some(r.kind()),
                 _ => None,
@@ -45,7 +73,7 @@ impl Core {
 
     /// The next event of the topics of this connection. It waits until one comes.
     pub fn next_event(&mut self) -> Result<Notification, String> {
-        self.0.next_notification().map_err(message)
+        self.client.next_notification().map_err(message)
     }
 }
 
