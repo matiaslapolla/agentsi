@@ -452,6 +452,114 @@ fn object_views_name_objects_of_the_product_and_accept_on_a_priority_writes_no_o
 }
 
 #[test]
+fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_its_length() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let show = |c: &mut Framed, view: Value| {
+        c.call("desk.show", json!({"session": session, "view": view}))
+    };
+
+    // A bad input is `invalid` with a text for Claude, and no item is stored.
+    for (view, word) in [
+        (
+            json!({"kind": "table", "title": "T", "columns": ["a", "b"],
+                   "rows": [["1", "2"], ["1", "2", "3"]]}),
+            "Row 2 has 3 cells",
+        ),
+        (
+            json!({"kind": "table", "title": "T", "columns": [], "rows": []}),
+            "columns has 0",
+        ),
+        (
+            json!({"kind": "chart", "chart": "bar", "title": "C", "labels": ["a"], "values": [1, 2]}),
+            "one label for each value",
+        ),
+        (
+            json!({"kind": "chart", "chart": "pie", "title": "C", "labels": ["a"], "values": [-1]}),
+            "negative",
+        ),
+        (
+            json!({"kind": "checklist", "title": "L", "items": ["x".repeat(201)]}),
+            "Item 1 has 201 characters",
+        ),
+        (
+            json!({"kind": "page", "title": "P", "html": "x".repeat(512_001)}),
+            "html has 512001",
+        ),
+    ] {
+        let r = show(&mut c, view);
+        assert_eq!(kind(&r), "invalid", "{r}");
+        let m = r["error"]["message"].as_str().unwrap();
+        assert!(m.contains(word), "{m}");
+    }
+    let r = show(&mut c, json!({"kind": "chart", "chart": "donut", "title": "C", "labels": [], "values": []}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+
+    let table = json!({"kind": "table", "title": "T", "columns": ["a"], "rows": [["1"]]});
+    assert_eq!(show(&mut c, table.clone())["result"]["view_id"], 4);
+    assert_eq!(c.next_event("desk.item")["item"]["view"], table);
+
+    // A checklist: the check is stored in the item and becomes a desk note.
+    let list = json!({"kind": "checklist", "title": "Launch", "items": ["tag", "post", "mail"]});
+    assert_eq!(show(&mut c, list)["result"]["view_id"], 5);
+    c.next_event("desk.item");
+    let r = c.ok(
+        "desk.check",
+        json!({"product": "alpha", "seq": 5, "checked": [1, 0, 1]}),
+    );
+    assert_eq!(r, json!({"seq": 5}));
+    let note = c.next_event("desk.item");
+    assert_eq!(
+        note["item"],
+        json!({"kind": "note", "text": "The owner checked 2 of 3 items of Launch: tag, post."})
+    );
+    for (params, want) in [
+        (json!({"product": "alpha", "seq": 5, "checked": [3]}), "invalid"),
+        (json!({"product": "alpha", "seq": 4, "checked": [0]}), "invalid"),
+        (json!({"product": "alpha", "seq": 99, "checked": []}), "not_found"),
+        (json!({"product": "nope", "seq": 5, "checked": []}), "not_found"),
+    ] {
+        let r = c.call("desk.check", params);
+        assert_eq!(kind(&r), want, "{r}");
+    }
+
+    // A page: the events and the history give its length. desk.page gives the HTML.
+    let html = "<h1>Report</h1>";
+    let r = show(&mut c, json!({"kind": "page", "title": "Report", "html": html}));
+    assert_eq!(r["result"]["view_id"], 7);
+    let e = c.next_event("desk.item");
+    assert_eq!(
+        e["item"],
+        json!({"kind": "view", "view": {"kind": "page", "title": "Report", "html": ""},
+               "html_len": 15})
+    );
+    let h = history(&mut c);
+    let items = h["items"].as_array().unwrap();
+    assert_eq!(items[4]["item"]["checked"], json!([0, 1]));
+    assert_eq!(items[6]["item"], e["item"]);
+    let r = c.ok("desk.page", json!({"product": "alpha", "seq": 7}));
+    assert_eq!(r, json!({"title": "Report", "html": html}));
+    let r = c.call("desk.page", json!({"product": "alpha", "seq": 5}));
+    assert_eq!(kind(&r), "invalid", "{r}");
+
+    // The next owner message carries the note of the check.
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    items_until(&mut c, "end");
+    let stdin = read(&w.bin.join("stdin"));
+    let last: Value = serde_json::from_str(stdin.lines().last().unwrap()).unwrap();
+    assert_eq!(
+        last["message"]["content"],
+        "Desk notes:\n- The owner checked 2 of 3 items of Launch: tag, post.\n\ntwo"
+    );
+}
+
+#[test]
 fn a_reset_starts_a_new_conversation_with_a_new_session() {
     let dir = TempDir::new();
     let w = setup(&dir, READY);

@@ -211,7 +211,9 @@ mod tests {
             "Read,Grep,Glob,mcp__agentsi__search,mcp__agentsi__get_doc,\
              mcp__agentsi__list_minutes,mcp__agentsi__pending_decisions,\
              mcp__agentsi__role_memory,mcp__agentsi__show_decisions,\
-             mcp__agentsi__show_priorities,mcp__agentsi__show_story,mcp__agentsi__show_diff"
+             mcp__agentsi__show_priorities,mcp__agentsi__show_story,mcp__agentsi__show_diff,\
+             mcp__agentsi__show_table,mcp__agentsi__show_chart,mcp__agentsi__show_checklist,\
+             mcp__agentsi__show_page"
         );
         let mcp: Value = serde_json::from_str(at("--mcp-config")).unwrap();
         assert_eq!(

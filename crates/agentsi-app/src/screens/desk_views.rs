@@ -5,19 +5,34 @@
 //! story and a diff. A button that writes asks a Confirm first. A button that would run a
 //! story or spend money only opens the story screen.
 //!
+//! A generic view (table, chart, checklist, page) draws the small data that Claude gave. The
+//! core checked its limits. A check in a checklist calls `desk.check`, which stores a desk note
+//! and writes no product data. A page is never drawn here: "Open in browser" writes it to a
+//! file with mode 0600 and opens the file.
+//!
 //! Spec: `docs/specs/agentsi-desktop-conversation-views.md`.
 
 use std::collections::HashMap;
+use std::io::Write as _;
+use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
+use std::path::{Path, PathBuf};
 
 use agentsi_proto::desk_api::{MinutesDetail, MinutesGet, MinutesGetParams, PriorityInfo};
-use agentsi_proto::desk_session_api::View;
+use agentsi_proto::desk_session_api::{
+    ChartKind, DeskCheck, DeskCheckParams, DeskPage, DeskPageParams, DeskPageResult, DeskSeqResult,
+    View,
+};
 use agentsi_proto::marks_api::{Mark, MarkEntry, MarkSet, MarkSetParams, MarkSetResult};
 use agentsi_proto::story_api::{
     StoryGet, StoryGetResult, StoryIdParams, StoryReview, StoryReviewResult,
 };
 use agentsi_ui::components::{Button, Card, neutral_tag};
 use agentsi_ui::tokens::{WorkState, control, line, radius, size, space, surface, text, weight};
+use gpui_kit::component::ActiveTheme as _;
+use gpui_kit::component::chart::{AreaChart, BarChart, LineChart, PieChart};
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::diff::{Diff, DiffFile, DiffParseOptions, DiffState};
+use gpui_kit::component::table::{Table, TableBody, TableCell, TableHead, TableHeader, TableRow};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -27,6 +42,62 @@ use crate::nav::{Nav, ScreenRequest};
 use crate::screens::parts::{Flash, Live, Load, mark_tag, mono, role_label};
 use crate::screens::stories::story_tag;
 use crate::screens::story::DIFF_LINES;
+
+/// What a view row knows of its stored item, apart from the view.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(super) struct Shown {
+    pub(super) seq: i64,
+    /// A checklist: the items that the owner checked.
+    pub(super) checked: Vec<u32>,
+    /// A page: the characters of its HTML. The app reads the HTML only to open it.
+    pub(super) html_len: Option<u64>,
+}
+
+/// The folder of the page files of this device: `$XDG_RUNTIME_DIR/agentsi/pages`
+/// (`$TMPDIR` on macOS). `None` when the variable is not set.
+pub(super) fn pages_dir() -> Option<PathBuf> {
+    let var = if cfg!(target_os = "macos") {
+        "TMPDIR"
+    } else {
+        "XDG_RUNTIME_DIR"
+    };
+    std::env::var_os(var)
+        .filter(|v| !v.is_empty())
+        .map(|base| PathBuf::from(base).join("agentsi").join("pages"))
+}
+
+/// Writes a page to `<dir>/<product>-<seq>.html`. Only the owner can read the folder and the
+/// file, because the page can hold product data.
+pub(super) fn write_page(
+    dir: &Path,
+    product: &str,
+    seq: i64,
+    html: &str,
+) -> std::io::Result<PathBuf> {
+    std::fs::create_dir_all(dir)?;
+    std::fs::set_permissions(dir, std::fs::Permissions::from_mode(0o700))?;
+    let name: String = product
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    let path = dir.join(format!("{name}-{seq}.html"));
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .create(true)
+        .truncate(true)
+        .mode(0o600)
+        .open(&path)?;
+    // A file from an older run keeps its mode on open.
+    file.set_permissions(std::fs::Permissions::from_mode(0o600))?;
+    file.write_all(html.as_bytes())?;
+    Ok(path)
+}
 
 /// The stored objects of the object views, by id.
 #[derive(Default)]
@@ -77,7 +148,7 @@ impl DeskConversation {
             .rows
             .iter()
             .filter_map(|r| match r {
-                Row::View(v) if which.covers(v) && !seen.contains(v) => {
+                Row::View(v, _) if which.covers(v) && !seen.contains(v) => {
                     seen.push(v.clone());
                     Some(v.clone())
                 }
@@ -93,7 +164,11 @@ impl DeskConversation {
     pub(super) fn read_view(&mut self, view: &View, cx: &mut Context<Self>) {
         let link = self.core.read(cx).link.clone();
         match view {
-            View::Decisions { .. } => {}
+            View::Decisions { .. }
+            | View::Table { .. }
+            | View::Chart { .. }
+            | View::Checklist { .. }
+            | View::Page { .. } => {}
             View::Priorities { minutes_id } => {
                 let id = minutes_id.clone();
                 self.objects
@@ -287,6 +362,91 @@ impl DeskConversation {
         cx.notify();
     }
 
+    /// Checks or unchecks one item of a checklist. The row shows it at once. A refusal of the
+    /// core puts the row back.
+    pub fn toggle(&mut self, seq: i64, item: u32, cx: &mut Context<Self>) {
+        let Some(shown) = self.rows.iter_mut().find_map(|r| match r {
+            Row::View(View::Checklist { .. }, shown) if shown.seq == seq => Some(shown),
+            _ => None,
+        }) else {
+            return;
+        };
+        let before = shown.checked.clone();
+        match shown.checked.iter().position(|c| *c == item) {
+            Some(i) => {
+                shown.checked.remove(i);
+            }
+            None => {
+                shown.checked.push(item);
+                shown.checked.sort_unstable();
+            }
+        }
+        let call = self.core.read(cx).link.call::<DeskCheck>(&DeskCheckParams {
+            product: self.product.clone(),
+            seq,
+            checked: shown.checked.clone(),
+        });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.check_done(seq, before, result, cx));
+        })
+        .detach();
+        cx.notify();
+    }
+
+    pub(crate) fn check_done(
+        &mut self,
+        seq: i64,
+        before: Vec<u32>,
+        result: Result<DeskSeqResult, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        if let Err(e) = result {
+            self.flash = Some(Flash::Failed(e.to_string()));
+            for r in &mut self.rows {
+                if let Row::View(_, shown) = r
+                    && shown.seq == seq
+                {
+                    shown.checked.clone_from(&before);
+                }
+            }
+        }
+        cx.notify();
+    }
+
+    /// "Open in browser": reads the HTML of the page from the core, then writes and opens it.
+    pub fn open_page(&mut self, seq: i64, cx: &mut Context<Self>) {
+        let call = self.core.read(cx).link.call::<DeskPage>(&DeskPageParams {
+            product: self.product.clone(),
+            seq,
+        });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.page_done(seq, result, cx));
+        })
+        .detach();
+    }
+
+    pub(crate) fn page_done(
+        &mut self,
+        seq: i64,
+        result: Result<DeskPageResult, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        let written = result.map_err(|e| e.to_string()).and_then(|page| {
+            let dir = self.pages.clone().ok_or_else(|| {
+                "XDG_RUNTIME_DIR is not set, so the app has no folder for the page.".to_string()
+            })?;
+            write_page(&dir, &self.product, seq, &page.html)
+                .map_err(|e| format!("The page file was not written: {e}"))
+        });
+        match written {
+            Ok(path) => cx.open_url(&crate::format::file_url(&path)),
+            Err(e) => self.flash = Some(Flash::Failed(e)),
+        }
+        cx.notify();
+    }
+
     /// Opens the story screen. A view never runs a story itself.
     pub fn open_story(&mut self, id: &str, cx: &mut Context<Self>) {
         Nav::open(cx, &self.core, ScreenRequest::story(&self.product, id));
@@ -298,7 +458,9 @@ impl DeskConversation {
         &self,
         row: usize,
         view: &View,
+        shown: &Shown,
         weak: &WeakEntity<Self>,
+        cx: &App,
     ) -> AnyElement {
         match view {
             // The conversation draws the decisions view itself.
@@ -306,6 +468,19 @@ impl DeskConversation {
             View::Priorities { minutes_id } => self.priorities_view(row, minutes_id, weak),
             View::Story { id } => self.story_view(row, id, weak),
             View::Diff { story_id } => self.diff_view(row, story_id, weak),
+            View::Table {
+                title,
+                columns,
+                rows,
+            } => table_view(row, title, columns, rows),
+            View::Chart {
+                chart,
+                title,
+                labels,
+                values,
+            } => chart_view(row, *chart, title, labels, values, cx),
+            View::Checklist { title, items } => checklist_view(row, title, items, shown, weak),
+            View::Page { title, .. } => page_view(row, title, shown, weak),
         }
     }
 
@@ -534,6 +709,160 @@ impl DeskConversation {
     }
 }
 
+fn table_view(row: usize, title: &str, columns: &[String], rows: &[Vec<String>]) -> AnyElement {
+    let table = Table::new()
+        .child(TableHeader::new().child(
+            TableRow::new().children(columns.iter().map(|c| TableHead::new().child(c.clone()))),
+        ))
+        .child(TableBody::new().children(rows.iter().map(|r| {
+            TableRow::new().children(r.iter().map(|cell| TableCell::new().child(cell.clone())))
+        })));
+    div()
+        .flex()
+        .flex_col()
+        .gap(space(2))
+        .child(view_title("Table", title))
+        .child(
+            div()
+                .id(SharedString::from(format!("deskv-{row}-table")))
+                .max_h(control::DESK_VIEW_HEIGHT)
+                .overflow_scroll()
+                .rounded(radius::md())
+                .border_1()
+                .border_color(line::border())
+                .child(table),
+        )
+        .when(rows.is_empty(), |el| {
+            el.child(muted("The table has no rows."))
+        })
+        .into_any_element()
+}
+
+/// One point of a chart: its label, its value and, for a pie, its color.
+#[derive(Clone)]
+struct Point {
+    label: String,
+    value: f64,
+    color: Hsla,
+}
+
+fn chart_view(
+    row: usize,
+    kind: ChartKind,
+    title: &str,
+    labels: &[String],
+    values: &[f64],
+    cx: &App,
+) -> AnyElement {
+    let theme = cx.theme();
+    let palette = [
+        theme.chart_1,
+        theme.chart_2,
+        theme.chart_3,
+        theme.chart_4,
+        theme.chart_5,
+    ];
+    let points: Vec<Point> = labels
+        .iter()
+        .zip(values)
+        .enumerate()
+        .map(|(n, (label, value))| Point {
+            label: label.clone(),
+            value: *value,
+            color: palette[n % palette.len()],
+        })
+        .collect();
+    let id = SharedString::from(format!("deskv-{row}-chart"));
+    let chart = match kind {
+        ChartKind::Bar => BarChart::new(points)
+            .id(id)
+            .band(|p: &Point| p.label.clone())
+            .value(|p: &Point| p.value)
+            .into_any_element(),
+        ChartKind::Line => LineChart::new(points)
+            .id(id)
+            .x(|p: &Point| p.label.clone())
+            .y(|p: &Point| p.value)
+            .dot()
+            .into_any_element(),
+        ChartKind::Area => AreaChart::new(points)
+            .id(id)
+            .x(|p: &Point| p.label.clone())
+            .y(|p: &Point| p.value)
+            .into_any_element(),
+        ChartKind::Pie => PieChart::new(points)
+            .id(id)
+            .value(|p: &Point| p.value as f32)
+            .color(|p: &Point| p.color)
+            .label(|p: &Point| SharedString::from(p.label.clone()))
+            .into_any_element(),
+    };
+    div()
+        .flex()
+        .flex_col()
+        .gap(space(2))
+        .child(view_title("Chart", title))
+        .child(div().h(control::DESK_CHART_HEIGHT).w_full().child(chart))
+        .into_any_element()
+}
+
+fn checklist_view(
+    row: usize,
+    title: &str,
+    items: &[String],
+    shown: &Shown,
+    weak: &WeakEntity<DeskConversation>,
+) -> AnyElement {
+    let seq = shown.seq;
+    div()
+        .flex()
+        .flex_col()
+        .gap(space(2))
+        .child(view_title(
+            "Checklist",
+            &format!("{title} · {} of {}", shown.checked.len(), items.len()),
+        ))
+        .children(items.iter().enumerate().map(|(n, item)| {
+            let weak = weak.clone();
+            let idx = n as u32;
+            Checkbox::new(SharedString::from(format!("deskv-{row}-check-{n}")))
+                .label(item.clone())
+                .checked(shown.checked.contains(&idx))
+                .on_click(move |_, _, cx| {
+                    let _ = weak.update(cx, |this, cx| this.toggle(seq, idx, cx));
+                })
+        }))
+        .into_any_element()
+}
+
+fn page_view(
+    row: usize,
+    title: &str,
+    shown: &Shown,
+    weak: &WeakEntity<DeskConversation>,
+) -> AnyElement {
+    let (weak, seq) = (weak.clone(), shown.seq);
+    Card::new(SharedString::from(format!("deskv-{row}-page")))
+        .child(view_title("Page", title))
+        .children(shown.html_len.map(|n| {
+            muted(&format!(
+                "{n} characters of HTML. The app does not draw it."
+            ))
+        }))
+        .child(
+            div().flex().child(
+                Button::new(SharedString::from(format!("deskv-{row}-open-page")))
+                    .secondary()
+                    .small()
+                    .label("Open in browser")
+                    .on_click(move |_, _, cx| {
+                        let _ = weak.update(cx, |this, cx| this.open_page(seq, cx));
+                    }),
+            ),
+        )
+        .into_any_element()
+}
+
 /// The lines that a diff with no parsed patch draws as text.
 const DIFF_TEXT_LINES: usize = 40;
 
@@ -643,6 +972,7 @@ mod tests {
     use crate::link::CallError;
     use crate::nav::{Nav, ScreenRequest};
     use crate::screens::parts::Flash;
+    use agentsi_proto::desk_session_api::{DeskPageResult, DeskSeqResult};
 
     pub(in crate::screens) fn minutes(mark: Option<&str>) -> MinutesDetail {
         serde_json::from_value(json!({
@@ -747,6 +1077,7 @@ mod tests {
             c.review_done("S001".into(), Ok(review(PATCH)), cx);
         });
         draw(cx);
+        draw_rows(cx, &conv);
         conv.read_with(cx, |c, _| {
             assert!(matches!(c.objects.minutes["m1"], Load::Ready(_)));
             assert!(matches!(c.objects.stories["S001"], Load::Ready(_)));
@@ -892,5 +1223,215 @@ mod tests {
             requests.try_recv().unwrap(),
             ScreenRequest::story("demo", "S001")
         );
+    }
+
+    /// All the rows of a conversation in one column, so that a test draws each row, also
+    /// the rows that the scroller does not show.
+    struct AllRows(Entity<DeskConversation>);
+
+    impl gpui::Render for AllRows {
+        fn render(
+            &mut self,
+            _: &mut gpui::Window,
+            cx: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            use gpui::{ParentElement as _, Styled as _};
+            let weak = self.0.downgrade();
+            let conv = self.0.read(cx);
+            gpui::div()
+                .flex()
+                .flex_col()
+                .w(gpui::px(380.))
+                .children((0..conv.rows.len()).map(|i| conv.row_element(i, &weak, cx)))
+        }
+    }
+
+    fn draw_rows(cx: &mut VisualTestContext, conv: &Entity<DeskConversation>) {
+        let conv = conv.clone();
+        cx.draw(
+            gpui::point(gpui::px(0.), gpui::px(0.)),
+            gpui::size(gpui::px(380.), gpui::px(4000.)),
+            |_, cx| {
+                use gpui::{AppContext as _, IntoElement as _};
+                gpui::AnyView::from(cx.new(|_| AllRows(conv))).into_any_element()
+            },
+        );
+    }
+
+    /// An empty folder of this test process.
+    fn scratch(name: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("agentsi-desk-pages-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        dir
+    }
+
+    fn generic_history(cx: &mut VisualTestContext, conv: &Entity<DeskConversation>) {
+        let chart = |kind: &str| {
+            json!({"kind": "view", "view": {"kind": "chart", "chart": kind, "title": "Cost",
+                   "labels": ["w1", "w2", "w3"], "values": [1.5, 3.0, 2.0]}})
+        };
+        conv.update(cx, |c, cx| {
+            c.history_done(
+                Ok(history(
+                    "idle",
+                    None,
+                    json!([
+                        entry(
+                            1,
+                            json!({"kind": "view", "view": {"kind": "table", "title": "Roles",
+                            "columns": ["role", "cost"], "rows": [["pm", "1"], ["dev", "2"]]}})
+                        ),
+                        entry(2, chart("bar")),
+                        entry(3, chart("line")),
+                        entry(4, chart("area")),
+                        entry(5, chart("pie")),
+                        entry(
+                            6,
+                            json!({"kind": "view", "view": {"kind": "checklist",
+                            "title": "Launch", "items": ["tag", "post", "mail"]},
+                            "checked": [2]})
+                        ),
+                        entry(
+                            7,
+                            json!({"kind": "view", "view": {"kind": "page",
+                            "title": "Report", "html": ""}, "html_len": 15})
+                        ),
+                    ]),
+                )),
+                cx,
+            )
+        });
+    }
+
+    fn checked(c: &DeskConversation, seq: i64) -> Vec<u32> {
+        c.rows
+            .iter()
+            .find_map(|r| match r {
+                super::Row::View(_, shown) if shown.seq == seq => Some(shown.checked.clone()),
+                _ => None,
+            })
+            .unwrap()
+    }
+
+    #[gpui::test]
+    fn a_table_each_chart_a_checklist_and_a_page_draw_from_their_data_with_no_read(
+        cx: &mut TestAppContext,
+    ) {
+        let (conv, mut other, cx) = setup(cx);
+        methods_sent(&mut other);
+        generic_history(cx, &conv);
+        draw(cx);
+        draw_rows(cx, &conv);
+        // A generic view holds its data. It reads nothing from the core.
+        assert!(methods_sent(&mut other).is_empty());
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.kinds(), ["view"; 7]);
+            assert_eq!(checked(c, 6), [2]);
+        });
+    }
+
+    #[gpui::test]
+    fn a_check_calls_desk_check_with_all_checked_items_and_a_refusal_puts_it_back(
+        cx: &mut TestAppContext,
+    ) {
+        let (conv, mut other, cx) = setup(cx);
+        generic_history(cx, &conv);
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| c.toggle(6, 0, cx));
+        assert_eq!(
+            methods_sent(&mut other),
+            [(
+                "desk.check".to_string(),
+                json!({"product": "demo", "seq": 6, "checked": [0, 2]})
+            )]
+        );
+        conv.read_with(cx, |c, _| assert_eq!(checked(c, 6), [0, 2]));
+        conv.update(cx, |c, cx| {
+            c.check_done(6, vec![2], Ok(DeskSeqResult { seq: 6 }), cx)
+        });
+        conv.read_with(cx, |c, _| assert_eq!(checked(c, 6), [0, 2]));
+
+        conv.update(cx, |c, cx| c.toggle(6, 2, cx));
+        assert_eq!(methods_sent(&mut other)[0].1["checked"], json!([0]));
+        conv.update(cx, |c, cx| {
+            c.check_done(6, vec![0, 2], Err(CallError::Link("gone".into())), cx)
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert_eq!(checked(c, 6), [0, 2]);
+            assert!(matches!(c.flash, Some(Flash::Failed(_))));
+        });
+        // A seq that is not a checklist sends nothing.
+        conv.update(cx, |c, cx| c.toggle(7, 0, cx));
+        assert!(methods_sent(&mut other).is_empty());
+    }
+
+    #[gpui::test]
+    fn open_in_browser_writes_the_page_with_mode_0600_and_opens_the_file(cx: &mut TestAppContext) {
+        use std::os::unix::fs::PermissionsExt as _;
+        let (conv, mut other, cx) = setup(cx);
+        generic_history(cx, &conv);
+        methods_sent(&mut other);
+        let dir = scratch("open");
+        let pages = dir.join("agentsi").join("pages");
+        conv.update(cx, |c, _| c.pages = Some(pages.clone()));
+        conv.update(cx, |c, cx| c.open_page(7, cx));
+        assert_eq!(
+            methods_sent(&mut other),
+            [(
+                "desk.page".to_string(),
+                json!({"product": "demo", "seq": 7})
+            )]
+        );
+        let html = "<h1>Report</h1>";
+        conv.update(cx, |c, cx| {
+            c.page_done(
+                7,
+                Ok(DeskPageResult {
+                    title: "Report".into(),
+                    html: html.into(),
+                }),
+                cx,
+            )
+        });
+        let file = pages.join("demo-7.html");
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), html);
+        let mode = std::fs::metadata(&file).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
+        let dir_mode = std::fs::metadata(&pages).unwrap().permissions().mode() & 0o777;
+        assert_eq!(dir_mode, 0o700);
+        assert_eq!(cx.opened_url(), Some(crate::format::file_url(&file)));
+
+        // With no runtime folder, the page is not written and a line says why.
+        conv.update(cx, |c, cx| {
+            c.pages = None;
+            c.page_done(
+                7,
+                Ok(DeskPageResult {
+                    title: "Report".into(),
+                    html: html.into(),
+                }),
+                cx,
+            )
+        });
+        conv.read_with(cx, |c, _| {
+            assert!(matches!(c.flash, Some(Flash::Failed(_))))
+        });
+    }
+
+    #[test]
+    fn an_old_page_file_gets_mode_0600_again() {
+        use std::os::unix::fs::PermissionsExt as _;
+        let dir = scratch("old");
+        std::fs::create_dir_all(&dir).unwrap();
+        let old = dir.join("a_b-3.html");
+        std::fs::write(&old, "old").unwrap();
+        std::fs::set_permissions(&old, std::fs::Permissions::from_mode(0o644)).unwrap();
+        let path = super::write_page(&dir, "a/b", 3, "new").unwrap();
+        assert_eq!(path, old);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600);
     }
 }

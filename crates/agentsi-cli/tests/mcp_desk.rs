@@ -27,11 +27,15 @@ const BASE: [&str; 9] = [
 ];
 
 /// The show tools, in the order of `View`.
-const SHOW: [&str; 4] = [
+const SHOW: [&str; 8] = [
     "show_decisions",
     "show_priorities",
     "show_story",
     "show_diff",
+    "show_table",
+    "show_chart",
+    "show_checklist",
+    "show_page",
 ];
 
 struct Work {
@@ -178,6 +182,10 @@ fn a_desk_session_shows_a_view_and_a_bad_call_is_an_error_result() {
                 json!({"product": "alpha", "kind": "todo", "title": "No"}),
             ),
             ("show_story", json!({"id": "S999"})),
+            (
+                "show_table",
+                json!({"title": "T", "columns": ["a"], "rows": [["1", "2"]]}),
+            ),
         ],
     );
     assert_eq!(
@@ -199,10 +207,13 @@ fn a_desk_session_shows_a_view_and_a_bad_call_is_an_error_result() {
     let (story, err) = text(&a[6]);
     assert!(err && story.contains("S999"), "{story}");
 
-    let list = names(&a[7]);
+    let (row, err) = text(&a[7]);
+    assert!(err && row.contains("Row 1 has 2 cells"), "{row}");
+
+    let list = names(&a[8]);
     assert_eq!(list[..9], BASE);
     assert_eq!(list[9..], SHOW);
-    let show = &a[7]["result"]["tools"][9];
+    let show = &a[8]["result"]["tools"][9];
     assert_eq!(show["inputSchema"]["required"], json!(["ids"]));
     assert!(
         show["description"]

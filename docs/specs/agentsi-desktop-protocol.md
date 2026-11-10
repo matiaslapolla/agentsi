@@ -468,9 +468,13 @@ The desk conversation is the right column of the front desk. Its spec is `agents
 | `desk.reset` | `product` | `{session}`: a new uuid. The items go | `not_found`, `unavailable` |
 | `desk.show` | `session, view` | `{view_id}`: the `seq` of the `view` item | `not_found`, `invalid`, `unavailable` |
 | `desk.auth` | `recheck?` | `{state, message?}` | none |
+| `desk.check` | `product, seq, checked` | `{seq}`. Stores the checked items of a checklist view and a desk note | `not_found`, `invalid`, `unavailable` |
+| `desk.page` | `product, seq` | `{title, html}` of a page view | `not_found`, `invalid`, `unavailable` |
 | `decision.get` | `product, ids` | `{decisions: [{id, kind, minutes_id, text, why, action, status, archived}]}` in the order of `ids`. An unknown id is left out | `not_found`, `unavailable` |
 
-- `item.kind` is `owner`, `reply`, `tool`, `view`, `note`, `end` or `error`. `view` holds `{kind: "decisions", ids}`. A field that the catalog does not know gives `invalid`.
+- `item.kind` is `owner`, `reply`, `tool`, `view`, `note`, `end` or `error`. A field that the catalog does not know gives `invalid`.
+- `view.kind` is `decisions`, `priorities`, `story`, `diff`, `table`, `chart`, `checklist` or `page`. `agentsi-desktop-conversation-views.md` gives the fields and the limits of each. A `view` item of a checklist also holds `checked`.
+- `desk.item` and `desk.history` give a page with an empty `html` and its length in `html_len`. `desk.page` gives the HTML.
 - `state` is `stopped`, `starting`, `idle`, `working`, `auth` or `failed`. `seq` counts from 1 for each product, and starts again after `desk.reset`.
 - `desk.send` returns `busy` while a reply runs. It returns `unavailable`, sends `desk.state auth` and starts no process while the login is not `ready`.
 - `desk.delta` carries one text delta of the reply that streams. The `reply` item that follows holds the whole text. One assistant message can give several `reply` items.

@@ -53,7 +53,7 @@ enum Row {
         text: Entity<TextViewState>,
     },
     Tool(String),
-    View(View),
+    View(View, views::Shown),
     Note(String),
     End {
         cost_usd: f64,
@@ -102,6 +102,8 @@ pub struct DeskConversation {
     decisions_read: bool,
     /// The objects of the other object views, as the core stores them.
     objects: views::Objects,
+    /// The folder of the page files. `None` when the device has no runtime folder.
+    pages: Option<std::path::PathBuf>,
     confirm: Option<Confirm>,
     /// A write or a login check waits for the core.
     busy: bool,
@@ -138,6 +140,7 @@ impl DeskConversation {
             decisions: HashMap::new(),
             decisions_read: false,
             objects: views::Objects::default(),
+            pages: views::pages_dir(),
             confirm: None,
             busy: false,
             sending: false,
@@ -225,7 +228,7 @@ impl DeskConversation {
             .rows
             .iter()
             .filter_map(|r| match r {
-                Row::View(View::Decisions { ids }) => Some(ids.iter().copied()),
+                Row::View(View::Decisions { ids }, _) => Some(ids.iter().copied()),
                 _ => None,
             })
             .flatten()
@@ -388,7 +391,7 @@ impl DeskConversation {
                 // A reply that never got its item stays as it streamed.
                 self.open = None;
                 let view = match &other {
-                    DeskItem::View { view } => Some(view.clone()),
+                    DeskItem::View { view, .. } => Some(view.clone()),
                     _ => None,
                 };
                 let row = self.row_of(seq, other, cx);
@@ -411,7 +414,18 @@ impl DeskConversation {
                 text: cx.new(|cx| TextViewState::markdown(&text, cx)),
             },
             DeskItem::Tool { line } => Row::Tool(line),
-            DeskItem::View { view } => Row::View(view),
+            DeskItem::View {
+                view,
+                checked,
+                html_len,
+            } => Row::View(
+                view,
+                views::Shown {
+                    seq,
+                    checked,
+                    html_len,
+                },
+            ),
             DeskItem::Note { text } => Row::Note(text),
             DeskItem::End {
                 cost_usd,
@@ -655,7 +669,7 @@ impl DeskConversation {
 
     // ---- Drawing ----------------------------------------------------------------------
 
-    fn row_element(&self, i: usize, weak: &WeakEntity<Self>) -> AnyElement {
+    fn row_element(&self, i: usize, weak: &WeakEntity<Self>, cx: &App) -> AnyElement {
         match &self.rows[i] {
             Row::Owner(t) => div()
                 .flex()
@@ -714,7 +728,7 @@ impl DeskConversation {
                 .text_color(WorkState::Failed.color())
                 .child(m.clone())
                 .into_any_element(),
-            Row::View(View::Decisions { ids }) => div()
+            Row::View(View::Decisions { ids }, _) => div()
                 .flex()
                 .flex_col()
                 .gap(space(3))
@@ -724,7 +738,7 @@ impl DeskConversation {
                         .map(|(n, id)| self.decision_card(i, n, *id, weak)),
                 )
                 .into_any_element(),
-            Row::View(view) => self.view_element(i, view, weak),
+            Row::View(view, shown) => self.view_element(i, view, shown, weak, cx),
         }
     }
 
@@ -1014,7 +1028,7 @@ impl Render for DeskConversation {
             Load::Ready(()) => {
                 let w = weak.clone();
                 MessageScroller::new("deskc-list", self.scroller.clone(), move |i, _, cx| {
-                    w.read_with(cx, |this, _| this.row_element(i, &w))
+                    w.read_with(cx, |this, cx| this.row_element(i, &w, cx))
                         .unwrap_or_else(|_| div().into_any_element())
                 })
                 .size_full()
@@ -1138,7 +1152,7 @@ mod tests {
 
     impl DeskConversation {
         /// One word for each row, with the seq of a reply: `reply:3`, `reply:-` while it streams.
-        fn kinds(&self) -> Vec<String> {
+        pub(super) fn kinds(&self) -> Vec<String> {
             self.rows
                 .iter()
                 .map(|r| match r {
@@ -1147,7 +1161,7 @@ mod tests {
                         format!("reply:{}", seq.map_or("-".into(), |s| s.to_string()))
                     }
                     Row::Tool(_) => "tool".into(),
-                    Row::View(_) => "view".into(),
+                    Row::View(..) => "view".into(),
                     Row::Note(_) => "note".into(),
                     Row::End { .. } => "end".into(),
                     Row::Error(_) => "error".into(),
