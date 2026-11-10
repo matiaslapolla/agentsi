@@ -18,15 +18,16 @@ Two lanes run at the same time. The core lane changes `agentsi-proto`, `agentsi-
 |---|---|---|---|---|---|
 | B1 | `ui-tokens` | app | immersive U1, U2 | none | sonnet |
 | B2 | `tracker-core` | core | tracker U1 to U6 | none | opus |
-| B3 | `setup-core` | core | actions U1 to U3, setup U1 to U3, U7 | B2 | opus |
-| B4 | `immersive-theme` | app | immersive U3 to U5 | B1 | sonnet |
+| B3 | `setup-core` | core | actions U1 to U3, setup U1 to U3, U7, immersive U5 | B2 | opus |
+| B4 | `immersive-theme` | app | immersive U3, U4 | B1 | sonnet |
 | B5 | `desk-core` | core | conversation U1 to U5 | B3 | opus |
-| B6 | `tracker-app` | app | tracker U7 to U9 | B2, B4 | sonnet |
+| B6 | `tracker-app` | app | tracker U7 to U9 | B2, B11a | sonnet |
 | B7 | `actions-app` | app | actions U4 to U10 | B3, B6 | sonnet |
 | B8 | `setup-app` | app | setup U4 to U6, U8 | B7 | sonnet |
 | B9 | `desk-app` | app | conversation U6, U7 | B5, B8 | sonnet |
 | B10 | `desk-views` | app | conversation U8 to U10 | B9 | sonnet |
-| B11 | `immersive-alerts` | app | immersive U6 to U9 | B10 | sonnet |
+| B11a | `immersive-alerts` | app | immersive U6 to U8 | B4 | sonnet |
+| B11b | `agent-cards` | app | immersive U9 | B10 | sonnet |
 
 ## Rules at each merge
 
