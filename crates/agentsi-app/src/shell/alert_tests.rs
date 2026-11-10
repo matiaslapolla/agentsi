@@ -81,7 +81,7 @@ fn the_bell_opens_the_log_and_open_shows_the_pane_and_ends_its_glow(cx: &mut Tes
         host: None,
         id: "t1-a".into(),
     };
-    let glow = |cx: &mut VisualTestContext| cx.update(|_, cx| Alerts::glow(cx, &target));
+    let glow = |cx: &mut VisualTestContext| cx.update(|_, cx| Alerts::glow_id(cx, &target));
     assert!(glow(cx).is_some());
     click(cx, "button:alert-open-0");
     assert_eq!(active_tab(&f, cx), "terminal:t1-a");
@@ -97,4 +97,30 @@ fn an_empty_log_says_so(cx: &mut TestAppContext) {
     redraw(cx);
     assert!(at(cx, "alert-log").is_some());
     assert!(at(cx, "alert-row-0").is_none());
+}
+
+#[gpui::test]
+fn opening_settings_ends_the_alerts_of_the_models(cx: &mut TestAppContext) {
+    let look = folder("alert-models").join("look.toml");
+    let (f, cx) = fixture(cx, Persist::None, &look);
+    raise(
+        cx,
+        note(
+            "models.error",
+            json!({"id": "kokoro", "error": "network", "message": "The download stopped."}),
+        ),
+    );
+    let target = AlertTarget::Model {
+        id: "kokoro".into(),
+    };
+    let glow = |cx: &mut VisualTestContext| cx.update(|_, cx| Alerts::glow_id(cx, &target));
+    assert!(glow(cx).is_some());
+    f.shell.update_in(cx, |s, window, cx| {
+        s.show_screen(crate::screens::ScreenSpec::settings(), window, cx)
+    });
+    redraw(cx);
+    assert!(
+        glow(cx).is_none(),
+        "Settings is the target of a model alert"
+    );
 }

@@ -538,13 +538,8 @@ impl AlertCenter {
         }
     }
 
-    /// The state that makes `target` glow because of an alert, else none.
-    pub fn glow(&self, target: &AlertTarget) -> Option<WorkState> {
-        self.active.get(target).map(|a| a.state)
-    }
-
-    /// [`glow`](Self::glow) and the id of the alert. A new alert has a new id, so its glow
-    /// pulses again.
+    /// The state that makes `target` glow because of an alert, and the id of the alert. A new
+    /// alert has a new id, so its glow pulses again.
     pub fn glow_id(&self, target: &AlertTarget) -> Option<(WorkState, u64)> {
         self.active.get(target).map(|a| (a.state, a.id))
     }
@@ -563,6 +558,19 @@ impl AlertCenter {
                 self.active.remove(target);
             }
             cx.notify();
+        }
+    }
+
+    /// The owner opened Settings: the alerts of the models end.
+    pub fn opened_models(&mut self, cx: &mut Context<Self>) {
+        let models: Vec<AlertTarget> = self
+            .active
+            .keys()
+            .filter(|t| matches!(t, AlertTarget::Model { .. }))
+            .cloned()
+            .collect();
+        for target in models {
+            self.opened(&target, cx);
         }
     }
 
@@ -697,9 +705,9 @@ impl Alerts {
         cx.try_global::<Alerts>().map(|a| a.0.clone())
     }
 
-    /// The glow of an alert on `target`.
-    pub fn glow(cx: &App, target: &AlertTarget) -> Option<WorkState> {
-        Self::try_get(cx).and_then(|c| c.read(cx).glow(target))
+    /// The glow of an alert on `target`, and the id of the alert.
+    pub fn glow_id(cx: &App, target: &AlertTarget) -> Option<(WorkState, u64)> {
+        Self::try_get(cx).and_then(|c| c.read(cx).glow_id(target))
     }
 }
 
@@ -858,8 +866,8 @@ mod tests {
             c.take(None, &failed, &none, cx);
         });
         center.read_with(cx, |c, _| {
-            assert_eq!(c.glow(&pane), Some(WorkState::Blocked));
-            assert_eq!(c.glow(&meeting), Some(WorkState::Failed));
+            assert_eq!(c.glow_id(&pane).map(|g| g.0), Some(WorkState::Blocked));
+            assert_eq!(c.glow_id(&meeting).map(|g| g.0), Some(WorkState::Failed));
             assert_eq!(c.unseen(), 2);
         });
         center.update(cx, |c, cx| {
@@ -869,7 +877,11 @@ mod tests {
         });
         center.read_with(cx, |c, _| {
             assert_eq!(
-                (c.glow(&pane), c.glow(&meeting), c.unseen()),
+                (
+                    c.glow_id(&pane).map(|g| g.0),
+                    c.glow_id(&meeting).map(|g| g.0),
+                    c.unseen()
+                ),
                 (None, None, 0)
             );
             assert_eq!(c.log().count(), 2, "the log keeps both");
@@ -932,9 +944,9 @@ mod tests {
             c.opened(&blocked, cx);
         });
         center.read_with(cx, |c, _| {
-            assert_eq!(c.glow(&bell), None, "a bell glow ends");
+            assert_eq!(c.glow_id(&bell).map(|g| g.0), None, "a bell glow ends");
             assert_eq!(
-                c.glow(&blocked),
+                c.glow_id(&blocked).map(|g| g.0),
                 Some(WorkState::Blocked),
                 "Blocked ends with the state"
             );
@@ -1011,7 +1023,9 @@ mod tests {
             assert!(!c.is_speaking(Some("host"), "dev"), "another core");
         });
         hear(cx, note("voice.stop", json!({"terminal": "t2"})));
-        center.read_with(cx, |c, _| assert!(c.is_speaking(None, "dev"), "another terminal"));
+        center.read_with(cx, |c, _| {
+            assert!(c.is_speaking(None, "dev"), "another terminal")
+        });
         hear(cx, note("voice.stop", json!({"terminal": "t1"})));
         center.read_with(cx, |c, _| assert!(!c.is_speaking(None, "dev")));
     }
@@ -1049,7 +1063,7 @@ mod tests {
         center.read_with(cx, |c, _| {
             assert_eq!((c.log().count(), c.unseen()), (0, 0));
             assert_eq!(
-                c.glow(&AlertTarget::Pane {
+                c.glow_id(&AlertTarget::Pane {
                     host: None,
                     id: "t1".into()
                 }),

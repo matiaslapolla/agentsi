@@ -44,6 +44,8 @@ pub struct Item {
     pub status: Status,
     /// The work state that makes the row glow.
     pub work: Option<WorkState>,
+    /// The id of the alert of the row, or 0. A new alert pulses the glow again.
+    pub alert: u64,
     pub title: String,
     /// The program title that a pane label replaced.
     pub tooltip: Option<String>,
@@ -95,6 +97,7 @@ fn pane(t: &Term, look: &LookData, host: Option<&str>) -> Item {
         key: ItemKey::Pane(t.id.clone()),
         status: status_of(Some(t)),
         work: glow_of(Some(t)),
+        alert: 0,
         title,
         tooltip,
         meta: state_word(t).into(),
@@ -109,6 +112,7 @@ fn meeting(m: &LiveMeeting) -> Item {
         key: ItemKey::Meeting,
         status: Status::Info,
         work: None,
+        alert: 0,
         title: if question.is_empty() {
             "Meeting".into()
         } else {
@@ -131,6 +135,7 @@ fn story(s: &StorySessionItem) -> Item {
         key: ItemKey::Story(s.id.clone()),
         status,
         work: None,
+        alert: 0,
         title: format!("{} {}", s.id, s.title),
         tooltip: None,
         meta: s.state.clone(),
@@ -169,6 +174,7 @@ pub fn items(
             key: ItemKey::Reflection,
             status: Status::Info,
             work: None,
+            alert: 0,
             title: "Reflection".into(),
             tooltip: None,
             meta: "running".into(),
