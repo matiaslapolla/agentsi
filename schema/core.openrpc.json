@@ -6533,6 +6533,27 @@
               "html"
             ],
             "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Shows tickets of the tracker with their kind and state. A click opens the Ticket\nscreen. Call it when your reply names tickets. The ids, such as C007, come from\nlist_tickets. 1 to 30 ids.",
+            "properties": {
+              "ids": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "kind": {
+                "const": "tickets",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind",
+              "ids"
+            ],
+            "type": "object"
           }
         ]
       },

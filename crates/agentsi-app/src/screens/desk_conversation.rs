@@ -293,6 +293,7 @@ impl DeskConversation {
                     self.read_objects(views::Reads::Minutes, cx);
                 }
                 Some("stories") => self.read_objects(views::Reads::Stories, cx),
+                Some("tickets") => self.read_objects(views::Reads::Tickets, cx),
                 // A clear deleted the desk rows of the product.
                 Some("clear") => self.reload(cx),
                 _ => {}

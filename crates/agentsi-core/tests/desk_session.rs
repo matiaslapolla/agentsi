@@ -560,6 +560,41 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
 }
 
 #[test]
+fn a_tickets_view_names_tickets_of_the_product() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    let t = c.ok(
+        "ticket.add",
+        json!({"product": "alpha", "kind": "todo", "title": "Tag the release",
+               "author": {"by": "owner", "id": ""}}),
+    );
+    let id = t["ticket"]["id"].as_str().unwrap().to_string();
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let show = |c: &mut Framed, ids: Value| {
+        c.call(
+            "desk.show",
+            json!({"session": session, "view": {"kind": "tickets", "ids": ids}}),
+        )
+    };
+    let r = show(&mut c, json!([id, "C999"]));
+    assert_eq!(kind(&r), "not_found", "{r}");
+    assert!(r["error"]["message"].as_str().unwrap().contains("C999"), "{r}");
+    let r = show(&mut c, json!([]));
+    assert_eq!(kind(&r), "invalid", "{r}");
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+    let r = show(&mut c, json!([id]));
+    assert!(r.get("error").is_none(), "{r}");
+    assert_eq!(
+        c.next_event("desk.item")["item"]["view"],
+        json!({"kind": "tickets", "ids": [id]})
+    );
+}
+
+#[test]
 fn a_reset_starts_a_new_conversation_with_a_new_session() {
     let dir = TempDir::new();
     let w = setup(&dir, READY);

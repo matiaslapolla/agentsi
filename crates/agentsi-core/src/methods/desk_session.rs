@@ -204,6 +204,7 @@ fn check_view(store: &agentsi_store::Store, product: &str, view: &View) -> Resul
                 )),
             }
         }
+        View::Tickets { ids } => check_tickets(store, product, ids),
         generic => check_limits(generic).map_err(RpcError::invalid_params),
     }
 }
@@ -300,7 +301,8 @@ fn check_limits(view: &View) -> Result<(), String> {
         View::Decisions { .. }
         | View::Priorities { .. }
         | View::Story { .. }
-        | View::Diff { .. } => Ok(()),
+        | View::Diff { .. }
+        | View::Tickets { .. } => Ok(()),
     }
 }
 
@@ -405,6 +407,41 @@ async fn page(ctx: Ctx, p: DeskPageParams) -> Result<DeskPageResult, RpcError> {
     })
     .await
     .map_err(join)?
+}
+
+fn check_tickets(
+    store: &agentsi_store::Store,
+    product: &str,
+    ids: &[String],
+) -> Result<(), RpcError> {
+    count("ids", ids.len(), 1, MAX_ITEMS).map_err(RpcError::invalid_params)?;
+    let (p, wanted) = (product.to_string(), ids.to_vec());
+    let found = store
+        .read(move |c| {
+            Ok(wanted
+                .iter()
+                .map(|id| agentsi_agency::tickets::find(c, &p, id).map(|t| t.is_some()))
+                .collect::<Result<Vec<bool>, _>>())
+        })
+        .map_err(store_error)?
+        .map_err(|e| RpcError::internal(e.to_string()))?;
+    let missing: Vec<&str> = ids
+        .iter()
+        .zip(found)
+        .filter(|(_, f)| !f)
+        .map(|(id, _)| id.as_str())
+        .collect();
+    if !missing.is_empty() {
+        return Err(RpcError::new(
+            ErrorKind::NotFound,
+            format!(
+                "The product {product} has no ticket with the id {}.",
+                missing.join(", ")
+            ),
+            "Use list_tickets for the ids that exist.",
+        ));
+    }
+    Ok(())
 }
 
 fn check_decisions(

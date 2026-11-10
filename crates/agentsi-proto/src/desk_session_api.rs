@@ -67,6 +67,10 @@ pub enum View {
     /// page. Call it only for a rich report that Markdown cannot hold. At most 120 characters
     /// in title and 512000 characters in html. Put all styles and scripts inline.
     Page { title: String, html: String },
+    /// Shows tickets of the tracker with their kind and state. A click opens the Ticket
+    /// screen. Call it when your reply names tickets. The ids, such as C007, come from
+    /// list_tickets. 1 to 30 ids.
+    Tickets { ids: Vec<String> },
 }
 
 /// The kind of a chart view.
@@ -91,6 +95,7 @@ impl View {
             View::Chart { .. } => "chart",
             View::Checklist { .. } => "checklist",
             View::Page { .. } => "page",
+            View::Tickets { .. } => "tickets",
         }
     }
 }
@@ -530,7 +535,8 @@ mod tests {
                 "show_table",
                 "show_chart",
                 "show_checklist",
-                "show_page"
+                "show_page",
+                "show_tickets"
             ]
         );
         let chart = &tools[5];

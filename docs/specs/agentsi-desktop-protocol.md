@@ -473,14 +473,14 @@ The desk conversation is the right column of the front desk. Its spec is `agents
 | `decision.get` | `product, ids` | `{decisions: [{id, kind, minutes_id, text, why, action, status, archived}]}` in the order of `ids`. An unknown id is left out | `not_found`, `unavailable` |
 
 - `item.kind` is `owner`, `reply`, `tool`, `view`, `note`, `end` or `error`. A field that the catalog does not know gives `invalid`.
-- `view.kind` is `decisions`, `priorities`, `story`, `diff`, `table`, `chart`, `checklist` or `page`. `agentsi-desktop-conversation-views.md` gives the fields and the limits of each. A `view` item of a checklist also holds `checked`.
+- `view.kind` is `decisions`, `priorities`, `story`, `diff`, `table`, `chart`, `checklist`, `page` or `tickets`. `agentsi-desktop-conversation-views.md` gives the fields and the limits of each. A `view` item of a checklist also holds `checked`.
 - `desk.item` and `desk.history` give a page with an empty `html` and its length in `html_len`. `desk.page` gives the HTML.
 - `state` is `stopped`, `starting`, `idle`, `working`, `auth` or `failed`. `seq` counts from 1 for each product, and starts again after `desk.reset`.
 - `desk.send` returns `busy` while a reply runs. It returns `unavailable`, sends `desk.state auth` and starts no process while the login is not `ready`.
 - `desk.delta` carries one text delta of the reply that streams. The `reply` item that follows holds the whole text. One assistant message can give several `reply` items.
 - `decision.get` only reads. A view of the desk conversation reads the decisions with it, and reads them again after `data.changed` of kind `decision` or `minutes`.
 - Auth states: `ready`, `signed_out`, `missing`, `not_read` and `unknown`. `agentsi-desktop-conversation.md` lists their messages.
-- With `AGENTSI_DESK_SESSION` set, `agentsi mcp` lists one `show_<kind>` tool for each variant of `View`. Each tool calls `desk.show`. A desk session has no tool that writes product data.
+- With `AGENTSI_DESK_SESSION` set, `agentsi mcp` lists one `show_<kind>` tool for each variant of `View`. Each tool calls `desk.show`. The desk session also gets `list_tickets` and `get_ticket`. A desk session has no tool that writes product data.
 - After `decision.decide`, `decision.add`, `mark.set` or `archive.*`, the core stores a desk note if the product has a desk session. The next `desk.send` carries the unsent notes before the owner text.
 
 ### Hook bridge

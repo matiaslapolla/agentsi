@@ -488,7 +488,7 @@ mod tests {
             .iter()
             .map(|t| t["name"].as_str().unwrap())
             .collect();
-        assert_eq!(names.len(), 17);
+        assert_eq!(names.len(), 18);
         assert_eq!(
             names[8..],
             [
@@ -500,7 +500,8 @@ mod tests {
                 "show_table",
                 "show_chart",
                 "show_checklist",
-                "show_page"
+                "show_page",
+                "show_tickets"
             ]
         );
         for (name, args) in [

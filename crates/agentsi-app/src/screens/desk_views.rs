@@ -2,7 +2,7 @@
 //!
 //! An object view keeps only the id that Claude gave. It reads the stored object from the core
 //! and reads it again on `data.changed` of its kind: `minutes` for priorities, `stories` for a
-//! story and a diff. A button that writes asks a Confirm first. A button that would run a
+//! story and a diff, `tickets` for tickets. A button that writes asks a Confirm first. A button that would run a
 //! story or spend money only opens the story screen.
 //!
 //! A generic view (table, chart, checklist, page) draws the small data that Claude gave. The
@@ -26,7 +26,8 @@ use agentsi_proto::marks_api::{Mark, MarkEntry, MarkSet, MarkSetParams, MarkSetR
 use agentsi_proto::story_api::{
     StoryGet, StoryGetResult, StoryIdParams, StoryReview, StoryReviewResult,
 };
-use agentsi_ui::components::{Button, Card, neutral_tag};
+use agentsi_proto::ticket_api::{Ticket, TicketGet, TicketGetParams, TicketGetResult};
+use agentsi_ui::components::{Button, Card, ListRow, neutral_tag};
 use agentsi_ui::tokens::{WorkState, control, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::ActiveTheme as _;
 use gpui_kit::component::chart::{AreaChart, BarChart, LineChart, PieChart};
@@ -105,6 +106,7 @@ pub(super) struct Objects {
     pub(super) minutes: HashMap<String, Load<MinutesDetail>>,
     pub(super) stories: HashMap<String, Load<StoryGetResult>>,
     pub(super) diffs: HashMap<String, Load<DiffShown>>,
+    pub(super) tickets: HashMap<String, Load<Ticket>>,
 }
 
 /// The diff of a story as the view draws it: at most `DIFF_LINES` lines.
@@ -125,6 +127,8 @@ pub(super) enum Reads {
     Minutes,
     /// The story and diff views: `data.changed` of kind `stories`.
     Stories,
+    /// The tickets views: `data.changed` of kind `tickets`.
+    Tickets,
 }
 
 impl Reads {
@@ -134,6 +138,7 @@ impl Reads {
             (Reads::All, _)
                 | (Reads::Minutes, View::Priorities { .. })
                 | (Reads::Stories, View::Story { .. } | View::Diff { .. })
+                | (Reads::Tickets, View::Tickets { .. })
         )
     }
 }
@@ -169,6 +174,24 @@ impl DeskConversation {
             | View::Chart { .. }
             | View::Checklist { .. }
             | View::Page { .. } => {}
+            View::Tickets { ids } => {
+                for id in ids {
+                    let id = id.clone();
+                    self.objects
+                        .tickets
+                        .entry(id.clone())
+                        .or_insert(Load::Loading);
+                    let call = link.call::<TicketGet>(&TicketGetParams {
+                        product: self.product.clone(),
+                        id: id.clone(),
+                    });
+                    cx.spawn(async move |this, cx| {
+                        let result = call.await;
+                        let _ = this.update(cx, |this, cx| this.ticket_done(id, result, cx));
+                    })
+                    .detach();
+                }
+            }
             View::Priorities { minutes_id } => {
                 let id = minutes_id.clone();
                 self.objects
@@ -228,6 +251,20 @@ impl DeskConversation {
             .entry(id)
             .or_insert(Load::Loading)
             .settle(result.map_err(|e| e.to_string()));
+        self.views_changed(cx);
+    }
+
+    pub(crate) fn ticket_done(
+        &mut self,
+        id: String,
+        result: Result<TicketGetResult, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        self.objects
+            .tickets
+            .entry(id)
+            .or_insert(Load::Loading)
+            .settle(result.map(|r| r.ticket).map_err(|e| e.to_string()));
         self.views_changed(cx);
     }
 
@@ -447,6 +484,11 @@ impl DeskConversation {
         cx.notify();
     }
 
+    /// Opens the Ticket screen. A view never changes a ticket itself.
+    pub fn open_ticket(&mut self, id: &str, cx: &mut Context<Self>) {
+        Nav::open(cx, &self.core, ScreenRequest::ticket(&self.product, id));
+    }
+
     /// Opens the story screen. A view never runs a story itself.
     pub fn open_story(&mut self, id: &str, cx: &mut Context<Self>) {
         Nav::open(cx, &self.core, ScreenRequest::story(&self.product, id));
@@ -481,7 +523,48 @@ impl DeskConversation {
             } => chart_view(row, *chart, title, labels, values, cx),
             View::Checklist { title, items } => checklist_view(row, title, items, shown, weak),
             View::Page { title, .. } => page_view(row, title, shown, weak),
+            View::Tickets { ids } => self.tickets_view(row, ids, weak),
         }
+    }
+
+    fn tickets_view(&self, row: usize, ids: &[String], weak: &WeakEntity<Self>) -> AnyElement {
+        let now = crate::format::now_secs();
+        div()
+            .flex()
+            .flex_col()
+            .gap(space(1))
+            .child(view_title(
+                "Tickets",
+                &format!(
+                    "{} ticket{}",
+                    ids.len(),
+                    if ids.len() == 1 { "" } else { "s" }
+                ),
+            ))
+            .children(ids.iter().enumerate().map(|(n, id)| {
+                let t = match self.objects.tickets.get(id) {
+                    Some(Load::Ready(t)) => t,
+                    other => return pending_line(other, &format!("the ticket {id}")),
+                };
+                let (weak, id) = (weak.clone(), id.clone());
+                ListRow::new(
+                    SharedString::from(format!("deskv-{row}-ticket-{n}")),
+                    t.title.clone(),
+                )
+                .meta(crate::screens::tickets::meta(t, now))
+                .trailing(
+                    div()
+                        .flex()
+                        .gap(space(2))
+                        .child(crate::screens::ticket::kind_tag(t.kind))
+                        .child(crate::screens::ticket::state_tag(t)),
+                )
+                .on_click(move |_, _, cx| {
+                    let _ = weak.update(cx, |this, cx| this.open_ticket(&id, cx));
+                })
+                .into_any_element()
+            }))
+            .into_any_element()
     }
 
     fn priorities_view(&self, row: usize, minutes_id: &str, weak: &WeakEntity<Self>) -> AnyElement {
@@ -1433,5 +1516,86 @@ mod tests {
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "new");
         let mode = std::fs::metadata(&path).unwrap().permissions().mode() & 0o777;
         assert_eq!(mode, 0o600);
+    }
+
+    fn ticket(id: &str, state: &str) -> agentsi_proto::ticket_api::TicketGetResult {
+        serde_json::from_value(json!({
+            "ticket": {
+                "product": "demo", "id": id, "scope": null, "kind": "todo", "state": state,
+                "title": "Tag the release", "body": "", "waiting_on": null, "assignee": "owner",
+                "author": {"by": "owner", "id": ""}, "updated_by": {"by": "owner", "id": ""},
+                "links": [], "objective": null, "created_at": "2026-11-09T10:00:00.000Z",
+                "updated_at": "2026-11-09T10:00:00.000Z", "closed_at": null
+            },
+            "markdown": ""
+        }))
+        .unwrap()
+    }
+
+    #[gpui::test]
+    fn a_tickets_view_reads_each_ticket_and_reads_again_at_once_after_a_ticket_write(
+        cx: &mut TestAppContext,
+    ) {
+        let (nav, mut requests) = Nav::channel();
+        cx.update(|cx| cx.set_global(nav));
+        let (conv, mut other, cx) = setup(cx);
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| {
+            c.history_done(
+                Ok(history(
+                    "idle",
+                    None,
+                    json!([entry(
+                        1,
+                        json!({"kind": "view",
+                        "view": {"kind": "tickets", "ids": ["C001", "C002"]}})
+                    )]),
+                )),
+                cx,
+            )
+        });
+        assert_eq!(
+            methods_sent(&mut other),
+            [
+                (
+                    "ticket.get".to_string(),
+                    json!({"product": "demo", "id": "C001"})
+                ),
+                (
+                    "ticket.get".to_string(),
+                    json!({"product": "demo", "id": "C002"})
+                ),
+            ]
+        );
+        conv.update(cx, |c, cx| {
+            c.ticket_done("C001".into(), Ok(ticket("C001", "open")), cx);
+            c.ticket_done("C002".into(), Err(CallError::Link("gone".into())), cx);
+        });
+        draw(cx);
+        draw_rows(cx, &conv);
+
+        // A ticket write sends data.changed of kind tickets. The view reads at once, with no
+        // timer, so it changes as soon as the core answers.
+        conv.update(cx, |c, cx| c.take(&changed("stories"), cx));
+        assert!(methods_sent(&mut other).is_empty());
+        conv.update(cx, |c, cx| c.take(&changed("tickets"), cx));
+        let names: Vec<String> = methods_sent(&mut other).into_iter().map(|m| m.0).collect();
+        assert_eq!(names, ["ticket.get", "ticket.get"]);
+        conv.update(cx, |c, cx| {
+            c.ticket_done("C001".into(), Ok(ticket("C001", "done")), cx)
+        });
+        draw_rows(cx, &conv);
+        conv.read_with(cx, |c, _| {
+            let Load::Ready(t) = &c.objects.tickets["C001"] else {
+                panic!("the ticket is not ready")
+            };
+            assert_eq!(t.state, agentsi_proto::ticket_api::TicketState::Done);
+        });
+
+        conv.update(cx, |c, cx| c.open_ticket("C001", cx));
+        assert_eq!(
+            requests.try_recv().unwrap(),
+            ScreenRequest::ticket("demo", "C001")
+        );
     }
 }

@@ -27,7 +27,7 @@ const BASE: [&str; 9] = [
 ];
 
 /// The show tools, in the order of `View`.
-const SHOW: [&str; 8] = [
+const SHOW: [&str; 9] = [
     "show_decisions",
     "show_priorities",
     "show_story",
@@ -36,6 +36,7 @@ const SHOW: [&str; 8] = [
     "show_chart",
     "show_checklist",
     "show_page",
+    "show_tickets",
 ];
 
 struct Work {
