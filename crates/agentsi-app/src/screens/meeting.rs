@@ -19,7 +19,7 @@ use agentsi_proto::roles_api::{RolesList, RolesListParams};
 use agentsi_proto::rpc::Notification;
 use agentsi_ui::components::{Button, Tag, status_tag};
 use agentsi_ui::style::StyleExt as _;
-use agentsi_ui::tokens::{Status, control, font, line, radius, size, space, surface, text, weight};
+use agentsi_ui::tokens::{Status, WorkState, control, font, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::IconName;
 use gpui_kit::component::Disableable as _;
 use gpui_kit::component::checkbox::Checkbox;
@@ -54,6 +54,10 @@ pub struct Pane {
     pub lines: VecDeque<String>,
     pub seconds: Option<f64>,
     pub cost_usd: Option<f64>,
+    /// What the last assistant line of the run did, for the agent card.
+    pub activity: Option<String>,
+    /// The synthesis run is the repair of the minutes.
+    pub repair: bool,
 }
 
 impl Pane {
@@ -64,6 +68,8 @@ impl Pane {
             lines: VecDeque::new(),
             seconds: None,
             cost_usd: None,
+            activity: None,
+            repair: false,
         }
     }
 
@@ -96,6 +102,8 @@ pub struct LiveMeeting {
     pub cost_usd: Option<f64>,
     /// The core dropped events for this app, so a pane can miss lines.
     pub lost_events: bool,
+    /// The check of the minutes runs: the PM card shows "Checking".
+    pub checking: bool,
 }
 
 impl LiveMeeting {
@@ -109,6 +117,7 @@ impl LiveMeeting {
             warnings: Vec::new(),
             cost_usd: None,
             lost_events: false,
+            checking: false,
         }
     }
 
@@ -138,7 +147,12 @@ impl LiveMeeting {
         match p.stage.as_str() {
             "start" => self.question = p.note.clone().unwrap_or_default(),
             "index" if !ended => self.stage = "Reading the product".into(),
-            "check" if !ended => self.stage = "Checking the minutes".into(),
+            "check" => {
+                self.checking = !ended;
+                if !ended {
+                    self.stage = "Checking the minutes".into();
+                }
+            }
             "warning" => self.warnings.extend(p.note.clone()),
             "role" | "synthesis" => {
                 if p.stage == "role" {
@@ -157,6 +171,8 @@ impl LiveMeeting {
                         };
                     } else {
                         pane.state = PaneState::Running;
+                        pane.activity = None;
+                        pane.repair = p.note.as_deref() == Some("repair");
                     }
                 }
             }
@@ -171,6 +187,31 @@ impl LiveMeeting {
             }
             _ => {}
         }
+    }
+
+    /// The state and the words of the agent card of `role`, or none when the role has no run in
+    /// this meeting. Each word comes from an event that was seen.
+    pub fn card(&self, role: &str) -> Option<(WorkState, String)> {
+        let pane = self.panes.iter().find(|p| p.role == role)?;
+        Some(match &pane.state {
+            PaneState::Failed(_) => (WorkState::Failed, "Failed".into()),
+            PaneState::Done if self.checking && role == "pm" => {
+                (WorkState::Working, "Checking".into())
+            }
+            PaneState::Done => (WorkState::Done, format!("Done, {}", pane_figures(pane))),
+            PaneState::Running if pane.repair => (WorkState::Repairing, String::new()),
+            PaneState::Running if role == "pm" && self.stage == "The PM writes the minutes" => {
+                let word = pane.activity.clone();
+                (
+                    WorkState::Working,
+                    word.unwrap_or_else(|| "Writing the minutes".into()),
+                )
+            }
+            PaneState::Running => (
+                WorkState::Working,
+                pane.activity.clone().unwrap_or_else(|| "Starting".into()),
+            ),
+        })
     }
 
     /// The meeting stopped, so no pane runs any more.
@@ -209,6 +250,40 @@ fn answer_lines(input: &Value) -> Vec<String> {
         .filter_map(|p| p.get("title").and_then(Value::as_str));
     out.extend(titles.enumerate().map(|(i, t)| format!("{}. {t}", i + 1)));
     out
+}
+
+/// The activity word of one stream-json line, or none when the line shows no work: "Reading" and a
+/// file name, "Searching", "Writing" or "Answering". The last block of a line wins.
+pub fn activity(stream_line: &str) -> Option<String> {
+    let v = serde_json::from_str::<Value>(stream_line).ok()?;
+    if v.get("type").and_then(Value::as_str) != Some("assistant") {
+        return None;
+    }
+    let blocks = v.pointer("/message/content")?.as_array()?;
+    blocks.iter().rev().find_map(|b| match b.get("type")?.as_str()? {
+        "text" => Some("Writing".to_string()),
+        "tool_use" => {
+            let name = b.get("name").and_then(Value::as_str).unwrap_or_default();
+            let input = b.get("input").unwrap_or(&Value::Null);
+            match name {
+                "StructuredOutput" => Some("Answering".into()),
+                "Read" | "Grep" | "Glob" => {
+                    let target = ["file_path", "path", "pattern"]
+                        .iter()
+                        .find_map(|k| input.get(*k).and_then(Value::as_str))
+                        .map(|t| t.rsplit('/').next().unwrap_or(t))
+                        .filter(|t| !t.is_empty());
+                    Some(match target {
+                        Some(t) => format!("Reading {t}"),
+                        None => "Reading".into(),
+                    })
+                }
+                n if n.starts_with("mcp__") => Some("Searching".into()),
+                _ => None,
+            }
+        }
+        _ => None,
+    })
 }
 
 /// The lines of a pane for one stream-json line. A line that is not an assistant
@@ -276,10 +351,15 @@ impl Meetings {
         }
         if let Some(e) = n.parse::<MeetingEvent>() {
             let lines = pane_lines(&e.line);
+            let word = activity(&e.line);
             let run = self.live.values_mut().find(|r| r.meeting == e.meeting);
             return match run {
-                Some(run) if !lines.is_empty() => {
-                    run.pane(&e.role).push(lines);
+                Some(run) if !lines.is_empty() || word.is_some() => {
+                    let pane = run.pane(&e.role);
+                    pane.push(lines);
+                    if word.is_some() {
+                        pane.activity = word;
+                    }
                     true
                 }
                 _ => false,
@@ -459,6 +539,7 @@ impl MeetingScreen {
                 cx.notify();
             }));
         }
+        subscriptions.extend(super::agent_row::watch(&core, cx));
         first_screen_ready();
         let mut screen = MeetingScreen {
             product,
@@ -1146,6 +1227,7 @@ impl Render for MeetingScreen {
                 Some("Write a question above, or run agentsi meet in a terminal.".into()),
             ));
         };
+        let roster: Vec<String> = self.roster.iter().map(|(id, _)| id.clone()).collect();
         let mut notes: Vec<String> = Vec::new();
         if !run.question.is_empty() {
             notes.push(run.question.clone());
@@ -1169,6 +1251,16 @@ impl Render for MeetingScreen {
                 .text_color(text::secondary())
                 .children(notes.into_iter().map(|n| div().child(n))),
         )
+        .child(
+            super::agent_row::row(super::agent_row::meeting_cards(
+                &run,
+                &roster,
+                self.core.read(cx).remote.as_deref(),
+                cx,
+            ))
+            .pad_x(space(4))
+            .pt(space(2)),
+        )
         .child(self.panes(&run))
     }
 }
@@ -1179,7 +1271,7 @@ mod tests {
     use super::{
         Lagged, MeetingEvent, MeetingFeed, MeetingProgress, MeetingProgressParams, MeetingScreen,
         MeetingState, Meetings, Notification, PANE_LINES, Pane, PaneState, cancel, pane_figures,
-        pane_lines, status_line,
+        activity, pane_lines, status_line,
     };
     use crate::link::Link;
     use crate::link::tests::FakeCore;
@@ -1619,6 +1711,71 @@ mod tests {
         let run = m.live("alpha").unwrap();
         assert_eq!(run.state, MeetingState::Done("2026-a".into()));
         assert_eq!(status_line(run), "Minutes 2026-a · $0.5000");
+    }
+
+    fn assistant(block: serde_json::Value) -> String {
+        json!({"type": "assistant", "message": {"content": [block]}}).to_string()
+    }
+
+    fn tool(name: &str, input: serde_json::Value) -> String {
+        assistant(json!({"type": "tool_use", "name": name, "input": input}))
+    }
+
+    #[test]
+    fn each_line_kind_gives_its_activity_word() {
+        let read = tool("Read", json!({"file_path": "/work/docs/plan.md"}));
+        assert_eq!(activity(&read).as_deref(), Some("Reading plan.md"));
+        let grep = tool("Grep", json!({"pattern": "todo"}));
+        assert_eq!(activity(&grep).as_deref(), Some("Reading todo"));
+        assert_eq!(activity(&tool("Glob", json!({}))).as_deref(), Some("Reading"));
+        let mcp = tool("mcp__agentsi__search", json!({"query": "x"}));
+        assert_eq!(activity(&mcp).as_deref(), Some("Searching"));
+        let text = assistant(json!({"type": "text", "text": "Hi"}));
+        assert_eq!(activity(&text).as_deref(), Some("Writing"));
+        let out = tool("StructuredOutput", json!({"answer": "A"}));
+        assert_eq!(activity(&out).as_deref(), Some("Answering"));
+        assert_eq!(activity(&tool("Bash", json!({}))), None, "an unmapped tool");
+        assert_eq!(activity(r#"{"type":"system"}"#), None);
+        assert_eq!(activity("not json"), None);
+    }
+
+    #[test]
+    fn a_card_shows_only_what_an_event_set() {
+        use agentsi_ui::tokens::WorkState::{Done, Failed, Repairing, Working};
+        let mut m = Meetings::default();
+        m.apply(&progress("start", "start", |_| {}));
+        assert_eq!(m.live("alpha").unwrap().card("dev"), None, "no event for dev yet");
+        m.apply(&progress("role", "start", |p| p.role = Some("dev".into())));
+        assert_eq!(m.live("alpha").unwrap().card("dev"), Some((Working, "Starting".into())));
+        let read = note::<MeetingEvent>(&MeetingEventParams {
+            meeting: "m1".into(),
+            role: "dev".into(),
+            line: tool("Read", json!({"file_path": "a/b.rs"})),
+        });
+        m.apply(&read);
+        assert_eq!(m.live("alpha").unwrap().card("dev"), Some((Working, "Reading b.rs".into())));
+        m.apply(&progress("role", "end", |p| {
+            p.role = Some("dev".into());
+            p.seconds = Some(12.4);
+            p.cost_usd = Some(0.03);
+        }));
+        assert_eq!(m.live("alpha").unwrap().card("dev"), Some((Done, "Done, 12 s · $0.0300".into())));
+        m.apply(&progress("role", "end", |p| {
+            p.role = Some("qa".into());
+            p.error = Some("boom".into());
+        }));
+        assert_eq!(m.live("alpha").unwrap().card("qa"), Some((Failed, "Failed".into())));
+        // The PM: minutes, then the check, then the repair.
+        m.apply(&progress("synthesis", "start", |p| p.role = Some("pm".into())));
+        assert_eq!(m.live("alpha").unwrap().card("pm"), Some((Working, "Writing the minutes".into())));
+        m.apply(&progress("synthesis", "end", |p| p.role = Some("pm".into())));
+        m.apply(&progress("check", "start", |_| {}));
+        assert_eq!(m.live("alpha").unwrap().card("pm"), Some((Working, "Checking".into())));
+        m.apply(&progress("synthesis", "start", |p| {
+            p.role = Some("pm".into());
+            p.note = Some("repair".into());
+        }));
+        assert_eq!(m.live("alpha").unwrap().card("pm").map(|c| c.0), Some(Repairing));
     }
 
     #[test]

@@ -60,6 +60,8 @@ pub struct DeskScreen {
     form: Option<(Entity<Form>, Subscription)>,
     /// The archived decisions, while the owner shows them.
     archived: Option<Vec<ArchivedDecision>>,
+    /// Repaints the agent cards when a meeting, a session or the speech changes.
+    _agent_subs: Vec<Subscription>,
 }
 
 /// `write_through` shows one fixed line for a reply, so a reply that did not do what the
@@ -82,6 +84,7 @@ impl DeskScreen {
             cx.new(|cx| super::desk_conversation::DeskConversation::new(product, core, cx))
         };
         let mut screen = DeskScreen {
+            _agent_subs: super::agent_row::watch(&core, cx),
             conversation,
             tickets,
             product,
@@ -780,13 +783,9 @@ impl DeskScreen {
             )
             .when_some(hint, |el, p| el.child(mono(p)))
             .when(!d.roles.is_empty(), |el| {
-                el.child(
-                    div()
-                        .flex()
-                        .flex_wrap()
-                        .gap(space(2))
-                        .children(d.roles.iter().map(|r| neutral_tag(role_label(r)))),
-                )
+                el.child(super::agent_row::row(super::agent_row::desk_cards(
+                    &d.roles, &product, &self.core, cx,
+                )))
             });
 
         let mut figures = vec![

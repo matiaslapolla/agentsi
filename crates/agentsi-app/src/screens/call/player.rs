@@ -112,6 +112,19 @@ impl Shared {
         }
     }
 
+    /// The peak of the last `seconds` of samples before the position, from 0 to 1.
+    pub fn peak(&self, seconds: f64) -> f32 {
+        let t = self.tape();
+        let end = (t.pos as usize).min(t.samples.len());
+        let start = end.saturating_sub((seconds * f64::from(RATE)) as usize);
+        let top = t.samples[start..end]
+            .iter()
+            .map(|s| s.unsigned_abs())
+            .max()
+            .unwrap_or(0);
+        f32::from(top) / 32768.
+    }
+
     /// Takes the end flag: true once for each end of the tape.
     pub fn take_ended(&self) -> bool {
         std::mem::take(&mut self.tape().ended)
@@ -304,6 +317,20 @@ mod tests {
 
     fn ramp(n: usize) -> Vec<i16> {
         (0..n).map(|i| (i % 100) as i16 * 100).collect()
+    }
+
+    #[test]
+    fn the_peak_is_the_loudest_sample_of_the_last_window_before_the_position() {
+        let s = Shared::new();
+        let mut samples = vec![0i16; 2_400];
+        samples[100] = 16_384;
+        samples[2_000] = -8_192;
+        s.append(&samples);
+        s.seek(2_400. / f64::from(RATE));
+        assert_eq!(s.peak(0.05), 0.25, "50 ms is 1 200 samples: the loud one at 100 is out");
+        assert_eq!(s.peak(0.2), 0.5);
+        s.seek(0.0);
+        assert_eq!(s.peak(0.05), 0.0);
     }
 
     #[test]

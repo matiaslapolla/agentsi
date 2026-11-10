@@ -17,6 +17,7 @@
 //! The layout file saves each screen panel as `{"kind": <name>, "product": <id>}`, with
 //! `"arg"` when the screen has one, and `"host"` for a screen of an SSH host.
 
+pub mod agent_row;
 pub mod call;
 pub mod desk;
 pub mod desk_conversation;

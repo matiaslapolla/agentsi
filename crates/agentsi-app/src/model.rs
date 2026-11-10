@@ -88,6 +88,8 @@ pub struct StorySessionItem {
     pub title: String,
     /// `queued`, `tests`, `work`, `checks`, `ready` or `failed`.
     pub state: String,
+    /// The agent that owns the story, for its card.
+    pub owner_role: String,
 }
 
 impl StorySessionItem {
@@ -102,6 +104,7 @@ impl StorySessionItem {
                     id: s.id,
                     title: s.title,
                     state,
+                    owner_role: s.owner_role,
                 })
             })
             .collect()
@@ -925,6 +928,7 @@ mod tests {
             id: "S1".into(),
             title: "T".into(),
             state: "work".into(),
+            owner_role: "dev".into(),
         }];
         assert!(s.set_sessions("demo", one.clone()));
         assert!(!s.set_sessions("demo", one));

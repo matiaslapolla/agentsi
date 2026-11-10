@@ -156,3 +156,113 @@ impl RenderOnce for StateMark {
             })
     }
 }
+
+/// The widest spread of the speaking ring, at a full audio level.
+const LEVEL_SPREAD: f32 = 4.;
+
+/// The small view of one agent: the initial in a ring in the color of its work state, the name,
+/// the state mark and the activity word. The state mark carries the word, so the ring never
+/// shows a state alone. A speaking card with a `level` (0 to 1) grows a shadow of up to 4 px that
+/// takes no layout space. The card draws no animation: its owner repaints it when the level
+/// changes, so an idle window draws no frames.
+#[derive(IntoElement)]
+pub struct AgentCard {
+    name: SharedString,
+    state: WorkState,
+    activity: SharedString,
+    level: Option<f32>,
+}
+
+impl AgentCard {
+    pub fn new(name: impl Into<SharedString>, state: WorkState) -> Self {
+        AgentCard {
+            name: name.into(),
+            state,
+            activity: SharedString::default(),
+            level: None,
+        }
+    }
+    /// The words of the work now, for example "Reading plan.md".
+    pub fn activity(mut self, activity: impl Into<SharedString>) -> Self {
+        self.activity = activity.into();
+        self
+    }
+    /// The peak audio level, 0 to 1. It only matters while the state is Speaking.
+    pub fn level(mut self, level: f32) -> Self {
+        self.level = Some(level.clamp(0., 1.));
+        self
+    }
+}
+
+/// The spread in pixels of the speaking ring shadow for an audio level.
+pub fn ring_spread(state: WorkState, level: Option<f32>) -> f32 {
+    match (state, level) {
+        (WorkState::Speaking, Some(l)) => l.clamp(0., 1.) * LEVEL_SPREAD,
+        _ => 0.,
+    }
+}
+
+impl RenderOnce for AgentCard {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        let s = self.state;
+        let on = s != WorkState::Off;
+        let initial = self
+            .name
+            .chars()
+            .next()
+            .map(|c| c.to_uppercase().to_string())
+            .unwrap_or_else(|| "?".into());
+        let spread = ring_spread(s, self.level);
+        let ring = div()
+            .flex_none()
+            .size(control::row())
+            .flex()
+            .items_center()
+            .justify_center()
+            .rounded(radius::FULL)
+            .border_2()
+            .border_color(s.color().hsla())
+            .bg(if on { s.tint() } else { surface::raised() }.hsla())
+            .text_size(size::lg())
+            .font_weight(weight::SEMIBOLD)
+            .text_color(if on { s.color() } else { text::secondary() }.hsla())
+            .when(spread > 0., |el| {
+                el.shadow(vec![BoxShadow {
+                    color: s.color().alpha(status::BORDER_ALPHA),
+                    offset: point(px(0.), px(0.)),
+                    blur_radius: px(0.),
+                    spread_radius: px(spread),
+                    inset: false,
+                }])
+            })
+            .child(initial);
+        div()
+            .flex()
+            .flex_col()
+            .items_center()
+            .gap(space(1))
+            .flex_none()
+            .w(grid(36))
+            .p(space(2))
+            .child(ring)
+            .child(
+                div()
+                    .max_w_full()
+                    .truncate()
+                    .text_size(size::sm())
+                    .font_weight(weight::MEDIUM)
+                    .text_color(if on { text::primary() } else { text::tertiary() }.hsla())
+                    .child(self.name),
+            )
+            .child(StateMark::new(s))
+            .child(
+                div()
+                    .max_w_full()
+                    .h(size::xs())
+                    .truncate()
+                    .text_size(size::xs())
+                    .text_color(text::tertiary().hsla())
+                    .child(self.activity),
+            )
+    }
+}
