@@ -1172,6 +1172,7 @@ mod tests {
                         id: "S1".into(),
                         title: "Login".into(),
                         state: "work".into(),
+                        owner_role: "dev".into(),
                     }],
                 );
                 s.set_reflecting("a", true);

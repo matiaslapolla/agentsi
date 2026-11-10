@@ -240,11 +240,13 @@ mod tests {
                     id: "S1".into(),
                     title: "Login".into(),
                     state: "work".into(),
+                    owner_role: "dev".into(),
                 },
                 StorySessionItem {
                     id: "S2".into(),
                     title: "Logout".into(),
                     state: "ready".into(),
+                    owner_role: "dev".into(),
                 },
             ],
         );

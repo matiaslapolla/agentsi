@@ -16,9 +16,9 @@ use agentsi_proto::call_api::{
     CallAudio, CallAudioParams, CallCancel, CallCancelParams, CallGet, CallGetParams,
     CallGetResult, CallHeard, CallHeardParams, CallRender, CallRenderParams, Segment, decode_pcm,
 };
-use agentsi_ui::components::{Button, Card, Force, neutral_tag, status_tag};
+use agentsi_ui::components::{AgentCard, Button, Card, Force, neutral_tag, status_tag};
 use agentsi_ui::tokens::{
-    Status, accent, control, line, radius, size, space, status, surface, text, weight,
+    Status, WorkState, accent, line, radius, size, space, surface, text, weight,
 };
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -39,6 +39,9 @@ const TICK: Duration = Duration::from_millis(50);
 const POLL: Duration = Duration::from_secs(1);
 /// The samples of one `call.audio` request: one minute.
 const CHUNK: u64 = 60 * player::RATE as u64;
+/// The span of the audio level of the speaking card, in seconds, and its gain.
+const LEVEL_WINDOW: f64 = 0.05;
+const LEVEL_GAIN: f32 = 3.;
 /// The role that speaks stays lit this long after its segment ends, as in the web player.
 const HOLD: f64 = 0.15;
 
@@ -554,42 +557,13 @@ impl Calls {
     }
 }
 
-fn speaker(role: &str, lit: bool) -> Div {
-    let initial = role_label(role).chars().next().unwrap_or('?').to_string();
-    div()
-        .flex()
-        .flex_col()
-        .items_center()
-        .gap(space(2))
-        .child(
-            div()
-                .size(control::row())
-                .flex()
-                .items_center()
-                .justify_center()
-                .rounded(radius::FULL)
-                .border_2()
-                .border_color(if lit { status::ok() } else { line::border() })
-                .bg(if lit {
-                    Status::Ok.tint()
-                } else {
-                    surface::raised()
-                })
-                .text_size(size::lg())
-                .font_weight(weight::SEMIBOLD)
-                .text_color(if lit { status::ok() } else { text::secondary() })
-                .child(initial),
-        )
-        .child(
-            div()
-                .text_size(size::sm())
-                .text_color(if lit {
-                    text::primary()
-                } else {
-                    text::tertiary()
-                })
-                .child(role_label(role)),
-        )
+/// The card of a participant. The speaker shows Speaking and the peak level of the last 50 ms.
+/// The others show Off, because the recording sets no other state.
+fn speaker(role: &str, level: Option<f32>) -> AgentCard {
+    match level {
+        Some(l) => AgentCard::new(role_label(role), WorkState::Speaking).level(l),
+        None => AgentCard::new(role_label(role), WorkState::Off),
+    }
 }
 
 impl Focusable for CallScreen {
@@ -646,6 +620,12 @@ impl Render for CallScreen {
             .then(|| speaking(&c.segments, t, playing))
             .flatten()
             .map(String::from);
+        // Speech peaks near 0.3 of full scale, so the ring takes a gain.
+        let level = if playing {
+            (self.player.shared.peak(LEVEL_WINDOW) * LEVEL_GAIN).min(1.)
+        } else {
+            0.
+        };
         let can_play = c.audio.is_some() && c.timed && !render_busy;
 
         let state_line = if let Some(r) = &rendering {
@@ -796,7 +776,7 @@ impl Render for CallScreen {
             .children(
                 participants(&c.segments)
                     .into_iter()
-                    .map(|r| speaker(r, lit.as_deref() == Some(r))),
+                    .map(|r| speaker(r, (lit.as_deref() == Some(r)).then_some(level))),
             );
 
         let segments =

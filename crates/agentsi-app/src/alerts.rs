@@ -425,6 +425,18 @@ pub struct AlertCenter {
     fades: HashMap<AlertTarget, (WorkState, u64)>,
     /// The pane that the microphone or the conversation listens to.
     listening: Option<(Option<String>, String)>,
+    /// The role whose speech the pill plays, and the terminal that asked for it.
+    speaking: Option<Speech>,
+}
+
+/// One speech of the pill, as far as the events tell it.
+#[derive(Debug, Clone, PartialEq)]
+struct Speech {
+    host: Option<String>,
+    terminal: String,
+    role: String,
+    /// The guessed end: no event tells it.
+    until: std::time::Instant,
 }
 
 /// What the core knows about a pane: the center cannot read it.
@@ -561,6 +573,55 @@ impl AlertCenter {
             .is_some_and(|(h, p)| h.as_deref() == host && p == id)
     }
 
+    /// True while the pill speaks with the voice of `role` for the core of `host`.
+    pub fn is_speaking(&self, host: Option<&str>, role: &str) -> bool {
+        self.speaking.as_ref().is_some_and(|s| {
+            s.host.as_deref() == host && s.role == role && std::time::Instant::now() < s.until
+        })
+    }
+
+    /// Reads `voice.speak` and `voice.stop`. The speech ends at `voice.stop`, or after the
+    /// guess of the chime, and the center then repaints once.
+    fn hear_speech(&mut self, host: Option<&str>, n: &Notification, cx: &mut Context<Self>) {
+        let text = |k: &str| n.params.get(k).and_then(|v| v.as_str()).map(str::to_string);
+        match n.method.as_str() {
+            "voice.speak" => {
+                let (Some(terminal), Some(role)) = (text("terminal"), text("role")) else {
+                    return;
+                };
+                let wait = crate::chime::speech_guess(n);
+                let until = std::time::Instant::now() + wait;
+                self.speaking = Some(Speech {
+                    host: host.map(str::to_string),
+                    terminal,
+                    role,
+                    until,
+                });
+                cx.spawn(async move |this, cx| {
+                    cx.background_executor().timer(wait).await;
+                    let _ = this.update(cx, |c, cx| {
+                        if c.speaking.as_ref().is_some_and(|s| s.until == until) {
+                            c.speaking = None;
+                            cx.notify();
+                        }
+                    });
+                })
+                .detach();
+                cx.notify();
+            }
+            "voice.stop" => {
+                let same = self.speaking.as_ref().is_some_and(|s| {
+                    s.host.as_deref() == host && Some(&s.terminal) == text("terminal").as_ref()
+                });
+                if same {
+                    self.speaking = None;
+                    cx.notify();
+                }
+            }
+            _ => {}
+        }
+    }
+
     /// Reads the events that open or close the microphone. `focused` is the pane that the
     /// owner uses, which `voice.mic` does not name.
     pub fn hear(
@@ -570,6 +631,7 @@ impl AlertCenter {
         focused: Option<&str>,
         cx: &mut Context<Self>,
     ) {
+        self.hear_speech(host, n, cx);
         let now = match n.method.as_str() {
             "voice.mic" => match n.params.get("open").and_then(|o| o.as_bool()) {
                 Some(true) => focused.map(str::to_string),
@@ -656,6 +718,7 @@ mod tests {
             id: s("id"),
             title: s("title"),
             state: s("state"),
+            owner_role: String::new(),
         }
     }
 
@@ -720,6 +783,7 @@ mod tests {
             id: "S1".into(),
             title: "A".into(),
             state: "ready".into(),
+            owner_role: "dev".into(),
         };
         assert!(st.stories("p", &[ready]).is_empty());
         let decision = |id| PendingDecision {
@@ -928,6 +992,28 @@ mod tests {
         // A mic with no focused pane marks nothing.
         hear(cx, note("voice.mic", json!({"open": true})), None);
         center.read_with(cx, |c, _| assert!(!c.is_listening(None, "t2")));
+    }
+
+    #[gpui::test]
+    fn the_pill_speech_marks_the_card_of_its_role_until_it_stops(cx: &mut gpui::TestAppContext) {
+        let center = cx.new(|_| AlertCenter::default());
+        let hear = |cx: &mut gpui::TestAppContext, n: Notification| {
+            center.update(cx, |c, cx| c.hear(None, &n, None, cx));
+        };
+        let speak = note(
+            "voice.speak",
+            json!({"terminal": "t1", "role": "dev", "text": "one two three"}),
+        );
+        hear(cx, speak);
+        center.read_with(cx, |c, _| {
+            assert!(c.is_speaking(None, "dev"));
+            assert!(!c.is_speaking(None, "qa"));
+            assert!(!c.is_speaking(Some("host"), "dev"), "another core");
+        });
+        hear(cx, note("voice.stop", json!({"terminal": "t2"})));
+        center.read_with(cx, |c, _| assert!(c.is_speaking(None, "dev"), "another terminal"));
+        hear(cx, note("voice.stop", json!({"terminal": "t1"})));
+        center.read_with(cx, |c, _| assert!(!c.is_speaking(None, "dev")));
     }
 
     #[test]

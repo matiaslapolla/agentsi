@@ -379,3 +379,13 @@ fn a_tab_chip_shows_its_count_only_when_it_is_collapsed_and_a_click_reaches_its_
     assert!(collapsed.get());
     assert!(cx.debug_bounds("tab-chip:chip:count").is_some());
 }
+
+#[test]
+fn only_a_speaking_card_with_a_level_grows_a_ring() {
+    use super::ring_spread;
+    use crate::tokens::WorkState;
+    assert_eq!(ring_spread(WorkState::Speaking, None), 0.);
+    assert_eq!(ring_spread(WorkState::Speaking, Some(0.5)), 2.);
+    assert_eq!(ring_spread(WorkState::Speaking, Some(9.)), 4.);
+    assert_eq!(ring_spread(WorkState::Working, Some(1.)), 0.);
+}

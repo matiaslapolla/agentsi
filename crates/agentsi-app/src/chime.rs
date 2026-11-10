@@ -140,6 +140,17 @@ pub const IDLE: Duration = Duration::from_secs(10);
 const WORD: Duration = Duration::from_millis(400);
 const SPEECH_MAX: Duration = Duration::from_secs(60);
 
+/// How long the pill speaks the text of a `voice.speak`: 400 ms for each word, at most 60 s.
+/// No event tells the end of a speech, so this guess ends it.
+pub fn speech_guess(n: &Notification) -> Duration {
+    let words = n
+        .params
+        .get("text")
+        .and_then(|t| t.as_str())
+        .map_or(0, |t| t.split_whitespace().count());
+    (WORD * words as u32).min(SPEECH_MAX)
+}
+
 /// The rules of "Tones", and the voice state that they read.
 pub struct Chime {
     sound: Box<dyn Sound>,
@@ -181,13 +192,7 @@ impl Chime {
     pub fn hear(&mut self, now: Instant, n: &Notification) {
         match n.method.as_str() {
             "voice.speak" => {
-                let words = n
-                    .params
-                    .get("text")
-                    .and_then(|t| t.as_str())
-                    .map_or(0, |t| t.split_whitespace().count());
-                let guess = (WORD * words as u32).min(SPEECH_MAX);
-                self.speech_until = Some(now + guess);
+                self.speech_until = Some(now + speech_guess(n));
             }
             "voice.stop" => self.speech_until = None,
             "voice.mic" => {
