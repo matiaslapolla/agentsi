@@ -2,6 +2,7 @@
 # A stand-in for `claude` in the screenshots of the guide (scripts/guide-shots.sh puts it first on the
 # PATH of the throwaway core). It prints a short stream-json for one role of a meeting, then waits,
 # so the meeting stays live. It calls no service.
+case "$*" in --version) echo "2.1.0 (Claude Code)"; exit 0 ;; esac
 cat > /dev/null &
 tool() { printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"%s","input":{"%s":"%s"}}]}}\n' "$1" "$2" "$3"; }
 text() { printf '{"type":"assistant","message":{"content":[{"type":"text","text":"%s"}]}}\n' "$1"; }
