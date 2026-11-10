@@ -12,6 +12,26 @@ use std::time::Duration;
 /// The bytes of stderr that the process keeps, for the message of a failure.
 const STDERR_KEEP: usize = 4096;
 
+/// The tries of a spawn that fails with `ETXTBSY`.
+const BUSY_TRIES: u32 = 5;
+
+/// Spawns `command`, and tries again after a short pause while the program file is busy
+/// (`ETXTBSY`): another thread's fork still holds the file open for writing, or `claude`
+/// is updating itself.
+pub fn spawn(command: &mut Command) -> std::io::Result<Child> {
+    let mut pause = Duration::from_millis(25);
+    for _ in 1..BUSY_TRIES {
+        match command.spawn() {
+            Err(e) if e.raw_os_error() == Some(libc::ETXTBSY) => {
+                std::thread::sleep(pause);
+                pause *= 2;
+            }
+            other => return other,
+        }
+    }
+    command.spawn()
+}
+
 /// What the process gives.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProcEvent {
@@ -49,7 +69,7 @@ impl DeskProcess {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         die_with_parent(&mut command);
-        let mut child = command.spawn()?;
+        let mut child = spawn(&mut command)?;
         let pid = child.id();
         let stdin = child.stdin.take();
         let stderr = keep_tail(child.stderr.take().expect("stderr is piped"));
