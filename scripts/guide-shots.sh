@@ -30,7 +30,7 @@ only=""
 keep=0
 
 # The shots in page order. Each name is the file name of an image in docs/guide/README.md.
-SHOTS="window-tree palette front-desk minutes-list minute priorities call meeting stories story memory roles git settings settings-voice settings-keys settings-dictation settings-data"
+SHOTS="window-tree palette front-desk minutes-list minute priorities call meeting stories story memory roles git settings settings-voice settings-keys settings-dictation settings-data tickets ticket front-desk-new setup meeting-roles story-forms settings-health settings-alerts settings-appearance alert-toast-glow alert-log desk-conversation tickets-light ticket-light front-desk-light settings-appearance-light desk-conversation-light"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -92,7 +92,7 @@ trap stop_all EXIT
 
 # --- Synthetic data -------------------------------------------------------------------------
 
-for p in lumen orchard harbor; do
+for p in lumen orchard harbor meadow; do
   mkdir -p "$work/repos/$p/docs"
   (cd "$work/repos/$p" && git init -q -b main \
     && git config user.name "Demo" && git config user.email "demo@example.invalid" \
@@ -101,13 +101,21 @@ for p in lumen orchard harbor; do
     && echo ".worktrees/" >> .git/info/exclude \
     && echo "change" >> README.md && echo "draft" > docs/notes.md)
 done
+# A folder that no product owns yet: the Setup screen reads it.
+mkdir -p "$work/repos/clinic-desk/docs"
+printf '{ "name": "clinic-desk", "version": "0.1.0" }\n' > "$work/repos/clinic-desk/package.json"
+printf '# Clinic Desk\n\nA shared desk for the front staff of small clinics.\n' > "$work/repos/clinic-desk/docs/product.md"
 # The session of the story S001 of Lumen has a real worktree.
 (cd "$work/repos/lumen" && git stash -q -u \
   && git worktree add -q -b story/S001-send-a-reminder-the-day-before \
     .worktrees/S001-send-a-reminder-the-day-before main && git stash pop -q)
 
 # A shell with a short prompt, and a stand-in for `claude` that calls no service.
-printf "PS1='\\w \\$ '\nHISTFILE=/dev/null\n" > "$home/.bashrc"
+cat > "$home/.bashrc" <<'EOF'
+PS1='\w \$ '
+HISTFILE=/dev/null
+PROMPT_COMMAND='printf "\033]0;%s\007" "${PWD##*/}"'
+EOF
 printf 'pcm.!default { type null }\nctl.!default { type null }\n' > "$work/asound.conf"
 # The Settings screen prints the path of the core program: a link keeps the path of this checkout out of the shot.
 mkdir -p "$home/.local/bin" "$work/stub"
@@ -125,6 +133,8 @@ cat > "$home/data/agentsi.config.json" <<EOF
     { "id": "orchard", "name": "Orchard", "paths": ["$work/repos/orchard"], "status": "active",
       "roles": ["pm", "dev"] },
     { "id": "harbor", "name": "Harbor", "paths": ["$work/repos/harbor"], "status": "active",
+      "roles": ["pm", "dev"] },
+    { "id": "meadow", "name": "Meadow", "paths": ["$work/repos/meadow"], "status": "active",
       "roles": ["pm", "dev"] }
   ]
 }
@@ -217,7 +227,7 @@ start_app() {
   agentsi_env "$bin_dir/agentsi-app" >> "$work/app.log" 2>&1 &
   app_pid=$!
   geo=""
-  for _ in $(seq 1 100); do
+  for _ in $(seq 1 300); do
     geo=$(geometry || true)
     [ -n "$geo" ] && break
     sleep 0.2
@@ -288,11 +298,15 @@ run_in_terminal() { typed "$1"; key Return; sleep 0.6; }
 start_app
 key ctrl+2                      # Lumen. The tree lists the products that have no group first.
 for cmd in "git log --oneline" "cat docs/vision.md" "git status --short"; do
-  key ctrl+t; sleep 1.5; run_in_terminal "$cmd"
+  key ctrl+t; sleep 3; run_in_terminal "$cmd"
 done
 key ctrl+3                      # Orchard
-for cmd in "ls docs" "git diff --stat"; do
-  key ctrl+t; sleep 1.5; run_in_terminal "$cmd"
+# Each Orchard pane also waits for a file in the home folder. When the file appears, the pane prints
+# the state of a program (OSC 7501): blocked for the first pane, an error for the second. The panes
+# are not in view, so each one makes an alert, a glow and a toast.
+for cmd in "ls docs; (while sleep 0.3; do [ -e ~/bell1 ] && rm ~/bell1 && printf '\\033]7501;state=blocked:kind=permission:msg=QWxsb3cgQmFzaDogcG5wbSB0ZXN0Pw==\\007'; done) &" \
+  "git diff --stat; (while sleep 0.3; do [ -e ~/bell2 ] && rm ~/bell2 && printf '\\033]7501;state=error:msg=VGhlIGJ1aWxkIGZhaWxlZCB3aXRoIDIgZXJyb3Jz\\007'; done) &"; do
+  key ctrl+t; sleep 3; run_in_terminal "$cmd"
 done
 sleep 1
 stop_app
@@ -403,9 +417,89 @@ shot settings-dictation
 key End; sleep 1
 shot settings-data
 
+# --- Shots of the tracker, the desk, the setup and the alerts (dark theme) ---------------------
+# A palette entry opens a screen with no keyboard focus in it. A page key then needs one more
+# `ctrl+comma` (it only shows the Settings screen again) to give the screen the focus.
+
+tracker_shots() {
+  local sfx=$1
+  key ctrl+2; sleep 1
+  key ctrl+shift+i; sleep 2
+  shot "tickets$sfx"
+  key Return; sleep 2
+  shot "ticket$sfx"
+  # Harbor has a short desk: its tickets and its archived decisions fit in the window.
+  key ctrl+1; sleep 1
+  key ctrl+shift+d; sleep 1
+  palette "Show the archived decisions"; sleep 1
+  shot "front-desk$( [ -n "$sfx" ] && echo "$sfx" || echo -new )"
+  palette "Show the archived decisions"; sleep 0.5
+  key ctrl+2; sleep 1
+  palette "Open the owner settings"; sleep 2
+  key ctrl+comma; sleep 1
+  shot "settings-appearance$sfx"
+}
+
+tracker_shots ""
+
+# Settings: Alerts is one page below Appearance, Health is one page above the end.
+key Next; sleep 1
+shot settings-alerts
+key End; sleep 1
+key Prior; sleep 1
+shot settings-health
+
+# Setup: the update mode of a registered product. The forms start from its stored brief.
+key ctrl+2; sleep 1
+palette "Update the brief of the active product"; sleep 3
+shot setup
+
+# Reserved for the desk conversation (another unit). Take them with --only when it exists.
+# shot desk-conversation
+
 # Last: a screen of a live meeting takes no key until the next click.
 key ctrl+shift+g; sleep 2
 shot meeting
+
+# The meeting screen shows its form when no meeting runs: stop the meeting of the CLI, and start the app again.
+kill "$meet_pid" 2>/dev/null || true
+meet_pid=""
+pkill -f "^/bin/sh $work/stub/claude" 2>/dev/null || true
+stop_app
+start_app
+key ctrl+2
+key ctrl+shift+g; sleep 2
+shot meeting-roles
+
+# Story forms: the New story form of the Stories screen.
+key ctrl+2; sleep 1
+palette "New story in the active product"; sleep 2
+shot story-forms
+key Escape; sleep 0.5
+
+# The same screens in the Light theme. The pair has the same size and the same content.
+stop_app
+printf 'theme = "light"\n' > "$home/.config/agentsi/appearance.toml"
+start_app
+key ctrl+2
+tracker_shots "-light"
+
+# The alerts come last, in the Dark theme. They leave a state in the core that no later shot should show.
+stop_app
+printf 'theme = "dark"\n' > "$home/.config/agentsi/appearance.toml"
+start_app
+key ctrl+2; sleep 1
+key ctrl+shift+d; sleep 3
+touch "$home/bell1"; sleep 1
+(agentsi_env "$bin_dir/agentsi" decision add --product lumen --text "Pick the pilot clinic by Friday" \
+  --why "Two clinics said yes and the onboarding mail waits.") > "$work/decision.log" 2>&1
+touch "$home/bell2"
+sleep 1.5
+shot alert-toast-glow
+palette "Show alerts"; sleep 1
+shot alert-log
+palette "Show alerts"; sleep 0.5
+
 
 # A PNG optimiser is optional. The shots are 100 KB or less without one.
 if command -v oxipng >/dev/null; then
