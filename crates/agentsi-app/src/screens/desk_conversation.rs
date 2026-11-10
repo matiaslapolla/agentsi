@@ -33,7 +33,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use super::memory::decision_flash;
-use super::parts::{Flash, Live, Load, flash_line, mono, notice};
+use super::parts::{Flash, Live, Load, failed_text, flash_line, mono, notice};
 use crate::format;
 use crate::link::CallError;
 use crate::model::{CoreEvent, CoreState, DeskNotice};
@@ -713,11 +713,7 @@ impl DeskConversation {
                 duration_ms,
                 error,
             } => match error {
-                Some(e) => div()
-                    .text_size(size::sm())
-                    .text_color(WorkState::Failed.color())
-                    .child(format!("The reply failed: {e}"))
-                    .into_any_element(),
+                Some(e) => failed_text(format!("The reply failed: {e}")).into_any_element(),
                 None => mono(format!(
                     "{} · {:.1} s",
                     format::usd(*cost_usd),
@@ -725,11 +721,7 @@ impl DeskConversation {
                 ))
                 .into_any_element(),
             },
-            Row::Error(m) => div()
-                .text_size(size::sm())
-                .text_color(WorkState::Failed.color())
-                .child(m.clone())
-                .into_any_element(),
+            Row::Error(m) => failed_text(m.clone()).into_any_element(),
             Row::View(View::Decisions { ids }, _) => div()
                 .flex()
                 .flex_col()
@@ -1071,16 +1063,11 @@ impl Render for DeskConversation {
                 .flex_col()
                 .gap(space(2))
                 .when(self.state == DeskState::Failed, |el| {
-                    el.child(
-                        div()
-                            .text_size(size::sm())
-                            .text_color(WorkState::Failed.color())
-                            .child(
-                                self.message
-                                    .clone()
-                                    .unwrap_or_else(|| "The desk session failed.".into()),
-                            ),
-                    )
+                    el.child(failed_text(
+                        self.message
+                            .clone()
+                            .unwrap_or_else(|| "The desk session failed.".into()),
+                    ))
                 })
                 .child(
                     div()

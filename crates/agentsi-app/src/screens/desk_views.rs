@@ -1052,11 +1052,11 @@ mod tests {
     // No `use super::*`: see the tests of the conversation.
     use super::super::tests::{draw, entry, history, methods_sent, setup};
     use super::{DeskConversation, Load};
-    use agentsi_ui::tokens::{control, grid};
     use crate::link::CallError;
     use crate::nav::{Nav, ScreenRequest};
     use crate::screens::parts::Flash;
     use agentsi_proto::desk_session_api::{DeskPageResult, DeskSeqResult};
+    use agentsi_ui::tokens::{control, grid};
 
     pub(in crate::screens) fn minutes(mark: Option<&str>) -> MinutesDetail {
         serde_json::from_value(json!({
