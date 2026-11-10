@@ -122,3 +122,26 @@ The final report lists each change to the protocol, the database schema and the 
 - **Decision:** a silent call participant shows "Off", the word of `WorkState::Off` in the spec. A visual detail for the owner's review.
 - **Flake fixed by the coordinator:** `bench::tests::latency_samples_of_the_warm_up_do_not_count` failed 3 times. Two calls of `Instant::now()` can return the same value, so a warm-up sample could count (`t >= from`). The test now uses explicit times. It passed 5 of 5.
 - **Incident at 21:35:** an out-of-memory kill stopped the coordinator session and the B10 worker. The coordinator's commit gate ran in the main checkout with the default 8 jobs, beside a worktree build. Rule since then: each cargo command in the main checkout runs with `CARGO_BUILD_JOBS=2`.
+
+## 2026-11-09 — B10 `desk-views` merged
+
+- **Changed:** the desk conversation shows object views of priorities, stories, diffs and tickets, and generic views of tables, charts and checklists. An HTML page shows as a view with "Open in browser", and the app writes the page file through `desk.page`. The desk session can read tickets. There are 9 show tools in all.
+- **Proof:** each of the 4 commits passed the gate. No golden file changed. On main after the merge, the schema test and `cargo test -p agentsi-app` passed (458), and `Cargo.lock` has no `wry` and no `webkit2gtk`.
+- **Decisions accepted:** the app writes the page file through `desk.page` (the spec rule, and it works for a core on an SSH host). `7bcb451` makes the memory limit of a core regression test follow the catalog size. It changes only the test, and the limit (about 124 MB) still catches the regression it guards (291 MB or more).
+- **Follow-up:** the core queues up to 256 whole `rpc.discover` replies for a client that does not read (about 92 MB). A cap in bytes would be safer.
+- **Incident:** the worker waited 40 min on a lost background test run after the out-of-memory restart. The owner asked not to re-run checks that already passed.
+
+## 2026-11-10 — Code review and `review-fixes` merged (ded47c7)
+
+- **Review:** `code-review` since `7d79a00` on three axes. Standards: one hard breach (`px(420.)` in `shell/alert_actions.rs`), state colors outside `WorkState`, and smells (helper copies in the core methods, `alerts_file.rs` copies `appearance.rs`, three files over 1,500 lines). Spec: five gaps. Bugs: seven findings, all traced as plausible by a separate verifier, none refuted. The fast gate failed once on `a_slow_auth_check_stops_at_its_limit`, likely ETXTBSY.
+- **Fixed in 15 commits, each with the gate:** F1 a story promote whose ticket changed names the new story and sends its event. F2 `update_ticket` checks the move before it saves. F3 a clear stops the desk processes first. F5 desk notes stay unsent until delivery. The auth check and the desk process retry a spawn on ETXTBSY. Sizes and failure colors come from tokens and `WorkState`. A failed `setup.draft` writes its log line. Opening Settings ends `Model` alerts, and a repeat alert pulses a sidebar row again. A write tool retries only when no request went out. Desk tool rows show short names.
+- **Owner choice:** the glow is a border only, everywhere (rows, panes, tabs). The blurred shadow is gone. The edge rests at alpha 0.75 and peaks at 1.0, because a resting edge needs 0.71 to reach 3:1.
+- **Found in the screenshots:** the agent card line under the state pill was clipped. Fixed.
+- **Proof after the merge:** `cargo check --workspace --all-targets` passed. The owner rule: no full suite runs a second time.
+- **Follow-up:** F4 (a bell ends a Blocked glow early), F6 (a reset from a second client goes unseen), F7 (a mark note can list another product's priorities), the byte cap of the `rpc.discover` outbox, the timing tests under load, and the smells above.
+
+## 2026-11-10 — Wrap-up
+
+- **Screenshots:** the five shots that show the state border or the agent cards were taken again after `review-fixes`. The gallery of the delivered result is the artifact https://claude.ai/artifact/PSwESgySsJ95ffvrXcSbN2.
+- **Watcher:** the user service `agentsi-build-watch` is stopped.
+- **Not run:** the release idle and alert benches. The owner checks the tones, the system notifications, the desk with the real `claude` and a real setup by hand.
