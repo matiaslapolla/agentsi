@@ -80,8 +80,21 @@ async fn draft(_: Ctx, p: SetupDraftParams) -> Result<SetupDraftResult, RpcError
         let context = setup::context(&dir);
         let prompt = setup::draft_prompt(&dir, &context, p.previous.as_ref(), &p.failures);
         let call = setup::draft_call(&dir, prompt);
-        let (output, usage) = run_call(&call, "setup").map_err(RpcError::internal)?;
+        let ran = run_call(&call, "setup");
         let seconds = started.elapsed().as_secs_f64();
+        let (output, usage) = match ran {
+            Ok(done) => done,
+            Err(error) => {
+                log(
+                    &root,
+                    json!({"at": clock::iso(clock::now_ms()), "kind": "draft",
+                           "path": dir.display().to_string(), "files": context.files.len(),
+                           "bytes": context.bytes, "repair": p.previous.is_some(),
+                           "error": error, "seconds": seconds}),
+                );
+                return Err(RpcError::internal(error));
+            }
+        };
         let no_data: Vec<String> = output["no_data"]
             .as_array()
             .map(|a| {
