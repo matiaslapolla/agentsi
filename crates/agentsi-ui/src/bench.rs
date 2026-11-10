@@ -784,11 +784,17 @@ mod tests {
     #[test]
     fn latency_samples_of_the_warm_up_do_not_count() {
         let b = measuring("terminal");
-        b.record_latency(500.);
-        b.record_latency(500.);
-        b.0.borrow_mut().window_from = Some(Instant::now());
-        b.record_latency(5.);
-        b.record_latency(7.);
+        let t0 = Instant::now();
+        let ms = |n| t0 + std::time::Duration::from_millis(n);
+        {
+            // Explicit times: two calls of `Instant::now()` can return the same value.
+            let mut s = b.0.borrow_mut();
+            s.latencies.push((t0, 500.));
+            s.latencies.push((t0, 500.));
+            s.window_from = Some(ms(1));
+            s.latencies.push((ms(2), 5.));
+            s.latencies.push((ms(3), 7.));
+        }
         let r = b.report();
         assert_eq!(r.latency_ms.n, 2);
         assert_eq!(r.latency_ms.max, 7.);
