@@ -174,7 +174,7 @@ impl Shell {
             .id("alert-log-list")
             .flex()
             .flex_col()
-            .max_h(px(420.))
+            .max_h(control::ALERT_LOG_HEIGHT)
             .overflow_y_scroll()
             .children(rows.iter().enumerate().map(|(i, alert)| {
                 let target = alert.target.clone();

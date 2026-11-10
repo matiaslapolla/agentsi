@@ -1052,6 +1052,7 @@ mod tests {
     // No `use super::*`: see the tests of the conversation.
     use super::super::tests::{draw, entry, history, methods_sent, setup};
     use super::{DeskConversation, Load};
+    use agentsi_ui::tokens::{control, grid};
     use crate::link::CallError;
     use crate::nav::{Nav, ScreenRequest};
     use crate::screens::parts::Flash;
@@ -1324,7 +1325,7 @@ mod tests {
             gpui::div()
                 .flex()
                 .flex_col()
-                .w(gpui::px(380.))
+                .w(control::DESK_CONVERSATION_WIDTH)
                 .children((0..conv.rows.len()).map(|i| conv.row_element(i, &weak, cx)))
         }
     }
@@ -1332,8 +1333,8 @@ mod tests {
     fn draw_rows(cx: &mut VisualTestContext, conv: &Entity<DeskConversation>) {
         let conv = conv.clone();
         cx.draw(
-            gpui::point(gpui::px(0.), gpui::px(0.)),
-            gpui::size(gpui::px(380.), gpui::px(4000.)),
+            gpui::Point::default(),
+            gpui::size(control::DESK_CONVERSATION_WIDTH, grid(1000)),
             |_, cx| {
                 use gpui::{AppContext as _, IntoElement as _};
                 gpui::AnyView::from(cx.new(|_| AllRows(conv))).into_any_element()

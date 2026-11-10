@@ -750,6 +750,8 @@ pub mod control {
     pub const DESK_VIEW_HEIGHT: Pixels = px(320.);
     /// The height of a chart view in the desk conversation.
     pub const DESK_CHART_HEIGHT: Pixels = px(200.);
+    /// The tallest alert log list. The list scrolls inside it.
+    pub const ALERT_LOG_HEIGHT: Pixels = px(420.);
     /// The widest column of a screen of text: longer lines read badly.
     pub const CONTENT_WIDTH: Pixels = px(880.);
     /// The width of a number column in a table.

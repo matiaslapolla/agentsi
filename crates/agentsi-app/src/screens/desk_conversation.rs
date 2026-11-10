@@ -24,6 +24,7 @@ use agentsi_proto::marks_api::{
 };
 use agentsi_proto::rpc::Notification;
 use agentsi_ui::components::{Button, Card, StateMark, neutral_tag};
+use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{WorkState, font, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::component::message_scroller::{MessageScroller, MessageScrollerState};
@@ -678,7 +679,7 @@ impl DeskConversation {
                 .child(
                     div()
                         .max_w(relative(0.85))
-                        .px(space(3))
+                        .pad_x(space(3))
                         .py(space(2))
                         .rounded(radius::lg())
                         .border_1()
@@ -1033,7 +1034,7 @@ impl Render for DeskConversation {
                         .unwrap_or_else(|_| div().into_any_element())
                 })
                 .size_full()
-                .px(space(3))
+                .pad_x(space(3))
                 .into_any_element()
             }
         };
