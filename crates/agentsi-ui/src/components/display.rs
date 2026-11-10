@@ -251,7 +251,14 @@ impl RenderOnce for AgentCard {
                     .truncate()
                     .text_size(size::sm())
                     .font_weight(weight::MEDIUM)
-                    .text_color(if on { text::primary() } else { text::tertiary() }.hsla())
+                    .text_color(
+                        if on {
+                            text::primary()
+                        } else {
+                            text::tertiary()
+                        }
+                        .hsla(),
+                    )
                     .child(self.name),
             )
             .child(StateMark::new(s))
