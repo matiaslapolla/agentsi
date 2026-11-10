@@ -30,7 +30,7 @@ only=""
 keep=0
 
 # The shots in page order. Each name is the file name of an image in docs/guide/README.md.
-SHOTS="window-tree palette front-desk minutes-list minute priorities call meeting stories story memory roles git settings settings-voice settings-keys settings-dictation settings-data tickets ticket front-desk-new setup meeting-roles story-forms settings-health settings-alerts settings-appearance alert-toast-glow alert-log desk-conversation tickets-light ticket-light front-desk-light settings-appearance-light desk-conversation-light"
+SHOTS="window-tree palette front-desk minutes-list minute priorities call meeting stories story memory roles git settings settings-voice settings-keys settings-dictation settings-data tickets ticket front-desk-new setup meeting-roles story-forms settings-health settings-alerts settings-appearance alert-toast-glow alert-log desk-conversation tickets-light ticket-light front-desk-light settings-appearance-light desk-conversation-light agent-cards agent-cards-light"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -290,6 +290,9 @@ shot() {
 # Move the pointer out of the window, so a shot shows no cursor.
 park_pointer() { hc dispatch movecursor 1599 999 >/dev/null 2>&1 || true; }
 
+# The helper that talks to the core: the desk conversation and a speaking role.
+desk_py() { python3 "$here/guide-shots/desk.py" "$core_sock" "$@"; }
+
 # A shell command in the focused terminal.
 run_in_terminal() { typed "$1"; key Return; sleep 0.6; }
 
@@ -454,12 +457,13 @@ key ctrl+2; sleep 1
 palette "Update the brief of the active product"; sleep 3
 shot setup
 
-# Reserved for the desk conversation (another unit). Take them with --only when it exists.
-# shot desk-conversation
-
 # Last: a screen of a live meeting takes no key until the next click.
 key ctrl+shift+g; sleep 2
 shot meeting
+# One role speaks: a voice.speak of a remote host does not need the pill. The speech lasts 400 ms a word.
+speech="The queue drops a job after one failure. I propose one retry rule: retry once after five minutes, then log the second failure. It closes the gap that the pilot clinic would hit first, and it costs one day of work for the whole team."
+desk_py speak studio dev "$speech"; sleep 2
+shot agent-cards
 
 # The meeting screen shows its form when no meeting runs: stop the meeting of the CLI, and start the app again.
 kill "$meet_pid" 2>/dev/null || true
@@ -483,6 +487,18 @@ printf 'theme = "light"\n' > "$home/.config/agentsi/appearance.toml"
 start_app
 key ctrl+2
 tracker_shots "-light"
+# The meeting again, in the Light theme, with the same speaker.
+agentsi_env "$bin_dir/agentsi" meet --product lumen --question "What should Lumen focus on this week?" \
+  > "$work/meet2.log" 2>&1 &
+meet_pid=$!
+sleep 8
+key ctrl+2; sleep 1
+key ctrl+shift+g; sleep 2
+desk_py speak studio dev "$speech"; sleep 2
+shot agent-cards-light
+kill "$meet_pid" 2>/dev/null || true
+meet_pid=""
+pkill -f "^/bin/sh $work/stub/claude" 2>/dev/null || true
 
 # The alerts come last, in the Dark theme. They leave a state in the core that no later shot should show.
 stop_app
@@ -500,6 +516,17 @@ palette "Show alerts"; sleep 1
 shot alert-log
 palette "Show alerts"; sleep 0.5
 
+# The desk conversation: one question, a streamed reply and three views, in Dark and then in Light.
+key ctrl+2; sleep 1
+key ctrl+shift+d; sleep 2
+desk_py desk lumen; sleep 2
+shot desk-conversation
+stop_app
+printf 'theme = "light"\n' > "$home/.config/agentsi/appearance.toml"
+start_app
+key ctrl+2; sleep 1
+key ctrl+shift+d; sleep 3
+shot desk-conversation-light
 
 # A PNG optimiser is optional. The shots are 100 KB or less without one.
 if command -v oxipng >/dev/null; then
