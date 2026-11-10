@@ -24,8 +24,8 @@ The immersive app is one module in three specs. This spec holds the work states,
 - **Work state**: the one state that the app shows for a pane, a meeting role, a story session or an agent. `tokens::WorkState` holds the 9 states of the state map.
 - **Blocked**: the work state of a program that waits for the input of the owner. It is not the pill state "Waiting".
 - **Alert**: what the app shows or plays when a work state needs the owner. A protocol message keeps the name "event".
-- **Glow**: a 2 px border in the color of a work state, with a shadow of 8 px blur outside it.
-- **Pulse**: one rise and fall of the glow shadow in 1.2 s.
+- **Glow**: a 2 px border in the color of a work state, with no fill and no shadow.
+- **Pulse**: one rise and fall of the alpha of the glow border in 1.2 s, from rest (`control::GLOW_REST_ALPHA`, 0.75) to 1.0.
 
 ## Design
 
@@ -65,11 +65,11 @@ When two work states apply to one element, the first row wins. The event numbers
 ### Glow and motion
 
 - `StyleExt::glow(state)` in `crates/agentsi-ui/src/style.rs` draws the edge and a `BoxShadow` at `status::BORDER_ALPHA`.
-- The 2 px edge carries the state. The shadow is decoration, because it does not reach 3:1.
+- The 2 px edge carries the state. At rest it reaches 3:1 on each surface. The owner chose the border only, because a shadow showed through the transparent overlay as a fill.
 - A tab draws the glow as its outline, and the 3 px bar keeps the group color. A tab of a Blocked or Failed pane also shows the state icon.
-- Only opacity, color, border and shadow move. No size or position changes, so the layout tests of the appearance spec stay valid.
+- Only opacity, color and border move. No size or position changes, so the layout tests of the appearance spec stay valid.
 - A pulse is a chain of oneshot animations with `with_max_fps(motion::PULSE_FPS)`. After the last pulse, the element asks for no frame.
-- New tokens: `motion::PULSE` (1.2 s), `motion::PULSES` (3), `motion::PULSE_FPS` (30), `control::GLOW_EDGE` (2 px) and `control::GLOW_BLUR` (8 px).
+- New tokens: `motion::PULSE` (1.2 s), `motion::PULSES` (3), `motion::PULSE_FPS` (30), `control::GLOW_EDGE` (2 px) and `control::GLOW_REST_ALPHA` (0.75).
 - When the owner opens an alert, the app shows the target. The target fills with its tint, and the tint fades in `motion::DIALOG`.
 - With reduced motion, the glow shows at once at full strength, and no pulse runs.
 - The bench mode `--bench alert` asks for a `blocked` state in a pane that is not in view. Then it waits 10 s and counts the frames for `--seconds`.

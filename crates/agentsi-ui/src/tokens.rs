@@ -720,9 +720,10 @@ pub mod control {
         by_text(14., 16., 18.)
     }
     pub const FOCUS_RING: Pixels = px(2.);
-    /// The edge of a glow, and the blur of its shadow.
+    /// The edge of a glow, and the alpha of the edge at rest. At rest the edge still
+    /// reaches 3:1 on each surface.
     pub const GLOW_EDGE: Pixels = px(2.);
-    pub const GLOW_BLUR: Pixels = px(8.);
+    pub const GLOW_REST_ALPHA: f32 = 0.75;
     /// Gap between an icon and its label.
     pub const ICON_GAP: Pixels = px(6.);
     /// Horizontal padding of a small and of a normal button.
@@ -987,6 +988,29 @@ mod tests {
                         contrast(w.color(), s) >= 3.0,
                         "{name}: {w:?} on {sn} is {:.2}",
                         contrast(w.color(), s)
+                    );
+                }
+            }
+        }
+        set_palette_for_test(Palette::DARK);
+    }
+
+    #[test]
+    fn the_resting_glow_edge_reaches_3_to_1_on_each_surface_of_both_palettes() {
+        for (name, palette) in [("dark", Palette::DARK), ("light", Palette::LIGHT)] {
+            set_palette_for_test(palette);
+            for w in WorkState::ALL.into_iter().filter(|w| w.pulses() > 0) {
+                for (sn, s) in [
+                    ("base", surface::base()),
+                    ("panel", surface::panel()),
+                    ("raised", surface::raised()),
+                    ("overlay", surface::overlay()),
+                ] {
+                    let edge = w.color().over(s, control::GLOW_REST_ALPHA);
+                    assert!(
+                        contrast(edge, s) >= 3.0,
+                        "{name}: {w:?} at rest on {sn} is {:.2}",
+                        contrast(edge, s)
                     );
                 }
             }
