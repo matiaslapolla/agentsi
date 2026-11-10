@@ -254,6 +254,18 @@ impl Server {
                 if !fields && state.is_none() {
                     return Err(format!("Nothing to change in ticket {id}."));
                 }
+                if let (true, Some(to)) = (fields, state) {
+                    let now = core
+                        .call::<TicketGet>(&TicketGetParams {
+                            product: product.clone(),
+                            id: id.clone(),
+                        })?
+                        .ticket;
+                    let named = waiting_on.as_deref().is_some_and(|w| !w.trim().is_empty());
+                    if let Some(refusal) = now.state.move_refusal(&id, to, named) {
+                        return Err(refusal);
+                    }
+                }
                 let mut ticket = None;
                 if fields {
                     ticket = Some(core.call::<TicketUpdate>(&update)?.ticket);

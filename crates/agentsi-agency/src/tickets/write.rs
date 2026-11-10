@@ -288,11 +288,8 @@ pub fn move_to(
     let mut t = get(tx, &product.id, &p.id)?;
     check_writer(&t, &by)?;
     let waiting_on = p.waiting_on.as_deref().and_then(trimmed);
-    if waiting_on.is_some() && p.state != Waiting {
-        return Err(Error::Invalid(format!(
-            "waiting_on goes only with the state waiting, not {}.",
-            p.state.as_str()
-        )));
+    if let Some(m) = t.state.move_refusal(&t.id, p.state, waiting_on.is_some()) {
+        return Err(Error::Invalid(m));
     }
     let now = clock::iso(now_ms);
     match (t.state, p.state) {
@@ -305,28 +302,13 @@ pub fn move_to(
             }
             t.waiting_on = waiting_on;
         }
-        (Open, Waiting) => {
-            t.waiting_on = Some(waiting_on.ok_or_else(|| {
-                Error::Invalid(format!(
-                    "Ticket {} needs waiting_on to wait: who or what it waits on.",
-                    t.id
-                ))
-            })?);
-        }
+        (Open, Waiting) => t.waiting_on = waiting_on,
         (Waiting, Open) => t.waiting_on = None,
-        (Open | Waiting, Done | Dropped) => {
+        (Open | Waiting, _) => {
             t.waiting_on = None;
             t.closed_at = Some(now.clone());
         }
-        (Done | Dropped, Open) => t.closed_at = None,
-        (from, to) => {
-            return Err(Error::Invalid(format!(
-                "Ticket {} cannot move from {} to {}.",
-                t.id,
-                from.as_str(),
-                to.as_str()
-            )));
-        }
+        (Done | Dropped, _) => t.closed_at = None,
     }
     t.state = p.state;
     t.updated_by = by;
