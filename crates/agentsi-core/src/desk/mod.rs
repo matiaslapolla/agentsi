@@ -29,9 +29,32 @@ pub const CLAUDE: &str = "claude";
 
 /// What the actor of a process gets.
 pub(crate) enum Cmd {
-    /// One owner message, with its desk notes.
-    Send(String),
+    Send(Delivery),
     Stop,
+}
+
+/// One owner message, with its desk notes, and the seqs of those notes. The actor marks the
+/// notes sent only after the line reached the process.
+#[derive(Clone)]
+pub(crate) struct Delivery {
+    pub text: String,
+    pub notes: Vec<i64>,
+}
+
+/// Marks the notes of a delivery sent.
+pub(crate) fn mark_sent(core: &Core, product: &str, notes: &[i64]) {
+    if notes.is_empty() {
+        return;
+    }
+    let (p, seqs) = (product.to_string(), notes.to_vec());
+    let marked = open_store(core).and_then(|store| {
+        store
+            .write(move |tx| desk::mark_sent(tx, &p, &seqs))
+            .map_err(rpc_store)
+    });
+    if let Err(e) = marked {
+        eprintln!("core: desk notes of {product} stay unsent: {}", e.message);
+    }
 }
 
 /// The time limits of a desk process.
@@ -408,8 +431,17 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
     let mut slots = lock(&core.desks.slots);
     let slot = slots.entry(product.to_string()).or_default();
     slot.sending = false;
-    let (seq, session, resume, notes) = stored?;
-    let message = owner_text(&notes, text);
+    let Recorded {
+        seq,
+        session,
+        resume,
+        notes,
+    } = stored?;
+    let (seqs, texts): (Vec<i64>, Vec<String>) = notes.into_iter().unzip();
+    let message = Delivery {
+        text: owner_text(&texts, text),
+        notes: seqs,
+    };
     if let Some(c) = &slot.commands
         && c.send(Cmd::Send(message.clone())).is_ok()
     {
@@ -441,14 +473,19 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
     Ok(seq)
 }
 
-/// Stores the owner item and marks the unsent notes sent, in one transaction. Makes the
-/// session when the product has none. Gives the seq, the session, whether to resume it, and
-/// the texts of the notes.
-fn record_owner(
-    core: &Core,
-    product: &str,
-    text: &str,
-) -> Result<(i64, String, bool, Vec<String>), RpcError> {
+/// An owner item that the store holds.
+struct Recorded {
+    seq: i64,
+    session: String,
+    /// True when the process resumes the session.
+    resume: bool,
+    /// The seqs and texts of the unsent notes.
+    notes: Vec<(i64, String)>,
+}
+
+/// Stores the owner item and reads the unsent notes, in one transaction. Makes the session
+/// when the product has none.
+fn record_owner(core: &Core, product: &str, text: &str) -> Result<Recorded, RpcError> {
     let store = open_store(core)?;
     let fresh =
         agentsi_agency::desk::new_session_id().map_err(|e| RpcError::internal(e.to_string()))?;
@@ -470,7 +507,7 @@ fn record_owner(
             // Claude Code saves the session at the end of a reply. Before one, a resume
             // would find no session.
             let resume = desk::has_kind(tx, &p, "end")?;
-            let notes = desk::take_notes(tx, &p)?;
+            let notes = desk::unsent_notes(tx, &p)?;
             let seq = desk::add_item(tx, &p, "owner", &body, &stamp)?;
             Ok((seq, session, resume, notes))
         })
@@ -482,13 +519,18 @@ fn record_owner(
         item,
     });
     let notes = notes
-        .iter()
-        .filter_map(|body| match serde_json::from_str(body) {
-            Ok(DeskItem::Note { text }) => Some(text),
+        .into_iter()
+        .filter_map(|(seq, body)| match serde_json::from_str(&body) {
+            Ok(DeskItem::Note { text }) => Some((seq, text)),
             _ => None,
         })
         .collect();
-    Ok((seq, session, resume, notes))
+    Ok(Recorded {
+        seq,
+        session,
+        resume,
+        notes,
+    })
 }
 
 /// `desk.stop`: stops the process of a product. False when none ran.
