@@ -121,6 +121,15 @@ impl Desks {
             .is_some_and(|s| s.generation == generation)
     }
 
+    /// The products that have a desk process.
+    pub fn running(&self) -> Vec<String> {
+        lock(&self.slots)
+            .iter()
+            .filter(|(_, s)| s.commands.is_some())
+            .map(|(p, _)| p.clone())
+            .collect()
+    }
+
     /// Sends Stop to each process. The core calls it when it stops.
     pub fn stop_all(&self) {
         for slot in lock(&self.slots).values_mut() {

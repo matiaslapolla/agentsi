@@ -619,3 +619,33 @@ fn a_reset_starts_a_new_conversation_with_a_new_session() {
     let r = c.call("desk.send", json!({"product": "nope", "text": "x"}));
     assert_eq!(kind(&r), "not_found", "{r}");
 }
+
+#[test]
+fn a_product_clear_stops_its_desk_process_before_it_deletes_the_rows() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let pid: i32 = read(&w.bin.join("pids")).trim().parse().unwrap();
+
+    let items = json!([{"item": "product", "product": "alpha"}]);
+    let plan = c.ok("data.clear_plan", json!({"items": items}));
+    c.ok(
+        "data.clear",
+        json!({"items": items, "plan_id": plan["plan_id"]}),
+    );
+    while c.next_event("desk.state")["state"] != "stopped" {}
+    wait_until("the process is gone", || !common::alive(pid));
+    let db = rusqlite::Connection::open(w.home.join("agentsi.db")).unwrap();
+    let rows: i64 = db
+        .query_row(
+            "select (select count(*) from desk_items where product = 'alpha')
+                  + (select count(*) from desk_sessions where product = 'alpha')",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert_eq!(rows, 0);
+}
