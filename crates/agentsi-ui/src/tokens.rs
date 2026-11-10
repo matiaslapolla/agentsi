@@ -525,6 +525,10 @@ pub mod size {
     pub fn xs() -> Pixels {
         step(12.)
     }
+    /// The line height of `xs` text. A box of this height shows the whole line.
+    pub fn xs_line() -> Pixels {
+        xs() * 1.5
+    }
     /// Dense lists and secondary body.
     pub fn sm() -> Pixels {
         step(13.)

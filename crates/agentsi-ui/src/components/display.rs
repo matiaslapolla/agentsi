@@ -257,8 +257,10 @@ impl RenderOnce for AgentCard {
             .child(StateMark::new(s))
             .child(
                 div()
+                    .debug_selector(|| "agent-card-activity".into())
                     .max_w_full()
-                    .h(size::xs())
+                    .h(size::xs_line())
+                    .line_height(size::xs_line())
                     .truncate()
                     .text_size(size::xs())
                     .text_color(text::tertiary().hsla())
