@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <!-- body -->
+    <path d="M256 38 L456 138 L456 374 L256 474 L56 374 L56 138 Z" fill="#0a0d10"/>
+    <!-- hidden edges -->
+    <g stroke="#cfcfcf" stroke-width="7" stroke-dasharray="20 14" stroke-linecap="butt">
+      <path d="M256 44 V150"/>
+      <path d="M256 150 L160 198 V326"/>
+      <path d="M256 150 L352 198 V282"/>
+      <path d="M160 326 L62 375"/>
+      <path d="M160 326 L256 374"/>
+      <path d="M352 326 L256 374"/>
+      <path d="M352 326 L450 375"/>
+    </g>
+    <!-- marker -->
+    <rect x="324" y="280" width="56" height="56" fill="#d84cc8"/>
+    <!-- visible edges -->
+    <g stroke="#d6d6d6" stroke-width="11">
+      <path d="M256 38 L456 138 L456 374 L256 474 L56 374 L56 138 Z"/>
+      <path d="M56 138 L256 238 L456 138 M256 238 V474"/>
+    </g>
+  </g>
+</svg>

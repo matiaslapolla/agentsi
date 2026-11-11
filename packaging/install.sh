@@ -19,7 +19,9 @@
 # Installs: agentsi and agentsi-core (required), agentsi-app and agentsi-pill (a headless
 # machine has no use for them: the script warns and goes on when they are missing).
 # Linux: the units go to ${XDG_CONFIG_HOME:-~/.config}/systemd/user/ (agentsi-core.service, and
-# agentsi-pill.service when agentsi-pill is installed).
+# agentsi-pill.service when agentsi-pill is installed). With agentsi-app, the desktop entry goes to
+# ${XDG_DATA_HOME:-~/.local/share}/applications/ and the icon to .../icons/hicolor/scalable/apps/.
+# The script restarts the core and the pill services that are active, so they run the new programs.
 # macOS: the agent goes to ~/Library/LaunchAgents/dev.agentsi.core.plist.
 set -eu
 
@@ -38,7 +40,7 @@ while [ $# -gt 0 ]; do
     --data-root) data_root=${2:?--data-root needs a folder}; shift 2 ;;
     --enable) enable=1; shift ;;
     --dry-run) dry=1; shift ;;
-    -h|--help) sed -n '2,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "install.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -72,6 +74,8 @@ for p in agentsi-app agentsi-pill; do
   if [ -x "$from/$p" ]; then programs="$programs $p"; else say "warning: $from/$p not found. Skipped."; fi
 done
 if [ -x "$from/agentsi-pill" ]; then have_pill=1; fi
+have_app=0
+if [ -x "$from/agentsi-app" ]; then have_app=1; fi
 
 do_ mkdir -p "$bin_dir"
 for p in $programs; do
@@ -119,13 +123,38 @@ case "$(uname -s)" in
       [ "$dry" = 1 ] || { render "$here/systemd/agentsi-pill.service" > "$unit_dir/.unit.new" && mv -f "$unit_dir/.unit.new" "$unit_dir/agentsi-pill.service"; }
       done_ "$unit_dir/agentsi-pill.service"
     fi
+    if [ "$have_app" = 1 ]; then
+      data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+      case "$data_home/" in "$HOME"/*) ;; *) die "XDG_DATA_HOME is outside $HOME." ;; esac
+      case "$data_home" in *..*) die "XDG_DATA_HOME must not hold .." ;; esac
+      apps_dir="$data_home/applications"
+      icon_dir="$data_home/icons/hicolor/scalable/apps"
+      do_ mkdir -p "$apps_dir" "$icon_dir"
+      [ "$dry" = 1 ] || { render "$here/applications/agentsi.desktop" > "$apps_dir/.agentsi.desktop.new" && mv -f "$apps_dir/.agentsi.desktop.new" "$apps_dir/agentsi.desktop"; }
+      done_ "$apps_dir/agentsi.desktop"
+      do_ cp "$here/icons/agentsi.svg" "$icon_dir/agentsi.svg"
+      done_ "$icon_dir/agentsi.svg"
+      if command -v update-desktop-database >/dev/null 2>&1; then
+        do_ update-desktop-database -q "$apps_dir" || true
+      fi
+    fi
+    # A running service keeps the old program after the copy. The script restarts each active one.
+    active() { command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet "$1" 2>/dev/null; }
+    enabled() { command -v systemctl >/dev/null 2>&1 && systemctl --user is-enabled --quiet "$1" 2>/dev/null; }
+    restart=""
+    active agentsi-core.service && restart="agentsi-core.service"
+    [ "$have_pill" = 1 ] && active agentsi-pill.service && restart="$restart agentsi-pill.service"
+    if [ "$enable" = 1 ] || [ -n "$restart" ]; then do_ systemctl --user daemon-reload; fi
+    for unit in $restart; do
+      do_ systemctl --user restart "$unit"
+      if [ "$dry" = 1 ]; then say "would restart $unit"; else say "restarted $unit"; fi
+    done
     if [ "$enable" = 1 ]; then
-      do_ systemctl --user daemon-reload
       do_ systemctl --user enable --now agentsi-core.service
       if [ "$have_pill" = 1 ]; then do_ systemctl --user enable --now agentsi-pill.service; fi
     else
-      say "The core service is not enabled. To enable it: systemctl --user enable --now agentsi-core"
-      if [ "$have_pill" = 1 ]; then say "The pill service is not enabled. It starts with the graphical session. To enable it: systemctl --user enable --now agentsi-pill"; fi
+      enabled agentsi-core.service || say "The core service is not enabled. To enable it: systemctl --user enable --now agentsi-core"
+      if [ "$have_pill" = 1 ] && ! enabled agentsi-pill.service; then say "The pill service is not enabled. It starts with the graphical session. To enable it: systemctl --user enable --now agentsi-pill"; fi
     fi
     ;;
   Darwin)

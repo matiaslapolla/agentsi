@@ -9,6 +9,10 @@ echo "== dry run changes nothing"
 sh "$pkg/install.sh" --from /in --dry-run
 [ ! -e "$HOME/.local/bin" ] || fail "dry run made ~/.local/bin"
 [ ! -e "$HOME/.config/systemd" ] || fail "dry run made the unit folder"
+apps="$HOME/.local/share/applications"
+icon="$HOME/.local/share/icons/hicolor/scalable/apps/agentsi.svg"
+[ ! -e "$apps" ] || fail "dry run made the applications folder"
+[ ! -e "$icon" ] || fail "dry run wrote the icon"
 
 echo "== a bin dir outside the home is refused"
 if sh "$pkg/install.sh" --from /in --bin-dir /usr/local/bin 2>/tmp/err; then fail "accepted /usr/local/bin"; fi
@@ -34,6 +38,8 @@ grep -q "^ExecStart=$HOME/.local/bin/agentsi-core serve$" "$unit" || fail "ExecS
 if grep -q "@" "$unit"; then fail "a placeholder is left in the unit"; fi
 [ ! -e "$HOME/.config/systemd/user/default.target.wants/agentsi-core.service" ] || fail "enabled without --enable"
 [ ! -e "$HOME/.config/systemd/user/agentsi-pill.service" ] || fail "a pill unit without the pill program"
+[ ! -e "$apps/agentsi.desktop" ] || fail "a desktop entry without the app program"
+[ ! -e "$icon" ] || fail "an icon without the app program"
 
 echo "== all four programs, custom bin dir, second run replaces the first"
 mkdir /tmp/four
@@ -50,10 +56,24 @@ grep -q "^ExecStart=$HOME/bin2/agentsi-pill$" "$pill" || fail "pill ExecStart no
 if grep -q "@" "$pill"; then fail "a placeholder is left in the pill unit"; fi
 grep -q "^WantedBy=graphical-session.target$" "$pill" || fail "the pill does not start with the graphical session"
 [ ! -e "$HOME/.config/systemd/user/graphical-session.target.wants/agentsi-pill.service" ] || fail "pill enabled without --enable"
+entry="$apps/agentsi.desktop"
+[ -f "$entry" ] || fail "no desktop entry"
+grep -q "^Exec=$HOME/bin2/agentsi-app$" "$entry" || fail "Exec not rendered"
+grep -q "^Icon=agentsi$" "$entry" || fail "no Icon line"
+grep -q "^StartupWMClass=agentsi-app$" "$entry" || fail "StartupWMClass is not the app id"
+if grep -q "@" "$entry"; then fail "a placeholder is left in the desktop entry"; fi
+if command -v desktop-file-validate >/dev/null 2>&1; then desktop-file-validate "$entry" || fail "the desktop entry is not valid"; fi
+cmp -s "$icon" "$pkg/icons/agentsi.svg" || fail "the icon is not the packaged icon"
 echo "== a dry run with the pill writes no unit"
 rm "$pill"
-sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2" --dry-run | grep -q "agentsi-pill.service" || fail "the dry run does not name the pill unit"
+rm "$entry" "$icon"
+sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2" --dry-run >/tmp/out
+grep -q "agentsi-pill.service" /tmp/out || fail "the dry run does not name the pill unit"
+grep -q "agentsi.desktop" /tmp/out || fail "the dry run does not name the desktop entry"
+grep -q "agentsi.svg" /tmp/out || fail "the dry run does not name the icon"
 [ ! -e "$pill" ] || fail "dry run wrote the pill unit"
+[ ! -e "$entry" ] || fail "dry run wrote the desktop entry"
+[ ! -e "$icon" ] || fail "dry run wrote the icon"
 sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2"
 
 echo "== --enable without a user manager fails loudly, not silently"

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=AgentSI
+GenericName=Agency of role agents
+Comment=Meetings, stories, tickets and voice for your own products
+Exec=@BINDIR@/agentsi-app
+Icon=agentsi
+Terminal=false
+Categories=Development;
+Keywords=agents;claude;tickets;stories;meetings;
+StartupWMClass=agentsi-app

@@ -11,8 +11,8 @@
 #                build between runs.
 #   --out <dir>  Where the tarball goes. Default: dist/ of this checkout.
 #
-# The tarball holds: bin/ (the 4 programs), install.sh, systemd/, the Claude Code plugin with
-# the hooks that need no Node, INSTALL.md, VERSION and SHA256SUMS.
+# The tarball holds: bin/ (the 4 programs), install.sh, systemd/, applications/, icons/, the
+# Claude Code plugin with the hooks that need no Node, INSTALL.md, VERSION and SHA256SUMS.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
 portable=0
@@ -68,13 +68,15 @@ fi
 
 name="agentsi-$sha-linux-$(uname -m)"
 pkg="$work/$name"
-mkdir -p "$pkg/bin" "$pkg/systemd" "$pkg/.claude-plugin"
+mkdir -p "$pkg/bin" "$pkg/systemd" "$pkg/applications" "$pkg/icons" "$pkg/.claude-plugin"
 for p in $programs; do
   cp "$from/$p" "$pkg/bin/$p"
   strip "$pkg/bin/$p" 2>/dev/null || true
 done
 cp "$root/packaging/install.sh" "$pkg/install.sh"
 cp "$root/packaging/systemd/"*.service "$pkg/systemd/"
+cp "$root/packaging/applications/agentsi.desktop" "$pkg/applications/"
+cp "$root/packaging/icons/agentsi.svg" "$pkg/icons/"
 
 # The plugin with the hooks of the switch-over: no Node, no test files.
 cp -R "$root/plugin" "$pkg/plugin"
