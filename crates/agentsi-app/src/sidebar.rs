@@ -11,6 +11,7 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
+use std::sync::{Arc, LazyLock};
 
 use agentsi_proto::desk_api::ProductInfo;
 use agentsi_ui::components::{
@@ -35,6 +36,14 @@ use crate::screens::minutes::cursor_after;
 use crate::shell::PaneRef;
 use crate::tree::{self, Item, ItemKey};
 use gpui_kit::component::IconName;
+
+/// The icon of the desktop entry. `img` renders an SVG in its own colors.
+static APP_ICON: LazyLock<Arc<Image>> = LazyLock::new(|| {
+    Arc::new(Image::from_bytes(
+        ImageFormat::Svg,
+        include_bytes!("../../../packaging/icons/agentsi.svg").to_vec(),
+    ))
+});
 
 /// The owner picked a product in the sidebar.
 pub struct SelectProduct(pub ProductRef);
@@ -859,10 +868,17 @@ impl Render for Sidebar {
                     .border_color(line::border())
                     .child(
                         div()
-                            .text_size(size::md())
-                            .font_weight(weight::SEMIBOLD)
-                            .text_color(text::primary())
-                            .child("AgentSI"),
+                            .flex()
+                            .items_center()
+                            .gap(space(2))
+                            .child(img(APP_ICON.clone()).size(px(18.)).flex_none())
+                            .child(
+                                div()
+                                    .text_size(size::md())
+                                    .font_weight(weight::SEMIBOLD)
+                                    .text_color(text::primary())
+                                    .child("AgentSI"),
+                            ),
                     )
                     .child(
                         div()
