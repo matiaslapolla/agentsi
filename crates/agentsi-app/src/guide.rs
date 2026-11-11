@@ -324,9 +324,16 @@ mod tests {
             assert!(alt.len() > 40, "{target} has a short alt text");
             assert!(guide_dir().join(target).is_file(), "{target} is no file");
         }
-        // Each PNG file of the folder is in the page.
-        let files = std::fs::read_dir(guide_dir().join("img")).unwrap().count();
-        assert_eq!(files, 18);
+        // Each PNG file of the folder is in the page or in the README of the repo.
+        let readme = std::fs::read_to_string(guide_dir().join("../../README.md")).unwrap();
+        for file in std::fs::read_dir(guide_dir().join("img")).unwrap() {
+            let name = file.unwrap().file_name().into_string().unwrap();
+            assert!(
+                PAGE.contains(&format!("(img/{name})"))
+                    || readme.contains(&format!("docs/guide/img/{name}")),
+                "img/{name} is in no page"
+            );
+        }
     }
 
     #[test]
