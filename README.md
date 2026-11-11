@@ -1,12 +1,78 @@
+<div align="center">
+
 # AgentSI
 
-Agent Super Intelligence
+**Agent Super Intelligence**
 
-AgentSI is an agency of role agents for your own products. The roles are PM, dev, QA, scout and social. You use the agency from Claude Code and from a native Linux desktop app. The app has terminals, voice, meetings, stories and git.
+An agency of role agents for your own products.<br>
+A PM, a dev, a QA, a scout and a social role read your product, meet and rank what to do next.<br>
+You approve every change.
 
-Nothing changes in a product without your approval. The roles read the product, meet, and give you ranked priorities and decisions to approve.
+[![CI](https://github.com/matiaslapolla/agentsi/actions/workflows/ci.yml/badge.svg)](https://github.com/matiaslapolla/agentsi/actions/workflows/ci.yml)
+[![Rust](https://github.com/matiaslapolla/agentsi/actions/workflows/rust.yml/badge.svg)](https://github.com/matiaslapolla/agentsi/actions/workflows/rust.yml)
+[![Release](https://img.shields.io/github/v/release/matiaslapolla/agentsi?include_prereleases&label=release)](https://github.com/matiaslapolla/agentsi/releases)
+![Platform](https://img.shields.io/badge/platform-Linux-informational)
+![Voice](https://img.shields.io/badge/voice-on%20device-8b5cf6)
+[![License](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-![The AgentSI window: the sidebar tree, the tabs and the front desk of a product](docs/guide/img/window-tree.png)
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/guide/img/desk-conversation-light.png">
+  <img width="900" alt="The front desk of the product Lumen. The roles PM, Dev and QA show their state. On the right, a conversation with the front desk shows a pending decision with Approve and Reject, a cost table and an open ticket." src="docs/guide/img/desk-conversation.png">
+</picture>
+
+<sub>The front desk. You ask Claude about the product, and the answer shows decisions, tables and tickets that you act on.</sub>
+
+[Install](#install-from-a-release-tarball) · [Build](#build-from-source) · [Guide](docs/guide/README.md) · [Roadmap](ROADMAP.md)
+
+</div>
+
+## Why AgentSI
+
+- **You decide.** The roles read and propose. Nothing changes in a product until you approve it.
+- **One place for each product.** Terminals, meetings, stories, tickets, git and voice sit in one native Linux app.
+- **Voice on your device.** You dictate, and the roles talk back. The speech models run on your machine.
+- **It works with Claude Code.** Run `/agentsi` in the repo of a product, and the same front desk opens in your terminal.
+
+## A tour
+
+<table>
+  <tr>
+    <td width="50%"><img alt="A meeting of Lumen. The agent cards of PM, Dev and QA show Working and Speaking. Each role pane shows its tool lines and answer." src="docs/guide/img/agent-cards.png"></td>
+    <td width="50%"><img alt="The Tickets screen of Lumen with 12 open tickets. Each row shows its id, author, owner, kind and state." src="docs/guide/img/tickets.png"></td>
+  </tr>
+  <tr>
+    <td><b>Meetings with agent cards.</b> Each role answers one question. Its card shows when it reads, writes and speaks. The PM writes the minutes.</td>
+    <td><b>Tickets.</b> Notes, todos and questions from you, the roles and the story sessions. You promote a ticket to a story.</td>
+  </tr>
+  <tr>
+    <td><img alt="The front desk with a toast that says the build failed with 2 errors. In the sidebar, the rows docs and diff have a colored border." src="docs/guide/img/alert-toast-glow.png"></td>
+    <td><img alt="The Call screen. The circle of the PM is lit while the call plays, above the transcript." src="docs/guide/img/call.png"></td>
+  </tr>
+  <tr>
+    <td><b>Alerts.</b> A blocked pane or a failed build gets a border in its state color, a toast, a tone and a system notification.</td>
+    <td><b>Calls.</b> A meeting plays as audio, with one voice for each role.</td>
+  </tr>
+  <tr>
+    <td><img alt="One story, Send a reminder the day before, with the buttons Accept and merge and Reject the session, and its criteria." src="docs/guide/img/story.png"></td>
+    <td><img alt="The setup screen of Lumen in update mode. It shows the facts of the folder, the optional Draft with Claude and the Product form." src="docs/guide/img/setup.png"></td>
+  </tr>
+  <tr>
+    <td><b>Stories.</b> A story runs in a sandboxed git worktree. You review the diff before anything merges.</td>
+    <td><b>Setup.</b> Pick a folder. The app reads its facts, and one optional Claude call drafts the forms. A dry run shows the result before anything saves.</td>
+  </tr>
+</table>
+
+<details>
+<summary><b>More screens</b>: settings, health, light theme, git, palette</summary>
+<br>
+
+| | |
+|---|---|
+| ![The Settings screen with the sections Owner and Appearance.](docs/guide/img/settings.png) | ![Settings, section Health. Each check shows ok or fail, with Check again.](docs/guide/img/settings-health.png) |
+| ![Settings, section Appearance, in the light theme. Color theme and Motion show below Density, Corners and Text size.](docs/guide/img/settings-appearance-light.png) | ![The Tickets screen in the light theme.](docs/guide/img/tickets-light.png) |
+| ![The Git screen of Lumen with the changed files, a diff and a field for the commit message.](docs/guide/img/git.png) | ![The command palette with the letters meet typed.](docs/guide/img/palette.png) |
+
+</details>
 
 ## What exists today
 
@@ -14,10 +80,14 @@ The desktop app:
 
 - A sidebar tree of products, with the panes, meetings, story sessions and reflections of each product.
 - Tabs and tab groups, with labels and colors, and product groups in the sidebar.
-- Context menus on products, panes, tabs, stories and meetings.
-- A git panel with a git config for each product.
-- Appearance settings: density, corners and text size.
-- A "Clear data" action in Settings. It makes a backup first.
+- A front desk conversation. Claude reads the product, and the answer shows decisions, priorities, stories, diffs, tickets, tables and charts. You approve or reject a decision in place.
+- Tickets: notes, todos and questions, with filters. `Ctrl+Shift+I` opens them. You promote a ticket to a story.
+- Agent cards on the meeting, call and desk screens. Each card shows the live state of its role.
+- Alerts: a border in the state color, toasts, tones, an alert log behind the bell and system notifications.
+- A setup screen that creates a product from a folder, with a dry run before it saves.
+- Actions that needed a command before: new decisions, marks, archive and restore, reflect, and "Run in Claude".
+- Settings: owner, appearance (density, corners, text size, Dark or Light theme, motion), health checks, backups, alerts and "Clear data". "Clear data" makes a backup first.
+- A git panel with a git config for each product, and context menus on products, panes, tabs, stories and meetings.
 
 Voice, on your device:
 
@@ -29,6 +99,7 @@ The agency:
 
 - Meetings in which each role answers one question. The PM writes the minutes, and a call plays the meeting as audio.
 - Stories that run in sandboxed git worktrees. You review the diff before anything merges.
+- MCP tools for tickets, so a Claude Code session can add and update tickets.
 - The Claude Code plugin. Run `/agentsi` in the repo of a product to open the front desk.
 
 ## Status

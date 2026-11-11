@@ -178,7 +178,7 @@ The Settings screen has a section "Owner" with your name and language. It also h
 
 The Health section shows one row for each check of `agentsi doctor`: the tool, its status and what a failed check blocks. "Check again" runs the checks again. In the Data section, "Back up now" copies the database and the registry into the backups folder, and shows the paths of both copies.
 
-![The Settings screen. The section Appearance shows Density, Corners and Text size, and the section Voice models starts below it.](img/settings.png)
+![The Settings screen. The section Owner shows the name and the language, and the section Appearance shows Density, Corners and Text size below it.](img/settings.png)
 
 *The Settings screen. The section "Appearance" comes first.*
 
