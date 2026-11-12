@@ -123,7 +123,7 @@ Download the tarball and its `.sha256` file from [Releases](https://github.com/m
 
 1. Install the runtime packages and Claude Code. `packaging/INSTALL.md` lists the packages for Arch and Ubuntu.
 2. Unpack the tarball and go into its folder.
-3. Run `./install.sh --enable`. It copies the programs to `~/.local/bin` and starts the core and the pill as systemd user services.
+3. Run `./install.sh --enable`. It copies the programs to `~/.local/bin` and starts the core and the pill as systemd user services. It also adds AgentSI and its icon to the app launcher.
 4. Add the plugin to Claude Code. Run these commands inside the tarball folder:
 
    ```sh
@@ -131,8 +131,10 @@ Download the tarball and its `.sha256` file from [Releases](https://github.com/m
    claude plugin install agentsi@agentsi
    ```
 
-5. Run `agentsi-app`.
+5. Open AgentSI from the app launcher, or run `agentsi-app`.
 6. Open Settings with `Ctrl+,`. In "Voice models", download the speech-in model, the voice and the voice detector.
+
+To update, unpack the new tarball and run `./install.sh` again. The script restarts the core and the pill when they run, so they use the new programs.
 
 ## Build from source
 
@@ -161,7 +163,7 @@ make dist-portable
 ```
 
 - `make release` builds the four programs in `target/release`. The first build takes several minutes.
-- `make install ENABLE=1` copies the programs to `~/.local/bin` and starts the services.
+- `make install ENABLE=1` copies the programs to `~/.local/bin`, adds the app to the launcher and starts the services. A second run restarts the active services.
 - `make dist-portable` builds in an `ubuntu:24.04` container and packs a tarball in `dist/`. The tarball runs on glibc 2.39 or newer. It has the CPU of the machine that builds it, so an aarch64 machine makes the aarch64 tarball.
 
 `make help` lists all targets. `CONTRIBUTING.md` has the details of the build.
