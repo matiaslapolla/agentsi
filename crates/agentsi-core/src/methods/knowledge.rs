@@ -59,11 +59,7 @@ async fn with_product<T: Send + 'static>(
         let root = agentsi_store::paths::data_root(None).map_err(|e| rpc(e.into()))?;
         let registry = Registry::load(&root).map_err(rpc)?;
         let found = registry.product(&product).map_err(rpc)?.clone();
-        let store: Arc<Store> = core.store().map_err(|e| rpc(e.into()))?.ok_or_else(|| {
-            rpc(AgencyError::Unavailable(
-                "the data root has no agentsi.db. Import the data first.".into(),
-            ))
-        })?;
+        let store: Arc<Store> = core.store_or_create().map_err(|e| rpc(e.into()))?;
         f(&store, &found).map_err(rpc)
     })
     .await

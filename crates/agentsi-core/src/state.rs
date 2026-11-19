@@ -177,8 +177,26 @@ impl Core {
         features
     }
 
+    /// The store of the data root, made and migrated when the database file does not exist.
+    /// A first install has no file, and its first setup or ticket needs one. After that,
+    /// `import-postgres` without `--fresh` still imports into the file.
+    /// It blocks: call it off the event loop.
+    pub fn store_or_create(&self) -> agentsi_store::Result<Arc<Store>> {
+        if let Some(s) = self.store()? {
+            return Ok(s);
+        }
+        let mut store = lock(&self.store);
+        if let Some(s) = &*store {
+            return Ok(s.clone());
+        }
+        let path = agentsi_store::paths::db_path(&agentsi_store::paths::data_root(None)?);
+        let opened = Arc::new(Store::open(&path)?);
+        *store = Some(opened.clone());
+        Ok(opened)
+    }
+
     /// The store of the data root. `Ok(None)` while the database file does not
-    /// exist: the core never makes it, so `import-postgres --fresh` can.
+    /// exist: a reader shows no rows then, and [`Core::store_or_create`] makes the file.
     /// It blocks: call it off the event loop.
     pub fn store(&self) -> agentsi_store::Result<Option<Arc<Store>>> {
         let mut store = lock(&self.store);

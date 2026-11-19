@@ -100,11 +100,7 @@ fn rpc(e: CallError) -> RpcError {
 }
 
 fn store(core: &Core) -> Result<Arc<Store>, RpcError> {
-    core.store().map_err(|e| rpc(e.into()))?.ok_or_else(|| {
-        rpc(CallError::Unavailable(
-            "the data root has no agentsi.db. Import the data first.".into(),
-        ))
-    })
+    core.store_or_create().map_err(|e| rpc(e.into()))
 }
 
 fn root() -> Result<PathBuf, RpcError> {

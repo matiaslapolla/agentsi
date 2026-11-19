@@ -269,16 +269,16 @@ fn the_desk_methods_read_a_database_and_say_what_is_missing() {
 }
 
 #[test]
-fn the_desk_methods_need_a_database_file_and_never_make_it() {
+fn the_desk_reads_with_no_database_file_find_nothing_and_never_make_it() {
     let dir = TempDir::new();
     let home = dir.0.join("home");
     std::fs::create_dir_all(&home).unwrap();
     let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", &home)]);
     let mut c = Framed::connect(&core.socket.path);
     let r = c.call("product.desk", json!({"product": "demo"}));
-    assert_eq!(r["error"]["data"]["kind"], "unavailable", "{r}");
+    assert_eq!(r["error"]["data"]["kind"], "not_found", "{r}");
     let r = c.call("minutes.get", json!({"id": "m1"}));
-    assert_eq!(r["error"]["data"]["kind"], "unavailable", "{r}");
+    assert_eq!(r["error"]["data"]["kind"], "not_found", "{r}");
     assert_eq!(
         c.ok("minutes.list", json!({"product": "demo"})),
         json!({"minutes": []})
