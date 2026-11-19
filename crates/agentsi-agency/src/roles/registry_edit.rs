@@ -198,7 +198,14 @@ pub fn add_product(text: &str, product: &Value) -> Result<String, String> {
         t.starts_with("{ \"id\":")
     };
     let Some(last) = lines.iter().rposition(starts_product) else {
-        return Err("Registry has no one-line products to append to.".into());
+        let products = products_mut(&mut doc)?;
+        if !products.is_empty() {
+            return Err("Registry has no one-line products to append to.".into());
+        }
+        // The empty registry of a first install: no line to keep, so the file is written again.
+        products.push(product.clone());
+        let doc = canon(&doc);
+        return checked(one_product_per_line(&doc), &doc);
     };
     let indent: String = lines[last]
         .chars()
@@ -208,6 +215,29 @@ pub fn add_product(text: &str, product: &Value) -> Result<String, String> {
     lines.insert(last + 1, format!("{indent}{}", one_line(product)));
     products_mut(&mut doc)?.push(product.clone());
     checked(lines.join("\n"), &doc)
+}
+
+/// The registry with each top-level key on one line, and each product on its own line.
+fn one_product_per_line(doc: &Value) -> String {
+    let entries: Vec<String> = doc
+        .as_object()
+        .into_iter()
+        .flatten()
+        .map(|(key, value)| {
+            let quoted = Value::String(key.clone());
+            match value.as_array().filter(|_| key == "products") {
+                Some(products) => {
+                    let lines: Vec<String> = products
+                        .iter()
+                        .map(|p| format!("    {}", one_line(p)))
+                        .collect();
+                    format!("  {quoted}: [\n{}\n  ]", lines.join(",\n"))
+                }
+                None => format!("  {quoted}: {}", one_line(value)),
+            }
+        })
+        .collect();
+    format!("{{\n{}\n}}\n", entries.join(",\n"))
 }
 
 /// Removes the lines of the products in `ids`, each on one line. The other lines stay.
@@ -242,6 +272,46 @@ pub fn remove_products(text: &str, ids: &[&str]) -> Result<String, String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_first_product_goes_into_the_empty_registry_of_a_first_install() {
+        let product =
+            json!({"id": "a", "name": "A", "paths": ["/x/a"], "status": "active", "roles": ["pm"]});
+        let first_install = "{ \"owner\": { \"name\": \"the owner\", \"language\": \"English\" }, \"products\": [] }\n";
+        let out = add_product(first_install, &product).unwrap();
+        assert_eq!(
+            out,
+            "{\n  \"owner\": { \"name\": \"the owner\", \"language\": \"English\" },\n  \"products\": [\n    { \"id\": \"a\", \"name\": \"A\", \"paths\": [\"/x/a\"], \"status\": \"active\", \"roles\": [\"pm\"] }\n  ]\n}\n"
+        );
+        let second =
+            json!({"id": "b", "name": "B", "paths": ["/x/b"], "status": "active", "roles": ["pm"]});
+        let two = add_product(&out, &second).unwrap();
+        assert_eq!(
+            parse(&two).unwrap()["products"].as_array().unwrap().len(),
+            2
+        );
+    }
+
+    #[test]
+    fn the_first_product_goes_into_an_empty_registry_on_several_lines_with_a_whole_float() {
+        let product =
+            json!({"id": "a", "name": "A", "paths": ["/x/a"], "status": "active", "roles": ["pm"]});
+        let registry = "{\n  \"owner\": { \"name\": \"Ada\" },\n  \"threshold\": 2.0,\n  \"products\": []\n}\n";
+        let out = add_product(registry, &product).unwrap();
+        assert!(out.contains("\n  \"threshold\": 2,\n"), "{out}");
+        assert!(out.contains("\n    { \"id\": \"a\""), "{out}");
+    }
+
+    #[test]
+    fn a_registry_whose_products_are_not_one_line_stays_an_error() {
+        let pretty = "{\n  \"products\": [\n    {\n      \"id\": \"a\"\n    }\n  ]\n}\n";
+        let product =
+            json!({"id": "b", "name": "B", "paths": ["/x/b"], "status": "active", "roles": ["pm"]});
+        assert_eq!(
+            add_product(pretty, &product).unwrap_err(),
+            "Registry has no one-line products to append to."
+        );
+    }
 
     const REGISTRY: &str = r#"{
   "owner": { "name": "Ada" },

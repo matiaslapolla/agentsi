@@ -177,17 +177,40 @@ impl Core {
         features
     }
 
+    /// The store of the data root, made and migrated when the database file does not exist.
+    /// A first install has no file, and its first setup or ticket needs one. The data root
+    /// must hold the registry, so a wrong `AGENTSI_HOME` gets no file. After the first use,
+    /// `import-postgres` without `--fresh` still imports into the file.
+    /// It blocks: call it off the event loop.
+    pub fn store_or_create(&self) -> agentsi_store::Result<Arc<Store>> {
+        let opened = self.open_store(true)?;
+        Ok(opened.expect("a store that may be made is always open"))
+    }
+
     /// The store of the data root. `Ok(None)` while the database file does not
-    /// exist: the core never makes it, so `import-postgres --fresh` can.
+    /// exist: a reader shows no rows then, and [`Core::store_or_create`] makes the file.
     /// It blocks: call it off the event loop.
     pub fn store(&self) -> agentsi_store::Result<Option<Arc<Store>>> {
+        self.open_store(false)
+    }
+
+    fn open_store(&self, make: bool) -> agentsi_store::Result<Option<Arc<Store>>> {
         let mut store = lock(&self.store);
         if let Some(s) = &*store {
             return Ok(Some(s.clone()));
         }
-        let path = agentsi_store::paths::db_path(&agentsi_store::paths::data_root(None)?);
+        let root = agentsi_store::paths::data_root(None)?;
+        let path = agentsi_store::paths::db_path(&root);
         if !path.exists() {
-            return Ok(None);
+            if !make {
+                return Ok(None);
+            }
+            if !root.join(agentsi_agency::registry::FILE).exists() {
+                return Err(agentsi_store::Error::Other(format!(
+                    "{} holds no agentsi.config.json, so it is not a data root",
+                    root.display()
+                )));
+            }
         }
         let opened = Arc::new(Store::open(&path)?);
         *store = Some(opened.clone());

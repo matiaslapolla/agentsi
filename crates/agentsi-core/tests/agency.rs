@@ -103,7 +103,7 @@ fn status_snapshot_and_audit_read_the_store() {
 }
 
 #[test]
-fn an_unknown_product_is_not_found_and_a_missing_database_is_unavailable() {
+fn an_unknown_product_is_not_found_and_a_missing_database_is_made_on_first_use() {
     let dir = TempDir::new();
     let (_core, mut c) = start(&dir, &root(&dir, true));
     for method in ["product.status", "data.snapshot", "data.audit"] {
@@ -112,11 +112,13 @@ fn an_unknown_product_is_not_found_and_a_missing_database_is_unavailable() {
     }
 
     let dir = TempDir::new();
-    let (_core, mut c) = start(&dir, &root(&dir, false));
+    let data = root(&dir, false);
+    let (_core, mut c) = start(&dir, &data);
     for method in ["product.status", "data.snapshot", "data.audit"] {
         let r = c.call(method, json!({"product": "alpha"}));
-        assert_eq!(kind(&r), "unavailable", "{method}: {r}");
+        assert_eq!(kind(&r), "none", "{method}: {r}");
     }
+    assert!(data.join("agentsi.db").exists());
     // The registry alone answers `whoami`.
     assert_eq!(
         c.ok("product.whoami", json!({"cwd": "/work/beta"}))["product"]["product"],

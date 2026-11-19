@@ -65,11 +65,7 @@ async fn with_store<T: Send + 'static>(
     let core = ctx.core.clone();
     blocking(move |root, registry| {
         let found = registry.product(&product)?.clone();
-        let store: Arc<agentsi_store::Store> = core.store()?.ok_or_else(|| {
-            AgencyError::Unavailable(
-                "the data root has no agentsi.db. Import the data first.".into(),
-            )
-        })?;
+        let store: Arc<agentsi_store::Store> = core.store_or_create()?;
         store
             .read(|c| Ok(f(c, root, &found)))
             .map_err(AgencyError::from)?

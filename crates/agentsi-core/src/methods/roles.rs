@@ -14,10 +14,10 @@ use agentsi_proto::RpcError;
 use agentsi_proto::desk_api::Objective;
 use agentsi_proto::events::{DataChanged, DataChangedParams};
 use agentsi_proto::roles_api::{
-    BriefView, CommitInfo, SourceOfTruth, Registration, RolesApply, RolesApplyParams, RolesApplyResult,
+    BriefView, CommitInfo, Registration, RolesApply, RolesApplyParams, RolesApplyResult,
     RolesBrief, RolesBriefParams, RolesBriefResult, RolesList, RolesListParams, RolesListResult,
     RolesReset, RolesResetParams, RolesResetResult, RolesValidate, RolesValidateParams,
-    RolesValidateResult,
+    RolesValidateResult, SourceOfTruth,
 };
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_store::Store;
@@ -75,14 +75,8 @@ async fn blocking<T: Send + 'static>(
             agentsi_store::paths::data_root(None).map_err(|e| rpc(AgencyError::from(e).into()))?;
         let registry = Registry::load(&root).map_err(|e| rpc(e.into()))?;
         let store = core
-            .store()
-            .map_err(|e| rpc(AgencyError::from(e).into()))?
-            .ok_or_else(|| {
-                rpc(AgencyError::Unavailable(
-                    "the data root has no agentsi.db. Import the data first.".into(),
-                )
-                .into())
-            })?;
+            .store_or_create()
+            .map_err(|e| rpc(AgencyError::from(e).into()))?;
         f(Work {
             root,
             registry,

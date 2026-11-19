@@ -100,9 +100,7 @@ struct Work {
 fn work(core: &Core) -> meeting::Result<Work> {
     let root = agentsi_store::paths::data_root(None)?;
     let registry = Registry::load(&root)?;
-    let store = core.store()?.ok_or_else(|| {
-        AgencyError::Unavailable("the data root has no agentsi.db. Import the data first.".into())
-    })?;
+    let store = core.store_or_create()?;
     Ok(Work {
         root,
         registry,
