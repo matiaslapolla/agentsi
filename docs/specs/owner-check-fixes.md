@@ -28,7 +28,7 @@ The owner checks found small faults in the setup, the desk and the alert tones. 
 
 ### Setup form (`crates/agentsi-app/src/screens/setup*.rs`)
 
-- F3. A Review with errors scrolls the form to the first error, and it shows one line next to the Review button: "Fix the N fields marked in red above."
+- F3. A Review with errors scrolls the form to the first error, and it shows one line next to the Review button: "Fix the N problems marked in red above.", or "Fix the problem marked in red above." for one problem.
 - F4. The empty Due field of an objective shows the placeholder `YYYY-MM-DD`.
 
 ### Desk
@@ -45,7 +45,7 @@ The owner checks found small faults in the setup, the desk and the alert tones. 
 
 - [ ] A draft reply with a source of kind `file` gives a form source of kind `docs`.
 - [ ] A draft reply with no stage keeps the stage of the form.
-- [ ] A Review with errors shows the line "Fix the N fields marked in red above." next to the Review button, and the form shows the first error.
+- [ ] A Review with errors shows the line "Fix the N problems marked in red above." next to the Review button, with the singular for one problem, and the form shows the first error.
 - [ ] The Due field of an empty objective shows `YYYY-MM-DD`.
 - [ ] A desk table with long cells draws no text over the next cell.
 - [ ] The desk session can read the objectives of the brief.

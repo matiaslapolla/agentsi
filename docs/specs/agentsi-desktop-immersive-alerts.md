@@ -80,7 +80,7 @@ The section "Alerts" sits after "Appearance" on the settings screen. It has one 
 
 ```toml
 mute = false
-volume = 60                 # 0 to 100
+volume = 50                 # 0 to 100
 done = false                # the tone of Done
 system = true               # system notifications
 quiet = ["22:00", "08:00"]  # absent: no quiet hours
