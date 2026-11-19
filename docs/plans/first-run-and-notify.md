@@ -3,7 +3,7 @@
 Spec: `docs/specs/first-run-and-notify.md`. One commit for each unit.
 
 ## U1 — The database on first use
-- **Files:** `crates/agentsi-core/src/state.rs`, the methods that needed an imported database, `crates/agentsi-core/src/methods/desk.rs`
+- **Files:** `crates/agentsi-core/src/state.rs`, `crates/agentsi-core/src/methods/{agency,call,desk,knowledge,marks,meeting,reflect,roles,story,tickets}.rs`, `crates/agentsi-core/src/desk/mod.rs`
 - **Steps:**
   1. Add `Core::store_or_create()`.
   2. Call it in each method that stopped with "Import the data first".
@@ -28,5 +28,5 @@ Spec: `docs/specs/first-run-and-notify.md`. One commit for each unit.
 - **Files:** none
 - **Steps:**
   1. Install the new programs into an isolated data root with an empty registry.
-  2. Run the setup from "Read the folder" to "Confirm".
+  2. Run the setup screen from the Folder step to the Confirm.
 - **Check:** the front desk of the product opens, and no file was edited by hand.
