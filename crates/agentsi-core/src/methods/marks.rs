@@ -69,12 +69,6 @@ fn join(e: tokio::task::JoinError) -> RpcError {
     RpcError::internal(e.to_string())
 }
 
-fn no_database() -> RpcError {
-    rpc(MarksError::Unavailable(
-        "the data root has no agentsi.db. Import the data first.".into(),
-    ))
-}
-
 /// The registry of the data root, or none when it cannot be read.
 fn registry() -> Result<Registry, RpcError> {
     let root = agentsi_store::paths::data_root(None).map_err(|e| rpc(e.into()))?;
@@ -82,9 +76,7 @@ fn registry() -> Result<Registry, RpcError> {
 }
 
 fn open_store(core: &crate::state::Core) -> Result<Arc<Store>, RpcError> {
-    core.store()
-        .map_err(|e| rpc(e.into()))?
-        .ok_or_else(no_database)
+    core.store_or_create().map_err(|e| rpc(e.into()))
 }
 
 /// The product must be in the registry of the data root.

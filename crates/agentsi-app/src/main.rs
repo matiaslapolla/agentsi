@@ -106,6 +106,8 @@ fn main() -> ExitCode {
                 cx.set_global(env);
             }
             alerts::Alerts::install(cx);
+            // The name of the system notifications. Without it they show the program name.
+            cx.set_app_identity("agentsi-app", "AgentSI");
             let core = cx.new(|_| CoreState::new(link.clone()));
             let (remote, cores) = hosts::start(core, cx);
             cx.set_global(hosts::HostsGlobal(remote));

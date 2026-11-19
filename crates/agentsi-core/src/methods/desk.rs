@@ -24,15 +24,7 @@ fn unavailable(e: agentsi_store::Error) -> RpcError {
     RpcError::new(
         ErrorKind::Unavailable,
         format!("the store cannot open: {e}"),
-        "Set AGENTSI_HOME to the data root, or import the data first.",
-    )
-}
-
-fn no_database() -> RpcError {
-    RpcError::new(
-        ErrorKind::Unavailable,
-        "the data root has no agentsi.db",
-        "Import the data first: agentsi-core import-postgres <url> --fresh.",
+        "Set AGENTSI_HOME to the data root.",
     )
 }
 
@@ -85,7 +77,8 @@ async fn desk(ctx: Ctx, p: ProductDeskParams) -> Result<DeskResult, RpcError> {
         store.read(|c| desk_data::desk(c, &product, registry.as_deref()))
     })
     .await?
-    .ok_or_else(no_database)?;
+    // No database file yet: no product has rows, so the answer is the same as an unknown id.
+    .flatten();
     found.ok_or_else(|| {
         RpcError::new(
             ErrorKind::NotFound,
@@ -111,7 +104,7 @@ async fn minutes_get(ctx: Ctx, p: MinutesGetParams) -> Result<MinutesDetail, Rpc
         store.read(|c| desk_data::minutes(c, &id))
     })
     .await?
-    .ok_or_else(no_database)?;
+    .flatten();
     found.ok_or_else(|| {
         RpcError::new(
             ErrorKind::NotFound,

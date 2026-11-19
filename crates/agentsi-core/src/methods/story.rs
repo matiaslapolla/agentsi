@@ -140,11 +140,7 @@ async fn blocking<T: Send + 'static>(
         let root = agentsi_store::paths::data_root(None).map_err(|e| agency(e.into()))?;
         let registry = Registry::load(&root).map_err(agency)?;
         let product = registry.product(&product).map_err(agency)?.clone();
-        let store = core.store().map_err(|e| agency(e.into()))?.ok_or_else(|| {
-            agency(AgencyError::Unavailable(
-                "the data root has no agentsi.db. Import the data first.".into(),
-            ))
-        })?;
+        let store = core.store_or_create().map_err(|e| agency(e.into()))?;
         f(Work {
             root,
             registry,

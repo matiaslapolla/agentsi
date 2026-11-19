@@ -206,16 +206,8 @@ fn rpc_store(e: agentsi_store::Error) -> RpcError {
     RpcError::internal(e.to_string())
 }
 
-fn no_database() -> RpcError {
-    RpcError::new(
-        ErrorKind::Unavailable,
-        "The data root has no agentsi.db.",
-        "Import the data first, or set AGENTSI_HOME to the data root.",
-    )
-}
-
 pub(crate) fn open_store(core: &Core) -> Result<Arc<Store>, RpcError> {
-    core.store().map_err(rpc_store)?.ok_or_else(no_database)
+    core.store_or_create().map_err(rpc_store)
 }
 
 pub(crate) fn registry() -> Result<Registry, RpcError> {
