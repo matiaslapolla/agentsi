@@ -361,12 +361,17 @@ const SOURCE_KINDS: [&str; 4] = ["issues", "analytics", "docs", "other"];
 /// Maps the kind of each source of truth of a draft to one that the form accepts: `file` and
 /// `doc` to `docs`, each other unknown kind to `other`.
 pub fn normalize_source_kinds(fields: &mut Value) {
-    let Some(sources) = fields["objectives"]["sources_of_truth"].as_array_mut() else {
+    let Some(sources) = fields
+        .get_mut("objectives")
+        .and_then(|o| o.get_mut("sources_of_truth"))
+        .and_then(Value::as_array_mut)
+    else {
         return;
     };
-    for source in sources {
-        let kind = source["kind"]
-            .as_str()
+    for source in sources.iter_mut().filter_map(Value::as_object_mut) {
+        let kind = source
+            .get("kind")
+            .and_then(Value::as_str)
             .unwrap_or_default()
             .trim()
             .to_lowercase();
@@ -375,7 +380,7 @@ pub fn normalize_source_kinds(fields: &mut Value) {
             k if SOURCE_KINDS.contains(&k) => k,
             _ => "other",
         };
-        source["kind"] = json!(kind);
+        source.insert("kind".into(), json!(kind));
     }
 }
 
@@ -533,7 +538,16 @@ mod tests {
             .map(|s| s["kind"].as_str().unwrap())
             .collect();
         assert_eq!(kinds, ["docs", "docs", "issues", "other", "other"]);
-        normalize_source_kinds(&mut json!({}));
+        let mut no_objectives = json!({});
+        normalize_source_kinds(&mut no_objectives);
+        assert_eq!(no_objectives, json!({}));
+        let mut odd = json!({"objectives": {"sources_of_truth": ["a string", {"kind": 3}]}});
+        normalize_source_kinds(&mut odd);
+        assert_eq!(
+            odd["objectives"]["sources_of_truth"],
+            json!(["a string", {"kind": "other"}])
+        );
+        normalize_source_kinds(&mut json!({"objectives": "not an object"}));
         assert!(SYSTEM.contains("issues, analytics, docs and other"));
     }
 

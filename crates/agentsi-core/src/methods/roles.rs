@@ -304,6 +304,8 @@ async fn roles_apply(ctx: Ctx, p: RolesApplyParams) -> Result<RolesApplyResult, 
     let product = p.product.clone();
     let done = apply_stage(&ctx, p).await?;
     if done.applied {
+        // The desk process holds the brief of its start in its system prompt.
+        crate::desk::stop(&ctx.core, &product);
         ctx.core.publish::<DataChanged>(&DataChangedParams {
             product,
             kind: "product".into(),

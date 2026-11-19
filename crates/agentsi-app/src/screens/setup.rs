@@ -1088,7 +1088,10 @@ fn label(text: &str, changed: bool, no_data: bool) -> Div {
 
 /// The line next to the Review button when the check found `n` problems.
 fn fix_line(n: usize) -> String {
-    format!("Fix the {n} fields marked in red above.")
+    match n {
+        1 => "Fix the problem marked in red above.".into(),
+        n => format!("Fix the {n} problems marked in red above."),
+    }
 }
 
 fn card() -> Div {
@@ -1999,7 +2002,11 @@ mod tests {
             );
         });
         assert!(cx.debug_bounds("setup-fix-line").is_some());
-        assert_eq!(super::fix_line(2), "Fix the 2 fields marked in red above.");
+        assert_eq!(
+            super::fix_line(2),
+            "Fix the 2 problems marked in red above."
+        );
+        assert_eq!(super::fix_line(1), "Fix the problem marked in red above.");
     }
 
     #[gpui::test]
