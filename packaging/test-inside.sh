@@ -105,6 +105,65 @@ if command -v desktop-file-validate >/dev/null 2>&1; then desktop-file-validate 
 mkdir -p /tmp/space-units
 cp "$unit" "$pill" /tmp/space-units/
 
+echo "== restart: a fake systemctl and a fake pgrep, because the container has no user manager"
+fake=/tmp/fake
+mkdir -p "$fake/bin"
+cat > "$fake/bin/systemctl" <<'EOF'
+#!/bin/sh
+echo "$*" >> /tmp/fake/calls
+unit=${*##* }
+case "$*" in
+  "--user is-active --quiet "*) [ -e "/tmp/fake/active-$unit" ] ;;
+  "--user is-enabled --quiet "*) [ -e "/tmp/fake/enabled-$unit" ] ;;
+  "--user restart "*) if [ -e "/tmp/fake/dies-$unit" ]; then rm -f "/tmp/fake/active-$unit"; fi ;;
+  *) exit 0 ;;
+esac
+EOF
+cat > "$fake/bin/pgrep" <<'EOF'
+#!/bin/sh
+name=${*##* }
+[ -s "/tmp/fake/pids-$name" ] && cat "/tmp/fake/pids-$name"
+EOF
+chmod +x "$fake/bin/systemctl" "$fake/bin/pgrep"
+run_fake() {
+  rm -f "$fake/calls"
+  PATH="$fake/bin:$PATH" sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2" >/tmp/out 2>&1 || { cat /tmp/out; fail "install failed"; }
+}
+state() { rm -f "$fake"/active-* "$fake"/enabled-* "$fake"/dies-* "$fake"/pids-*; for f in "$@"; do echo "${f#*=}" > "$fake/${f%%=*}"; done; }
+
+state active-agentsi-core.service= active-agentsi-pill.service=
+run_fake
+grep -q "^--user restart agentsi-core.service$" "$fake/calls" || fail "the active core was not restarted"
+grep -q "^restarted agentsi-core.service$" /tmp/out || fail "no restarted line for the core"
+grep -q "^restarted agentsi-pill.service$" /tmp/out || fail "no restarted line for the pill"
+
+state active-agentsi-core.service= active-agentsi-pill.service= pids-agentsi-app=4242
+run_fake
+if grep -q "restart agentsi-core.service" "$fake/calls"; then fail "the core restarted while the app is open"; fi
+grep -q "agentsi-app is open" /tmp/out || fail "no reason given for the skipped core restart"
+grep -q "systemctl --user restart agentsi-core" /tmp/out || fail "no restart command for after the app closes"
+grep -q "^restarted agentsi-pill.service$" /tmp/out || fail "the pill did not restart while the app is open"
+
+state active-agentsi-core.service= dies-agentsi-core.service= pids-agentsi-core=777
+run_fake
+if grep -q "^restarted agentsi-core.service$" /tmp/out; then fail "restarted printed for a unit that is not active"; fi
+grep -q "agentsi-core.service is not active after the restart" /tmp/out || fail "no warning for a unit that stopped"
+grep -q "pid 777" /tmp/out || fail "the warning does not name the other core"
+
+state pids-agentsi-core=999
+run_fake
+grep -q "outside systemd (pid 999)" /tmp/out || fail "a core outside systemd is not named"
+grep -q "kill 999" /tmp/out || fail "no command for the core outside systemd"
+if grep -q "^--user restart" "$fake/calls"; then fail "a restart without an active unit"; fi
+
+state enabled-agentsi-core.service= enabled-agentsi-pill.service=
+run_fake
+if grep -q "not enabled" /tmp/out; then fail "an enable hint for an enabled unit"; fi
+state
+run_fake
+grep -q "The core service is not enabled" /tmp/out || fail "no enable hint for the core"
+grep -q "The pill service is not enabled" /tmp/out || fail "no enable hint for the pill"
+
 echo "== --enable without a user manager fails loudly, not silently"
 if sh "$pkg/install.sh" --from /in --enable >/tmp/out 2>&1; then
   echo "(systemctl --user worked)"

@@ -22,6 +22,8 @@
 # agentsi-pill.service when agentsi-pill is installed). With agentsi-app, the desktop entry goes to
 # ${XDG_DATA_HOME:-~/.local/share}/applications/ and the icon to .../icons/hicolor/scalable/apps/.
 # The script restarts the core and the pill services that are active, so they run the new programs.
+# It does not restart the core while agentsi-app is open, and it names a core that runs outside
+# systemd. Both keep the old program, and the script prints the command for each.
 # macOS: the agent goes to ~/Library/LaunchAgents/dev.agentsi.core.plist.
 set -eu
 
@@ -40,7 +42,7 @@ while [ $# -gt 0 ]; do
     --data-root) data_root=${2:?--data-root needs a folder}; shift 2 ;;
     --enable) enable=1; shift ;;
     --dry-run) dry=1; shift ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "install.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -148,13 +150,34 @@ case "$(uname -s)" in
     # A running service keeps the old program after the copy. The script restarts each active one.
     # unit_is <active|enabled> <unit>
     unit_is() { command -v systemctl >/dev/null 2>&1 && systemctl --user "is-$1" --quiet "$2" 2>/dev/null; }
+    # pids_of <name>: the pids of this user's processes with that name. Empty without pgrep.
+    pids_of() { if command -v pgrep >/dev/null 2>&1; then pgrep -u "$(id -u)" -x "$1" | tr '\n' ' ' | sed 's/ $//'; fi; }
     restart=""
-    unit_is active agentsi-core.service && restart="agentsi-core.service"
+    if unit_is active agentsi-core.service; then
+      # The app has no reconnect: a core restart ends its link, its meetings and its terminals.
+      if [ -n "$(pids_of agentsi-app)" ]; then
+        say "agentsi-app is open, so the core keeps the old program. Close the app, then run: systemctl --user restart agentsi-core"
+      else
+        restart="agentsi-core.service"
+      fi
+    else
+      core_pids=$(pids_of agentsi-core)
+      if [ -n "$core_pids" ]; then
+        say "warning: agentsi-core runs outside systemd (pid $core_pids) and keeps the old program. Close the app if it is open, then run: kill $core_pids"
+      fi
+    fi
     [ "$have_pill" = 1 ] && unit_is active agentsi-pill.service && restart="$restart agentsi-pill.service"
     if [ "$enable" = 1 ] || [ -n "$restart" ]; then do_ systemctl --user daemon-reload; fi
     for unit in $restart; do
       do_ systemctl --user restart "$unit"
-      done_ "$unit" restart
+      if [ "$dry" = 1 ]; then done_ "$unit" restart; continue; fi
+      # A client can start its own core between the stop and the start. Then the unit exits with 3.
+      sleep 1
+      if unit_is active "$unit"; then
+        done_ "$unit" restart
+      else
+        say "warning: $unit is not active after the restart. Another agentsi-core may hold the socket (pid $(pids_of agentsi-core)). See: systemctl --user status $unit"
+      fi
     done
     if [ "$enable" = 1 ]; then
       do_ systemctl --user enable --now agentsi-core.service
