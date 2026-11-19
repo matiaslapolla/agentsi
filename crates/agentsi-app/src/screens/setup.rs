@@ -5,7 +5,9 @@
 //! stage keeps the files off the product repo and off the clipboard. See
 //! `docs/specs/agentsi-desktop-setup.md`.
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
+use std::rc::Rc;
 
 use agentsi_proto::marks_api::{DecisionAdd, DecisionAddParams};
 use agentsi_proto::method::Method;
@@ -159,6 +161,11 @@ pub struct SetupScreen {
     no_data: BTreeSet<String>,
     /// A fill from a draft keeps the marks against the stored brief.
     keep_marks: bool,
+    /// The input keys whose real placeholder is set. `put` can make an input before the draw
+    /// that knows the placeholder.
+    placed: BTreeSet<String>,
+    /// The form to scroll to at the next paint, after a check found problems.
+    reveal: Rc<Cell<Option<Form>>>,
 }
 
 impl SetupScreen {
@@ -191,6 +198,8 @@ impl SetupScreen {
             draft: DraftState::default(),
             no_data: BTreeSet::new(),
             keep_marks: false,
+            placed: BTreeSet::new(),
+            reveal: Rc::new(Cell::new(None)),
         };
         screen.reload(cx);
         screen
@@ -254,11 +263,15 @@ impl SetupScreen {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Entity<InputState> {
-        if let Some(i) = self.inputs.get(key) {
-            return i.clone();
+        if let Some(i) = self.inputs.get(key).cloned() {
+            if !placeholder.is_empty() && self.placed.insert(key.into()) {
+                i.update(cx, |s, cx| s.set_placeholder(placeholder, window, cx));
+            }
+            return i;
         }
         let input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
         self.inputs.insert(key.into(), input.clone());
+        self.placed.insert(key.into());
         input
     }
 
@@ -269,11 +282,15 @@ impl SetupScreen {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Entity<TextareaState> {
-        if let Some(a) = self.areas.get(key) {
-            return a.clone();
+        if let Some(a) = self.areas.get(key).cloned() {
+            if !placeholder.is_empty() && self.placed.insert(key.into()) {
+                a.update(cx, |s, cx| s.set_placeholder(placeholder, window, cx));
+            }
+            return a;
         }
         let area = cx.new(|cx| TextareaState::new(window, cx).placeholder(placeholder));
         self.areas.insert(key.into(), area.clone());
+        self.placed.insert(key.into());
         area
     }
 
@@ -808,6 +825,7 @@ impl SetupScreen {
         self.problems = fields.problems();
         self.message = None;
         if !self.problems.is_empty() {
+            self.reveal_first_problem();
             cx.notify();
             return;
         }
@@ -815,6 +833,11 @@ impl SetupScreen {
         cx.notify();
         let params = self.apply_params(&fields, false);
         self.ask::<RolesApply>(params, cx, |this, r, cx| this.planned(r, cx));
+    }
+
+    /// Scrolls to the form of the first problem at the next paint.
+    fn reveal_first_problem(&self) {
+        self.reveal.set(self.problems.iter().map(|p| p.form).min());
     }
 
     fn today() -> String {
@@ -855,6 +878,7 @@ impl SetupScreen {
                     })
                     .collect();
                 self.message = Some(Err("The core refused the stage.".into()));
+                self.reveal_first_problem();
                 cx.notify();
             }
             Err(e) => self.fail(e, cx),
@@ -1062,8 +1086,14 @@ fn label(text: &str, changed: bool, no_data: bool) -> Div {
         .when(no_data, |el| el.child(status_tag("no data", Status::Warn)))
 }
 
+/// The line next to the Review button when the check found `n` problems.
+fn fix_line(n: usize) -> String {
+    format!("Fix the {n} fields marked in red above.")
+}
+
 fn card() -> Div {
     div()
+        .relative()
         .flex()
         .flex_col()
         .gap(space(3))
@@ -1115,6 +1145,27 @@ impl SetupScreen {
             .gap(space(1))
             .child(label(title, self.changed(key, cx), self.no_data(key, cx)))
             .child(Textarea::new(&area).h(space(height)))
+    }
+
+    /// A zero-size canvas at the top of the form. Its bounds tell where to scroll.
+    fn anchor(&self, form: Form) -> impl IntoElement {
+        let (reveal, scroll) = (self.reveal.clone(), self.scroll.clone());
+        canvas(
+            move |bounds, window, _| {
+                if reveal.get() == Some(form) {
+                    reveal.set(None);
+                    let content_top = scroll.bounds().top() + scroll.offset().y;
+                    scroll.set_offset(point(Pixels::ZERO, -(bounds.top() - content_top)));
+                    window.refresh();
+                }
+            },
+            |_, _, _, _| {},
+        )
+        .absolute()
+        .top_0()
+        .left_0()
+        .w_full()
+        .h(space(1))
     }
 
     fn problems_of(&self, form: Form) -> Div {
@@ -1207,6 +1258,7 @@ impl SetupScreen {
         let fixed_id = self.baseline.is_some();
         let id = self.input("id", "my-product", window, cx);
         card()
+            .child(self.anchor(Form::Product))
             .child(section("Product", None))
             .child(
                 div()
@@ -1303,6 +1355,7 @@ impl SetupScreen {
             );
         }
         card()
+            .child(self.anchor(Form::Objectives))
             .child(section("Objectives", None))
             .child(hint("One to three. Leave a row empty to skip it."))
             .children(rows)
@@ -1372,6 +1425,7 @@ impl SetupScreen {
             ));
         }
         card()
+            .child(self.anchor(Form::Roster))
             .child(section("Roster", Some(roster.len())))
             .child(
                 div()
@@ -1447,6 +1501,7 @@ impl SetupScreen {
             );
         }
         card()
+            .child(self.anchor(Form::Models))
             .child(section("Models", None))
             .child(hint(
                 "Leave a field empty to keep the model and the effort of the global role.",
@@ -1459,6 +1514,7 @@ impl SetupScreen {
         let bwrap = self.scan.as_ref().is_none_or(|s| s.tools.bwrap);
         let on = self.stories_on;
         card()
+            .child(self.anchor(Form::Stories))
             .child(section("Stories mode", None))
             .child(
                 Checkbox::new("setup-stories-on")
@@ -1561,7 +1617,13 @@ impl SetupScreen {
     }
 
     fn forms_step(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
-        let other = self.problems_of(Form::Other);
+        let other = self
+            .problems_of(Form::Other)
+            .relative()
+            .child(self.anchor(Form::Other));
+        let fix_line = (!self.problems.is_empty()).then(|| {
+            failed_text(fix_line(self.problems.len())).debug_selector(|| "setup-fix-line".into())
+        });
         let busy = self.busy;
         div()
             .flex()
@@ -1578,6 +1640,7 @@ impl SetupScreen {
             .child(
                 div()
                     .flex()
+                    .items_center()
                     .gap(space(2))
                     .child(
                         Button::new("setup-review")
@@ -1587,6 +1650,7 @@ impl SetupScreen {
                             .disabled(busy)
                             .on_click(cx.listener(|this, _, _, cx| this.review_now(cx))),
                     )
+                    .children(fix_line)
                     .child(
                         Button::new("setup-back")
                             .secondary()
@@ -1888,6 +1952,54 @@ mod tests {
         screen.update(cx, |s, cx| s.decision_done(Ok(()), f, cx));
         assert_eq!(screen.read_with(cx, |s, _| s.step()), Step::Done);
         draw(cx);
+    }
+
+    #[gpui::test]
+    fn the_due_field_shows_its_placeholder_when_a_fill_made_it_before_the_draw(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(agentsi_ui::init);
+        let (end, _other) = UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
+        let (screen, cx) = cx.add_window_view(|_, cx| SetupScreen::new(String::new(), core, cx));
+        screen.update_in(cx, |s, w, cx| s.put("o0.due", "", w, cx));
+        screen.update(cx, |s, cx| s.scanned(Ok(scan(None)), cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        screen.read_with(cx, |s, cx| {
+            assert!(s.placed.contains("o0.due"), "the draw set the placeholder");
+            assert_eq!(s.inputs["o0.due"].read(cx).value().as_ref(), "");
+        });
+    }
+
+    #[gpui::test]
+    fn a_review_with_errors_shows_the_fix_line_and_scrolls_to_the_first_error(
+        cx: &mut TestAppContext,
+    ) {
+        cx.update(agentsi_ui::init);
+        let (end, mut other) = UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
+        let (screen, cx) = cx.add_window_view(|_, cx| SetupScreen::new(String::new(), core, cx));
+        screen.update(cx, |s, cx| s.scanned(Ok(scan(None)), cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        assert!(cx.debug_bounds("setup-fix-line").is_none());
+        screen.update_in(cx, |s, w, cx| {
+            s.put("what", "A demo", w, cx);
+            s.put("o0.text", "Ship it", w, cx);
+        });
+        screen.update(cx, |s, cx| s.review_now(cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        assert!(methods(&mut other).is_empty(), "nothing is sent");
+        screen.read_with(cx, |s, _| {
+            let first = s.problems.iter().map(|p| p.form).min();
+            assert_eq!(first, Some(super::Form::Objectives));
+            assert!(
+                s.scroll.offset().y < gpui::Pixels::ZERO,
+                "the form scrolled"
+            );
+        });
+        assert!(cx.debug_bounds("setup-fix-line").is_some());
+        assert_eq!(super::fix_line(2), "Fix the 2 fields marked in red above.");
     }
 
     #[gpui::test]
