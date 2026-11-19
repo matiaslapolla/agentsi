@@ -792,14 +792,37 @@ impl DeskConversation {
     }
 }
 
+/// The text of a table cell. The kit gives a cell a minimum width of 100 px, so in the narrow
+/// conversation column the text of a cell drew over the next cell. A cell shrinks to its share
+/// of the row, wraps its text there and clips a word that is wider than the share.
+fn table_text(row: usize, r: usize, c: usize, text: &str) -> Div {
+    div()
+        .min_w_0()
+        .debug_selector(move || format!("deskv-{row}-cell-{r}-{c}"))
+        .child(text.to_string())
+}
+
 fn table_view(row: usize, title: &str, columns: &[String], rows: &[Vec<String>]) -> AnyElement {
-    let table = Table::new()
-        .child(TableHeader::new().child(
-            TableRow::new().children(columns.iter().map(|c| TableHead::new().child(c.clone()))),
-        ))
-        .child(TableBody::new().children(rows.iter().map(|r| {
-            TableRow::new().children(r.iter().map(|cell| TableCell::new().child(cell.clone())))
-        })));
+    let table =
+        Table::new()
+            .child(TableHeader::new().child(TableRow::new().children(
+                columns.iter().enumerate().map(|(c, text)| {
+                    TableHead::new()
+                        .min_w_0()
+                        .overflow_hidden()
+                        .child(table_text(row, 0, c, text))
+                }),
+            )))
+            .child(
+                TableBody::new().children(rows.iter().enumerate().map(|(r, cells)| {
+                    TableRow::new().children(cells.iter().enumerate().map(|(c, text)| {
+                        TableCell::new()
+                            .min_w_0()
+                            .overflow_hidden()
+                            .child(table_text(row, r + 1, c, text))
+                    }))
+                })),
+            );
     div()
         .flex()
         .flex_col()
@@ -1413,6 +1436,69 @@ mod tests {
             assert_eq!(c.kinds(), ["view"; 7]);
             assert_eq!(checked(c, 6), [2]);
         });
+    }
+
+    /// A table in a column as wide as the desk conversation.
+    struct TableHost {
+        columns: Vec<String>,
+        rows: Vec<Vec<String>>,
+    }
+
+    impl gpui::Render for TableHost {
+        fn render(
+            &mut self,
+            _: &mut gpui::Window,
+            _: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            use gpui::{ParentElement as _, Styled as _};
+            gpui::div()
+                .w(control::DESK_CONVERSATION_WIDTH)
+                .child(super::table_view(
+                    0,
+                    "Objectives",
+                    &self.columns,
+                    &self.rows,
+                ))
+        }
+    }
+
+    #[gpui::test]
+    fn a_table_cell_wraps_its_text_inside_its_column(cx: &mut TestAppContext) {
+        cx.update(agentsi_ui::init);
+        let long = "An objective with a long text that needs several lines in a narrow column";
+        let strings = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let (_, cx) = cx.add_window_view(|_, _| TableHost {
+            columns: strings(&["objective", "metric", "due", "owner", "state"]),
+            rows: vec![
+                strings(&[long, long, "2026-12-31", long, "open"]),
+                strings(&["short", long, long, "pm", long]),
+            ],
+        });
+        draw(cx);
+        let cell = |cx: &mut VisualTestContext, r: usize, c: usize| {
+            let name: &'static str = Box::leak(format!("deskv-0-cell-{r}-{c}").into_boxed_str());
+            cx.debug_bounds(name)
+                .unwrap_or_else(|| panic!("cell {r},{c} is drawn"))
+        };
+        for r in 0..3 {
+            for c in 0..5 {
+                let b = cell(cx, r, c);
+                assert!(
+                    b.right() <= control::DESK_CONVERSATION_WIDTH,
+                    "cell {r},{c} reaches {:?}",
+                    b.right()
+                );
+                if c < 4 {
+                    assert!(
+                        b.right() <= cell(cx, r, c + 1).left(),
+                        "the text of cell {r},{c} draws over cell {r},{}",
+                        c + 1
+                    );
+                }
+            }
+        }
+        // The long text wraps: its cell is taller than a one-line cell of the same row.
+        assert!(cell(cx, 1, 0).size.height > cell(cx, 2, 0).size.height);
     }
 
     #[gpui::test]
