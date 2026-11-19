@@ -98,6 +98,46 @@ fn inline_stage_refuses_both_neither_and_a_key_outside_the_stage_names() {
 }
 
 #[test]
+fn a_first_install_registers_its_first_product_and_gets_its_database() {
+    let dir = TempDir::new();
+    let root = dir.0.join("root");
+    let tmp = dir.0.join("tmp");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::create_dir_all(&tmp).unwrap();
+    // The registry that packaging/install.sh writes, and no agentsi.db.
+    std::fs::write(
+        root.join("agentsi.config.json"),
+        "{ \"owner\": { \"name\": \"the owner\", \"language\": \"English\" }, \"products\": [] }\n",
+    )
+    .unwrap();
+    let e = Env { dir, root, tmp };
+    let core = start(&e);
+    let mut c = Framed::connect(&core.socket.path);
+    let db = e.root.join("agentsi.db");
+
+    let listed = c.ok("product.list", json!({}));
+    assert_eq!(listed["products"], json!([]), "{listed}");
+    assert!(!db.exists(), "a read made the database");
+
+    let path = e.dir.0.join("gamma");
+    std::fs::create_dir_all(&path).unwrap();
+    let r = c.ok(
+        "roles.apply",
+        json!({"product": "gamma", "stage": inline(), "yes": true,
+               "register": {"name": "Gamma", "path": path.display().to_string()}}),
+    );
+    assert_eq!(r["applied"], true, "{r}");
+    assert!(db.exists(), "the setup did not make the database");
+    let registry = std::fs::read_to_string(e.root.join("agentsi.config.json")).unwrap();
+    assert!(
+        registry.contains("\n    { \"id\": \"gamma\", \"name\": \"Gamma\""),
+        "{registry}"
+    );
+    let listed = c.ok("product.list", json!({}));
+    assert_eq!(listed["products"][0]["id"], "gamma", "{listed}");
+}
+
+#[test]
 fn register_writes_the_products_row_and_sends_data_changed_of_kind_product() {
     let e = env();
     let core = start(&e);
