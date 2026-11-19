@@ -3,7 +3,7 @@
 ARG BASE=archlinux
 FROM ${BASE}
 RUN if command -v pacman >/dev/null 2>&1; then \
-      pacman -Sy --noconfirm --needed systemd desktop-file-utils && pacman -Scc --noconfirm; \
+      pacman -Syu --noconfirm --needed systemd desktop-file-utils && pacman -Scc --noconfirm; \
     else \
       apt-get update && apt-get install -y --no-install-recommends systemd desktop-file-utils \
         && rm -rf /var/lib/apt/lists/*; \

@@ -20,7 +20,7 @@
 # machine has no use for them: the script warns and goes on when they are missing).
 # Linux: the units go to ${XDG_CONFIG_HOME:-~/.config}/systemd/user/ (agentsi-core.service, and
 # agentsi-pill.service when agentsi-pill is installed). With agentsi-app, the desktop entry goes to
-# ${XDG_DATA_HOME:-~/.local/share}/applications/ and the icon to .../icons/hicolor/scalable/apps/.
+# ${XDG_DATA_HOME:-~/.local/share}/applications/ and the app icon to .../icons/hicolor/scalable/apps/.
 # The script restarts the core and the pill services that are active, so they run the new programs.
 # It does not restart the core while agentsi-app is open, and it names a core that runs outside
 # systemd. Both keep the old program, and the script prints the command for each.
@@ -42,7 +42,7 @@ while [ $# -gt 0 ]; do
     --data-root) data_root=${2:?--data-root needs a folder}; shift 2 ;;
     --enable) enable=1; shift ;;
     --dry-run) dry=1; shift ;;
-    -h|--help) sed -n '2,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) awk 'NR == 1 { next } /^set -eu$/ { exit } { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
     *) echo "install.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -56,6 +56,8 @@ done_() { v=${2:-install}; if [ "$dry" = 1 ]; then say "would $v $1"; else say "
 
 [ -d "$from" ] || die "no folder $from. Build first (cargo build --release) or pass --from."
 from=$(cd "$from" && pwd)
+# With a trailing /, the pattern "$HOME"/* of guard_home_path matches no path.
+[ "$HOME" = / ] || HOME=${HOME%/}
 config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 # Stops unless the path is absolute, inside $HOME and free of "..": guard_home_path <name> <path>.
@@ -67,7 +69,7 @@ guard_home_path() {
 # All checks come before the first change, so a bad path changes nothing.
 guard_home_path --bin-dir "$bin_dir"
 guard_home_path XDG_CONFIG_HOME "$config_home"
-guard_home_path XDG_DATA_HOME "$data_home"
+case "$data_root" in ""|/*) ;; *) die "--data-root must be an absolute path" ;; esac
 # render() puts these paths into sed commands, and the templates put them inside double quotes
 # (Exec of the desktop entry, ExecStart and Environment of the units).
 case "$bin_dir$HOME" in
@@ -87,6 +89,13 @@ done
 if [ -x "$from/agentsi-pill" ]; then have_pill=1; fi
 have_app=0
 if [ -x "$from/agentsi-app" ]; then have_app=1; fi
+home_file="$config_home/agentsi/home"
+# The script writes under XDG_DATA_HOME only for the desktop entry and for the default data root.
+first_root=0
+if [ -z "${AGENTSI_HOME:-}" ] && [ ! -s "$home_file" ]; then first_root=1; fi
+if { [ "$have_app" = 1 ] && [ "$(uname -s)" = Linux ]; } || { [ "$first_root" = 1 ] && [ -z "$data_root" ]; }; then
+  guard_home_path XDG_DATA_HOME "$data_home"
+fi
 
 do_ mkdir -p "$bin_dir"
 for p in $programs; do
@@ -98,14 +107,12 @@ for p in $programs; do
 done
 
 # The data root of a first install: the home file names it, and it holds an empty registry.
-home_file="$config_home/agentsi/home"
 if [ -n "${AGENTSI_HOME:-}" ]; then
   say "AGENTSI_HOME is set ($AGENTSI_HOME). The data root stays as it is."
-elif [ -s "$home_file" ]; then
+elif [ "$first_root" = 0 ]; then
   say "The data root stays as $home_file names it: $(head -1 "$home_file")"
 else
   [ -n "$data_root" ] || data_root="$data_home/agentsi/data"
-  case "$data_root" in /*) ;; *) die "--data-root must be an absolute path" ;; esac
   do_ mkdir -p "$data_root" "$config_home/agentsi"
   [ "$dry" = 1 ] || printf '%s\n' "$data_root" > "$home_file"
   done_ "$home_file (data root $data_root)"
@@ -153,7 +160,10 @@ case "$(uname -s)" in
     # pids_of <name>: the pids of this user's processes with that name. Empty without pgrep.
     pids_of() { if command -v pgrep >/dev/null 2>&1; then pgrep -u "$(id -u)" -x "$1" | tr '\n' ' ' | sed 's/ $//'; fi; }
     restart=""
+    # systemd keeps the unit it loaded. A reload makes the restart, or the printed command, use the new file.
+    reload=$enable
     if unit_is active agentsi-core.service; then
+      reload=1
       # The app has no reconnect: a core restart ends its link, its meetings and its terminals.
       if [ -n "$(pids_of agentsi-app)" ]; then
         say "agentsi-app is open, so the core keeps the old program. Close the app, then run: systemctl --user restart agentsi-core"
@@ -166,8 +176,11 @@ case "$(uname -s)" in
         say "warning: agentsi-core runs outside systemd (pid $core_pids) and keeps the old program. Close the app if it is open, then run: kill $core_pids"
       fi
     fi
-    [ "$have_pill" = 1 ] && unit_is active agentsi-pill.service && restart="$restart agentsi-pill.service"
-    if [ "$enable" = 1 ] || [ -n "$restart" ]; then do_ systemctl --user daemon-reload; fi
+    if [ "$have_pill" = 1 ] && unit_is active agentsi-pill.service; then
+      restart="$restart agentsi-pill.service"
+      reload=1
+    fi
+    if [ "$reload" = 1 ]; then do_ systemctl --user daemon-reload; fi
     for unit in $restart; do
       do_ systemctl --user restart "$unit"
       if [ "$dry" = 1 ]; then done_ "$unit" restart; continue; fi
@@ -175,8 +188,12 @@ case "$(uname -s)" in
       sleep 1
       if unit_is active "$unit"; then
         done_ "$unit" restart
-      else
-        say "warning: $unit is not active after the restart. Another agentsi-core may hold the socket (pid $(pids_of agentsi-core)). See: systemctl --user status $unit"
+        continue
+      fi
+      say "warning: $unit is not active after the restart. See: systemctl --user status $unit"
+      if [ "$unit" = agentsi-core.service ]; then
+        other=$(pids_of agentsi-core)
+        [ -z "$other" ] || say "Another agentsi-core holds the socket (pid $other). It keeps the old program. Close the app if it is open, then run: kill $other"
       fi
     done
     if [ "$enable" = 1 ]; then

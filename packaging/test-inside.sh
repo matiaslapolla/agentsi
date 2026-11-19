@@ -31,6 +31,16 @@ for d in /tmp/outside-data rel/data; do
   [ ! -e "$d" ] || fail "XDG_DATA_HOME=$d was written"
 done
 
+echo "== --help prints the header and stops before the code"
+sh "$pkg/install.sh" --help >/tmp/out
+grep -q -- "--dry-run" /tmp/out || fail "--help does not list --dry-run"
+if grep -q "set -eu" /tmp/out; then fail "--help prints code"; fi
+
+echo "== a relative --data-root is refused before any change"
+if sh "$pkg/install.sh" --from /in --data-root rel/data 2>/tmp/err; then fail "accepted a relative --data-root"; fi
+cat /tmp/err
+[ ! -e "$HOME/.local/bin" ] || fail "a relative --data-root: the bin dir changed before the check"
+
 echo "== a path with % or \$ is refused before any change"
 for d in "$HOME/b%fin" "$HOME/b\$x"; do
   if sh "$pkg/install.sh" --from /in --bin-dir "$d" 2>/tmp/err; then fail "accepted --bin-dir $d"; fi
@@ -58,6 +68,10 @@ if grep -q "@" "$unit"; then fail "a placeholder is left in the unit"; fi
 [ ! -e "$HOME/.config/systemd/user/agentsi-pill.service" ] || fail "a pill unit without the pill program"
 [ ! -e "$apps/agentsi.desktop" ] || fail "a desktop entry without the app program"
 [ ! -e "$icon" ] || fail "an icon without the app program"
+
+echo "== a headless second install ignores an XDG_DATA_HOME that it does not use"
+XDG_DATA_HOME=/tmp/outside-unused sh "$pkg/install.sh" --from /tmp/two >/tmp/out 2>&1 || { cat /tmp/out; fail "a headless second install stopped on XDG_DATA_HOME"; }
+[ ! -e /tmp/outside-unused ] || fail "the unused XDG_DATA_HOME was written"
 
 echo "== all four programs, custom bin dir, second run replaces the first"
 mkdir /tmp/four
@@ -132,37 +146,48 @@ run_fake() {
   rm -f "$fake/calls"
   PATH="$fake/bin:$PATH" sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2" >/tmp/out 2>&1 || { cat /tmp/out; fail "install failed"; }
 }
-state() { rm -f "$fake"/active-* "$fake"/enabled-* "$fake"/dies-* "$fake"/pids-*; for f in "$@"; do echo "${f#*=}" > "$fake/${f%%=*}"; done; }
+fake_state() { rm -f "$fake"/active-* "$fake"/enabled-* "$fake"/dies-* "$fake"/pids-*; for f in "$@"; do echo "${f#*=}" > "$fake/${f%%=*}"; done; }
 
-state active-agentsi-core.service= active-agentsi-pill.service=
+fake_state active-agentsi-core.service= active-agentsi-pill.service=
 run_fake
 grep -q "^--user restart agentsi-core.service$" "$fake/calls" || fail "the active core was not restarted"
 grep -q "^restarted agentsi-core.service$" /tmp/out || fail "no restarted line for the core"
 grep -q "^restarted agentsi-pill.service$" /tmp/out || fail "no restarted line for the pill"
+if grep -q "not active after the restart" /tmp/out; then fail "a warning for a unit that restarted"; fi
 
-state active-agentsi-core.service= active-agentsi-pill.service= pids-agentsi-app=4242
+fake_state active-agentsi-core.service= active-agentsi-pill.service= pids-agentsi-app=4242
 run_fake
 if grep -q "restart agentsi-core.service" "$fake/calls"; then fail "the core restarted while the app is open"; fi
 grep -q "agentsi-app is open" /tmp/out || fail "no reason given for the skipped core restart"
 grep -q "systemctl --user restart agentsi-core" /tmp/out || fail "no restart command for after the app closes"
 grep -q "^restarted agentsi-pill.service$" /tmp/out || fail "the pill did not restart while the app is open"
 
-state active-agentsi-core.service= dies-agentsi-core.service= pids-agentsi-core=777
+fake_state active-agentsi-core.service= pids-agentsi-app=4242
+run_fake
+grep -q "^--user daemon-reload$" "$fake/calls" || fail "no daemon-reload when the core restart is skipped"
+if grep -q "^--user restart" "$fake/calls"; then fail "a restart while the app is open and the pill is inactive"; fi
+
+fake_state active-agentsi-core.service= dies-agentsi-core.service= pids-agentsi-core=777
 run_fake
 if grep -q "^restarted agentsi-core.service$" /tmp/out; then fail "restarted printed for a unit that is not active"; fi
 grep -q "agentsi-core.service is not active after the restart" /tmp/out || fail "no warning for a unit that stopped"
 grep -q "pid 777" /tmp/out || fail "the warning does not name the other core"
 
-state pids-agentsi-core=999
+fake_state active-agentsi-pill.service= dies-agentsi-pill.service=
+run_fake
+grep -q "agentsi-pill.service is not active after the restart" /tmp/out || fail "no warning for a pill that stopped"
+if grep -q "Another agentsi-core" /tmp/out; then fail "the pill warning blames a core"; fi
+
+fake_state pids-agentsi-core=999
 run_fake
 grep -q "outside systemd (pid 999)" /tmp/out || fail "a core outside systemd is not named"
 grep -q "kill 999" /tmp/out || fail "no command for the core outside systemd"
 if grep -q "^--user restart" "$fake/calls"; then fail "a restart without an active unit"; fi
 
-state enabled-agentsi-core.service= enabled-agentsi-pill.service=
+fake_state enabled-agentsi-core.service= enabled-agentsi-pill.service=
 run_fake
 if grep -q "not enabled" /tmp/out; then fail "an enable hint for an enabled unit"; fi
-state
+fake_state
 run_fake
 grep -q "The core service is not enabled" /tmp/out || fail "no enable hint for the core"
 grep -q "The pill service is not enabled" /tmp/out || fail "no enable hint for the pill"

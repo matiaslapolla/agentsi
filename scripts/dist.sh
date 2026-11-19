@@ -76,7 +76,11 @@ for p in $programs; do
   strip "$pkg/bin/$p" 2>/dev/null || true
 done
 cp "$root/packaging/install.sh" "$pkg/install.sh"
-for d in $assets; do cp -R "$root/packaging/$d" "$pkg/$d"; done
+# Only tracked files: an editor swap file in these folders must not go into the tarball.
+for f in $(cd "$root/packaging" && git ls-files $assets); do
+  mkdir -p "$pkg/$(dirname "$f")"
+  cp "$root/packaging/$f" "$pkg/$f"
+done
 
 # The plugin with the hooks of the switch-over: no Node, no test files.
 cp -R "$root/plugin" "$pkg/plugin"
