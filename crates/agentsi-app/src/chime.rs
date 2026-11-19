@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use agentsi_proto::rpc::Notification;
 use agentsi_ui::tokens::WorkState;
-use gpui_kit::Global;
+use gpui_kit::{App, Global};
 
 use crate::alerts::Alert;
 use crate::alerts_file::{AlertsConfig, Minute};
@@ -278,6 +278,20 @@ impl Chime {
 /// `call_playing()` of the player, for the scene.
 pub fn call_playing() -> bool {
     player::call_playing()
+}
+
+/// Closes the device once [`IDLE`] has passed with no tone. Call it after each tone or preview.
+pub fn close_when_idle(cx: &App) {
+    let Some(chime) = cx.try_global::<ChimeGlobal>().map(|g| g.0.clone()) else {
+        return;
+    };
+    cx.spawn(async move |cx| {
+        cx.background_executor()
+            .timer(IDLE + Duration::from_millis(100))
+            .await;
+        chime.borrow_mut().close_if_idle(Instant::now());
+    })
+    .detach();
 }
 
 /// A [`Sound`] that makes no sound and records the tones, for tests.

@@ -11,7 +11,7 @@ use gpui_kit::*;
 
 use super::{SettingsScreen, pair};
 use crate::alerts_file::{self, AlertsConfig, Minute, format_time};
-use crate::chime::ChimeGlobal;
+use crate::chime::{self, ChimeGlobal};
 use crate::screens::parts::section;
 
 /// The volumes of the buttons.
@@ -66,6 +66,7 @@ impl SettingsScreen {
                         if let Some(chime) = cx.try_global::<ChimeGlobal>() {
                             chime.0.borrow_mut().preview(&config, Instant::now());
                         }
+                        chime::close_when_idle(cx);
                         cx.notify();
                     }));
                 if now.volume == volume {

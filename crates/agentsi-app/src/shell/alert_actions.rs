@@ -1,7 +1,7 @@
 //! What the shell does when an alert is raised: the tone, the toast and the system
 //! notification. It also draws the alert log and opens the target of an alert.
 
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use agentsi_ui::components::{Button, StateMark, state_icon};
 use agentsi_ui::tokens::{control, line, radius, size, space, surface, text};
@@ -284,13 +284,6 @@ impl Shell {
         if chime.borrow_mut().consider(alert, &config, scene).is_err() {
             return;
         }
-        // The device closes after 10 s with no tone.
-        cx.spawn(async move |_, cx| {
-            cx.background_executor()
-                .timer(chime::IDLE + Duration::from_millis(100))
-                .await;
-            chime.borrow_mut().close_if_idle(Instant::now());
-        })
-        .detach();
+        chime::close_when_idle(cx);
     }
 }
