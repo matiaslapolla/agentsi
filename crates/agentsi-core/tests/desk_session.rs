@@ -63,7 +63,9 @@ fn setup(dir: &TempDir, auth: &str) -> World {
             '{\"id\":\"m1\",\"question\":\"What now?\",\"priorities\":[{\"title\":\"P0\",\"why\":\"w\",\"sources\":[]}]}'),
            ('mb', 'beta', 'Other?', 'valid', '2026-11-02T10:00:00.000Z', '{\"id\":\"mb\"}');
          insert into priorities (minutes_id, idx, title, why) values ('m1', 0, 'P0', 'w');
-         insert into stories (product, id, data) values ('alpha', 'S001', '{\"id\":\"S001\"}');",
+         insert into stories (product, id, data) values ('alpha', 'S001', '{\"id\":\"S001\"}');
+         insert into briefs (product, data) values ('alpha',
+           '{\"product\":{\"what\":\"A desk\",\"audience\":\"Owners\",\"stage\":\"building\"},\"objectives\":[{\"id\":\"o1\",\"text\":\"Reach ten owners\",\"signal\":\"sign-ups\",\"due\":\"2026-12-31\"}]}');",
     )
     .unwrap();
     let fake = bin.join("claude");
@@ -194,6 +196,26 @@ fn a_second_owner_message_goes_to_the_same_claude_process() {
     assert_eq!(
         c.ok("desk.stop", json!({"product": "alpha"})),
         json!({"stopped": false})
+    );
+}
+
+#[test]
+fn the_system_prompt_of_the_process_holds_the_objectives_of_the_brief() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok(
+        "desk.send",
+        json!({"product": "alpha", "text": "Which objectives?"}),
+    );
+    items_until(&mut c, "end");
+    let args = read(&w.bin.join("args-1"));
+    assert!(
+        args.contains(
+            "<objective id=\"o1\" due=\"2026-12-31\" signal=\"sign-ups\">Reach ten owners</objective>"
+        ),
+        "{args}"
     );
 }
 
@@ -418,7 +440,10 @@ fn object_views_name_objects_of_the_product_and_accept_on_a_priority_writes_no_o
     ] {
         let r = show(&mut c, view);
         assert_eq!(kind(&r), "not_found", "{r}");
-        assert!(r["error"]["message"].as_str().unwrap().contains(word), "{r}");
+        assert!(
+            r["error"]["message"].as_str().unwrap().contains(word),
+            "{r}"
+        );
     }
     let r = show(&mut c, json!({"kind": "story"}));
     assert_eq!(kind(&r), "invalid", "{r}");
@@ -497,7 +522,10 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
         let m = r["error"]["message"].as_str().unwrap();
         assert!(m.contains(word), "{m}");
     }
-    let r = show(&mut c, json!({"kind": "chart", "chart": "donut", "title": "C", "labels": [], "values": []}));
+    let r = show(
+        &mut c,
+        json!({"kind": "chart", "chart": "donut", "title": "C", "labels": [], "values": []}),
+    );
     assert_eq!(kind(&r), "invalid", "{r}");
     assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
 
@@ -520,10 +548,22 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
         json!({"kind": "note", "text": "The owner checked 2 of 3 items of Launch: tag, post."})
     );
     for (params, want) in [
-        (json!({"product": "alpha", "seq": 5, "checked": [3]}), "invalid"),
-        (json!({"product": "alpha", "seq": 4, "checked": [0]}), "invalid"),
-        (json!({"product": "alpha", "seq": 99, "checked": []}), "not_found"),
-        (json!({"product": "nope", "seq": 5, "checked": []}), "not_found"),
+        (
+            json!({"product": "alpha", "seq": 5, "checked": [3]}),
+            "invalid",
+        ),
+        (
+            json!({"product": "alpha", "seq": 4, "checked": [0]}),
+            "invalid",
+        ),
+        (
+            json!({"product": "alpha", "seq": 99, "checked": []}),
+            "not_found",
+        ),
+        (
+            json!({"product": "nope", "seq": 5, "checked": []}),
+            "not_found",
+        ),
     ] {
         let r = c.call("desk.check", params);
         assert_eq!(kind(&r), want, "{r}");
@@ -531,7 +571,10 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
 
     // A page: the events and the history give its length. desk.page gives the HTML.
     let html = "<h1>Report</h1>";
-    let r = show(&mut c, json!({"kind": "page", "title": "Report", "html": html}));
+    let r = show(
+        &mut c,
+        json!({"kind": "page", "title": "Report", "html": html}),
+    );
     assert_eq!(r["result"]["view_id"], 7);
     let e = c.next_event("desk.item");
     assert_eq!(
@@ -582,7 +625,10 @@ fn a_tickets_view_names_tickets_of_the_product() {
     };
     let r = show(&mut c, json!([id, "C999"]));
     assert_eq!(kind(&r), "not_found", "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("C999"), "{r}");
+    assert!(
+        r["error"]["message"].as_str().unwrap().contains("C999"),
+        "{r}"
+    );
     let r = show(&mut c, json!([]));
     assert_eq!(kind(&r), "invalid", "{r}");
     assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
