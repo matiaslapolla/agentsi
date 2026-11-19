@@ -154,3 +154,14 @@ impl SettingsScreen {
             })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::VOLUMES;
+    use crate::alerts_file::AlertsConfig;
+
+    #[test]
+    fn the_default_volume_is_one_of_the_buttons() {
+        assert!(VOLUMES.contains(&AlertsConfig::default().volume));
+    }
+}
