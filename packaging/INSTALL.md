@@ -17,7 +17,7 @@ This tarball holds the built programs. You need no Rust, no Zig and no build. `V
    - It copies the 4 programs to `~/.local/bin`.
    - On a first install, it makes the data root `~/.local/share/agentsi/data` with an empty registry, and writes its path into `~/.config/agentsi/home`. Add `--data-root <dir>` to use another folder.
    - It installs and starts the core and pill as systemd user services.
-   - It adds a desktop entry and an icon, so AgentSI shows in the app launcher.
+   - It adds a desktop entry and an app icon, so the launcher lists AgentSI.
    - On a second run, it restarts the core and the pill when they are active. Run it again to update.
    - It changes nothing outside your home folder.
 3. If the script says that `~/.local/bin` is not on your PATH, add it to your shell profile and open a new terminal.
@@ -31,7 +31,7 @@ This tarball holds the built programs. You need no Rust, no Zig and no build. `V
 
 ## 4. The app
 
-1. Open AgentSI from the app launcher, or run `agentsi-app`.
+1. Open AgentSI from the launcher, or run `agentsi-app`.
 2. Open Settings with `Ctrl+,`. In "Voice models", download the speech-in model, the voice and the voice detector.
 3. On Hyprland: in the section "Dictation key", pick a key, then add the include line that the section shows to the end of `~/.config/hypr/hyprland.lua`. On another compositor, the section shows the two commands to bind by hand.
 4. Read the guide: use the palette entry "Open the guide". The app holds the guide.

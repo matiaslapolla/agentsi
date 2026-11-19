@@ -20,8 +20,10 @@
 # machine has no use for them: the script warns and goes on when they are missing).
 # Linux: the units go to ${XDG_CONFIG_HOME:-~/.config}/systemd/user/ (agentsi-core.service, and
 # agentsi-pill.service when agentsi-pill is installed). With agentsi-app, the desktop entry goes to
-# ${XDG_DATA_HOME:-~/.local/share}/applications/ and the icon to .../icons/hicolor/scalable/apps/.
+# ${XDG_DATA_HOME:-~/.local/share}/applications/ and the app icon to .../icons/hicolor/scalable/apps/.
 # The script restarts the core and the pill services that are active, so they run the new programs.
+# It does not restart the core while agentsi-app is open, and it names a core that runs outside
+# systemd. Both keep the old program, and the script prints the command for each.
 # macOS: the agent goes to ~/Library/LaunchAgents/dev.agentsi.core.plist.
 set -eu
 
@@ -40,7 +42,7 @@ while [ $# -gt 0 ]; do
     --data-root) data_root=${2:?--data-root needs a folder}; shift 2 ;;
     --enable) enable=1; shift ;;
     --dry-run) dry=1; shift ;;
-    -h|--help) sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) awk 'NR == 1 { next } /^set -eu$/ { exit } { sub(/^# ?/, ""); print }' "$0"; exit 0 ;;
     *) echo "install.sh: unknown option $1" >&2; exit 2 ;;
   esac
 done
@@ -49,19 +51,30 @@ die() { echo "install.sh: $*" >&2; exit 1; }
 say() { echo "$*"; }
 # Runs a command, or only prints it with --dry-run.
 do_() { if [ "$dry" = 1 ]; then echo "would run: $*"; else "$@"; fi; }
-# Reports a finished step. With --dry-run the step did not happen.
-done_() { if [ "$dry" = 1 ]; then say "would install $1"; else say "installed $1"; fi; }
+# Reports a finished step: done_ <what> [install|restart]. With --dry-run the step did not happen.
+done_() { v=${2:-install}; if [ "$dry" = 1 ]; then say "would $v $1"; else say "${v}ed $1"; fi; }
 
 [ -d "$from" ] || die "no folder $from. Build first (cargo build --release) or pass --from."
 from=$(cd "$from" && pwd)
-case "$bin_dir" in /*) ;; *) die "--bin-dir must be an absolute path" ;; esac
-case "$bin_dir/" in
-  "$HOME"/*) ;;
-  *) die "--bin-dir $bin_dir is outside $HOME. This script changes nothing outside your home." ;;
+# With a trailing /, the pattern "$HOME"/* of guard_home_path matches no path.
+[ "$HOME" = / ] || HOME=${HOME%/}
+config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
+data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
+# Stops unless the path is absolute, inside $HOME and free of "..": guard_home_path <name> <path>.
+guard_home_path() {
+  case "$2" in /*) ;; *) die "$1 must be an absolute path" ;; esac
+  case "$2/" in "$HOME"/*) ;; *) die "$1 $2 is outside $HOME. This script changes nothing outside your home." ;; esac
+  case "$2" in *..*) die "$1 must not hold .." ;; esac
+}
+# All checks come before the first change, so a bad path changes nothing.
+guard_home_path --bin-dir "$bin_dir"
+guard_home_path XDG_CONFIG_HOME "$config_home"
+case "$data_root" in ""|/*) ;; *) die "--data-root must be an absolute path" ;; esac
+# render() puts these paths into sed commands, and the templates put them inside double quotes
+# (Exec of the desktop entry, ExecStart and Environment of the units).
+case "$bin_dir$HOME" in
+  *'|'*|*'&'*|*'\'*|*'"'*|*'`'*|*'$'*|*'%'*) die "a path holds |, &, a backslash, \", \`, \$ or %" ;;
 esac
-case "$bin_dir" in *..*) die "--bin-dir must not hold .." ;; esac
-# render() puts these paths into sed commands.
-case "$bin_dir$HOME" in *'|'*|*'&'*|*'\'*) die "a path holds |, & or a backslash" ;; esac
 
 for p in agentsi agentsi-core; do
   [ -x "$from/$p" ] || die "$from/$p is missing or not executable."
@@ -76,6 +89,13 @@ done
 if [ -x "$from/agentsi-pill" ]; then have_pill=1; fi
 have_app=0
 if [ -x "$from/agentsi-app" ]; then have_app=1; fi
+home_file="$config_home/agentsi/home"
+# The script writes under XDG_DATA_HOME only for the desktop entry and for the default data root.
+first_root=0
+if [ -z "${AGENTSI_HOME:-}" ] && [ ! -s "$home_file" ]; then first_root=1; fi
+if { [ "$have_app" = 1 ] && [ "$(uname -s)" = Linux ]; } || { [ "$first_root" = 1 ] && [ -z "$data_root" ]; }; then
+  guard_home_path XDG_DATA_HOME "$data_home"
+fi
 
 do_ mkdir -p "$bin_dir"
 for p in $programs; do
@@ -87,15 +107,12 @@ for p in $programs; do
 done
 
 # The data root of a first install: the home file names it, and it holds an empty registry.
-config_home="${XDG_CONFIG_HOME:-$HOME/.config}"
-home_file="$config_home/agentsi/home"
 if [ -n "${AGENTSI_HOME:-}" ]; then
   say "AGENTSI_HOME is set ($AGENTSI_HOME). The data root stays as it is."
-elif [ -s "$home_file" ]; then
+elif [ "$first_root" = 0 ]; then
   say "The data root stays as $home_file names it: $(head -1 "$home_file")"
 else
-  [ -n "$data_root" ] || data_root="${XDG_DATA_HOME:-$HOME/.local/share}/agentsi/data"
-  case "$data_root" in /*) ;; *) die "--data-root must be an absolute path" ;; esac
+  [ -n "$data_root" ] || data_root="$data_home/agentsi/data"
   do_ mkdir -p "$data_root" "$config_home/agentsi"
   [ "$dry" = 1 ] || printf '%s\n' "$data_root" > "$home_file"
   done_ "$home_file (data root $data_root)"
@@ -109,29 +126,28 @@ fi
 render() {
   sed -e "s|@BINDIR@|$bin_dir|g" -e "s|@HOME@|$HOME|g" "$1"
 }
+# Renders a template to a hidden name next to the target, then renames it onto the target.
+install_tpl() {
+  if [ "$dry" = 0 ]; then
+    render "$1" > "${2%/*}/.${2##*/}.new"
+    mv -f "${2%/*}/.${2##*/}.new" "$2"
+  fi
+  done_ "$2"
+}
 
 case "$(uname -s)" in
   Linux)
-    unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}"
-    case "$unit_dir/" in "$HOME"/*) ;; *) die "XDG_CONFIG_HOME is outside $HOME." ;; esac
-    case "$unit_dir" in *..*) die "XDG_CONFIG_HOME must not hold .." ;; esac
-    unit_dir="$unit_dir/systemd/user"
+    unit_dir="$config_home/systemd/user"
     do_ mkdir -p "$unit_dir"
-    [ "$dry" = 1 ] || { render "$here/systemd/agentsi-core.service" > "$unit_dir/.unit.new" && mv -f "$unit_dir/.unit.new" "$unit_dir/agentsi-core.service"; }
-    done_ "$unit_dir/agentsi-core.service"
+    install_tpl "$here/systemd/agentsi-core.service" "$unit_dir/agentsi-core.service"
     if [ "$have_pill" = 1 ]; then
-      [ "$dry" = 1 ] || { render "$here/systemd/agentsi-pill.service" > "$unit_dir/.unit.new" && mv -f "$unit_dir/.unit.new" "$unit_dir/agentsi-pill.service"; }
-      done_ "$unit_dir/agentsi-pill.service"
+      install_tpl "$here/systemd/agentsi-pill.service" "$unit_dir/agentsi-pill.service"
     fi
     if [ "$have_app" = 1 ]; then
-      data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
-      case "$data_home/" in "$HOME"/*) ;; *) die "XDG_DATA_HOME is outside $HOME." ;; esac
-      case "$data_home" in *..*) die "XDG_DATA_HOME must not hold .." ;; esac
       apps_dir="$data_home/applications"
       icon_dir="$data_home/icons/hicolor/scalable/apps"
       do_ mkdir -p "$apps_dir" "$icon_dir"
-      [ "$dry" = 1 ] || { render "$here/applications/agentsi.desktop" > "$apps_dir/.agentsi.desktop.new" && mv -f "$apps_dir/.agentsi.desktop.new" "$apps_dir/agentsi.desktop"; }
-      done_ "$apps_dir/agentsi.desktop"
+      install_tpl "$here/applications/agentsi.desktop" "$apps_dir/agentsi.desktop"
       do_ cp "$here/icons/agentsi.svg" "$icon_dir/agentsi.svg"
       done_ "$icon_dir/agentsi.svg"
       if command -v update-desktop-database >/dev/null 2>&1; then
@@ -139,29 +155,59 @@ case "$(uname -s)" in
       fi
     fi
     # A running service keeps the old program after the copy. The script restarts each active one.
-    active() { command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet "$1" 2>/dev/null; }
-    enabled() { command -v systemctl >/dev/null 2>&1 && systemctl --user is-enabled --quiet "$1" 2>/dev/null; }
+    # unit_is <active|enabled> <unit>
+    unit_is() { command -v systemctl >/dev/null 2>&1 && systemctl --user "is-$1" --quiet "$2" 2>/dev/null; }
+    # pids_of <name>: the pids of this user's processes with that name. Empty without pgrep.
+    pids_of() { if command -v pgrep >/dev/null 2>&1; then pgrep -u "$(id -u)" -x "$1" | tr '\n' ' ' | sed 's/ $//'; fi; }
     restart=""
-    active agentsi-core.service && restart="agentsi-core.service"
-    [ "$have_pill" = 1 ] && active agentsi-pill.service && restart="$restart agentsi-pill.service"
-    if [ "$enable" = 1 ] || [ -n "$restart" ]; then do_ systemctl --user daemon-reload; fi
+    # systemd keeps the unit it loaded. A reload makes the restart, or the printed command, use the new file.
+    reload=$enable
+    if unit_is active agentsi-core.service; then
+      reload=1
+      # The app has no reconnect: a core restart ends its link, its meetings and its terminals.
+      if [ -n "$(pids_of agentsi-app)" ]; then
+        say "agentsi-app is open, so the core keeps the old program. Close the app, then run: systemctl --user restart agentsi-core"
+      else
+        restart="agentsi-core.service"
+      fi
+    else
+      core_pids=$(pids_of agentsi-core)
+      if [ -n "$core_pids" ]; then
+        say "warning: agentsi-core runs outside systemd (pid $core_pids) and keeps the old program. Close the app if it is open, then run: kill $core_pids"
+      fi
+    fi
+    if [ "$have_pill" = 1 ] && unit_is active agentsi-pill.service; then
+      restart="$restart agentsi-pill.service"
+      reload=1
+    fi
+    if [ "$reload" = 1 ]; then do_ systemctl --user daemon-reload; fi
     for unit in $restart; do
       do_ systemctl --user restart "$unit"
-      if [ "$dry" = 1 ]; then say "would restart $unit"; else say "restarted $unit"; fi
+      if [ "$dry" = 1 ]; then done_ "$unit" restart; continue; fi
+      # A client can start its own core between the stop and the start. Then the unit exits with 3.
+      sleep 1
+      if unit_is active "$unit"; then
+        done_ "$unit" restart
+        continue
+      fi
+      say "warning: $unit is not active after the restart. See: systemctl --user status $unit"
+      if [ "$unit" = agentsi-core.service ]; then
+        other=$(pids_of agentsi-core)
+        [ -z "$other" ] || say "Another agentsi-core holds the socket (pid $other). It keeps the old program. Close the app if it is open, then run: kill $other"
+      fi
     done
     if [ "$enable" = 1 ]; then
       do_ systemctl --user enable --now agentsi-core.service
       if [ "$have_pill" = 1 ]; then do_ systemctl --user enable --now agentsi-pill.service; fi
     else
-      enabled agentsi-core.service || say "The core service is not enabled. To enable it: systemctl --user enable --now agentsi-core"
-      if [ "$have_pill" = 1 ] && ! enabled agentsi-pill.service; then say "The pill service is not enabled. It starts with the graphical session. To enable it: systemctl --user enable --now agentsi-pill"; fi
+      unit_is enabled agentsi-core.service || say "The core service is not enabled. To enable it: systemctl --user enable --now agentsi-core"
+      if [ "$have_pill" = 1 ] && ! unit_is enabled agentsi-pill.service; then say "The pill service is not enabled. It starts with the graphical session. To enable it: systemctl --user enable --now agentsi-pill"; fi
     fi
     ;;
   Darwin)
     agent_dir="$HOME/Library/LaunchAgents"
     do_ mkdir -p "$agent_dir" "$HOME/Library/Logs"
-    [ "$dry" = 1 ] || { render "$here/launchd/dev.agentsi.core.plist" > "$agent_dir/.agent.new" && mv -f "$agent_dir/.agent.new" "$agent_dir/dev.agentsi.core.plist"; }
-    done_ "$agent_dir/dev.agentsi.core.plist"
+    install_tpl "$here/launchd/dev.agentsi.core.plist" "$agent_dir/dev.agentsi.core.plist"
     if [ "$enable" = 1 ]; then
       do_ launchctl bootstrap "gui/$(id -u)" "$agent_dir/dev.agentsi.core.plist"
     else

@@ -386,3 +386,15 @@ _Avoid_: Right-click menu, popup, dropdown
 
 **Menu key**:
 Shift+F10 (the action "Context menu" in `keys.toml`) and the Menu key (fixed). In the sidebar they open the menu of the row under the cursor. Elsewhere they open the menu of the focused pane. A terminal program does not get these two keys.
+
+**Launcher**:
+The program of the desktop that lists the installed apps and starts them, for example Walker on Omarchy. It is not part of AgentSI.
+_Avoid_: App launcher, app menu, start menu
+
+**Desktop entry**:
+The file `agentsi.desktop` that `install.sh` writes to `${XDG_DATA_HOME:-~/.local/share}/applications/`. It makes the launcher list the app.
+_Avoid_: Launcher entry, shortcut, .desktop file
+
+**App icon**:
+The file `agentsi.svg` that `install.sh` writes to the `hicolor` icon theme of the owner. The launcher and the sidebar header show it.
+_Avoid_: Logo, icon (alone)

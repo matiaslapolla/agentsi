@@ -198,12 +198,14 @@ Code, comments, commit messages and docs are in English. The web UI is in Spanis
 
 ## The guide
 
-`docs/guide/README.md` is the guide of the desktop app. It is one hand-written Markdown page, in English. GitHub renders it, and the app draws it on the Guide screen. The program embeds the page and the PNG files of `docs/guide/img/` at compile time. The app opens the Guide screen from the palette and from the Settings screen.
+`docs/guide/README.md` is the guide of the desktop app. It is one hand-written Markdown page, in English. GitHub renders it, and the app draws it on the Guide screen. The program embeds the page and the PNG files that the list `IMAGES` of `crates/agentsi-app/src/guide.rs` names, at compile time. The app opens the Guide screen from the palette and from the Settings screen.
 
 - Edit the page by hand. Write a key as an inline code span, for example `Ctrl+K`. Draw a diagram as numbered steps, because the Guide screen shows no HTML and no SVG.
 - Do not number a heading. The heading gives the anchor of its section, as on GitHub.
 - Each link and image must resolve to a file in the repo, a heading of the page or an embedded image. `cargo test -p agentsi-app guide` checks it.
 - A screenshot is `![alt text](img/<name>.png)`. `scripts/guide-shots.sh` takes `docs/guide/img/<name>.png` in a nested Hyprland, on synthetic data from `scripts/guide-shots/seed.sql`. It never touches your data or your session. A new image also goes into the list `IMAGES` of `crates/agentsi-app/src/guide.rs`.
+- `docs/guide/img/` also holds the shots of the root `README.md`. They are not in `IMAGES`, because the Guide screen does not show them.
+- `docs/guide/img-unused/` holds shots that no page shows. Move a shot there when you remove it from a page.
 
 ## License
 

@@ -60,7 +60,7 @@ fn the_switch_over_hooks_keep_each_bridge_event_of_the_plugin() {
 #[test]
 fn the_unit_and_the_agent_start_the_core_in_the_foreground() {
     let unit = packaging("systemd/agentsi-core.service");
-    assert!(unit.contains("ExecStart=@BINDIR@/agentsi-core serve\n"));
+    assert!(unit.contains("ExecStart=\"@BINDIR@/agentsi-core\" serve\n"));
     assert!(!unit.contains("--detach"));
     assert!(unit.contains("WantedBy=default.target"));
     let plist = packaging("launchd/dev.agentsi.core.plist");
@@ -72,7 +72,7 @@ fn the_unit_and_the_agent_start_the_core_in_the_foreground() {
 #[test]
 fn the_pill_unit_starts_the_pill_with_the_graphical_session_after_the_core() {
     let unit = packaging("systemd/agentsi-pill.service");
-    assert!(unit.contains("ExecStart=@BINDIR@/agentsi-pill\n"));
+    assert!(unit.contains("ExecStart=\"@BINDIR@/agentsi-pill\"\n"));
     assert!(unit.contains("WantedBy=graphical-session.target\n"));
     assert!(unit.contains("PartOf=graphical-session.target\n"));
     assert!(unit.contains("Wants=agentsi-core.service\n"));
