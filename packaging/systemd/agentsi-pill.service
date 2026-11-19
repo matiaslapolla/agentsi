@@ -11,7 +11,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=@BINDIR@/agentsi-pill
+ExecStart="@BINDIR@/agentsi-pill"
 Restart=on-failure
 RestartSec=2
 

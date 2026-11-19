@@ -20,6 +20,23 @@ cat /tmp/err
 grep -q "outside" /tmp/err || fail "no reason given"
 if sh "$pkg/install.sh" --from /in --bin-dir "$HOME/../root/bin" 2>/tmp/err; then fail "accepted .."; fi
 
+echo "== an XDG_DATA_HOME outside the home or relative is refused before any change"
+for d in /tmp/outside-data rel/data; do
+  if XDG_DATA_HOME="$d" sh "$pkg/install.sh" --from /in 2>/tmp/err; then fail "accepted XDG_DATA_HOME=$d"; fi
+  cat /tmp/err
+  grep -q "XDG_DATA_HOME" /tmp/err || fail "no reason given for XDG_DATA_HOME=$d"
+  [ ! -e "$HOME/.local/bin" ] || fail "XDG_DATA_HOME=$d: the bin dir changed before the check"
+  [ ! -e "$HOME/.config/systemd" ] || fail "XDG_DATA_HOME=$d: the unit folder changed before the check"
+  [ ! -e "$d" ] || fail "XDG_DATA_HOME=$d was written"
+done
+
+echo "== a path with % or \$ is refused before any change"
+for d in "$HOME/b%fin" "$HOME/b\$x"; do
+  if sh "$pkg/install.sh" --from /in --bin-dir "$d" 2>/tmp/err; then fail "accepted --bin-dir $d"; fi
+  cat /tmp/err
+  [ ! -e "$d" ] || fail "--bin-dir $d was made"
+done
+
 echo "== missing required program is refused"
 mkdir /tmp/empty
 if sh "$pkg/install.sh" --from /tmp/empty 2>/tmp/err; then fail "accepted an empty folder"; fi
@@ -34,7 +51,7 @@ for p in agentsi agentsi-core; do [ -x "$HOME/.local/bin/$p" ] || fail "$p not i
 "$HOME/.local/bin/agentsi" help | head -3
 unit="$HOME/.config/systemd/user/agentsi-core.service"
 [ -f "$unit" ] || fail "no unit"
-grep -q "^ExecStart=$HOME/.local/bin/agentsi-core serve$" "$unit" || fail "ExecStart not rendered"
+grep -q "^ExecStart=\"$HOME/.local/bin/agentsi-core\" serve$" "$unit" || fail "ExecStart not rendered"
 if grep -q "@" "$unit"; then fail "a placeholder is left in the unit"; fi
 [ ! -e "$HOME/.config/systemd/user/default.target.wants/agentsi-core.service" ] || fail "enabled without --enable"
 [ ! -e "$HOME/.config/systemd/user/agentsi-pill.service" ] || fail "a pill unit without the pill program"
@@ -52,13 +69,13 @@ ls "$HOME/bin2"
 sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2"
 pill="$HOME/.config/systemd/user/agentsi-pill.service"
 [ -f "$pill" ] || fail "no pill unit"
-grep -q "^ExecStart=$HOME/bin2/agentsi-pill$" "$pill" || fail "pill ExecStart not rendered"
+grep -q "^ExecStart=\"$HOME/bin2/agentsi-pill\"$" "$pill" || fail "pill ExecStart not rendered"
 if grep -q "@" "$pill"; then fail "a placeholder is left in the pill unit"; fi
 grep -q "^WantedBy=graphical-session.target$" "$pill" || fail "the pill does not start with the graphical session"
 [ ! -e "$HOME/.config/systemd/user/graphical-session.target.wants/agentsi-pill.service" ] || fail "pill enabled without --enable"
 entry="$apps/agentsi.desktop"
 [ -f "$entry" ] || fail "no desktop entry"
-grep -q "^Exec=$HOME/bin2/agentsi-app$" "$entry" || fail "Exec not rendered"
+grep -q "^Exec=\"$HOME/bin2/agentsi-app\"$" "$entry" || fail "Exec not rendered"
 grep -q "^Icon=agentsi$" "$entry" || fail "no Icon line"
 grep -q "^StartupWMClass=agentsi-app$" "$entry" || fail "StartupWMClass is not the app id"
 if grep -q "@" "$entry"; then fail "a placeholder is left in the desktop entry"; fi
@@ -75,6 +92,18 @@ grep -q "agentsi.svg" /tmp/out || fail "the dry run does not name the icon"
 [ ! -e "$entry" ] || fail "dry run wrote the desktop entry"
 [ ! -e "$icon" ] || fail "dry run wrote the icon"
 sh "$pkg/install.sh" --from /tmp/four --bin-dir "$HOME/bin2"
+
+echo "== a bin dir with a space gives one Exec and one ExecStart argument"
+sp="$HOME/my bin"
+sh "$pkg/install.sh" --from /tmp/four --bin-dir "$sp" >/dev/null
+grep -q "^Exec=\"$sp/agentsi-app\"$" "$entry" || fail "Exec with a space not quoted"
+grep -q "^ExecStart=\"$sp/agentsi-core\" serve$" "$unit" || fail "core ExecStart with a space not quoted"
+grep -q "^ExecStart=\"$sp/agentsi-pill\"$" "$pill" || fail "pill ExecStart with a space not quoted"
+grep -q "^Environment=\"PATH=$sp:" "$unit" || fail "PATH with a space not quoted"
+if command -v desktop-file-validate >/dev/null 2>&1; then desktop-file-validate "$entry" || fail "the desktop entry with a space is not valid"; fi
+# test-install-container.sh verifies these copies as root.
+mkdir -p /tmp/space-units
+cp "$unit" "$pill" /tmp/space-units/
 
 echo "== --enable without a user manager fails loudly, not silently"
 if sh "$pkg/install.sh" --from /in --enable >/tmp/out 2>&1; then

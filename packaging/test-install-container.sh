@@ -27,7 +27,8 @@ su tester -c "sh /tmp/pkg/test-inside.sh /tmp/pkg"
 echo "== the units are valid (systemd-analyze verify, as root: it cannot start a user manager here)"
 systemd-analyze verify /home/tester/.config/systemd/user/agentsi-core.service
 systemd-analyze verify /home/tester/.config/systemd/user/agentsi-pill.service
-echo "systemd-analyze verify: ok"
+for u in /tmp/space-units/*.service; do systemd-analyze verify "$u"; done
+echo "systemd-analyze verify: ok (also with a space in the bin dir)"
 printf "[Service]\\nExecStart=/nonexistent/x\\nBogusKey=1\\n" > /tmp/bad.service
 if systemd-analyze verify /tmp/bad.service >/dev/null 2>&1; then echo "FAIL: verify accepts a broken unit"; exit 1; fi
 echo "a broken unit is rejected: ok"
