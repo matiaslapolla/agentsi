@@ -82,7 +82,7 @@ async fn draft(_: Ctx, p: SetupDraftParams) -> Result<SetupDraftResult, RpcError
         let call = setup::draft_call(&dir, prompt);
         let ran = run_call(&call, "setup");
         let seconds = started.elapsed().as_secs_f64();
-        let (output, usage) = match ran {
+        let (mut output, usage) = match ran {
             Ok(done) => done,
             Err(error) => {
                 log(
@@ -95,6 +95,7 @@ async fn draft(_: Ctx, p: SetupDraftParams) -> Result<SetupDraftResult, RpcError
                 return Err(RpcError::internal(error));
             }
         };
+        setup::normalize_source_kinds(&mut output["fields"]);
         let no_data: Vec<String> = output["no_data"]
             .as_array()
             .map(|a| {

@@ -352,7 +352,32 @@ leave it empty and put its path in no_data, for example \"product.audience\" or 
 dev, qa and scout. pm is always in the roster. Propose a specialist only for an area of the \
 code that the files show. Leave models empty: the global roles set them. Turn stories on only \
 when the files show a test runner and a gate that need no database and no network. A test \
-command must contain {files}.";
+command must contain {files}. The kind of a source of truth is one of issues, analytics, docs \
+and other.";
+
+/// The kinds of a source of truth that the setup form accepts.
+const SOURCE_KINDS: [&str; 4] = ["issues", "analytics", "docs", "other"];
+
+/// Maps the kind of each source of truth of a draft to one that the form accepts: `file` and
+/// `doc` to `docs`, each other unknown kind to `other`.
+pub fn normalize_source_kinds(fields: &mut Value) {
+    let Some(sources) = fields["objectives"]["sources_of_truth"].as_array_mut() else {
+        return;
+    };
+    for source in sources {
+        let kind = source["kind"]
+            .as_str()
+            .unwrap_or_default()
+            .trim()
+            .to_lowercase();
+        let kind = match kind.as_str() {
+            "file" | "doc" => "docs",
+            k if SOURCE_KINDS.contains(&k) => k,
+            _ => "other",
+        };
+        source["kind"] = json!(kind);
+    }
+}
 
 /// The prompt of a draft. `previous` and `failures` ask for a repair of an earlier draft.
 pub fn draft_prompt(
@@ -490,6 +515,26 @@ mod tests {
         assert_eq!(c.bytes, MAX_BYTES);
         assert_eq!(c.files, ["README.md", "package.json", "docs/product.md"]);
         assert!(c.text.contains("## git log --oneline -30"));
+    }
+
+    #[test]
+    fn a_source_of_kind_file_becomes_docs_and_an_unknown_kind_becomes_other() {
+        let mut fields = json!({"objectives": {"sources_of_truth": [
+            {"kind": "file", "ref": "docs/", "note": ""},
+            {"kind": "Doc", "ref": "a", "note": ""},
+            {"kind": "issues", "ref": "gh", "note": ""},
+            {"kind": "wiki", "ref": "w", "note": ""},
+            {"ref": "no kind", "note": ""}]}});
+        normalize_source_kinds(&mut fields);
+        let kinds: Vec<_> = fields["objectives"]["sources_of_truth"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["kind"].as_str().unwrap())
+            .collect();
+        assert_eq!(kinds, ["docs", "docs", "issues", "other", "other"]);
+        normalize_source_kinds(&mut json!({}));
+        assert!(SYSTEM.contains("issues, analytics, docs and other"));
     }
 
     #[test]
