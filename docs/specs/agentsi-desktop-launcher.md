@@ -25,7 +25,7 @@ The app has no app icon. The sidebar header shows only the word "AgentSI".
 ## Design
 
 - `packaging/icons/agentsi.svg` is the app icon, the owner's `layer-cube.svg`. The app embeds the same file with `include_bytes!`.
-- `packaging/applications/agentsi.desktop` is a template. `Exec=@BINDIR@/agentsi-app`, `Icon=agentsi`, `StartupWMClass=agentsi-app` (the `app_id` of the window).
+- `packaging/applications/agentsi.desktop` is a template. `Exec="@BINDIR@/agentsi-app"`, `Icon=agentsi`, `StartupWMClass=agentsi-app` (the `app_id` of the window).
 - On Linux, `install.sh` writes the desktop entry to `${XDG_DATA_HOME:-~/.local/share}/applications/agentsi.desktop` and the app icon to `.../icons/hicolor/scalable/apps/agentsi.svg`. It does this only when `agentsi-app` is installed. It runs `update-desktop-database` when the program exists.
 - After the copy, `install.sh` restarts each of `agentsi-core` and `agentsi-pill` that is active. `--enable` keeps `enable --now`. `--dry-run` prints the restart.
 - `scripts/dist.sh` copies `applications/` and `icons/` into the tarball next to `systemd/`.

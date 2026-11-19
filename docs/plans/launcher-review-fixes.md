@@ -38,7 +38,7 @@ Spec: `docs/specs/launcher-review-fixes.md`. One commit for each unit, in this o
   1. Skip the core restart while the app is open.
   2. Check `is-active` after each restart.
   3. Name a core that runs outside systemd.
-  4. Test each case with a fake `systemctl` and a fake `pgrep`.
+  4. Test each case with a fake `systemctl` and a fake `pgrep`, also the case "unit already enabled".
 - **Check:** the container test passes with the restart cases.
 
 ## U6 — Test image with desktop-file-utils
@@ -49,4 +49,11 @@ Spec: `docs/specs/launcher-review-fixes.md`. One commit for each unit, in this o
   3. Fail in `test-inside.sh` when `desktop-file-validate` is missing.
 - **Check:** `packaging/test-install-container.sh <portable bin dir>` passes on this aarch64 machine.
 
-The case "unit already enabled" needs a fake `systemctl` too, because the container has no user manager.
+## U7 — Second review round
+- **Files:** `packaging/install.sh`, `packaging/test-inside.sh`, `packaging/test-image/Dockerfile`, `scripts/dist.sh`, the two specs
+- **Steps:**
+  1. Run `daemon-reload` also when the core restart is skipped.
+  2. Check `XDG_DATA_HOME` only when the script writes there, and check `--data-root` before the copy.
+  3. Give the pill its own warning after a failed restart.
+  4. Copy only tracked files in `dist.sh`, and use `pacman -Syu` in the test image.
+- **Check:** the container test passes with the new cases.

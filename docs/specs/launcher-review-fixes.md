@@ -4,9 +4,7 @@
 
 ## Problem
 
-The review of the desktop entry work found five bugs in `packaging/install.sh`. A bad `XDG_DATA_HOME` stops the script after the copy, so the services keep the old programs. A second install restarts the core under an open app, and a path with a space breaks the `Exec` line.
-
-The docs use three names for the desktop entry, and `CONTEXT.md` defines none of them. The rules of the guide in `CONTRIBUTING.md` are out of date.
+The review of the desktop entry work found five bugs in `packaging/install.sh`, for example a stop after the copy and a core restart under an open app. A path with a space breaks the `Exec` line. The docs use three names for the desktop entry, and the guide rules in `CONTRIBUTING.md` are out of date.
 
 ## Goal
 
@@ -33,8 +31,9 @@ The docs use three names for the desktop entry, and `CONTEXT.md` defines none of
 ### Path checks (bug B1)
 
 - One function `guard_home_path <name> <path>` checks that a path is absolute, inside `$HOME` and free of `..`.
-- The script runs it on the bin dir, `XDG_CONFIG_HOME` and `XDG_DATA_HOME` before the copy. A relative `XDG_*` value now stops the script.
-- The script computes `config_home` and `data_home` one time, at the top.
+- The script runs it on the bin dir and `XDG_CONFIG_HOME` before the copy. It runs it on `XDG_DATA_HOME` only when the script writes there: for the desktop entry, or for the default data root. A relative `XDG_*` value that the script uses now stops it.
+- A relative `--data-root` stops the script before the copy too.
+- The script removes a trailing `/` from `$HOME`, and it computes `config_home` and `data_home` one time, at the top.
 - The script refuses `"`, a backtick, `$`, `%` and a backslash in the bin dir and in `$HOME`, in addition to `|` and `&`.
 
 ### Quoting (bug B3)
@@ -47,7 +46,8 @@ The docs use three names for the desktop entry, and `CONTEXT.md` defines none of
 
 - An app is open when `pgrep -u <uid> -x agentsi-app` finds a process. Without `pgrep`, the script treats the app as closed.
 - When the core service is active and the app is open, the script does not restart the core. It prints the restart command for after the app closes. The pill restarts as before.
-- After each restart, the script waits 1 s and checks `is-active`. It prints "restarted <unit>" only when the unit is active. Otherwise it prints that another core holds the socket.
+- The script runs `daemon-reload` when a service is active or with `--enable`, also when it skips the core restart. Then the printed command starts the new unit.
+- After each restart, the script waits 1 s and checks `is-active`. It prints "restarted <unit>" only when the unit is active. Otherwise it prints a warning. For the core, the warning names each other `agentsi-core` that runs.
 - When the core service is not active and a process `agentsi-core` runs, the script prints that this core keeps the old program, with its pid and `kill <pid>`.
 - Without `--enable`, the script prints the enable command only for a unit that is not enabled.
 
@@ -55,7 +55,8 @@ The docs use three names for the desktop entry, and `CONTEXT.md` defines none of
 
 - `install_tpl <template> <target>` renders a template to a temp name and renames it. It replaces the four copies of that step.
 - `done_ <path> [verb]` also prints "restarted". `unit_is <active|enabled> <unit>` replaces `active()` and `enabled()`.
-- `scripts/dist.sh` copies each folder of one list `assets="systemd applications icons"`.
+- `scripts/dist.sh` copies the tracked files of each folder of one list `assets="systemd applications icons"`.
+- `--help` prints the header up to the line `set -eu`, with no fixed line numbers.
 
 ### Tests
 
@@ -74,7 +75,8 @@ The docs use three names for the desktop entry, and `CONTEXT.md` defines none of
 - [ ] With `XDG_DATA_HOME` outside `$HOME`, `install.sh` exits 1 and the bin dir and the unit folder are unchanged.
 - [ ] `install.sh --bin-dir "$HOME/my bin"` writes an entry that `desktop-file-validate` accepts, with `Exec="$HOME/my bin/agentsi-app"`.
 - [ ] A bin dir with `%` or `$` is refused before any change.
-- [ ] With the core service active and the app open, `install.sh` does not call `systemctl --user restart agentsi-core.service` and prints the command.
+- [ ] With the core service active and the app open, `install.sh` does not call `systemctl --user restart agentsi-core.service`, calls `daemon-reload` and prints the command.
+- [ ] A headless install with `XDG_DATA_HOME` outside `$HOME` and an existing home file goes on.
 - [ ] With the core service active and the app closed, `install.sh` restarts it and prints "restarted agentsi-core.service".
 - [ ] When the unit is not active after the restart, `install.sh` does not print "restarted" for it.
 - [ ] With the core service inactive and a process `agentsi-core` running, `install.sh` prints its pid.
