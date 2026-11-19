@@ -198,11 +198,13 @@ pub fn add_product(text: &str, product: &Value) -> Result<String, String> {
         t.starts_with("{ \"id\":")
     };
     let Some(last) = lines.iter().rposition(starts_product) else {
-        if !products_mut(&mut doc)?.is_empty() {
+        let products = products_mut(&mut doc)?;
+        if !products.is_empty() {
             return Err("Registry has no one-line products to append to.".into());
         }
         // The empty registry of a first install: no line to keep, so the file is written again.
-        products_mut(&mut doc)?.push(product.clone());
+        products.push(product.clone());
+        let doc = canon(&doc);
         return checked(one_product_per_line(&doc), &doc);
     };
     let indent: String = lines[last]
@@ -217,22 +219,21 @@ pub fn add_product(text: &str, product: &Value) -> Result<String, String> {
 
 /// The registry with each top-level key on one line, and each product on its own line.
 fn one_product_per_line(doc: &Value) -> String {
-    let Some(map) = doc.as_object() else {
-        return one_line(doc);
-    };
-    let entries: Vec<String> = map
-        .iter()
+    let entries: Vec<String> = doc
+        .as_object()
+        .into_iter()
+        .flatten()
         .map(|(key, value)| {
-            let key = Value::String(key.clone());
-            match (key.as_str(), value.as_array()) {
-                (Some("products"), Some(products)) => {
+            let quoted = Value::String(key.clone());
+            match value.as_array().filter(|_| key == "products") {
+                Some(products) => {
                     let lines: Vec<String> = products
                         .iter()
                         .map(|p| format!("    {}", one_line(p)))
                         .collect();
-                    format!("  {key}: [\n{}\n  ]", lines.join(",\n"))
+                    format!("  {quoted}: [\n{}\n  ]", lines.join(",\n"))
                 }
-                _ => format!("  {key}: {}", one_line(value)),
+                None => format!("  {quoted}: {}", one_line(value)),
             }
         })
         .collect();
@@ -289,8 +290,16 @@ mod tests {
             parse(&two).unwrap()["products"].as_array().unwrap().len(),
             2
         );
-        let pretty_empty = "{\n  \"owner\": { \"name\": \"Ada\" },\n  \"products\": []\n}\n";
-        assert!(add_product(pretty_empty, &product).is_ok());
+    }
+
+    #[test]
+    fn the_first_product_goes_into_an_empty_registry_on_several_lines_with_a_whole_float() {
+        let product =
+            json!({"id": "a", "name": "A", "paths": ["/x/a"], "status": "active", "roles": ["pm"]});
+        let registry = "{\n  \"owner\": { \"name\": \"Ada\" },\n  \"threshold\": 2.0,\n  \"products\": []\n}\n";
+        let out = add_product(registry, &product).unwrap();
+        assert!(out.contains("\n  \"threshold\": 2,\n"), "{out}");
+        assert!(out.contains("\n    { \"id\": \"a\""), "{out}");
     }
 
     #[test]

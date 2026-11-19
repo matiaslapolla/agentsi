@@ -77,6 +77,7 @@ async fn desk(ctx: Ctx, p: ProductDeskParams) -> Result<DeskResult, RpcError> {
         store.read(|c| desk_data::desk(c, &product, registry.as_deref()))
     })
     .await?
+    // No database file yet: no product has rows, so the answer is the same as an unknown id.
     .flatten();
     found.ok_or_else(|| {
         RpcError::new(

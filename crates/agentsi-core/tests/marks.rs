@@ -164,10 +164,8 @@ fn a_data_root_without_a_database_gets_one_on_first_use() {
     std::fs::write(home.join("agentsi.config.json"), REGISTRY).unwrap();
     let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", home.as_path())]);
     let mut c = Framed::connect(&core.socket.path);
-    let r = c.call("mark.set", json!({"entries": []}));
-    assert_ne!(kind(&r), "unavailable", "{r}");
-    let r = c.call("mark.pending", json!({"product": "alpha"}));
-    assert_ne!(kind(&r), "unavailable", "{r}");
+    assert_eq!(c.ok("mark.set", json!({"entries": []}))["marked"], 0);
+    c.ok("mark.pending", json!({"product": "alpha"}));
     assert!(home.join("agentsi.db").exists());
 }
 
@@ -234,6 +232,18 @@ fn decision_archived_lists_the_archived_decisions_and_a_restore_removes_one() {
 }
 
 #[test]
+fn a_folder_with_no_registry_gets_no_database() {
+    let dir = TempDir::new();
+    let home = dir.0.join("not-a-root");
+    std::fs::create_dir_all(&home).unwrap();
+    let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", home.as_path())]);
+    let mut c = Framed::connect(&core.socket.path);
+    let r = c.call("mark.set", json!({"entries": []}));
+    assert!(r["error"].is_object(), "{r}");
+    assert!(!home.join("agentsi.db").exists());
+}
+
+#[test]
 fn decision_archived_without_a_database_gets_one_on_first_use() {
     let dir = TempDir::new();
     let home = dir.0.join("root");
@@ -241,7 +251,6 @@ fn decision_archived_without_a_database_gets_one_on_first_use() {
     std::fs::write(home.join("agentsi.config.json"), REGISTRY).unwrap();
     let core = CoreProc::start_with(&dir, &[("AGENTSI_HOME", home.as_path())]);
     let mut c = Framed::connect(&core.socket.path);
-    let r = c.call("decision.archived", json!({"product": "alpha"}));
-    assert_ne!(kind(&r), "unavailable", "{r}");
+    c.ok("decision.archived", json!({"product": "alpha"}));
     assert!(home.join("agentsi.db").exists());
 }
