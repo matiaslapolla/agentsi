@@ -516,6 +516,36 @@ impl Fields {
         f
     }
 
+    /// Takes each value that the draft left empty from `current`: the text fields, the stage,
+    /// the lists of the brief, the test command and the gate. The roster and the models stay as
+    /// drafted, because an empty one is an answer.
+    pub fn keep_empty_from(&mut self, current: &Fields) {
+        fn keep(text: &mut String, old: &str) {
+            if text.trim().is_empty() {
+                *text = old.to_string();
+            }
+        }
+        fn keep_list<T: Clone>(list: &mut Vec<T>, old: &[T], empty: bool) {
+            if empty {
+                *list = old.to_vec();
+            }
+        }
+        keep(&mut self.what, &current.what);
+        keep(&mut self.audience, &current.audience);
+        keep(&mut self.stage, &current.stage);
+        keep(&mut self.stories.test, &current.stories.test);
+        let empty = clean(&self.out_of_scope).is_empty();
+        keep_list(&mut self.out_of_scope, &current.out_of_scope, empty);
+        let empty = clean(&self.north_stars).is_empty();
+        keep_list(&mut self.north_stars, &current.north_stars, empty);
+        let empty = clean(&self.stories.gate).is_empty();
+        keep_list(&mut self.stories.gate, &current.stories.gate, empty);
+        let empty = self.filled_objectives().is_empty();
+        keep_list(&mut self.objectives, &current.objectives, empty);
+        let empty = self.sources.is_empty();
+        keep_list(&mut self.sources, &current.sources, empty);
+    }
+
     /// The same fields in the shape of a `setup.draft` result, for a repair call.
     pub fn to_draft(&self) -> Value {
         json!({
@@ -834,6 +864,32 @@ mod tests {
         assert_eq!(back["roster"]["specialists"][0]["role"], "dev");
         assert_eq!(back["stories"]["test"], "pnpm test {files}");
         assert_eq!(back["objectives"]["objectives"][0]["due"], "2026-12-31");
+    }
+
+    #[test]
+    fn a_draft_with_no_stage_keeps_the_stage_and_the_other_empty_fields_of_the_form() {
+        let mut drafted = Fields::from_draft(&draft());
+        drafted.stage.clear();
+        drafted.audience.clear();
+        drafted.objectives.clear();
+        drafted.sources.clear();
+        let current = Fields {
+            stage: "launched".into(),
+            audience: "Small teams".into(),
+            what: "Old text".into(),
+            objectives: vec![Objective {
+                text: "Grow".into(),
+                signal: "100 users".into(),
+                due: "2027-01-31".into(),
+            }],
+            ..Fields::default()
+        };
+        drafted.keep_empty_from(&current);
+        assert_eq!(drafted.stage, "launched");
+        assert_eq!(drafted.audience, "Small teams");
+        assert_eq!(drafted.objectives, current.objectives);
+        assert_eq!(drafted.what, "A mail filter", "a drafted value wins");
+        assert!(drafted.sources.is_empty());
     }
 
     #[test]

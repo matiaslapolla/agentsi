@@ -764,11 +764,11 @@ impl SetupScreen {
         };
         let current = self.read_fields(cx);
         let mut f = Fields::from_draft(&d.fields);
-        f.id = current.id;
-        f.name = current.name;
-        f.paths = current.paths;
-        f.stories.repo = current.stories.repo;
-        f.stories.budget = current.stories.budget;
+        f.id = current.id.clone();
+        f.name = current.name.clone();
+        f.paths = current.paths.clone();
+        f.stories.repo = current.stories.repo.clone();
+        f.stories.budget = current.stories.budget.clone();
         for id in f.roster() {
             if f.why.get(&id).is_none_or(|w| w.trim().is_empty())
                 && let Some((_, w)) = DEFAULT_WHY.iter().find(|(k, _)| *k == id)
@@ -789,6 +789,7 @@ impl SetupScreen {
             no_data: d.no_data,
             fields: f.clone(),
         });
+        f.keep_empty_from(&current);
         self.draft.failures.clear();
         self.problems.clear();
         self.message = None;
@@ -2007,6 +2008,24 @@ mod tests {
             }
         }))
         .unwrap()
+    }
+
+    #[gpui::test]
+    fn a_draft_with_no_stage_keeps_the_stage_chip_of_the_owner(cx: &mut TestAppContext) {
+        cx.update(agentsi_ui::init);
+        let (end, _other) = UnixStream::pair().unwrap();
+        let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
+        let (screen, cx) = cx.add_window_view(|_, cx| SetupScreen::new(String::new(), core, cx));
+        screen.update(cx, |s, cx| s.scanned(Ok(scan(None)), cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        screen.update(cx, |s, _| s.stage = "launched".into());
+        let mut result = drafted_result();
+        result.fields["product"]["stage"] = json!("");
+        screen.update(cx, |s, cx| s.drafted(Ok(result), cx));
+        cx.update(|w, cx| w.draw(cx).clear(cx));
+        let f = screen.read_with(cx, |s, cx| s.read_fields(cx));
+        assert_eq!(f.stage, "launched");
+        assert_eq!(f.what, "A mail filter", "a drafted value still fills");
     }
 
     #[gpui::test]
