@@ -4,6 +4,7 @@
 set -eu
 pkg=${1:?usage: test-inside.sh <packaging dir>}
 fail() { echo "FAIL: $*" >&2; exit 1; }
+command -v desktop-file-validate >/dev/null 2>&1 || fail "desktop-file-validate is missing. Use the image of packaging/test-image."
 
 echo "== dry run changes nothing"
 sh "$pkg/install.sh" --from /in --dry-run
@@ -79,7 +80,8 @@ grep -q "^Exec=\"$HOME/bin2/agentsi-app\"$" "$entry" || fail "Exec not rendered"
 grep -q "^Icon=agentsi$" "$entry" || fail "no Icon line"
 grep -q "^StartupWMClass=agentsi-app$" "$entry" || fail "StartupWMClass is not the app id"
 if grep -q "@" "$entry"; then fail "a placeholder is left in the desktop entry"; fi
-if command -v desktop-file-validate >/dev/null 2>&1; then desktop-file-validate "$entry" || fail "the desktop entry is not valid"; fi
+desktop-file-validate "$entry" || fail "the desktop entry is not valid"
+echo "desktop-file-validate: ok"
 cmp -s "$icon" "$pkg/icons/agentsi.svg" || fail "the icon is not the packaged icon"
 echo "== a dry run with the pill writes no unit"
 rm "$pill"
@@ -100,7 +102,8 @@ grep -q "^Exec=\"$sp/agentsi-app\"$" "$entry" || fail "Exec with a space not quo
 grep -q "^ExecStart=\"$sp/agentsi-core\" serve$" "$unit" || fail "core ExecStart with a space not quoted"
 grep -q "^ExecStart=\"$sp/agentsi-pill\"$" "$pill" || fail "pill ExecStart with a space not quoted"
 grep -q "^Environment=\"PATH=$sp:" "$unit" || fail "PATH with a space not quoted"
-if command -v desktop-file-validate >/dev/null 2>&1; then desktop-file-validate "$entry" || fail "the desktop entry with a space is not valid"; fi
+desktop-file-validate "$entry" || fail "the desktop entry with a space is not valid"
+echo "desktop-file-validate with a space: ok"
 # test-install-container.sh verifies these copies as root.
 mkdir -p /tmp/space-units
 cp "$unit" "$pill" /tmp/space-units/
