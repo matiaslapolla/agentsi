@@ -9,6 +9,7 @@ mod actor;
 use crate::state::{Core, lock};
 use agentsi_agency::desk::args::{DeskCall, DeskContext, desk_args, owner_text, system_prompt};
 use agentsi_agency::desk::auth::{self, AUTH_TIMEOUT, Auth};
+use agentsi_agency::prompt_inputs::brief_xml;
 use agentsi_agency::registry::Registry;
 use agentsi_agency::roles::files::RoleFiles;
 use agentsi_agency::roles::load::load_role;
@@ -334,10 +335,11 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     })?;
     let store = open_store(core)?;
     let id = p.id.clone();
-    let overlays = store
+    let (overlays, brief) = store
         .read(move |c| {
-            agentsi_agency::roster::read_overlays(c, &id)
-                .map_err(|e| agentsi_store::Error::Other(e.to_string()))
+            let overlays = agentsi_agency::roster::read_overlays(c, &id)
+                .map_err(|e| agentsi_store::Error::Other(e.to_string()))?;
+            Ok((overlays, agentsi_store::read::brief(c, &id)?))
         })
         .map_err(rpc_store)?;
     let root = agentsi_store::paths::data_root(None).map_err(rpc_store)?;
@@ -357,6 +359,7 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
             owner: &registry.owner.name,
             language: &registry.owner.language,
             cwd: &cwd_text,
+            brief: &brief.as_ref().map(brief_xml).unwrap_or_default(),
         },
     );
     Ok(Plan {

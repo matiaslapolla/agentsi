@@ -63,7 +63,9 @@ fn setup(dir: &TempDir, auth: &str) -> World {
             '{\"id\":\"m1\",\"question\":\"What now?\",\"priorities\":[{\"title\":\"P0\",\"why\":\"w\",\"sources\":[]}]}'),
            ('mb', 'beta', 'Other?', 'valid', '2026-11-02T10:00:00.000Z', '{\"id\":\"mb\"}');
          insert into priorities (minutes_id, idx, title, why) values ('m1', 0, 'P0', 'w');
-         insert into stories (product, id, data) values ('alpha', 'S001', '{\"id\":\"S001\"}');",
+         insert into stories (product, id, data) values ('alpha', 'S001', '{\"id\":\"S001\"}');
+         insert into briefs (product, data) values ('alpha',
+           '{\"product\":{\"what\":\"A desk\",\"audience\":\"Owners\",\"stage\":\"building\"},\"objectives\":[{\"id\":\"o1\",\"text\":\"Reach ten owners\",\"signal\":\"sign-ups\",\"due\":\"2026-12-31\"}]}');",
     )
     .unwrap();
     let fake = bin.join("claude");
@@ -194,6 +196,26 @@ fn a_second_owner_message_goes_to_the_same_claude_process() {
     assert_eq!(
         c.ok("desk.stop", json!({"product": "alpha"})),
         json!({"stopped": false})
+    );
+}
+
+#[test]
+fn the_system_prompt_of_the_process_holds_the_objectives_of_the_brief() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok(
+        "desk.send",
+        json!({"product": "alpha", "text": "Which objectives?"}),
+    );
+    items_until(&mut c, "end");
+    let args = read(&w.bin.join("args-1"));
+    assert!(
+        args.contains(
+            "<objective id=\"o1\" due=\"2026-12-31\" signal=\"sign-ups\">Reach ten owners</objective>"
+        ),
+        "{args}"
     );
 }
 

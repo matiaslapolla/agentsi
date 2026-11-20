@@ -131,6 +131,8 @@ pub struct DeskContext<'a> {
     pub owner: &'a str,
     pub language: &'a str,
     pub cwd: &'a str,
+    /// The brief of the product as XML (`prompt_inputs::brief_xml`). Empty when it has none.
+    pub brief: &'a str,
 }
 
 /// The persona of the `pm` agent, then the desk rules and the catalog of views.
@@ -139,12 +141,18 @@ pub fn system_prompt(persona: &str, ctx: &DeskContext) -> String {
         .iter()
         .map(|t| format!("- {}: {}", t.name, t.description))
         .collect();
+    let brief = if ctx.brief.is_empty() {
+        "The product has no brief."
+    } else {
+        ctx.brief
+    };
     let desk = include_str!("system.md")
         .replace("{product}", ctx.product)
         .replace("{owner}", ctx.owner)
         .replace("{language}", ctx.language)
         .replace("{cwd}", ctx.cwd)
-        .replace("{views}", &views.join("\n"));
+        .replace("{views}", &views.join("\n"))
+        .replace("{brief}", brief);
     format!("{}\n\n{}", persona.trim_end(), desk.trim_end())
 }
 
@@ -161,6 +169,7 @@ pub fn owner_text(notes: &[String], text: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::prompt_inputs::brief_xml;
     use serde_json::Value;
 
     fn call(resume: bool) -> DeskCall {
@@ -301,11 +310,40 @@ mod tests {
                 owner: "Ada",
                 language: "English",
                 cwd: "/work/alpha",
+                brief: "",
             },
         );
         assert!(text.starts_with("You are the PM.\n\n# The front desk"));
         assert!(text.contains("Answer in English"));
         assert!(text.contains("- show_decisions: Shows pending decisions"));
         assert!(!text.contains('{'), "{text}");
+        assert!(text.contains("The product has no brief."));
+    }
+
+    #[test]
+    fn the_system_prompt_holds_the_objectives_of_the_brief() {
+        let brief = brief_xml(&serde_json::json!({
+            "product": {"what": "A desk", "audience": "Owners", "stage": "building"},
+            "objectives": [{"id": "o1", "text": "Reach 10 owners", "signal": "sign-ups",
+                            "due": "2026-12-31"}]
+        }));
+        let text = system_prompt(
+            "You are the PM.",
+            &DeskContext {
+                product: "alpha",
+                owner: "Ada",
+                language: "English",
+                cwd: "/work/alpha",
+                brief: &brief,
+            },
+        );
+        assert!(text.contains("## Brief"), "{text}");
+        assert!(
+            text.contains(
+                "<objective id=\"o1\" due=\"2026-12-31\" signal=\"sign-ups\">Reach 10 owners</objective>"
+            ),
+            "{text}"
+        );
+        assert!(!text.contains("The product has no brief."));
     }
 }

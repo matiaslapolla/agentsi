@@ -3,7 +3,7 @@
 //!
 //! ```toml
 //! mute = false
-//! volume = 60                 # 0 to 100
+//! volume = 50                 # 0 to 100
 //! done = false                # the tone of Done
 //! system = true               # system notifications
 //! quiet = ["22:00", "08:00"]  # absent: no quiet hours
@@ -40,7 +40,7 @@ impl Default for AlertsConfig {
     fn default() -> Self {
         AlertsConfig {
             mute: false,
-            volume: 60,
+            volume: 50,
             done: false,
             system: true,
             quiet: None,
@@ -260,7 +260,7 @@ mod tests {
     fn a_missing_file_gives_the_defaults_and_no_note() {
         let (c, note) = read(&tempdir("missing").join(FILE_NAME));
         assert_eq!((c, note), (AlertsConfig::default(), None));
-        assert_eq!(c.volume, 60);
+        assert_eq!(c.volume, 50);
         assert!(c.system && !c.mute && !c.done && c.quiet.is_none());
     }
 
@@ -287,7 +287,7 @@ mod tests {
         let (c, note) =
             of("mute = true\nvolume = 150\nquiet = [\"25:00\", \"08:00\"]\nsystem = 3\nfont = 1\n");
         assert!(c.mute);
-        assert_eq!(c.volume, 60);
+        assert_eq!(c.volume, 50);
         assert_eq!(c.quiet, None);
         assert!(c.system);
         let note = note.expect("one note");
