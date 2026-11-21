@@ -6,6 +6,7 @@ use futures::channel::mpsc;
 use gpui_kit::{App, Entity, Global};
 
 use crate::model::{CoreState, ProductRef};
+use crate::screens::settings::Section;
 use crate::screens::{ScreenKind, ScreenSpec};
 
 /// Which screen to open, or select when it is open already.
@@ -138,6 +139,22 @@ impl ScreenSpec {
         }
     }
 
+    /// The settings screen at one section. The section is no part of the screen: the one
+    /// settings screen opens at it.
+    pub fn settings_at(section: Section) -> Self {
+        ScreenSpec {
+            arg: Some(section.id().into()),
+            ..ScreenSpec::settings()
+        }
+    }
+
+    /// The section that a settings request asks for.
+    pub fn settings_section(&self) -> Option<Section> {
+        (self.kind == ScreenKind::Settings)
+            .then(|| self.arg.as_deref().and_then(Section::from_id))
+            .flatten()
+    }
+
     /// The guide, which belongs to no product.
     pub fn guide() -> Self {
         ScreenSpec {
@@ -253,6 +270,20 @@ mod tests {
         assert_eq!((r.kind, r.arg.as_deref()), (ScreenKind::Minute, Some("m1")));
         let r = ScreenRequest::minutes("demo");
         assert_eq!((r.kind, r.arg), (ScreenKind::Minutes, None));
+    }
+
+    #[test]
+    fn a_settings_request_names_its_section_and_the_plain_one_none() {
+        let r = ScreenRequest::settings_at(Section::Git);
+        assert_eq!(r.settings_section(), Some(Section::Git));
+        assert_eq!(ScreenRequest::settings().settings_section(), None);
+        assert_eq!(
+            ScreenRequest::minute("demo", "git").settings_section(),
+            None
+        );
+        for s in Section::ALL {
+            assert_eq!(Section::from_id(s.id()), Some(s));
+        }
     }
 
     #[test]

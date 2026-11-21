@@ -1113,7 +1113,7 @@ impl MeetingScreen {
             .border_1()
             .border_color(line::border())
             .bg(surface::raised())
-            .font_family(font::MONO)
+            .font_family(font::mono())
             .text_size(size::xs())
             .text_color(text_color)
             .child(body)
@@ -1150,7 +1150,7 @@ impl MeetingScreen {
                             .flex_1()
                             .min_w_0()
                             .truncate()
-                            .font_family(font::MONO)
+                            .font_family(font::mono())
                             .text_size(size::sm())
                             .text_color(text::primary())
                             .child(pane.role.clone()),

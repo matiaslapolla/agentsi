@@ -40,6 +40,10 @@ pub struct Layout {
     /// `panel_key`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tab_groups: Vec<TabGroupSave>,
+    /// The id of the settings section that the owner opened last. A file from before the
+    /// sections has none, so no version bump.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settings_section: Option<String>,
     pub dock: DockAreaState,
 }
 
@@ -374,6 +378,7 @@ mod tests {
                 collapsed: true,
                 tabs: vec![panel_key(&term("t1-a")).unwrap()],
             }],
+            settings_section: Some("terminal".into()),
             dock: DockAreaState {
                 version: None,
                 center: tabs(0, vec![term("t1-a")]),
@@ -388,6 +393,7 @@ mod tests {
         let old = read(&file).unwrap().unwrap();
         assert!(old.tree.is_empty());
         assert!(old.tab_groups.is_empty());
+        assert_eq!(old.settings_section, None);
         assert_eq!(old.version, 1);
         // The groups survive a write and a read, and a file with none writes no key.
         write(&file, &layout).unwrap();

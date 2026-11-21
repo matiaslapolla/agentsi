@@ -97,7 +97,7 @@ fn swatch(name: &'static str, c: Color) -> Div {
         .child(
             div()
                 .text_size(size::xs())
-                .font_family(font::MONO)
+                .font_family(font::mono())
                 .text_color(text::tertiary().hsla())
                 .child(format!("#{:06x}", c.0)),
         )
@@ -321,9 +321,9 @@ impl StatesPanel {
                         .child(div().text_size(size::xs()).text_color(text::tertiary().hsla()).child("Meta 12: docs/specs/agentsi-desktop-ui.md"))
                         .child(
                             div()
-                                .font_family(font::MONO)
-                                .text_size(size::MONO)
-                                .text_color(tokens::terminal::FOREGROUND.hsla())
+                                .font_family(font::mono())
+                                .text_size(size::mono())
+                                .text_color(tokens::terminal::colors().foreground.hsla())
                                 .child("agentsi › claude --model haiku   ▁▂▃▅▇ ┌─┐ ⣿"),
                         ),
                 ),
@@ -568,7 +568,7 @@ impl Render for Gallery {
             .flex()
             .bg(surface::panel().hsla())
             .text_color(text::primary().hsla())
-            .font_family(font::UI)
+            .font_family(font::ui())
             .text_size(size::base())
             .when_some(self.bench.as_ref(), |el, b| el.child(b.marker()))
             .child(

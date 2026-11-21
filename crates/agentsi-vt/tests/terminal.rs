@@ -294,6 +294,18 @@ fn encodes_keys_with_the_modes_of_the_program() {
     );
 }
 
+#[cfg(not(target_os = "macos"))]
+#[test]
+fn the_option_as_alt_switch_keeps_alt_on_other_systems() {
+    // The switch applies to the Option key of macOS. Elsewhere Alt sends ESC either way.
+    let mut t = term();
+    for on in [false, true] {
+        t.set_option_as_alt(on);
+        let e = press(Key::Letter('x'), Mods::ALT, Some("x"));
+        assert_eq!(t.encode_key(&e).unwrap(), b"\x1bx", "on = {on}");
+    }
+}
+
 #[test]
 fn the_kitty_keyboard_flags_change_the_encoding() {
     let mut t = term();

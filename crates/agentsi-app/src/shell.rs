@@ -49,7 +49,7 @@ use crate::prompt::{Choice, Prompt, PromptEvent};
 use crate::screens::meeting;
 use crate::screens::memory::MemoryScreen;
 use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
-use crate::screens::settings::{ModelFeed, ModelFeedGlobal};
+use crate::screens::settings::{ModelFeed, ModelFeedGlobal, OpenedSection, Section};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec, screen_of};
 use crate::sidebar::{NewProduct, OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged};
 use crate::tab_bar;
@@ -263,6 +263,7 @@ impl Shell {
                 |this, _, raised: &Raised, window, cx| this.alert_raised(&raised.0, window, cx),
             ));
         }
+        subscriptions.push(cx.observe_global::<OpenedSection>(|this, cx| this.schedule_save(cx)));
         let hub = menus::install(cx);
         subscriptions.push(cx.subscribe_in(
             &hub,
@@ -470,6 +471,10 @@ impl Shell {
                 self.prune_look(&known, cx);
                 let tree = std::mem::take(&mut saved.tree);
                 self.sidebar.update(cx, |s, cx| s.set_open_state(tree, cx));
+                // Before the dock loads, so a saved settings screen opens at the section.
+                if let Some(s) = saved.settings_section.as_deref().and_then(Section::from_id) {
+                    cx.set_global(OpenedSection(s));
+                }
                 let dropped = layout::prune(&mut saved.dock, &known);
                 if !dropped.is_empty() {
                     let note = format!(
@@ -559,6 +564,9 @@ impl Shell {
             active_host,
             tree: self.sidebar.read(cx).open_state(),
             tab_groups: self.tabs.read(cx).save(self.dock.read(cx), cx),
+            settings_section: cx
+                .try_global::<OpenedSection>()
+                .map(|s| s.0.id().to_string()),
             dock: self.dock.read(cx).dump(cx),
         };
         if let Err(e) = layout::write(path, &layout) {
@@ -681,7 +689,16 @@ impl Shell {
     }
 
     /// Selects the panel of `spec`, or opens one.
-    pub fn show_screen(&mut self, spec: ScreenSpec, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn show_screen(
+        &mut self,
+        mut spec: ScreenSpec,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let section = spec.settings_section();
+        if spec.kind == ScreenKind::Settings {
+            spec.arg = None;
+        }
         let found = self.open.borrow().screens.iter().find_map(|w| {
             let e = w.upgrade()?;
             (e.read(cx).is(&spec) && self.in_dock(e.entity_id(), cx)).then_some(e)
@@ -711,6 +728,9 @@ impl Shell {
                 p
             }
         };
+        if let Some(s) = section {
+            panel.update(cx, |p, cx| p.open_settings_section(s, cx));
+        }
         window.focus(&panel.focus_handle(cx), cx);
     }
 
@@ -978,7 +998,7 @@ impl Shell {
             .active
             .as_ref()
             .is_some_and(|p| p.host.is_some());
-        shell_argv_for(remote)
+        shell_argv_for(remote, cx)
     }
 
     /// The panel with the keyboard focus, else the panel in view that had it last: the palette
@@ -1147,6 +1167,7 @@ impl Shell {
                     .action((e.action)())
             })
             .collect();
+        let first_product = items.len();
         for (n, (_, name)) in products.iter().enumerate() {
             let item = CommandItem::new()
                 .label(format!("Go to {name}"))
@@ -1156,7 +1177,16 @@ impl Shell {
                 None => item,
             });
         }
-        let first_product = ENTRIES.len();
+        // After the products, so a row number still names its product.
+        for section in Section::shown(cx) {
+            items.push(
+                CommandItem::new()
+                    .label(actions::settings_entry(section))
+                    .icon(gpui_kit::component::IconName::Settings)
+                    .keywords(["settings", "section", "preferences"])
+                    .action(Box::new(actions::OpenSettingsSection { section })),
+            );
+        }
         let this = cx.weak_entity();
         let cancel = this.clone();
         div()
@@ -1384,14 +1414,15 @@ impl Shell {
     }
 }
 
-/// The program of a new shell. `remote` is true for a terminal on an SSH host.
-fn shell_argv_for(remote: bool) -> Vec<String> {
+/// The program of a new shell. `remote` is true for a terminal on an SSH host: a path of this
+/// device may not exist there, so the shell of the settings is for this device only.
+fn shell_argv_for(remote: bool, cx: &App) -> Vec<String> {
     if remote {
         return ["/bin/sh", "-c", "exec \"${SHELL:-/bin/sh}\""]
             .map(String::from)
             .to_vec();
     }
-    vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into())]
+    vec![crate::terminal_settings::local_shell(cx)]
 }
 
 impl Render for Shell {
@@ -1411,7 +1442,7 @@ impl Render for Shell {
             .relative()
             .bg(surface::panel())
             .text_color(text::primary())
-            .font_family(font::UI)
+            .font_family(font::ui())
             .text_size(size::base())
             .on_action(cx.listener(|this, _: &actions::TogglePalette, window, cx| this.toggle_palette(window, cx)))
             .on_action(cx.listener(|this, _: &actions::NewTerminal, window, cx| {
@@ -1480,13 +1511,11 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::OpenSettings, window, cx| {
                 this.show_screen(ScreenSpec::settings(), window, cx)
             }))
+            .on_action(cx.listener(|this, a: &actions::OpenSettingsSection, window, cx| {
+                this.show_screen(ScreenSpec::settings_at(a.section), window, cx)
+            }))
             .on_action(cx.listener(|this, _: &actions::OpenDataSettings, window, cx| {
-                this.show_screen(ScreenSpec::settings(), window, cx);
-                for p in this.open_screens(cx) {
-                    if p.read(cx).is(&ScreenSpec::settings()) {
-                        p.update(cx, |p, cx| p.reveal_data(None, cx));
-                    }
-                }
+                this.show_screen(ScreenSpec::settings_at(Section::Data), window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::ShowMeetingContext, window, cx| {
                 this.show_active(ScreenSpec::meeting, window, cx);
@@ -1502,15 +1531,10 @@ impl Render for Shell {
                     .update(cx, |s, cx| s.toggle_archived(host.as_deref(), cx));
             }))
             .on_action(cx.listener(|this, _: &actions::OpenOwnerSettings, window, cx| {
-                this.show_screen(ScreenSpec::settings(), window, cx);
-                for p in this.open_screens(cx) {
-                    if p.read(cx).is(&ScreenSpec::settings()) {
-                        p.update(cx, |p, cx| p.reveal_owner(cx));
-                    }
-                }
+                this.show_screen(ScreenSpec::settings_at(Section::Owner), window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
-                this.show_screen(ScreenSpec::settings(), window, cx);
+                this.show_screen(ScreenSpec::settings_at(Section::Health), window, cx);
                 for p in this.open_screens(cx) {
                     if p.read(cx).is(&ScreenSpec::settings()) {
                         p.update(cx, |p, cx| p.check_health(cx));
@@ -2540,6 +2564,49 @@ mod tests {
         assert!(!text.contains("t9-gone"), "{text}");
         assert!(text.contains("label = \"keep\""), "{text}");
         let _ = &f.look;
+    }
+
+    #[gpui::test]
+    fn a_settings_section_entry_opens_one_settings_screen_at_it_and_a_restart_keeps_it(
+        cx: &mut TestAppContext,
+    ) {
+        use crate::screens::settings::Section;
+        let dir = folder("settings-section");
+        let (layout_file, look_file) = (dir.join("layout.json"), dir.join("look.toml"));
+        {
+            let (f, cx) = fixture(cx, Persist::File(layout_file.clone()), &look_file);
+            f.shell.update(cx, |s, _| s.restored = true);
+            let tabs = order(&f, cx).len();
+            cx.dispatch_action(actions::OpenSettingsSection {
+                section: Section::Git,
+            });
+            redraw(cx);
+            assert!(
+                at(cx, "settings-page:git").is_some(),
+                "the Git section shows"
+            );
+            assert!(
+                at(cx, "owner-section").is_none(),
+                "and only the Git section"
+            );
+            cx.dispatch_action(actions::OpenSettingsSection {
+                section: Section::Data,
+            });
+            redraw(cx);
+            assert!(at(cx, "settings-page:data").is_some());
+            assert_eq!(order(&f, cx).len(), tabs + 1, "one settings tab");
+            f.shell.read_with(cx, |s, cx| s.save_now(&layout_file, cx));
+        }
+        let saved = layout::read(&layout_file).unwrap().unwrap();
+        assert_eq!(saved.settings_section.as_deref(), Some("data"));
+        let (f, cx) = fixture(cx, Persist::File(layout_file.clone()), &look_file);
+        f.shell.update_in(cx, |s, window, cx| s.restore(window, cx));
+        cx.dispatch_action(actions::OpenSettings);
+        redraw(cx);
+        assert!(
+            at(cx, "settings-page:data").is_some(),
+            "a new start opens the settings at the last section"
+        );
     }
 
     /// The top of the page of the guide screen that the dock shows, if one is open.

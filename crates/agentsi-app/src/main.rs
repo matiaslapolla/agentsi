@@ -30,6 +30,7 @@ mod shell;
 mod sidebar;
 mod tab_bar;
 mod tabs;
+mod terminal_settings;
 mod tree;
 
 use std::cell::RefCell;
@@ -93,6 +94,7 @@ fn main() -> ExitCode {
         .run(move |cx| {
             agentsi_ui::init(cx);
             appearance::install(cx, appearance::path());
+            terminal_settings::install(cx, terminal_settings::path());
             actions::bind_from(cx, keys::path());
             if persist_look {
                 look::install(cx, look::path());

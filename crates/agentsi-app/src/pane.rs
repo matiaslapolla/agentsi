@@ -264,11 +264,12 @@ impl TerminalPanel {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
+        let scrollback_bytes = crate::terminal_settings::scrollback_bytes(cx);
         let pane = cx.new(|cx| {
             TerminalPane::new(
                 PaneOptions {
+                    scrollback_bytes,
                     bench,
-                    ..Default::default()
                 },
                 window,
                 cx,

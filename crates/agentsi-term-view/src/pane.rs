@@ -4,12 +4,18 @@
 //! The pane has three views. The root takes input. The cells view draws the screen and is cached,
 //! so a frame that only moves the cursor does not draw the cells again. The cursor view draws the
 //! cursor and its blink.
+//!
+//! The pane reads the terminal settings and the mono font of `agentsi-ui` at each draw of the
+//! root. A change measures the cells again, builds the frame again and reports the new grid
+//! size, as a window resize does. A change asks one frame of each window, so the idle pane draws
+//! nothing.
 
 use std::cell::{Cell as StdCell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
+use agentsi_ui::appearance::with_terminal;
 use agentsi_ui::bench::Bench;
 use agentsi_ui::tokens::{font, motion, size, terminal};
 use agentsi_vt::{
@@ -74,8 +80,37 @@ pub enum PaneEvent {
     Bell,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+/// What the pane takes from the terminal settings and the fonts.
+#[derive(Clone, Debug, PartialEq)]
+struct Look {
+    family: SharedString,
+    font_size: Pixels,
+    line_height: f32,
+    colors: terminal::Colors,
+    option_as_alt: bool,
+    /// The cursor settings: the frame applies them when it builds the cursor.
+    cursor: (
+        agentsi_ui::appearance::CursorStyle,
+        agentsi_ui::appearance::CursorBlink,
+    ),
+}
+
+impl Look {
+    fn now() -> Look {
+        Look {
+            family: font::mono(),
+            font_size: size::mono(),
+            line_height: terminal::line_height(),
+            colors: terminal::colors(),
+            option_as_alt: with_terminal(|t| t.option_as_meta),
+            cursor: with_terminal(|t| (t.cursor_style, t.cursor_blink)),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 struct Metrics {
+    family: SharedString,
     font_size: Pixels,
     cell_w: Pixels,
     cell_h: Pixels,
@@ -83,10 +118,10 @@ struct Metrics {
 }
 
 impl Metrics {
-    fn measure(window: &Window) -> Metrics {
-        let font_size = size::MONO;
+    fn measure(look: &Look, window: &Window) -> Metrics {
+        let font_size = look.font_size;
         let ts = window.text_system();
-        let id = ts.resolve_font(&mono(false, false));
+        let id = ts.resolve_font(&mono(&look.family, false, false));
         let fallback = font_size * 0.6;
         let cell_w = ts
             .advance(id, font_size, 'm')
@@ -94,9 +129,10 @@ impl Metrics {
             .unwrap_or(fallback)
             .round();
         Metrics {
+            family: look.family.clone(),
             font_size,
             cell_w,
-            cell_h: (font_size * terminal::LINE_HEIGHT).round(),
+            cell_h: (font_size * look.line_height).round(),
             pad: terminal::PADDING,
         }
     }
@@ -120,8 +156,8 @@ fn px_u32(p: Pixels) -> u32 {
     f32::from(p).round().max(0.) as u32
 }
 
-fn mono(bold: bool, italic: bool) -> Font {
-    let mut f = gpui_kit::font(font::MONO);
+fn mono(family: &SharedString, bold: bool, italic: bool) -> Font {
+    let mut f = gpui_kit::font(family.clone());
     if bold {
         f.weight = FontWeight::BOLD;
     }
@@ -139,12 +175,12 @@ fn rgb(c: agentsi_ui::tokens::Color) -> Rgb {
     }
 }
 
-fn palette() -> Palette {
+fn palette(c: &terminal::Colors) -> Palette {
     Palette {
-        foreground: rgb(terminal::FOREGROUND),
-        background: rgb(terminal::BACKGROUND),
-        cursor: Some(rgb(terminal::CURSOR)),
-        ansi: terminal::ANSI.map(rgb),
+        foreground: rgb(c.foreground),
+        background: rgb(c.background),
+        cursor: Some(rgb(c.cursor)),
+        ansi: c.ansi.map(rgb),
     }
 }
 
@@ -246,6 +282,8 @@ impl Screen {
 
 pub struct TerminalPane {
     screen: Rc<RefCell<Screen>>,
+    /// The look that the screen has now.
+    look: Look,
     focus: FocusHandle,
     cells: Entity<CellsView>,
     cursor: Entity<CursorView>,
@@ -281,7 +319,8 @@ impl Focusable for TerminalPane {
 
 impl TerminalPane {
     pub fn new(options: PaneOptions, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let metrics = Metrics::measure(window);
+        let look = Look::now();
+        let metrics = Metrics::measure(&look, window);
         let (cols, rows) = (80, 24);
         let mut term = Terminal::new(Options {
             cols,
@@ -291,7 +330,8 @@ impl TerminalPane {
         .expect("libghostty-vt makes a terminal");
         // Both calls fail only on an allocation failure or a value out of range, and the values are fixed.
         let _ = term.resize(cols, rows, px_u32(metrics.cell_w), px_u32(metrics.cell_h));
-        let _ = term.set_palette(&palette());
+        let _ = term.set_palette(&palette(&look.colors));
+        term.set_option_as_alt(look.option_as_alt);
         let screen = Rc::new(RefCell::new(Screen {
             term,
             metrics,
@@ -333,6 +373,7 @@ impl TerminalPane {
         ];
         TerminalPane {
             screen,
+            look,
             focus,
             cells,
             cursor,
@@ -424,6 +465,31 @@ impl TerminalPane {
         s.term.grid().map(|g| g.text_lines()).unwrap_or_default()
     }
 
+    /// Takes a new look of the settings: new cells, new colors and a new frame. The next layout of
+    /// the cells reports the grid that fits, as a window resize does. The root calls it in a draw
+    /// that `refresh_windows` asked for, and that draw renders the cached views again, so it
+    /// notifies no view.
+    fn take_look(&mut self, look: Look, window: &Window) {
+        {
+            let mut s = self.screen.borrow_mut();
+            let s = &mut *s;
+            let metrics = Metrics::measure(&look, window);
+            if metrics != s.metrics {
+                let (cw, ch) = (px_u32(metrics.cell_w), px_u32(metrics.cell_h));
+                // The size reports of the program read the pixel size of a cell.
+                let _ = s.term.resize(s.cols, s.rows, cw, ch);
+                s.metrics = metrics;
+            }
+            if look.colors != self.look.colors {
+                let _ = s.term.set_palette(&palette(&look.colors));
+            }
+            s.term.set_option_as_alt(look.option_as_alt);
+            s.cache = FrameCache::default();
+            s.dirty = true;
+        }
+        self.look = look;
+    }
+
     fn redraw(&mut self, cx: &mut Context<Self>) {
         self.cells.update(cx, |_, cx| cx.notify());
         self.cursor.update(cx, |_, cx| cx.notify());
@@ -463,7 +529,7 @@ impl TerminalPane {
             if same && s.sized {
                 return;
             }
-            let m = s.metrics;
+            let m = s.metrics.clone();
             if !same
                 && s.term
                     .resize(cols, rows, px_u32(m.cell_w), px_u32(m.cell_h))
@@ -724,6 +790,9 @@ impl TerminalPane {
                 s.selected_text()
             };
             if let Some(t) = text {
+                if with_terminal(|t| t.copy_on_select) {
+                    cx.write_to_clipboard(ClipboardItem::new_string(t.clone()));
+                }
                 cx.write_to_primary(ClipboardItem::new_string(t));
             }
             self.cells.update(cx, |_, cx| cx.notify());
@@ -863,7 +932,11 @@ fn vt_button(b: MouseButton) -> Option<VtButton> {
 }
 
 impl Render for TerminalPane {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let look = Look::now();
+        if look != self.look {
+            self.take_look(look, window);
+        }
         let layer = || {
             StyleRefinement::default()
                 .absolute()
@@ -874,7 +947,7 @@ impl Render for TerminalPane {
         div()
             .size_full()
             .relative()
-            .bg(terminal::BACKGROUND.hsla())
+            .bg(self.look.colors.background.hsla())
             .track_focus(&self.focus)
             .key_context("Terminal")
             .on_key_down(cx.listener(Self::on_key_down))
@@ -902,12 +975,13 @@ impl Render for CellsView {
         let (frame, metrics) = {
             let mut s = self.screen.borrow_mut();
             s.refresh();
-            (s.frame().clone(), s.metrics)
+            (s.frame().clone(), s.metrics.clone())
         };
         let blinking = frame.cursor.as_ref().is_some_and(|c| c.blinking);
         let screen = self.screen.clone();
         let pane = self.pane.clone();
         let bench = self.bench.clone();
+        let fit_metrics = metrics.clone();
         canvas(
             move |bounds, _, cx| {
                 let (cols, rows, sized) = {
@@ -915,7 +989,7 @@ impl Render for CellsView {
                     s.bounds = bounds;
                     (s.cols, s.rows, s.sized)
                 };
-                let fit = metrics.fit(bounds);
+                let fit = fit_metrics.fit(bounds);
                 if fit != (cols, rows) || !sized || blinking {
                     cx.defer(move |cx| {
                         let _ = pane.update(cx, |p, cx| {
@@ -994,7 +1068,7 @@ fn shape_run(r: &Run, m: &Metrics, window: &Window) -> ShapedLine {
     let advance = if r.is_wide() { m.cell_w * 2. } else { m.cell_w };
     let run = TextRun {
         len: r.text.len(),
-        font: mono(r.bold, r.italic),
+        font: mono(&m.family, r.bold, r.italic),
         color: r.color,
         background_color: None,
         underline: (r.underline != agentsi_vt::Underline::None).then_some(UnderlineStyle {
@@ -1112,7 +1186,7 @@ impl Render for CursorView {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let (cursor, metrics) = {
             let s = self.screen.borrow();
-            (s.frame().cursor.clone(), s.metrics)
+            (s.frame().cursor.clone(), s.metrics.clone())
         };
         let (on, focused) = (self.blink.on.get(), self.blink.focused.get());
         canvas(
@@ -1174,7 +1248,7 @@ fn paint_cursor(
             {
                 let run = TextRun {
                     len: c.text.len(),
-                    font: mono(c.bold, c.italic),
+                    font: mono(&m.family, c.bold, c.italic),
                     color: c.text_color,
                     background_color: None,
                     underline: None,
@@ -1222,7 +1296,7 @@ mod tests {
         cx.update(agentsi_ui::init);
         let (host, cx) = cx.add_window_view(|window, cx| {
             let pane = cx.new(|cx| TerminalPane::new(PaneOptions::default(), window, cx));
-            let m = pane.read(cx).screen.borrow().metrics;
+            let m = pane.read(cx).screen.borrow().metrics.clone();
             let fit = |n: u16, cell: Pixels| m.pad * 2. + cell * (f32::from(n) + 0.5);
             let events = cx.subscribe(&pane, |h: &mut Host, _, e: &PaneEvent, _| {
                 h.events.push(e.clone())
@@ -1262,6 +1336,85 @@ mod tests {
         // Another frame at the same size reports nothing more.
         draw(cx);
         assert_eq!(resizes(&host, cx), vec![(80, 24)]);
+    }
+
+    #[gpui::test]
+    fn a_new_font_size_resizes_the_grid_and_reports_it_as_a_window_resize(cx: &mut TestAppContext) {
+        use agentsi_ui::appearance::TerminalSettings;
+        let (host, cx) = host(cx, 80, 24);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        assert_eq!(resizes(&host, cx), vec![(80, 24)]);
+        let cell = |pane: &Entity<TerminalPane>, cx: &mut VisualTestContext| {
+            pane.read_with(cx, |p, _| {
+                let m = p.screen.borrow().metrics.clone();
+                (m.font_size, m.cell_h)
+            })
+        };
+        assert_eq!(cell(&pane, cx), (px(13.), px(16.)));
+        let larger = TerminalSettings {
+            font_size: 16,
+            ..TerminalSettings::default()
+        };
+        cx.update(|_, cx| larger.clone().apply(cx));
+        draw(cx);
+        assert_eq!(cell(&pane, cx), (px(16.), px(20.)));
+        let (cols, rows) = *resizes(&host, cx).last().unwrap();
+        assert!(
+            cols < 80 && rows < 24,
+            "the same box holds fewer cells: {cols} x {rows}"
+        );
+        assert_eq!(pane.read_with(cx, |p, _| p.grid_size()), (cols, rows));
+        // The same settings again change nothing.
+        let count = resizes(&host, cx).len();
+        cx.update(|_, cx| larger.apply(cx));
+        draw(cx);
+        assert_eq!(resizes(&host, cx).len(), count);
+    }
+
+    #[gpui::test]
+    fn a_new_mono_font_reaches_an_open_pane_at_once(cx: &mut TestAppContext) {
+        use agentsi_ui::appearance::Fonts;
+        let (host, cx) = host(cx, 80, 24);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        let family = |cx: &mut VisualTestContext| {
+            pane.read_with(cx, |p, _| p.screen.borrow().metrics.family.to_string())
+        };
+        assert_eq!(family(cx), "JetBrains Mono");
+        // Not the platform default of gpui-component, which its theme swaps for an installed one.
+        cx.update(|_, cx| {
+            Fonts {
+                mono: "Fira Mono".into(),
+                ..Fonts::default()
+            }
+            .apply(cx)
+        });
+        draw(cx);
+        assert_eq!(family(cx), "Fira Mono");
+    }
+
+    #[gpui::test]
+    fn a_bar_setting_draws_a_bar_where_the_program_asks_for_a_block(cx: &mut TestAppContext) {
+        use agentsi_ui::appearance::{CursorStyle, TerminalSettings};
+        let (host, cx) = host(cx, 80, 24);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        let shape = |cx: &mut VisualTestContext| {
+            pane.read_with(cx, |p, _| {
+                p.screen.borrow().frame().cursor.as_ref().map(|c| c.shape)
+            })
+        };
+        // DECSCUSR 2: a steady block.
+        pane.update(cx, |p, cx| p.feed(b"\x1b[2 q$ ", Instant::now(), cx));
+        draw(cx);
+        assert_eq!(shape(cx), Some(CursorShape::Block));
+        cx.update(|_, cx| {
+            TerminalSettings {
+                cursor_style: CursorStyle::Bar,
+                ..TerminalSettings::default()
+            }
+            .apply(cx)
+        });
+        draw(cx);
+        assert_eq!(shape(cx), Some(CursorShape::Bar));
     }
 
     #[gpui::test]

@@ -1,14 +1,20 @@
-//! `<config>/agentsi/appearance.toml`: the density, the corners, the text size, the color theme
-//! and the motion.
+//! `<config>/agentsi/appearance.toml`: the density, the corners, the text offset, the color
+//! theme and the motion.
 //!
 //! ```toml
 //! density = "compact"   # compact, normal or comfortable
 //! corners = "round"     # square, subtle or round
-//! text = "large"        # small, medium or large
+//! text_offset = 2       # -2 to 4 px
 //! theme = "light"       # system, dark or light
 //! motion = "reduced"    # system, reduced or full
+//! ui_font = "Inter"     # a family that the text system knows
+//! mono_font = "JetBrains Mono"
 //! ```
 //!
+//! - A family that the text system does not know gives the default family and a note, as a
+//!   bad value does: GPUI stops at the first line in a family that it cannot find.
+//! - The old key `text = "small|medium|large"` reads as the offset -1, 0 or 2. A save writes
+//!   `text_offset` in its place.
 //! - A missing file means the defaults. An unknown key, an unknown value or a file that does
 //!   not parse gives the default for that part and one line in [`note`]. The app starts anyway.
 //! - [`change`] applies a choice at once and saves it. A file that does not parse is not
@@ -16,16 +22,20 @@
 
 use std::path::{Path, PathBuf};
 
-use agentsi_ui::appearance::{Appearance, ColorTheme, Corners, Density, Motion, TextSize};
-use gpui_kit::{App, Global};
+use agentsi_ui::appearance::{
+    Appearance, ColorTheme, Corners, Density, Fonts, Motion, TEXT_OFFSETS, text_offset_of_size,
+};
+use agentsi_ui::tokens::font;
+use gpui_kit::{App, Global, SharedString};
 use toml_edit::{DocumentMut, Item, value};
 
 /// Everything that `appearance.toml` holds.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Look {
     pub appearance: Appearance,
     pub theme: ColorTheme,
     pub motion: Motion,
+    pub fonts: Fonts,
 }
 
 pub const FILE_NAME: &str = "appearance.toml";
@@ -67,6 +77,7 @@ fn parse(text: &str, path: &Path) -> (Look, Option<String>) {
     };
     let mut problems = Vec::new();
     let mut look = Look::default();
+    let mut offset_key = false;
     for (key, item) in doc.iter() {
         match key {
             "density" => pick(
@@ -85,14 +96,30 @@ fn parse(text: &str, path: &Path) -> (Look, Option<String>) {
                 &mut look.appearance.corners,
                 &Corners::ALL.map(Corners::key),
             ),
-            "text" => pick(
+            // `text_offset` wins over the old key, in any order of the file.
+            "text" if !offset_key => pick(
                 key,
                 item,
                 &mut problems,
-                TextSize::from_key,
-                &mut look.appearance.text,
-                &TextSize::ALL.map(TextSize::key),
+                text_offset_of_size,
+                &mut look.appearance.text_offset,
+                &["small", "medium", "large"],
             ),
+            "text" => {}
+            "text_offset" => {
+                offset_key = true;
+                look.appearance.text_offset = 0;
+                match item.as_integer() {
+                    Some(n) if TEXT_OFFSETS.contains(&n.try_into().unwrap_or(i8::MAX)) => {
+                        look.appearance.text_offset = n as i8;
+                    }
+                    _ => problems.push(format!(
+                        "text_offset must be a whole number from {} to {}.",
+                        TEXT_OFFSETS.start(),
+                        TEXT_OFFSETS.end()
+                    )),
+                }
+            }
             "theme" => pick(
                 key,
                 item,
@@ -109,6 +136,17 @@ fn parse(text: &str, path: &Path) -> (Look, Option<String>) {
                 &mut look.motion,
                 &Motion::ALL.map(Motion::key),
             ),
+            "ui_font" | "mono_font" => match item.as_str().map(str::trim) {
+                Some(name) if !name.is_empty() => {
+                    let slot = if key == "ui_font" {
+                        &mut look.fonts.ui
+                    } else {
+                        &mut look.fonts.mono
+                    };
+                    *slot = SharedString::from(name.to_string());
+                }
+                _ => problems.push(format!("{key} must be the name of a font family.")),
+            },
             other => problems.push(format!("{other}: no setting has this name.")),
         }
     }
@@ -141,6 +179,37 @@ fn pick<T>(
     }
 }
 
+/// The families that the text system knows: the bundled ones first, then the others, sorted.
+pub fn families(cx: &App) -> Vec<SharedString> {
+    let mut names: Vec<SharedString> = font::BUNDLED.iter().map(|f| (*f).into()).collect();
+    for name in cx.text_system().all_font_names() {
+        if !font::BUNDLED.contains(&name.as_str()) {
+            names.push(name.into());
+        }
+    }
+    names
+}
+
+/// `fonts` with each family that `known` does not name replaced by its default, and one line
+/// for each.
+fn known_fonts(fonts: Fonts, known: &[SharedString]) -> (Fonts, Vec<String>) {
+    let default = Fonts::default();
+    let mut problems = Vec::new();
+    let mut check = |key: &str, name: SharedString, default: SharedString| {
+        if known.contains(&name) {
+            name
+        } else {
+            problems.push(format!(
+                "{key} \"{name}\" is not a font of this system, so {default} stays."
+            ));
+            default
+        }
+    };
+    let ui = check("ui_font", fonts.ui, default.ui);
+    let mono = check("mono_font", fonts.mono, default.mono);
+    (Fonts { ui, mono }, problems)
+}
+
 /// The file and the line about it, kept as a global so the settings screen shows them.
 #[derive(Clone, Debug, Default)]
 pub struct Setting {
@@ -152,10 +221,25 @@ impl Global for Setting {}
 
 /// Reads the file at `path` and makes it the look of the app. The app calls this once, at start.
 pub fn install(cx: &mut App, path: Option<PathBuf>) {
-    let (look, note) = match &path {
+    let (mut look, mut note) = match &path {
         Some(p) => read(p),
         None => (Look::default(), None),
     };
+    // The bundled families need no list of the system: that list costs time at each start.
+    let bundled = |f: &SharedString| font::BUNDLED.contains(&f.as_ref());
+    let (fonts, problems) = if bundled(&look.fonts.ui) && bundled(&look.fonts.mono) {
+        (look.fonts, Vec::new())
+    } else {
+        known_fonts(look.fonts, &families(cx))
+    };
+    look.fonts = fonts;
+    if !problems.is_empty() {
+        let line = problems.join(" ");
+        note = Some(match note {
+            Some(n) => format!("{n} {line}"),
+            None => line,
+        });
+    }
     cx.set_global(Setting { path, note });
     apply(cx, look);
 }
@@ -170,9 +254,9 @@ pub fn note(cx: &App) -> Option<String> {
 pub fn change(cx: &mut App, f: impl FnOnce(&mut Look)) -> Result<(), String> {
     let mut next = current(cx);
     f(&mut next);
-    apply(cx, next);
+    apply(cx, next.clone());
     let saved = match cx.try_global::<Setting>().and_then(|s| s.path.clone()) {
-        Some(path) => write(&path, next),
+        Some(path) => write(&path, &next),
         None => Err("There is no config folder, so the look cannot be saved.".into()),
     };
     let mut setting = cx.try_global::<Setting>().cloned().unwrap_or_default();
@@ -187,6 +271,7 @@ pub fn current(cx: &App) -> Look {
         appearance: Appearance::get(cx),
         theme: ColorTheme::get(cx),
         motion: Motion::get(cx),
+        fonts: Fonts::get(cx),
     }
 }
 
@@ -194,15 +279,19 @@ fn apply(cx: &mut App, look: Look) {
     look.appearance.apply(cx);
     look.theme.apply(cx);
     look.motion.apply(cx);
+    look.fonts.apply(cx);
 }
 
-fn write(path: &Path, look: Look) -> Result<(), String> {
+fn write(path: &Path, look: &Look) -> Result<(), String> {
     crate::keys::edit(path, |doc| {
         doc["density"] = value(look.appearance.density.key());
         doc["corners"] = value(look.appearance.corners.key());
-        doc["text"] = value(look.appearance.text.key());
+        doc.remove("text");
+        doc["text_offset"] = value(i64::from(look.appearance.text_offset));
         doc["theme"] = value(look.theme.key());
         doc["motion"] = value(look.motion.key());
+        doc["ui_font"] = value(look.fonts.ui.as_ref());
+        doc["mono_font"] = value(look.fonts.mono.as_ref());
         Ok(())
     })
 }
@@ -234,18 +323,18 @@ mod tests {
 
     #[test]
     fn each_word_of_the_file_picks_its_choice() {
-        let (a, note) = of("density = \"compact\"\ncorners = \"round\"\ntext = \"large\"\n");
+        let (a, note) = of("density = \"compact\"\ncorners = \"round\"\ntext_offset = 4\n");
         assert_eq!(
             a.appearance,
             Appearance {
                 density: Density::Compact,
                 corners: Corners::Round,
-                text: TextSize::Large
+                text_offset: 4,
             }
         );
         assert_eq!(note, None);
-        let (a, _) = of("text = \"small\"");
-        assert_eq!(a.appearance.text, TextSize::Small);
+        let (a, _) = of("text_offset = -2");
+        assert_eq!(a.appearance.text_offset, -2);
         assert_eq!(a.appearance.density, Density::Normal);
         assert_eq!((a.theme, a.motion), (ColorTheme::Dark, Motion::System));
         let (a, note) = of("theme = \"light\"\nmotion = \"reduced\"\n");
@@ -262,13 +351,14 @@ mod tests {
 
     #[test]
     fn a_bad_value_keeps_its_default_and_the_good_ones_stay() {
-        let (a, note) = of("density = \"huge\"\ncorners = \"round\"\ntext = 3\nfont = \"x\"\n");
+        let (a, note) =
+            of("density = \"huge\"\ncorners = \"round\"\ntext_offset = 5\nfont = \"x\"\n");
         assert_eq!(a.appearance.density, Density::Normal);
         assert_eq!(a.appearance.corners, Corners::Round);
-        assert_eq!(a.appearance.text, TextSize::Medium);
+        assert_eq!(a.appearance.text_offset, 0);
         let note = note.expect("one note");
         assert!(note.contains("density \"huge\" is not a choice (compact, normal, comfortable)"));
-        assert!(note.contains("text must be text"));
+        assert!(note.contains("text_offset must be a whole number from -2 to 4"));
         assert!(note.contains("font: no setting has this name"));
         assert_eq!(note.lines().count(), 1, "one note, one line: {note}");
     }
@@ -289,12 +379,16 @@ mod tests {
             appearance: Appearance {
                 density: Density::Compact,
                 corners: Corners::Square,
-                text: TextSize::Large,
+                text_offset: 3,
             },
             theme: ColorTheme::Light,
             motion: Motion::Full,
+            fonts: Fonts {
+                ui: "Noto Sans".into(),
+                mono: "Fira Mono".into(),
+            },
         };
-        write(&path, a).unwrap();
+        write(&path, &a).unwrap();
         assert_eq!(read(&path), (a, None));
         assert!(
             std::fs::read_to_string(&path)
@@ -304,10 +398,63 @@ mod tests {
     }
 
     #[test]
+    fn the_old_text_key_reads_as_its_offset_and_a_save_replaces_it() {
+        for (word, offset) in [("small", -1), ("medium", 0), ("large", 2)] {
+            let (a, note) = of(&format!("text = \"{word}\""));
+            assert_eq!((a.appearance.text_offset, note), (offset, None), "{word}");
+        }
+        let (a, _) = of("text_offset = 3\ntext = \"small\"\n");
+        assert_eq!(a.appearance.text_offset, 3, "the new key wins");
+        let (a, _) = of("text = \"small\"\ntext_offset = 3\n");
+        assert_eq!(a.appearance.text_offset, 3, "in either order");
+
+        let path = tempdir("old").join(FILE_NAME);
+        std::fs::write(&path, "text = \"large\"\n").unwrap();
+        let (look, _) = read(&path);
+        write(&path, &look).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("text ="), "{text}");
+        assert!(text.contains("text_offset = 2"), "{text}");
+    }
+
+    #[test]
+    fn a_font_family_reads_as_text_and_an_unknown_one_gives_the_default() {
+        let (a, note) = of("ui_font = \"Noto Sans\"\nmono_font = \" Fira Mono \"\n");
+        assert_eq!(note, None);
+        assert_eq!(
+            (a.fonts.ui.as_ref(), a.fonts.mono.as_ref()),
+            ("Noto Sans", "Fira Mono")
+        );
+        let (a, note) = of("ui_font = 3\nmono_font = \"\"\n");
+        assert_eq!(a.fonts, Fonts::default());
+        let note = note.unwrap();
+        assert!(
+            note.contains("ui_font must be the name of a font family"),
+            "{note}"
+        );
+        assert!(note.contains("mono_font must be the name"), "{note}");
+
+        let known: Vec<SharedString> = ["Inter", "JetBrains Mono", "Fira Mono"]
+            .map(SharedString::from)
+            .to_vec();
+        let (fonts, problems) = known_fonts(
+            Fonts {
+                ui: "Comic Mono".into(),
+                mono: "Fira Mono".into(),
+            },
+            &known,
+        );
+        assert_eq!(fonts.ui.as_ref(), "Inter");
+        assert_eq!(fonts.mono.as_ref(), "Fira Mono");
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("ui_font \"Comic Mono\" is not a font of this system"));
+    }
+
+    #[test]
     fn a_file_that_does_not_parse_is_not_overwritten() {
         let path = tempdir("broken").join(FILE_NAME);
         std::fs::write(&path, "density = = x").unwrap();
-        assert!(write(&path, Look::default()).is_err());
+        assert!(write(&path, &Look::default()).is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "density = = x");
     }
 }

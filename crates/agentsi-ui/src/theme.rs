@@ -37,6 +37,15 @@ pub(crate) fn apply_metrics(cx: &mut App) {
         t.font_size = size::base();
         t.radius = radius::md();
         t.radius_lg = radius::lg();
+        t.mono_font_size = size::mono();
+    });
+}
+
+/// Sets the families of the theme from the fonts in effect.
+pub(crate) fn apply_fonts(cx: &mut App) {
+    Theme::update(cx, |t| {
+        t.font_family = font::ui();
+        t.mono_font_family = font::mono();
     });
 }
 
@@ -45,9 +54,8 @@ pub(crate) fn apply(cx: &mut App, mode: ThemeMode) {
     Theme::change(mode, None, cx);
     Theme::update(cx, |t| {
         let c = |c: Color| c.hsla();
-        t.font_family = font::UI.into();
-        t.mono_font_family = font::MONO.into();
-        t.mono_font_size = size::MONO;
+        t.font_family = font::ui();
+        t.mono_font_family = font::mono();
         t.shadow = false;
         t.focus_ring = true;
         t.cursor_blink =

@@ -72,6 +72,8 @@ pub struct Terminal {
     key_event: sys::KeyEvent,
     mouse_encoder: sys::MouseEncoder,
     mouse_event: sys::MouseEvent,
+    /// The macOS Option key sends Alt. See [`Terminal::set_option_as_alt`].
+    option_as_alt: bool,
 }
 
 /// DEC private modes that the pane reads with [`Terminal::mode`].
@@ -129,6 +131,7 @@ impl Terminal {
             key_event: ptr::null_mut(),
             mouse_encoder: ptr::null_mut(),
             mouse_event: ptr::null_mut(),
+            option_as_alt: true,
         };
         // SAFETY: each `new` call gets a valid out-pointer to a field of `terminal` and the default
         // allocator (null).
@@ -347,6 +350,13 @@ impl Terminal {
         unsafe { terminal_string(self.raw, data) }
     }
 
+    /// With `on`, the Option key of macOS sends Alt: ESC and the key, as Ghostty's
+    /// `macos-option-as-alt`. Off, Option types the character of the layout. Other systems
+    /// ignore it. On by default.
+    pub fn set_option_as_alt(&mut self, on: bool) {
+        self.option_as_alt = on;
+    }
+
     /// Encodes a key event with the modes that the program set (cursor keys, Kitty flags).
     /// The result is empty for a key that makes no bytes.
     pub fn encode_key(&mut self, event: &KeyEvent) -> Result<Vec<u8>> {
@@ -377,6 +387,17 @@ impl Terminal {
                 sys::ghostty_key_event_set_utf8(self.key_event, text.as_ptr().cast(), text.len());
             }
             sys::ghostty_key_encoder_setopt_from_terminal(self.encoder, self.raw);
+            let option_as_alt = if self.option_as_alt {
+                sys::OptionAsAlt::TRUE
+            } else {
+                sys::OptionAsAlt::FALSE
+            };
+            // The library reads the value during the call.
+            sys::ghostty_key_encoder_setopt(
+                self.encoder,
+                sys::KeyEncoderOption::MACOS_OPTION_AS_ALT,
+                (&raw const option_as_alt).cast(),
+            );
         }
         let mut out = vec![0u8; 64];
         let mut required = 0usize;

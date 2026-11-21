@@ -6,7 +6,7 @@ use std::cell::Cell;
 
 use gpui_kit::{Hsla, Pixels, Rgba, px};
 
-use crate::appearance::{Corners, Density, TextSize, current};
+use crate::appearance::{Corners, Density, current};
 
 /// A color token, `0xRRGGBB`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -466,34 +466,101 @@ pub fn danger_fill_press() -> Color {
     status::danger().over(surface::raised(), status::DANGER_PRESS_ALPHA)
 }
 
-/// Colors of a terminal pane. `ANSI` holds the 16 colors, normal then bright.
+/// The colors and the metrics of a terminal pane. The Terminal section of the settings picks
+/// the palette, the font size and the line height.
 pub mod terminal {
-    use super::Color;
+    use super::{Color, Palette, current_palette};
+    use crate::appearance::{TerminalPalette, with_terminal};
     use gpui_kit::{Pixels, px};
-    pub const BACKGROUND: Color = Color(0x0b0c0f);
-    pub const FOREGROUND: Color = Color(0xdcdde2);
-    pub const CURSOR: Color = Color(0x8b7cf6);
-    pub const SELECTION: Color = Color(0x2f2a52);
-    pub const ANSI: [Color; 16] = [
-        Color(0x1e2027),
-        Color(0xf87171),
-        Color(0x4ade80),
-        Color(0xf2b84b),
-        Color(0x60a5fa),
-        Color(0xb69cf8),
-        Color(0x5ccfe6),
-        Color(0xc8cad0),
-        Color(0x5c616d),
-        Color(0xfca5a5),
-        Color(0x86efac),
-        Color(0xfcd38d),
-        Color(0x93c5fd),
-        Color(0xd2c2fb),
-        Color(0x99e3f0),
-        Color(0xf4f5f7),
-    ];
-    /// The height of a row of cells, as a factor of `size::MONO`.
-    pub const LINE_HEIGHT: f32 = 1.25;
+
+    /// The colors of one terminal palette. `ansi` holds the 16 colors, normal then bright.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Colors {
+        pub background: Color,
+        pub foreground: Color,
+        pub cursor: Color,
+        pub selection: Color,
+        pub ansi: [Color; 16],
+    }
+
+    impl Colors {
+        /// `agentsi-dark`.
+        pub const DARK: Colors = Colors {
+            background: Color(0x0b0c0f),
+            foreground: Color(0xdcdde2),
+            cursor: Color(0x8b7cf6),
+            selection: Color(0x2f2a52),
+            ansi: [
+                Color(0x1e2027),
+                Color(0xf87171),
+                Color(0x4ade80),
+                Color(0xf2b84b),
+                Color(0x60a5fa),
+                Color(0xb69cf8),
+                Color(0x5ccfe6),
+                Color(0xc8cad0),
+                Color(0x5c616d),
+                Color(0xfca5a5),
+                Color(0x86efac),
+                Color(0xfcd38d),
+                Color(0x93c5fd),
+                Color(0xd2c2fb),
+                Color(0x99e3f0),
+                Color(0xf4f5f7),
+            ],
+        };
+
+        /// `agentsi-light`. Each of the 16 colors reaches 4.5:1 on the background, so a
+        /// program that writes in white stays readable.
+        pub const LIGHT: Colors = Colors {
+            background: Color(0xfbfbfc),
+            foreground: Color(0x24262d),
+            cursor: Color(0x6d5ae6),
+            selection: Color(0xd9d3fb),
+            ansi: [
+                Color(0x24262d),
+                Color(0xc4262e),
+                Color(0x1a7f37),
+                Color(0x8a6100),
+                Color(0x0969da),
+                Color(0x8250df),
+                Color(0x1b7c83),
+                Color(0x68707a),
+                Color(0x57606a),
+                Color(0xa40e26),
+                Color(0x116329),
+                Color(0x704f00),
+                Color(0x0550ae),
+                Color(0x6639ba),
+                Color(0x0f6068),
+                Color(0x5c6470),
+            ],
+        };
+
+        /// The palette that follows the color theme `palette` of the app.
+        pub fn of_theme(palette: Palette) -> Colors {
+            if palette == Palette::LIGHT {
+                Colors::LIGHT
+            } else {
+                Colors::DARK
+            }
+        }
+    }
+
+    /// The colors in effect: the palette of the settings, or the one of the color theme.
+    pub fn colors() -> Colors {
+        match with_terminal(|t| t.palette) {
+            TerminalPalette::AgentsiDark => Colors::DARK,
+            TerminalPalette::AgentsiLight => Colors::LIGHT,
+            TerminalPalette::FollowTheme => Colors::of_theme(current_palette()),
+        }
+    }
+
+    /// The height of a row of cells, as a factor of `size::mono()`.
+    pub fn line_height() -> f32 {
+        with_terminal(|t| t.line_height)
+    }
+
     /// The space between the edge of a pane and its cells. It does not follow the density.
     pub const PADDING: Pixels = super::grid(2);
     /// The width of a bar cursor, and the height of an underline cursor.
@@ -502,24 +569,38 @@ pub mod terminal {
     pub const FAINT_ALPHA: f32 = 0.6;
 }
 
-/// Font families. `theme::load_fonts` registers the bundled files.
+/// Font families. `theme::load_fonts` registers the bundled files. The owner picks other
+/// families in the appearance, and `ui` and `mono` give the ones in effect.
 pub mod font {
-    pub const UI: &str = "Inter";
-    pub const MONO: &str = "JetBrains Mono";
+    use gpui_kit::SharedString;
+
+    use crate::appearance::current_fonts;
+
+    pub const UI_DEFAULT: &str = "Inter";
+    pub const MONO_DEFAULT: &str = "JetBrains Mono";
+    /// The bundled families. The text system knows them on every machine.
+    pub const BUNDLED: [&str; 2] = [UI_DEFAULT, MONO_DEFAULT];
+
+    /// The family of the text of the app.
+    pub fn ui() -> SharedString {
+        current_fonts().ui
+    }
+
+    /// The family of the terminals, the ids and the code.
+    pub fn mono() -> SharedString {
+        current_fonts().mono
+    }
 }
 
-/// Type sizes, in px. The text size of the appearance moves `XS` to `XL`, and `MONO` stays.
+/// Type sizes, in px. The text offset of the appearance moves `xs` to `xl`, and `mono` follows
+/// the terminal settings.
 pub mod size {
-    use super::{TextSize, current};
+    use super::current;
     use gpui_kit::{Pixels, px};
 
-    /// The size of the step `base` px at medium, for the text size in effect.
+    /// The size of the step `base` px at offset 0, for the text offset in effect.
     fn step(base: f32) -> Pixels {
-        px(match current().text {
-            TextSize::Small => base - 1.,
-            TextSize::Medium => base,
-            TextSize::Large => base + 2.,
-        })
+        px(base + f32::from(current().text_offset))
     }
     /// Meta text, key hints, tags.
     pub fn xs() -> Pixels {
@@ -549,8 +630,10 @@ pub mod size {
     pub fn xl() -> Pixels {
         step(28.)
     }
-    /// Terminal cells.
-    pub const MONO: Pixels = px(13.);
+    /// Terminal cells: the font size of the terminal settings. The text offset does not move it.
+    pub fn mono() -> Pixels {
+        px(f32::from(crate::appearance::with_terminal(|t| t.font_size)))
+    }
 }
 
 /// Font weights.
@@ -682,7 +765,7 @@ pub mod label {
 
 /// Fixed sizes of controls and the shell.
 pub mod control {
-    use super::{Density, TextSize, current};
+    use super::{Density, current};
     use gpui_kit::{Pixels, px};
 
     fn by_density(compact: f32, normal: f32, comfortable: f32) -> Pixels {
@@ -692,11 +775,14 @@ pub mod control {
             Density::Comfortable => comfortable,
         })
     }
-    fn by_text(small: f32, medium: f32, large: f32) -> Pixels {
-        px(match current().text {
-            TextSize::Small => small,
-            TextSize::Medium => medium,
-            TextSize::Large => large,
+    /// An icon of `base` px at offset 0. A smaller text takes the icon 2 px smaller, and a
+    /// larger text grows the icon with it.
+    fn by_text(base: f32) -> Pixels {
+        let offset = f32::from(current().text_offset);
+        px(if offset < 0. {
+            base - 2.
+        } else {
+            base + offset
         })
     }
     /// The height of a small button.
@@ -707,9 +793,11 @@ pub mod control {
     pub fn height_md() -> Pixels {
         by_density(28., 32., 36.)
     }
-    /// The height of a list row.
+    /// The height of a list row. Above a text offset of 2, the row grows 3 px for each px of
+    /// text, so its two lines still fit in the compact row.
     pub fn row() -> Pixels {
-        by_density(32., 44., 52.)
+        let grow = (f32::from(current().text_offset) - 2.).max(0.) * 3.;
+        by_density(32., 44., 52.) + px(grow)
     }
     /// The vertical padding of a row of the sidebar and of the tree.
     pub fn row_pad() -> Pixels {
@@ -717,11 +805,11 @@ pub mod control {
     }
     /// The icon next to a small text.
     pub fn icon_sm() -> Pixels {
-        by_text(12., 14., 16.)
+        by_text(14.)
     }
     /// The icon next to a normal text.
     pub fn icon_md() -> Pixels {
-        by_text(14., 16., 18.)
+        by_text(16.)
     }
     pub const FOCUS_RING: Pixels = px(2.);
     /// The edge of a glow, and the alpha of the edge at rest. At rest the edge still
@@ -749,6 +837,10 @@ pub mod control {
     /// The widest trailing element of a list row. The title keeps the rest.
     pub const TRAILING_MAX: Pixels = px(160.);
     pub const SIDEBAR_WIDTH: Pixels = px(248.);
+    /// The sample pane of the Terminal section: 4 rows at the largest font size and line height.
+    pub const TERMINAL_SAMPLE_HEIGHT: Pixels = px(176.);
+    /// The list of the sections of the settings screen.
+    pub const SETTINGS_NAV_WIDTH: Pixels = px(200.);
     /// The desk conversation: the right column of the front desk.
     pub const DESK_CONVERSATION_WIDTH: Pixels = px(380.);
     /// The height of a diff view in the desk conversation. The diff scrolls inside it.
@@ -894,21 +986,20 @@ fn text_pairs_in_effect() -> Vec<(String, Color, Color)> {
         status::danger(),
         danger_fill_press(),
     ));
-    // The terminal keeps its dark colors in both color themes.
+    // The terminal palette that follows this color theme.
+    let light = current_palette() == Palette::LIGHT;
+    let t = terminal::Colors::of_theme(current_palette());
+    pairs.push(("terminal foreground".into(), t.foreground, t.background));
     pairs.push((
-        "terminal::FOREGROUND".into(),
-        terminal::FOREGROUND,
-        terminal::BACKGROUND,
+        "terminal foreground on the selection".into(),
+        t.foreground,
+        t.selection,
     ));
-    pairs.push((
-        "terminal::FOREGROUND on terminal::SELECTION".into(),
-        terminal::FOREGROUND,
-        terminal::SELECTION,
-    ));
-    for (i, &c) in terminal::ANSI.iter().enumerate().skip(1) {
-        // Color 0 is black and color 8 is dark grey. Programs use them as fills.
-        if i != 8 {
-            pairs.push((format!("terminal::ANSI[{i}]"), c, terminal::BACKGROUND));
+    for (i, &c) in t.ansi.iter().enumerate() {
+        // In the dark palette, color 0 is black and color 8 is dark grey: programs use them as
+        // fills. Each color of the light palette is text.
+        if light || (i != 0 && i != 8) {
+            pairs.push((format!("terminal ansi[{i}]"), c, t.background));
         }
     }
     pairs
@@ -1103,11 +1194,11 @@ mod tests {
         }
     }
 
-    fn at(density: Density, corners: Corners, text: TextSize) -> Measures {
+    fn at(density: Density, corners: Corners, text_offset: i8) -> Measures {
         set_for_test(Appearance {
             density,
             corners,
-            text,
+            text_offset,
         });
         let m = measures();
         set_for_test(Appearance::default());
@@ -1128,12 +1219,12 @@ mod tests {
                 icons: [px(14.), px(16.)],
             }
         );
-        assert_eq!(Appearance::default(), Appearance::all().nth(13).unwrap());
+        assert_eq!(Appearance::default(), Appearance::all().nth(30).unwrap());
     }
 
     #[test]
     fn each_choice_gives_the_values_of_the_spec() {
-        let (n, s, m) = (Density::Normal, Corners::Subtle, TextSize::Medium);
+        let (n, s, m) = (Density::Normal, Corners::Subtle, 0);
         let d = |d| at(d, s, m);
         assert_eq!(d(Density::Compact).space, px(3.));
         assert_eq!(d(Density::Comfortable).space, px(5.));
@@ -1147,24 +1238,41 @@ mod tests {
         assert_eq!(c(Corners::Square), [px(0.), px(2.), px(2.)]);
         assert_eq!(c(Corners::Round), [px(8.), px(12.), px(16.)]);
         let t = |t| at(n, s, t);
+        // The old sizes: small is -1, large is +2.
         assert_eq!(
-            t(TextSize::Small).sizes,
+            t(-1).sizes,
             [px(11.), px(12.), px(13.), px(15.), px(19.), px(27.)]
         );
         assert_eq!(
-            t(TextSize::Large).sizes,
+            t(2).sizes,
             [px(14.), px(15.), px(16.), px(18.), px(22.), px(30.)]
         );
-        assert_eq!(t(TextSize::Small).icons, [px(12.), px(14.)]);
-        assert_eq!(t(TextSize::Large).icons, [px(16.), px(18.)]);
+        assert_eq!(t(-1).icons, [px(12.), px(14.)]);
+        assert_eq!(t(2).icons, [px(16.), px(18.)]);
+        assert_eq!(
+            t(-2).sizes,
+            [px(10.), px(11.), px(12.), px(14.), px(18.), px(26.)]
+        );
+        assert_eq!(t(-2).icons, [px(12.), px(14.)]);
+        assert_eq!(
+            t(4).sizes,
+            [px(16.), px(17.), px(18.), px(20.), px(24.), px(32.)]
+        );
+        assert_eq!(t(4).icons, [px(18.), px(20.)]);
+        assert_eq!(
+            t(2).heights,
+            t(0).heights,
+            "up to +2 the rows keep their height"
+        );
+        assert_eq!(t(4).heights[2], px(50.));
     }
 
     #[test]
     fn only_the_listed_groups_change_with_a_choice() {
-        let base = at(Density::Normal, Corners::Subtle, TextSize::Medium);
-        let denser = at(Density::Compact, Corners::Subtle, TextSize::Medium);
-        let rounder = at(Density::Normal, Corners::Round, TextSize::Medium);
-        let larger = at(Density::Normal, Corners::Subtle, TextSize::Large);
+        let base = at(Density::Normal, Corners::Subtle, 0);
+        let denser = at(Density::Compact, Corners::Subtle, 0);
+        let rounder = at(Density::Normal, Corners::Round, 0);
+        let larger = at(Density::Normal, Corners::Subtle, 2);
         assert_eq!(
             (denser.sizes, denser.radii, denser.icons),
             (base.sizes, base.radii, base.icons)
@@ -1180,7 +1288,7 @@ mod tests {
     }
 
     #[test]
-    fn the_fixed_heights_hold_their_text_in_each_of_the_27_combinations() {
+    fn the_fixed_heights_hold_their_text_in_each_of_the_63_combinations() {
         use crate::appearance::INK_EM;
         let ink = |p: Pixels| f32::from(p) * INK_EM;
         let mut failures = Vec::new();
@@ -1230,6 +1338,6 @@ mod tests {
             assert_eq!(text_pairs(Palette::DARK), pairs, "{a:?}");
         }
         set_for_test(Appearance::default());
-        assert_eq!(Appearance::all().count(), 27);
+        assert_eq!(Appearance::all().count(), 63);
     }
 }

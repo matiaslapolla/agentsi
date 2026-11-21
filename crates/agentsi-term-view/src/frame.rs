@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
+use agentsi_ui::appearance::{CursorBlink, CursorStyle, with_terminal};
 use agentsi_ui::tokens::{Color, terminal};
 use agentsi_vt::{Cell, Colors, CursorShape, Grid, Rgb, RowId, Terminal, Underline, Width};
 use gpui_kit::{Hsla, Pixels, ShapedLine};
@@ -226,7 +227,7 @@ impl FrameCache {
 /// The background of a cell after inverse and the selection. `None` is the default background.
 fn background(cell: &Cell, colors: &Colors, selected: bool) -> Option<Hsla> {
     if selected {
-        Some(terminal::SELECTION.hsla())
+        Some(terminal::colors().selection.hsla())
     } else if cell.style.inverse {
         Some(hsla(cell.fg.unwrap_or(colors.foreground)))
     } else {
@@ -345,6 +346,28 @@ fn single_char(s: &str) -> Option<char> {
     }
 }
 
+/// The shape and the blink of the cursor: what the program asks, unless the terminal settings
+/// fix them.
+fn cursor_look(
+    shape: CursorShape,
+    blinking: bool,
+    style: CursorStyle,
+    blink: CursorBlink,
+) -> (CursorShape, bool) {
+    let shape = match style {
+        CursorStyle::Program => shape,
+        CursorStyle::Block => CursorShape::Block,
+        CursorStyle::Bar => CursorShape::Bar,
+        CursorStyle::Underline => CursorShape::Underline,
+    };
+    let blinking = match blink {
+        CursorBlink::Program => blinking,
+        CursorBlink::On => true,
+        CursorBlink::Off => false,
+    };
+    (shape, blinking)
+}
+
 fn cursor(grid: &Grid) -> Option<CursorCell> {
     let c = grid.cursor.filter(|c| c.visible)?;
     let mut col = c.x;
@@ -365,17 +388,19 @@ fn cursor(grid: &Grid) -> Option<CursorCell> {
     let under_bg = cell
         .and_then(|cell| cell.bg)
         .unwrap_or(grid.colors.background);
+    let (shape, blinking) =
+        with_terminal(|t| cursor_look(c.shape, c.blinking, t.cursor_style, t.cursor_blink));
     Some(CursorCell {
         row: c.y,
         col,
         wide,
-        shape: c.shape,
-        blinking: c.blinking,
+        shape,
+        blinking,
         color: grid
             .colors
             .cursor
             .map(hsla)
-            .unwrap_or_else(|| terminal::CURSOR.hsla()),
+            .unwrap_or_else(|| terminal::colors().cursor.hsla()),
         text: cell
             .filter(|cell| !cell.style.invisible)
             .map(|cell| cell.text.clone())
@@ -490,6 +515,33 @@ mod tests {
     }
 
     #[test]
+    fn the_settings_fix_the_cursor_shape_and_blink_or_leave_them_to_the_program() {
+        use super::cursor_look;
+        use agentsi_ui::appearance::{CursorBlink, CursorStyle};
+        let program = (CursorShape::Block, true);
+        let look = |style, blink| cursor_look(program.0, program.1, style, blink);
+        assert_eq!(look(CursorStyle::Program, CursorBlink::Program), program);
+        assert_eq!(
+            look(CursorStyle::Bar, CursorBlink::Program),
+            (CursorShape::Bar, true),
+            "a bar where the program asks for a block"
+        );
+        assert_eq!(
+            look(CursorStyle::Underline, CursorBlink::Off),
+            (CursorShape::Underline, false)
+        );
+        assert_eq!(
+            cursor_look(
+                CursorShape::Bar,
+                false,
+                CursorStyle::Program,
+                CursorBlink::On
+            ),
+            (CursorShape::Bar, true)
+        );
+    }
+
+    #[test]
     fn the_selection_paints_its_cells() {
         let g = grid(b"hello world");
         let mut s = Selection::new(Point { row: 7, col: 0 }, Unit::Cell, &g.rows[0]);
@@ -498,7 +550,7 @@ mod tests {
         let backs = backs(&f);
         assert_eq!(backs.len(), 1);
         assert_eq!((backs[0].col, backs[0].cols), (0, 5));
-        assert_eq!(backs[0].color, terminal::SELECTION.hsla());
+        assert_eq!(backs[0].color, terminal::colors().selection.hsla());
         // The same selection on other absolute rows paints nothing here.
         assert!(super::tests::backs(&build(&g, 100, Some(&s))).is_empty());
     }

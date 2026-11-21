@@ -165,7 +165,7 @@ pub fn stats(items: Vec<Div>) -> Div {
 /// Text in the mono font, for ids and commands.
 pub fn mono(s: impl Into<SharedString>) -> Div {
     div()
-        .font_family(font::MONO)
+        .font_family(font::mono())
         .text_size(size::xs())
         .text_color(text::tertiary())
         .child(s.into())

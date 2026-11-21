@@ -442,7 +442,7 @@ fn error_line(message: &str) -> impl IntoElement {
         .child(
             div()
                 .text_size(size::sm())
-                .font_family(font::UI)
+                .font_family(font::UI_DEFAULT)
                 .text_color(text::primary().hsla())
                 .overflow_hidden()
                 .text_ellipsis()

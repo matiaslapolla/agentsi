@@ -697,7 +697,7 @@ impl DeskConversation {
                 .child(TextView::new(text).selectable(true))
                 .into_any_element(),
             Row::Tool(l) => div()
-                .font_family(font::MONO)
+                .font_family(font::mono())
                 .text_size(size::xs())
                 .text_color(text::tertiary())
                 .truncate()

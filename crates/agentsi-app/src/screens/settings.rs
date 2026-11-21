@@ -2,6 +2,9 @@
 //! role, the vocabulary, the keys of the app and the SSH hosts. It belongs to no product.
 //! The owner edits the hosts in `hosts.toml`. The keys are saved in `keys.toml` (see `keys.rs`).
 //!
+//! The screen has two columns: the list of the settings sections at the left, and the one
+//! section that the owner picked at the right. `layout.json` keeps the last section opened.
+//!
 //! The `models.*` events of the core reach the screen through the `ModelFeed` entity. They
 //! skip `CoreState`, so a download redraws this screen only.
 
@@ -19,8 +22,11 @@ use agentsi_proto::rpc::Notification;
 use agentsi_proto::vocabulary_api::{
     VocabularyEntry, VocabularyGet, VocabularyList, VocabularySet, VocabularySetParams,
 };
-use agentsi_ui::components::{Button, Card, neutral_tag, status_tag};
-use agentsi_ui::tokens::{Status, accent, font, line, radius, size, space, surface, text, weight};
+use agentsi_ui::components::{Button, Card, ItemRow, neutral_tag, status_tag};
+use agentsi_ui::style::StyleExt as _;
+use agentsi_ui::tokens::{
+    Status, accent, control, font, line, radius, size, space, surface, text, weight,
+};
 use gpui_kit::component::IconName;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -35,13 +41,134 @@ mod alerts;
 mod appearance;
 mod data;
 mod dictation;
+mod fonts;
 mod git;
 mod guide;
 mod health;
 mod owner;
+mod terminal;
 use crate::model::{CoreState, HostState};
 pub use dictation::DictationGlobal;
 use dictation::DictationKey;
+
+/// One page of the settings screen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Section {
+    Owner,
+    Appearance,
+    Fonts,
+    Terminal,
+    Alerts,
+    VoiceModels,
+    Vocabulary,
+    Voices,
+    Keys,
+    DictationKey,
+    Git,
+    Hosts,
+    Guide,
+    Health,
+    Data,
+}
+
+impl Section {
+    /// The sections in the order of the list.
+    pub const ALL: [Section; 15] = [
+        Section::Owner,
+        Section::Appearance,
+        Section::Fonts,
+        Section::Terminal,
+        Section::Alerts,
+        Section::VoiceModels,
+        Section::Vocabulary,
+        Section::Voices,
+        Section::Keys,
+        Section::DictationKey,
+        Section::Git,
+        Section::Hosts,
+        Section::Guide,
+        Section::Health,
+        Section::Data,
+    ];
+
+    /// The word in `layout.json`.
+    pub const fn id(self) -> &'static str {
+        match self {
+            Section::Owner => "owner",
+            Section::Appearance => "appearance",
+            Section::Fonts => "fonts",
+            Section::Terminal => "terminal",
+            Section::Alerts => "alerts",
+            Section::VoiceModels => "voice-models",
+            Section::Vocabulary => "vocabulary",
+            Section::Voices => "voices",
+            Section::Keys => "keys",
+            Section::DictationKey => "dictation-key",
+            Section::Git => "git",
+            Section::Hosts => "hosts",
+            Section::Guide => "guide",
+            Section::Health => "health",
+            Section::Data => "data",
+        }
+    }
+
+    pub const fn title(self) -> &'static str {
+        match self {
+            Section::Owner => "Owner",
+            Section::Appearance => "Appearance",
+            Section::Fonts => "Fonts",
+            Section::Terminal => "Terminal",
+            Section::Alerts => "Alerts",
+            Section::VoiceModels => "Voice models",
+            Section::Vocabulary => "Vocabulary",
+            Section::Voices => "Voices",
+            Section::Keys => "Keys",
+            Section::DictationKey => "Dictation key",
+            Section::Git => "Git",
+            Section::Hosts => "Hosts",
+            Section::Guide => "Guide",
+            Section::Health => "Health",
+            Section::Data => "Data",
+        }
+    }
+
+    pub fn from_id(id: &str) -> Option<Section> {
+        Section::ALL.into_iter().find(|s| s.id() == id)
+    }
+
+    /// The sections that this app shows. The dictation key needs a dictation global (not on
+    /// macOS), and the hosts need `hosts.toml`.
+    pub fn shown(cx: &App) -> Vec<Section> {
+        let dictation = cx.try_global::<DictationGlobal>().is_some();
+        let hosts = cx.try_global::<HostsGlobal>().is_some();
+        Section::ALL
+            .into_iter()
+            .filter(|s| match s {
+                Section::DictationKey => dictation,
+                Section::Hosts => hosts,
+                _ => true,
+            })
+            .collect()
+    }
+}
+
+/// The section that the owner opened last. The shell saves it in `layout.json`, and a new
+/// settings screen opens at it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct OpenedSection(pub Section);
+
+impl Global for OpenedSection {}
+
+/// The section after Up or Down in the list `shown`, or `None` for another key or at an end.
+fn section_after(key: &str, shown: &[Section], now: Section) -> Option<Section> {
+    let at = shown.iter().position(|s| *s == now)?;
+    let to = match key {
+        "up" => at.checked_sub(1)?,
+        "down" => at + 1,
+        _ => return None,
+    };
+    shown.get(to).copied()
+}
 
 /// Two downloads at once send up to 20 events each second. The screen draws at most 10 times.
 const REDRAW_EVERY: Duration = Duration::from_millis(100);
@@ -181,6 +308,10 @@ struct Capturing {
 
 pub struct SettingsScreen {
     core: Entity<CoreState>,
+    /// The section that the right column shows.
+    section: Section,
+    /// The list of the sections. Up and Down move in it while it has the focus.
+    nav_focus: FocusHandle,
     /// Takes the focus while a key row waits, so no field gets the key.
     focus: FocusHandle,
     /// The filter field of the Keys section. The first render makes it.
@@ -196,6 +327,10 @@ pub struct SettingsScreen {
     owner_state: owner::OwnerState,
     /// The error of the last save of the Appearance section.
     appearance_error: Option<String>,
+    /// The Fonts section: the families, the search fields and the filter.
+    fonts: fonts::FontsState,
+    /// The Terminal section: the sample pane, the shell field and the last error.
+    terminal: terminal::TerminalState,
     /// The error of the last save of the Alerts section.
     alerts_error: Option<String>,
     /// The shared table of the git config file: the section "Git".
@@ -244,6 +379,90 @@ impl SettingsScreen {
         self.focus.clone()
     }
 
+    /// The section in view: the one picked, or the first when this app does not show it.
+    fn shown_section(&self, shown: &[Section]) -> Section {
+        if shown.contains(&self.section) {
+            self.section
+        } else {
+            shown[0]
+        }
+    }
+
+    /// Shows `section` from its top, and keeps it for the next start.
+    pub fn open_section(&mut self, section: Section, cx: &mut Context<Self>) {
+        self.section = section;
+        self.scroll.set_offset(Point::default());
+        if cx.try_global::<OpenedSection>() != Some(&OpenedSection(section)) {
+            cx.set_global(OpenedSection(section));
+        }
+        cx.notify();
+    }
+
+    fn nav_key(&mut self, e: &KeyDownEvent, cx: &mut Context<Self>) {
+        if e.keystroke.modifiers.modified() {
+            return;
+        }
+        let shown = Section::shown(cx);
+        let now = self.shown_section(&shown);
+        match section_after(e.keystroke.key.as_str(), &shown, now) {
+            Some(next) => {
+                self.open_section(next, cx);
+                cx.stop_propagation();
+            }
+            // Page Up, Page Down, Home and End scroll the section from the list too.
+            None => self.scroll_key(e, cx),
+        }
+    }
+
+    /// The list of the sections, with the title of the screen above it.
+    fn nav(
+        &self,
+        shown: &[Section],
+        now: Section,
+        window: &Window,
+        cx: &mut Context<Self>,
+    ) -> Stateful<Div> {
+        let focused = self.nav_focus.is_focused(window);
+        div()
+            .id("settings-nav")
+            .debug_selector(|| "settings-nav".into())
+            .track_focus(&self.nav_focus)
+            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.nav_key(e, cx)))
+            .flex_none()
+            .w(control::SETTINGS_NAV_WIDTH)
+            .h_full()
+            .overflow_y_scroll()
+            .flex()
+            .flex_col()
+            .gap(space(1))
+            .p(space(3))
+            .bg(surface::base())
+            .border_r_1()
+            .border_color(line::border())
+            .child(
+                div()
+                    .debug_selector(|| "settings-header".into())
+                    .pad_x(space(2))
+                    .pb(space(2))
+                    .text_size(size::lg())
+                    .font_weight(weight::SEMIBOLD)
+                    .text_color(text::primary())
+                    .child("Settings"),
+            )
+            .children(shown.iter().map(|&s| {
+                ItemRow::new(
+                    SharedString::from(format!("settings-section-{}", s.id())),
+                    s.title(),
+                )
+                .selected(s == now)
+                .focused(focused && s == now)
+                .on_click(cx.listener(move |this, _, window, cx| {
+                    window.focus(&this.nav_focus, cx);
+                    this.open_section(s, cx);
+                }))
+            }))
+    }
+
     /// Page Up, Page Down, Home and End scroll the page: the screen has no other way to the
     /// lower sections for a keyboard.
     fn scroll_key(&mut self, e: &KeyDownEvent, cx: &mut Context<Self>) {
@@ -276,6 +495,10 @@ impl SettingsScreen {
         let mut screen = SettingsScreen {
             core,
             git,
+            section: cx
+                .try_global::<OpenedSection>()
+                .map_or(Section::ALL[0], |s| s.0),
+            nav_focus: cx.focus_handle().tab_index(0).tab_stop(true),
             focus: cx.focus_handle(),
             keys_filter: None,
             capture: None,
@@ -287,6 +510,8 @@ impl SettingsScreen {
             health: health::HealthState::default(),
             owner_state: owner::OwnerState::default(),
             appearance_error: None,
+            fonts: fonts::FontsState::default(),
+            terminal: terminal::TerminalState::default(),
             alerts_error: None,
             keys_note: None,
             models: Load::Loading,
@@ -1047,7 +1272,7 @@ fn voice_rows(v: &VoicesResult) -> Div {
             .gap(space(1))
             .child(
                 div()
-                    .font_family(font::MONO)
+                    .font_family(font::mono())
                     .text_size(size::sm())
                     .text_color(text::secondary())
                     .child(voice.to_string()),
@@ -1142,22 +1367,17 @@ fn host_rows(h: &Hosts) -> Div {
         )
 }
 
-impl Render for SettingsScreen {
-    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let root = div()
-            .id("settings")
-            .debug_selector(|| "settings-root".into())
-            .size_full()
-            .bg(surface::panel())
-            // A click outside the row that waits ends the capture.
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, _, cx| this.cancel_captures(cx)),
-            );
+impl SettingsScreen {
+    fn voice_models_section(&self, cx: &mut Context<Self>) -> Div {
+        let head = div().flex().flex_col().gap(space(3));
         let models = match &self.models {
-            Load::Loading => return root.child(notice("Reading the models…", None)),
+            Load::Loading => {
+                return head
+                    .child(section("Voice models", None))
+                    .child(mono("Reading the models…"));
+            }
             Load::Failed(e) => {
-                return root.child(notice(
+                return head.child(section("Voice models", None)).child(notice(
                     format!("The models were not read: {e}"),
                     Some("Check that the core runs, then reload the screen.".into()),
                 ));
@@ -1170,6 +1390,15 @@ impl Render for SettingsScreen {
             .enumerate()
             .map(|(i, m)| self.model_card(i, m, cx))
             .collect();
+        head.child(section("Voice models", Some(cards.len())))
+            .child(mono(format!(
+                "{} · each file has a pinned SHA-256",
+                models.root
+            )))
+            .children(cards)
+    }
+
+    fn voices_section(&self) -> Div {
         let voices = match &self.voices {
             Load::Loading => div().child(mono("Reading the voices…")),
             Load::Failed(e) => div()
@@ -1178,84 +1407,78 @@ impl Render for SettingsScreen {
                 .child(format!("The voices were not read: {e}")),
             Load::Ready(v) => voice_rows(v),
         };
-        let vocabulary = self.vocabulary_section(window, cx);
-        let keys_section = self.keys_section(window, cx);
-        let dictation = self.dictation_section(cx);
-        let appearance = self.appearance_section(cx);
-        let alerts = self.alerts_section(cx);
-        let health = self.health_section(cx);
-        let owner = self.owner_section(window, cx);
-        let data = self.data_section(window, cx);
-        let git = self.git_section();
-        let guide = self.guide_section(cx);
-        let hosts = self.hosts.as_ref().map(|h| host_rows(h.read(cx)));
-        root.overflow_y_scroll()
-            .track_focus(&self.focus)
-            .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.scroll_key(e, cx)))
-            .track_scroll(&self.scroll)
+        div()
+            .flex()
+            .flex_col()
+            .gap(space(3))
+            .child(section("Voices", None))
+            .child(voices)
+    }
+
+    fn hosts_section(&self, cx: &mut Context<Self>) -> Div {
+        div()
+            .flex()
+            .flex_col()
+            .gap(space(3))
+            .child(section("Hosts", None))
+            .children(self.hosts.as_ref().map(|h| host_rows(h.read(cx))))
+    }
+
+    /// The content of one section.
+    fn render_section(&mut self, s: Section, window: &mut Window, cx: &mut Context<Self>) -> Div {
+        match s {
+            Section::Owner => self.owner_section(window, cx),
+            Section::Appearance => self.appearance_section(cx),
+            Section::Fonts => self.fonts_section(window, cx),
+            Section::Terminal => self.terminal_section(window, cx),
+            Section::Alerts => self.alerts_section(cx),
+            Section::VoiceModels => self.voice_models_section(cx),
+            Section::Vocabulary => self.vocabulary_section(window, cx),
+            Section::Voices => self.voices_section(),
+            Section::Keys => self.keys_section(window, cx),
+            Section::DictationKey => self.dictation_section(cx).unwrap_or_else(div),
+            Section::Git => self.git_section(),
+            Section::Hosts => self.hosts_section(cx),
+            Section::Guide => self.guide_section(cx),
+            Section::Health => self.health_section(cx),
+            Section::Data => self.data_section(window, cx),
+        }
+    }
+}
+
+impl Render for SettingsScreen {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let shown = Section::shown(cx);
+        let now = self.shown_section(&shown);
+        let nav = self.nav(&shown, now, window, cx);
+        let content = self.render_section(now, window, cx);
+        div()
+            .id("settings")
+            .debug_selector(|| "settings-root".into())
+            .size_full()
+            .flex()
+            .bg(surface::panel())
+            // A click outside the row that waits ends the capture.
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(|this, _, _, cx| this.cancel_captures(cx)),
+            )
+            .child(nav)
             .child(
-            column()
-                .child(
-                    div()
-                        .debug_selector(|| "settings-header".into())
-                        .flex()
-                        .flex_col()
-                        .gap(space(1))
-                        .child(
-                            div()
-                                .text_size(size::lg())
-                                .font_weight(weight::SEMIBOLD)
-                                .text_color(text::primary())
-                                .child("Settings"),
-                        )
-                        .child(
-                            div()
-                                .text_size(size::sm())
-                                .text_color(text::secondary())
-                                .child("The look of the app, voice models, voices, the vocabulary and the keys of this device, its SSH hosts, and the data to delete."),
-                        ),
-                )
-                .child(owner)
-                .child(appearance)
-                .child(alerts)
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(space(3))
-                        .child(section("Voice models", Some(cards.len())))
-                        .child(mono(format!(
-                            "{} · each file has a pinned SHA-256",
-                            models.root
-                        )))
-                        .children(cards),
-                )
-                .child(vocabulary)
-                .child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(space(3))
-                        .child(section("Voices", None))
-                        .child(voices),
-                )
-                .child(keys_section)
-                .when_some(dictation, |el, section| el.child(section))
-                .child(git)
-                .when_some(hosts, |el, rows| {
-                    el.child(
-                        div()
-                            .flex()
-                            .flex_col()
-                            .gap(space(3))
-                            .child(section("Hosts", None))
-                            .child(rows),
+                div()
+                    .id("settings-page")
+                    .debug_selector(|| format!("settings-page:{}", now.id()))
+                    .flex_1()
+                    .min_w_0()
+                    .h_full()
+                    .overflow_y_scroll()
+                    .track_focus(&self.focus)
+                    .on_key_down(
+                        cx.listener(|this, e: &KeyDownEvent, _, cx| this.scroll_key(e, cx)),
                     )
-                })
-                .child(guide)
-                .child(health)
-                .child(data),
-        )
+                    .track_scroll(&self.scroll)
+                    .child(column().child(content)),
+            )
     }
 }
 
@@ -1406,6 +1629,61 @@ mod tests {
         assert_eq!(bytes(999), "999 B");
     }
 
+    #[test]
+    fn up_and_down_move_in_the_shown_sections_and_stop_at_both_ends() {
+        use super::{Section, section_after};
+        let shown = [Section::Owner, Section::Appearance, Section::Git];
+        let after = |key, now| section_after(key, &shown, now);
+        assert_eq!(after("down", Section::Owner), Some(Section::Appearance));
+        assert_eq!(after("up", Section::Git), Some(Section::Appearance));
+        assert_eq!(after("up", Section::Owner), None);
+        assert_eq!(after("down", Section::Git), None);
+        assert_eq!(after("down", Section::Hosts), None, "a hidden section");
+        assert_eq!(after("pagedown", Section::Owner), None);
+    }
+
+    #[gpui::test]
+    fn a_click_in_the_list_shows_only_that_section_and_keys_move_in_the_list(
+        cx: &mut gpui::TestAppContext,
+    ) {
+        use super::{OpenedSection, Section};
+        let (t, cx) = support::setup(cx, None);
+        let draw = |cx: &mut gpui::VisualTestContext| cx.update(|w, cx| w.draw(cx).clear(cx));
+        draw(cx);
+        // No dictation global and no hosts here: both sections are hidden in the list.
+        assert!(cx.debug_bounds("tree-row:settings-section-hosts").is_none());
+        assert!(
+            cx.debug_bounds("tree-row:settings-section-dictation-key")
+                .is_none()
+        );
+        assert!(
+            cx.debug_bounds("settings-page:owner").is_some(),
+            "the first section"
+        );
+
+        let git = cx.debug_bounds("tree-row:settings-section-git").unwrap();
+        cx.simulate_click(git.center(), gpui::Modifiers::none());
+        draw(cx);
+        assert!(cx.debug_bounds("settings-page:git").is_some());
+        assert!(
+            cx.debug_bounds("owner-section").is_none(),
+            "only the Git section"
+        );
+        assert_eq!(
+            cx.update(|_, cx| cx.try_global::<OpenedSection>().copied()),
+            Some(OpenedSection(Section::Git))
+        );
+
+        // The click gave the list the focus: Down and Up move in it, past the hidden Hosts.
+        cx.simulate_keystrokes("down");
+        draw(cx);
+        assert!(cx.debug_bounds("settings-page:guide").is_some());
+        cx.simulate_keystrokes("up up");
+        draw(cx);
+        assert!(cx.debug_bounds("settings-page:keys").is_some());
+        let _ = &t;
+    }
+
     pub(super) mod support {
         use std::cell::Cell;
         use std::path::PathBuf;
@@ -1420,7 +1698,7 @@ mod tests {
         use crate::link::Link;
         use crate::model::CoreState;
         use crate::screens::parts::Load;
-        use crate::screens::settings::SettingsScreen;
+        use crate::screens::settings::{Section, SettingsScreen};
 
         pub struct Setup {
             pub screen: Entity<SettingsScreen>,
@@ -1431,6 +1709,14 @@ mod tests {
             pub roles: Rc<Cell<usize>>,
             // The core side of the link: it must stay open.
             pub core_end: std::os::unix::net::UnixStream,
+        }
+
+        impl Setup {
+            /// Shows `section` in the right column.
+            pub fn open(&self, cx: &mut VisualTestContext, section: Section) {
+                self.screen.update(cx, |s, cx| s.open_section(section, cx));
+                cx.update(|window, cx| window.draw(cx).clear(cx));
+            }
         }
 
         /// A settings screen in a window, on a key file in a folder of its own. `NewTerminal`
