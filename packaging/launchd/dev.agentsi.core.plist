@@ -14,6 +14,8 @@
   </array>
   <key>EnvironmentVariables</key>
   <dict>
+    <!-- At start the core adds the folders of the login shell PATH ($SHELL -l -i) to this
+         one. This PATH is the base when that read fails. -->
     <key>PATH</key>
     <string>@BINDIR@:@HOME@/.cargo/bin:@HOME@/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>

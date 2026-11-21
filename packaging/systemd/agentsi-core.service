@@ -12,7 +12,9 @@ Restart=on-failure
 RestartSec=2
 # A client (agentsi, the app) may start a core first. The second core exits with 3.
 SuccessExitStatus=3
-# The core starts `claude`, `git` and `bwrap` for meetings and stories.
+# The core starts `claude`, `git` and `bwrap` for meetings and stories. At start the core
+# adds the folders of the login shell PATH (`$SHELL -l -i`) to this one. This PATH is the
+# base when that read fails.
 Environment="PATH=@BINDIR@:%h/.cargo/bin:%h/.local/bin:/usr/local/bin:/usr/bin:/bin"
 
 [Install]
