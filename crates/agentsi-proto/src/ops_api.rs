@@ -38,6 +38,38 @@ pub struct CoreStatusResult {
     /// True while the pill is connected. Only the pill subscribes to the dictation topic.
     #[serde(default)]
     pub pill: bool,
+    /// The `PATH` that the core starts programs with. `None` from an older core.
+    #[serde(default)]
+    pub path: Option<CorePath>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct CorePath {
+    pub source: PathSource,
+    /// The folders, joined with `:`.
+    pub value: String,
+}
+
+/// Where the `PATH` of the core comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PathSource {
+    /// The `PATH` that the core started with. `AGENTSI_NO_SHELL_PATH=1` turned off the read.
+    Process,
+    /// The `PATH` that the core started with, followed by the new folders of the login shell.
+    Merged,
+    /// The `PATH` that the core started with, because the login shell gave none in time.
+    ShellReadFailed,
+}
+
+impl PathSource {
+    pub fn words(self) -> &'static str {
+        match self {
+            PathSource::Process => "process",
+            PathSource::Merged => "merged",
+            PathSource::ShellReadFailed => "shell read failed",
+        }
+    }
 }
 
 impl Method for CoreStatus {

@@ -85,6 +85,7 @@ impl CoreProc {
         let mut c = Command::new(BIN);
         c.arg("serve")
             .env("AGENTSI_CORE_SOCKET", &socket.path)
+            .env("AGENTSI_NO_SHELL_PATH", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::null());
         c

@@ -189,7 +189,7 @@ impl Terminals {
             .env
             .get("PATH")
             .map(OsString::from)
-            .or_else(|| std::env::var_os("PATH"));
+            .or_else(agentsi_proto::path::current);
         if let Some(path) = child_path(path) {
             env.push(("PATH".into(), path));
         }

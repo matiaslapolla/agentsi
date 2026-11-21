@@ -62,7 +62,7 @@ fn setup(dir: &TempDir) -> World {
 fn start(dir: &TempDir, w: &World) -> CoreProc {
     let mut path = OsString::from(w.bin.as_os_str());
     path.push(":");
-    path.push(std::env::var_os("PATH").unwrap_or_default());
+    path.push(agentsi_proto::path::current().unwrap_or_default());
     CoreProc::start_with(
         dir,
         &[

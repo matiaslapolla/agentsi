@@ -70,7 +70,7 @@ fn agentsi(w: &Work, args: &[&str]) -> (i32, String, String) {
         .args(args)
         .current_dir(w.dir.path())
         .env_clear()
-        .env("PATH", std::env::var_os("PATH").unwrap_or_default())
+        .env("PATH", agentsi_proto::path::current().unwrap_or_default())
         .env("HOME", w.dir.path())
         .env("AGENTSI_HOME", w.dir.path().join("root"))
         .env("XDG_DATA_HOME", w.dir.path().join("data"))

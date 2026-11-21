@@ -146,6 +146,7 @@ mod tests {
                 latest: 3,
             }),
             pill: false,
+            path: None,
         }
     }
 
