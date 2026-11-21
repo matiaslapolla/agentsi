@@ -20,7 +20,8 @@ use gpui_kit::*;
 
 use super::{Ask, PaneRef, Shell, shell_argv_for};
 use crate::actions;
-use crate::look::LookGlobal;
+use crate::favorites::{Favorite, FavoritesGlobal, Saved};
+use crate::look::{self, LookGlobal};
 use crate::menus::{self, Cmd, Facts, Item, Kind, MenuRequest, Target};
 use crate::model::ProductRef;
 use crate::pane::TerminalPanel;
@@ -28,7 +29,7 @@ use crate::prompt::{Choice, Prompt};
 use crate::screens::meeting;
 use crate::screens::ticket::{self, Op};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec};
-use crate::tabs::GroupId;
+use crate::tabs::{GroupId, SpaceId};
 
 /// The answer of the Confirm that runs the command.
 const YES: &str = "yes";
@@ -84,10 +85,17 @@ impl Shell {
                     folder: !t.cwd.is_empty(),
                     local: p.host.is_none(),
                     tabbed: tab.is_some(),
-                    grouped: tab.is_some_and(|t| self.tabs.read(cx).group_of(t).is_some()),
+                    grouped: tab.is_some_and(|t| self.grouped(t, cx)),
+                    pinned: tab.is_some_and(|t| self.is_pinned(t, cx)),
                     ..Facts::default()
                 }
             }
+            Target::Tab(tab) => Facts {
+                tabbed: self.space_of_panel(*tab, cx).is_some(),
+                grouped: self.grouped(*tab, cx),
+                pinned: self.is_pinned(*tab, cx),
+                ..Facts::default()
+            },
             Target::Meeting(p) => Facts {
                 meeting: meeting(p),
                 ..Facts::default()
@@ -106,7 +114,30 @@ impl Shell {
                 ticket: Some(*state),
                 ..Facts::default()
             },
-            Target::Reflection(_) | Target::Group(..) | Target::TabGroup(_) => Facts::default(),
+            Target::Reflection(_)
+            | Target::Group(..)
+            | Target::TabGroup(_)
+            | Target::Favorite(_) => Facts::default(),
+        }
+    }
+
+    fn grouped(&self, tab: PanelId, cx: &App) -> bool {
+        self.tabs_of(tab, cx)
+            .is_some_and(|t| t.read(cx).group_of(tab).is_some())
+    }
+
+    /// The menu target of a tab: a terminal tab is its pane, a screen tab is a tab.
+    pub(super) fn tab_target(&self, tab: PanelId, cx: &App) -> Target {
+        let pane = self.open.borrow().terminals.iter().find_map(|t| {
+            let t = t.upgrade()?;
+            (PanelId::from(t.entity_id()) == tab).then(|| PaneRef {
+                host: t.read(cx).host(cx),
+                id: t.read(cx).id.clone(),
+            })
+        });
+        match pane {
+            Some(p) => Target::Pane(p),
+            None => Target::Tab(tab),
         }
     }
 
@@ -245,6 +276,8 @@ impl Shell {
                     Kind::Ticket => "No ticket is in view. Open the tickets of a product first.",
                     Kind::Group => "The active product is in no group.",
                     Kind::TabGroup => "The active tab is in no tab group.",
+                    Kind::Tab => "No tab is open. Open a terminal first.",
+                    Kind::Favorite => "No favorite yet. Use \"Add to favorites\" on a tab first.",
                     _ => "No active product. Pick one in the sidebar first.",
                 },
                 cx,
@@ -274,6 +307,13 @@ impl Shell {
                 let tab = self.active_tab(window, cx)?;
                 self.tabs.read(cx).group_of(tab).map(Target::TabGroup)
             }
+            Kind::Tab => {
+                let tab = self.active_tab(window, cx)?;
+                Some(self.tab_target(tab, cx))
+            }
+            Kind::Favorite => FavoritesGlobal::get(cx)
+                .filter(|f| !f.read(cx).list.is_empty())
+                .map(|_| Target::Favorite(0)),
             Kind::Ticket => {
                 // The ticket screens: the one with the focus, else the one in view.
                 let screens = self.open_screens(cx);
@@ -347,6 +387,8 @@ impl Shell {
             Target::Story(p, id) => self.story_cmd(p, id, cmd, window, cx),
             Target::Ticket(p, id, _) => self.ticket_cmd(p, id, cmd, window, cx),
             Target::TabGroup(g) => self.tab_group_cmd(g, cmd, window, cx),
+            Target::Tab(tab) => self.tab_cmd(tab, cmd, window, cx),
+            Target::Favorite(at) => self.favorite_cmd(at, cmd, window, cx),
             Target::Group(host, name) => match cmd {
                 Cmd::RenameGroup => self.ask(Ask::GroupName(host, name), window, cx),
                 Cmd::ColorGroup => self.ask(Ask::GroupColor(host, name), window, cx),
@@ -378,7 +420,7 @@ impl Shell {
                 let argv = shell_argv_for(p.host.is_some(), cx);
                 self.open_terminal_in(Some(p), argv, window, cx)
             }
-            Cmd::OpenDesk => self.select_product(&p, window, cx),
+            Cmd::OpenDesk => self.open_desk(&p, window, cx),
             Cmd::StartMeeting => {
                 self.show_screen(ScreenSpec::meeting(&p.id).on(p.host.clone()), window, cx);
                 self.start_meeting(&p, cx);
@@ -533,7 +575,7 @@ impl Shell {
             .iter()
             .filter_map(WeakEntity::upgrade)
             .find(|p| {
-                p.read(cx).is(pane.host.as_deref(), &pane.id, cx) && self.in_dock(p.entity_id(), cx)
+                p.read(cx).is(pane.host.as_deref(), &pane.id, cx) && self.in_any(p.entity_id(), cx)
             })
     }
 
@@ -588,12 +630,16 @@ impl Shell {
                     None => self.notice("The folder of this pane is not known.", cx),
                 }
             }
-            Cmd::ClosePane => self.close_pane(pane, window, cx),
+            Cmd::ClosePane | Cmd::CloseTab => self.close_pane(pane, window, cx),
+            Cmd::AddToFavorites => self.favorite_pane(&pane, cx),
             Cmd::NewTabGroup
             | Cmd::AddToTabGroup
             | Cmd::LeaveTabGroup
             | Cmd::CloseOthers
-            | Cmd::CloseToRight => {
+            | Cmd::CloseToRight
+            | Cmd::PinTab
+            | Cmd::UnpinTab
+            | Cmd::MoveToProduct => {
                 let Some(tab) = self
                     .pane_panel(&pane, cx)
                     .map(|t| PanelId::from(t.entity_id()))
@@ -601,16 +647,170 @@ impl Shell {
                     self.notice("This pane has no tab. Click its row first.", cx);
                     return;
                 };
-                match cmd {
-                    Cmd::NewTabGroup => self.ask(Ask::NewTabGroup(tab), window, cx),
-                    Cmd::AddToTabGroup => self.ask(Ask::AddToTabGroup(tab), window, cx),
-                    Cmd::LeaveTabGroup => self.leave_group(tab, window, cx),
-                    Cmd::CloseOthers => self.close_others(tab, window, cx),
-                    _ => self.close_to_the_right(tab, window, cx),
+                if cmd == Cmd::MoveToProduct {
+                    self.ask(Ask::MoveTab(tab), window, cx);
+                } else {
+                    self.tab_cmd(tab, cmd, window, cx);
                 }
             }
             _ => {}
         }
+    }
+
+    /// A command on a tab of a space.
+    fn tab_cmd(&mut self, tab: PanelId, cmd: Cmd, window: &mut Window, cx: &mut Context<Self>) {
+        match cmd {
+            Cmd::PinTab => self.pin_tab(tab, true, window, cx),
+            Cmd::UnpinTab => self.pin_tab(tab, false, window, cx),
+            Cmd::NewTabGroup => self.ask(Ask::NewTabGroup(tab), window, cx),
+            Cmd::AddToTabGroup => self.ask(Ask::AddToTabGroup(tab), window, cx),
+            Cmd::LeaveTabGroup => self.leave_group(tab, window, cx),
+            Cmd::CloseOthers => self.close_others(tab, window, cx),
+            Cmd::CloseToRight => self.close_to_the_right(tab, window, cx),
+            Cmd::CloseTab => self.close_tabs(vec![tab], window, cx),
+            Cmd::AddToFavorites => self.favorite_screen(tab, cx),
+            _ => {}
+        }
+    }
+
+    /// Saves the screen of a tab as a favorite.
+    fn favorite_screen(&mut self, tab: PanelId, cx: &mut Context<Self>) {
+        let spec = self.open_screens(cx).into_iter().find_map(|s| {
+            (PanelId::from(s.entity_id()) == tab).then(|| {
+                let s = s.read(cx);
+                ScreenSpec {
+                    kind: s.kind,
+                    host: s.host.clone(),
+                    product: s.product.clone(),
+                    arg: s.arg.clone(),
+                }
+            })
+        });
+        let Some(spec) = spec else {
+            return;
+        };
+        let product = SpaceId::of_screen(&spec).product().cloned();
+        self.add_favorite(
+            product,
+            Saved::Screen(spec.kind, spec.arg),
+            String::new(),
+            cx,
+        );
+    }
+
+    /// Saves the command and the folder of a terminal as a favorite.
+    fn favorite_pane(&mut self, pane: &PaneRef, cx: &mut Context<Self>) {
+        let Some(core) = self.cores.of(pane.host.as_deref()) else {
+            return;
+        };
+        let core = core.read(cx);
+        let Some(t) = core.terminals.get(&pane.id) else {
+            self.notice("The terminal of this pane is gone.", cx);
+            return;
+        };
+        let product = t.product.clone().map(|id| ProductRef {
+            host: pane.host.clone(),
+            id,
+        });
+        let saved = Saved::Command {
+            argv: t.argv.clone(),
+            folder: t.cwd.clone(),
+        };
+        let label = LookGlobal::with(cx, |l| l.pane(pane.host.as_deref(), &pane.id).label)
+            .flatten()
+            .unwrap_or_default();
+        self.add_favorite(product, saved, label, cx);
+    }
+
+    fn add_favorite(
+        &mut self,
+        product: Option<ProductRef>,
+        saved: Saved,
+        label: String,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(list) = FavoritesGlobal::get(cx) else {
+            self.notice("This window has no favorites file.", cx);
+            return;
+        };
+        let favorite = Favorite {
+            label,
+            product,
+            saved,
+        };
+        list.update(cx, |l, cx| l.add(favorite, cx));
+        let label = list
+            .read(cx)
+            .list
+            .last()
+            .map(|f| f.label.clone())
+            .unwrap_or_default();
+        self.notice(&format!("Added {label} to the favorites."), cx);
+    }
+
+    fn favorite_cmd(&mut self, at: usize, cmd: Cmd, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(list) = FavoritesGlobal::get(cx) else {
+            return;
+        };
+        match cmd {
+            Cmd::Open => self.open_favorite(at, window, cx),
+            Cmd::RenameFavorite => self.ask(Ask::RenameFavorite(at), window, cx),
+            Cmd::RemoveFavorite => list.update(cx, |l, cx| l.remove(at, cx)),
+            _ => {}
+        }
+    }
+
+    /// Opens the target of a favorite in the space of its product: a screen, a shell in a
+    /// folder, or a terminal with the command in its folder.
+    pub fn open_favorite(&mut self, at: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(f) = FavoritesGlobal::get(cx).and_then(|l| l.read(cx).list.get(at).cloned())
+        else {
+            return;
+        };
+        if let Some(spec) = f.screen() {
+            self.show_screen(spec, window, cx);
+            return;
+        }
+        let host = f.product.as_ref().and_then(|p| p.host.clone());
+        let Some(core) = self.cores.of(host.as_deref()).cloned() else {
+            self.notice(
+                &format!("{} is on a host that this window does not know.", f.label),
+                cx,
+            );
+            return;
+        };
+        let (folder, argv) = match f.saved {
+            Saved::Folder(path) => (path, shell_argv_for(host.is_some(), cx)),
+            Saved::Command { argv, folder } => (folder, argv),
+            Saved::Screen(..) => return,
+        };
+        let product = f.product.map(|p| p.id);
+        self.create_terminal(core, expand(&folder), argv, product, None, window, cx);
+    }
+
+    /// Moves a terminal tab to the space of `to`. The terminal keeps running: the old tab lets it
+    /// go, and a new tab in the other space attaches to it.
+    fn move_tab(&mut self, tab: PanelId, to: SpaceId, window: &mut Window, cx: &mut Context<Self>) {
+        let panel = self
+            .open
+            .borrow()
+            .terminals
+            .iter()
+            .filter_map(WeakEntity::upgrade)
+            .find(|t| PanelId::from(t.entity_id()) == tab);
+        let (Some(panel), Some(dock)) = (panel, self.dock_of(tab, cx)) else {
+            return;
+        };
+        if self.space_of_panel(tab, cx).as_ref() == Some(&to) {
+            return;
+        }
+        let (id, core) = {
+            let p = panel.read(cx);
+            (p.id.clone(), p.core().clone())
+        };
+        panel.update(cx, |p, _| p.keep_terminal());
+        dock.update(cx, |d, cx| d.remove_panel(panel, window, cx));
+        self.add_terminal_panel_in(to, id, core, window, cx);
     }
 
     fn tab_group_cmd(
@@ -912,11 +1112,49 @@ impl Shell {
                     Target::Ticket(_, id, _) => id.clone(),
                     Target::Group(_, name) => name.clone(),
                     Target::TabGroup(_) => "this tab group".to_string(),
+                    Target::Tab(_) => "this tab".to_string(),
+                    Target::Favorite(at) => FavoritesGlobal::get(cx)
+                        .and_then(|l| l.read(cx).list.get(*at).map(|f| f.label.clone()))
+                        .unwrap_or_default(),
                 };
                 let (title, verb) = menus::confirm_text(*cmd, &name);
                 let choices = vec![Choice::new(verb, YES), Choice::new("Keep it as it is", NO)];
                 // Enter keeps: the safe answer is the one under the cursor.
                 Some(cx.new(|cx| Prompt::pick(title, choices, 1, window, cx)))
+            }
+            Ask::MoveTab(_) => {
+                let mut choices: Vec<Choice> = self
+                    .products(cx)
+                    .into_iter()
+                    .map(|(p, name)| Choice::new(name, look::key(p.host.as_deref(), &p.id)))
+                    .collect();
+                choices.push(Choice::new("Home", crate::layout::HOME));
+                Some(cx.new(|cx| Prompt::pick("Move this tab to", choices, 0, window, cx)))
+            }
+            Ask::RenameFavorite(at) => {
+                let now = FavoritesGlobal::get(cx)
+                    .and_then(|l| l.read(cx).list.get(*at).map(|f| f.label.clone()))
+                    .unwrap_or_default();
+                Some(cx.new(|cx| {
+                    Prompt::text(
+                        "Name for this favorite",
+                        "A name of 40 characters or less.",
+                        &now,
+                        Vec::new(),
+                        window,
+                        cx,
+                    )
+                }))
+            }
+            Ask::PickFavorite(_) => {
+                let choices: Vec<Choice> = FavoritesGlobal::get(cx)?
+                    .read(cx)
+                    .list
+                    .iter()
+                    .enumerate()
+                    .map(|(i, f)| Choice::new(f.label.clone(), i.to_string()))
+                    .collect();
+                Some(cx.new(|cx| Prompt::pick("Which favorite?", choices, 0, window, cx)))
             }
             _ => None,
         }
@@ -965,6 +1203,21 @@ impl Shell {
                     self.perform(target.clone(), *cmd, window, cx);
                 }
             }
+            Ask::MoveTab(tab) => self.move_tab(*tab, SpaceId::from_key(answer), window, cx),
+            Ask::RenameFavorite(at) => {
+                if let Some(list) = FavoritesGlobal::get(cx) {
+                    list.update(cx, |l, cx| l.rename(*at, answer, cx));
+                }
+            }
+            Ask::PickFavorite(cmd) => {
+                if let Ok(at) = answer.parse::<usize>() {
+                    // The answer of this question opens the next one: let this one end first.
+                    let cmd = *cmd;
+                    cx.defer_in(window, move |this, window, cx| {
+                        this.run_menu(Target::Favorite(at), cmd, window, cx)
+                    });
+                }
+            }
             _ => return false,
         }
         true
@@ -984,7 +1237,7 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
             r
         }};
     }
-    palette!(
+    let root = palette!(
         root,
         StartMeeting => (Product, StartMeeting),
         CancelMeeting => (Meeting, CancelMeeting),
@@ -1022,5 +1275,33 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         RenameGroup => (Group, RenameGroup),
         ColorGroup => (Group, ColorGroup),
         RemoveGroup => (Group, RemoveGroup),
+        CloseActiveTab => (Tab, CloseTab),
+        PinTab => (Tab, PinTab),
+        UnpinTab => (Tab, UnpinTab),
+        AddTabToFavorites => (Tab, AddToFavorites),
+        MoveTabToProduct => (Tab, MoveToProduct),
+    );
+    // A favorite of the palette is picked first.
+    root.on_action(cx.listener(|this, _: &actions::OpenFavorite, window, cx| {
+        this.pick_favorite(Cmd::Open, window, cx)
+    }))
+    .on_action(
+        cx.listener(|this, _: &actions::RenameFavorite, window, cx| {
+            this.pick_favorite(Cmd::RenameFavorite, window, cx)
+        }),
     )
+    .on_action(
+        cx.listener(|this, _: &actions::RemoveFavorite, window, cx| {
+            this.pick_favorite(Cmd::RemoveFavorite, window, cx)
+        }),
+    )
+}
+
+impl Shell {
+    fn pick_favorite(&mut self, cmd: Cmd, window: &mut Window, cx: &mut Context<Self>) {
+        match self.palette_target(Kind::Favorite, window, cx) {
+            Some(_) => self.ask(Ask::PickFavorite(cmd), window, cx),
+            None => self.run_active(Kind::Favorite, cmd, window, cx),
+        }
+    }
 }

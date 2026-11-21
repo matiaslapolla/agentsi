@@ -8,9 +8,12 @@ use agentsi_proto::events::ProgramState;
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{Status, WorkState};
 
+use gpui_kit::component::dock::PanelId;
+
 use crate::look::LookData;
 use crate::model::{CoreState, StorySessionItem, Term};
 use crate::pane::{glow_of, status_of};
+use crate::screens::ScreenKind;
 use crate::screens::meeting::{LiveMeeting, Meetings};
 
 /// What an item row opens.
@@ -24,6 +27,8 @@ pub enum ItemKey {
     Story(String),
     /// The reflection of the product.
     Reflection,
+    /// An open screen tab: its kind and its argument.
+    Screen(ScreenKind, Option<String>),
 }
 
 impl ItemKey {
@@ -34,8 +39,19 @@ impl ItemKey {
             ItemKey::Meeting => "meeting".into(),
             ItemKey::Story(id) => format!("story-{id}"),
             ItemKey::Reflection => "reflection".into(),
+            ItemKey::Screen(kind, None) => format!("screen-{}", kind.name()),
+            ItemKey::Screen(kind, Some(arg)) => format!("screen-{}-{arg}", kind.name()),
         }
     }
+}
+
+/// One open tab of a space, in the order of its top bar.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TabRow {
+    /// A terminal tab is `Pane`, a screen tab is `Screen`.
+    pub key: ItemKey,
+    pub panel: PanelId,
+    pub pinned: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -54,6 +70,9 @@ pub struct Item {
     pub hue: Option<Hue>,
     /// The item counts as running in the chip of a closed product.
     pub running: bool,
+    /// The tab of the item, when the space of the product shows one.
+    pub tab: Option<PanelId>,
+    pub pinned: bool,
 }
 
 /// The longest question that a meeting row shows.
@@ -103,6 +122,8 @@ fn pane(t: &Term, look: &LookData, host: Option<&str>) -> Item {
         meta: state_word(t).into(),
         hue: style.hue,
         running: t.running,
+        tab: None,
+        pinned: false,
     }
 }
 
@@ -122,6 +143,8 @@ fn meeting(m: &LiveMeeting) -> Item {
         meta: m.stage.clone(),
         hue: None,
         running: true,
+        tab: None,
+        pinned: false,
     }
 }
 
@@ -141,6 +164,8 @@ fn story(s: &StorySessionItem) -> Item {
         meta: s.state.clone(),
         hue: None,
         running: s.running(),
+        tab: None,
+        pinned: false,
     }
 }
 
@@ -180,8 +205,77 @@ pub fn items(
             meta: "running".into(),
             hue: None,
             running: true,
+            tab: None,
+            pinned: false,
         });
     }
+    out
+}
+
+/// The row of a screen tab that no item stands for.
+fn screen(kind: ScreenKind, arg: Option<String>) -> Item {
+    Item {
+        title: kind.title(arg.as_deref()),
+        key: ItemKey::Screen(kind, arg),
+        status: Status::Off,
+        work: None,
+        alert: 0,
+        tooltip: None,
+        meta: String::new(),
+        hue: None,
+        running: false,
+        tab: None,
+        pinned: false,
+    }
+}
+
+/// The item that stands for the screen tab `key`: the meeting for its screen, a story session
+/// for its story, the reflection for the memory.
+pub fn stands_for(item: &ItemKey, tab: &ItemKey) -> bool {
+    match (item, tab) {
+        (ItemKey::Meeting, ItemKey::Screen(ScreenKind::Meeting, _)) => true,
+        (ItemKey::Reflection, ItemKey::Screen(ScreenKind::Memory, _)) => true,
+        (ItemKey::Story(id), ItemKey::Screen(ScreenKind::Story, Some(arg))) => id == arg,
+        (a, b) => a == b,
+    }
+}
+
+/// The rows of one product: first its open tabs, in the order of its top bar with the pinned
+/// tabs first, then the items that have no tab there. An item that stands for a tab takes the
+/// place of the tab. A pane that has a tab in another space shows only there (`elsewhere`).
+pub fn with_tabs(
+    core: &CoreState,
+    look: &LookData,
+    mut items: Vec<Item>,
+    tabs: &[TabRow],
+    elsewhere: &dyn Fn(&str) -> bool,
+) -> Vec<Item> {
+    let host = core.remote.as_deref();
+    let mut ordered: Vec<&TabRow> = tabs.iter().filter(|t| t.pinned).collect();
+    ordered.extend(tabs.iter().filter(|t| !t.pinned));
+    let mut out = Vec::new();
+    for tab in ordered {
+        let found = items.iter().position(|i| stands_for(&i.key, &tab.key));
+        let item = match (found, &tab.key) {
+            (Some(at), _) => Some(items.remove(at)),
+            (None, ItemKey::Pane(id)) => core.terminals.get(id).map(|t| pane(t, look, host)),
+            (None, ItemKey::Screen(kind, arg)) => Some(screen(*kind, arg.clone())),
+            (None, _) => None,
+        };
+        if let Some(mut item) = item {
+            item.tab = Some(tab.panel);
+            item.pinned = tab.pinned;
+            if item.pinned && item.meta.is_empty() {
+                item.meta = "pinned".into();
+            }
+            out.push(item);
+        }
+    }
+    out.extend(
+        items
+            .into_iter()
+            .filter(|i| !matches!(&i.key, ItemKey::Pane(id) if elsewhere(id))),
+    );
     out
 }
 
@@ -234,6 +328,51 @@ mod tests {
         assert_eq!(rows[1].tooltip, None);
         assert_eq!(rows[0].meta, "working");
         assert_eq!(rows[0].key, ItemKey::Pane("t2-a".into()));
+    }
+
+    #[test]
+    fn the_tabs_come_first_in_the_order_of_the_bar_and_an_item_takes_the_place_of_its_tab() {
+        let mut core = core();
+        for (id, p) in [("t1-a", "demo"), ("t2-a", "demo"), ("t3-a", "other")] {
+            core.terminals.insert(id.into(), term(id, p, "zsh"));
+        }
+        core.sessions.insert(
+            "demo".into(),
+            vec![StorySessionItem {
+                id: "S1".into(),
+                title: "Login".into(),
+                state: "work".into(),
+                owner_role: "dev".into(),
+            }],
+        );
+        let look = LookData::default();
+        let rows = items(&core, None, &look, "demo");
+        let tab = |key: ItemKey, n: u64, pinned: bool| TabRow {
+            key,
+            panel: PanelId::from_u64(n),
+            pinned,
+        };
+        let tabs = [
+            tab(ItemKey::Screen(ScreenKind::Desk, None), 1, false),
+            tab(ItemKey::Pane("t2-a".into()), 2, false),
+            // A terminal of another product that was moved here.
+            tab(ItemKey::Pane("t3-a".into()), 3, false),
+            tab(
+                ItemKey::Screen(ScreenKind::Story, Some("S1".into())),
+                4,
+                true,
+            ),
+        ];
+        let out = with_tabs(&core, &look, rows, &tabs, &|id| id == "t1-a");
+        let keys: Vec<String> = out.iter().map(|i| i.key.slug()).collect();
+        // The pinned story first, then the bar, and t1-a has its tab in another space.
+        assert_eq!(keys, ["story-S1", "screen-desk", "pane-t2-a", "pane-t3-a"]);
+        assert!(out[0].pinned);
+        assert_eq!(out[0].tab, Some(PanelId::from_u64(4)));
+        assert_eq!(out[0].meta, "work", "the item keeps its own word");
+        assert_eq!(out[1].title, "Front desk");
+        assert_eq!(out[1].tab, Some(PanelId::from_u64(1)));
+        assert!(out.iter().all(|i| i.tab.is_some()));
     }
 
     #[test]

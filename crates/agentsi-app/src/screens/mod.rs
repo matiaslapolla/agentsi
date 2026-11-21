@@ -46,7 +46,8 @@ use gpui_kit::*;
 use serde_json::{Value, json};
 
 use agentsi_ui::style;
-use agentsi_ui::tokens::space;
+use agentsi_ui::tokens::{control, space, text};
+use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::FluentBuilder as _;
 
 use crate::alerts::{AlertTarget, Alerts};
@@ -127,6 +128,22 @@ impl ScreenKind {
             "ticket" => Some(ScreenKind::Ticket),
             "setup" => Some(ScreenKind::Setup),
             _ => None,
+        }
+    }
+
+    /// The icon of a pinned tab of this kind.
+    pub fn icon(self) -> IconName {
+        match self {
+            ScreenKind::Desk => IconName::LayoutDashboard,
+            ScreenKind::Minutes | ScreenKind::Minute => IconName::FileText,
+            ScreenKind::Roles => IconName::User,
+            ScreenKind::Settings => IconName::Settings,
+            ScreenKind::Stories | ScreenKind::Story | ScreenKind::Guide => IconName::BookOpen,
+            ScreenKind::Meeting | ScreenKind::Memory => IconName::Bot,
+            ScreenKind::Call => IconName::Mic,
+            ScreenKind::Git => IconName::Github,
+            ScreenKind::Tickets | ScreenKind::Ticket => IconName::FileText,
+            ScreenKind::Setup => IconName::Plus,
         }
     }
 
@@ -614,6 +631,41 @@ impl BasePanel for ScreenPanel {
             info: PanelInfo::panel(info),
             ..PanelState::new(SCREEN_PANEL)
         }
+    }
+}
+
+impl ScreenPanel {
+    /// What the tab shows while it is pinned: the icon of the kind, and the color of the product.
+    pub fn mark(&self, cx: &App) -> AnyElement {
+        let hue = LookGlobal::with(cx, |look| {
+            look.product(self.host.as_deref(), &self.product).hue
+        })
+        .flatten();
+        let tip = self.kind.title(self.arg.as_deref());
+        div()
+            .id(SharedString::from(format!(
+                "tab-mark:{}:{}",
+                self.kind.name(),
+                self.product
+            )))
+            .flex()
+            .items_center()
+            .gap(space(1))
+            .when_some(hue, |el, h| {
+                el.child(tab_bar(
+                    h,
+                    format!("tab-color:{}:{}", self.kind.name(), self.product),
+                ))
+            })
+            .child(
+                Icon::new(self.kind.icon())
+                    .size(control::icon_sm())
+                    .text_color(Hsla::from(text::secondary())),
+            )
+            .tooltip(move |window, cx| {
+                gpui_kit::component::tooltip::Tooltip::new(tip.clone()).build(window, cx)
+            })
+            .into_any_element()
     }
 }
 

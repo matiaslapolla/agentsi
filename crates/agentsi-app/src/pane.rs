@@ -30,8 +30,8 @@ use agentsi_ui::tokens::WorkState;
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{Status, control, line, radius, size, space, surface, text, weight};
 use futures::StreamExt;
-use gpui_kit::component::Icon;
 use gpui_kit::component::dock::{BasePanel, Panel, PanelEvent, PanelState};
+use gpui_kit::component::{Icon, IconName};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -250,6 +250,8 @@ pub struct TerminalPanel {
     pub last_use: u64,
     /// True while the dock displays this tab. A hidden pane takes no keys.
     pub shown: bool,
+    /// The tab moves to another space: its removal lets the terminal go and does not end it.
+    kept: bool,
     header: Entity<PaneHeader>,
     _subscriptions: Vec<Subscription>,
     _stream: Option<Task<()>>,
@@ -300,6 +302,7 @@ impl TerminalPanel {
             focused: false,
             last_use: 0,
             shown: false,
+            kept: false,
             header,
             _subscriptions: subscriptions,
             _stream: None,
@@ -312,6 +315,15 @@ impl TerminalPanel {
     /// This panel shows terminal `id` of `host`.
     pub fn is(&self, host: Option<&str>, id: &str, cx: &App) -> bool {
         self.id == id && self.core.read(cx).remote.as_deref() == host
+    }
+
+    pub fn core(&self) -> &Entity<CoreState> {
+        &self.core
+    }
+
+    /// The next removal of this tab keeps the terminal: a new tab attaches to it.
+    pub fn keep_terminal(&mut self) {
+        self.kept = true;
     }
 
     /// The SSH host of this terminal, or `None` for this device.
@@ -835,7 +847,7 @@ impl BasePanel for TerminalPanel {
             open.send(&Frame::close(c, ""));
         }
         self.stream = Stream::Closed;
-        if QUITTING.load(Ordering::Relaxed) {
+        if QUITTING.load(Ordering::Relaxed) || self.kept {
             return;
         }
         let id = self.id.clone();
@@ -860,6 +872,35 @@ impl BasePanel for TerminalPanel {
             info: terminal_info(&self.id, self.core.read(cx).remote.as_deref()),
             ..PanelState::new(TERMINAL_PANEL)
         }
+    }
+}
+
+impl TerminalPanel {
+    /// What the tab shows while it is pinned: the terminal icon and the state of the program,
+    /// with the title as the tooltip.
+    pub fn mark(&self, cx: &App) -> AnyElement {
+        let core = self.core.read(cx);
+        let term = core.terminals.get(&self.id);
+        let title = shown(core, &self.id, cx).title;
+        let glow = glow_with_alert(term, core.remote.as_deref(), &self.id, cx);
+        let glow_key = format!("tab-glow:{}:{}", self.id, glow.map_or(0, |g| g.1));
+        div()
+            .id(SharedString::from(format!("tab-mark:{}", self.id)))
+            .flex()
+            .items_center()
+            .gap(space(1))
+            .glow(glow_key, glow.map(|g| g.0))
+            .child(
+                Icon::new(IconName::SquareTerminal)
+                    .flex_none()
+                    .size(control::icon_sm())
+                    .text_color(Hsla::from(text::secondary())),
+            )
+            .child(StatusDot(status_of(term)))
+            .tooltip(move |window, cx| {
+                gpui_kit::component::tooltip::Tooltip::new(title.clone()).build(window, cx)
+            })
+            .into_any_element()
     }
 }
 

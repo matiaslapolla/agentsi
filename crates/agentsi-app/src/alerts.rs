@@ -16,6 +16,7 @@ use agentsi_ui::tokens::WorkState;
 use gpui_kit::{App, AppContext as _, Context, Entity, EventEmitter, Global};
 
 use crate::model::{StorySessionItem, attention_text};
+use crate::screens::ScreenKind;
 use crate::tree::ItemKey;
 
 /// The alerts that the log keeps.
@@ -64,6 +65,16 @@ impl AlertTarget {
                 id: id.clone(),
             }),
             ItemKey::Reflection => None,
+            ItemKey::Screen(kind, arg) => match (kind, arg) {
+                (ScreenKind::Meeting, _) => Some(AlertTarget::Meeting { host, product }),
+                (ScreenKind::Story, Some(id)) => Some(AlertTarget::Story {
+                    host,
+                    product,
+                    id: id.clone(),
+                }),
+                (ScreenKind::Desk, _) => Some(AlertTarget::Decisions { host, product }),
+                _ => None,
+            },
         }
     }
 

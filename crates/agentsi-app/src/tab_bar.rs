@@ -12,6 +12,8 @@
 //!   3 px bar at the left edge. A collapsed group shows the chip only.
 //! - a drop on a tab puts the dragged tab right before it, in the group of that tab. A drop on a
 //!   chip puts it at the end of the group. A drop past the last tab takes it out of its group.
+//! - a pinned tab sits first and shows only its icon and its state mark, with no close button.
+//!   `TabGroups::reconcile` keeps it first after a drop.
 //!
 //! The dock moves the tab. This module only chooses the slot and tells `TabGroups` the new
 //! group, so a drag reorders inside one bar, moves to another bar and joins a group with one
@@ -33,12 +35,14 @@ use gpui_kit::component::dock::{
 };
 use gpui_kit::component::menu::DropdownMenu as _;
 use gpui_kit::component::tab::{Tab, TabBar};
-use gpui_kit::component::{IconName, Selectable as _, Sizable as _};
+use gpui_kit::component::{Icon, IconName, Selectable as _, Sizable as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::layout;
 use crate::menus::{self, Target};
+use crate::pane::TerminalPanel;
+use crate::screens::ScreenPanel;
 use crate::shell::PaneRef;
 use crate::tabs::{self, Group, GroupId, TabGroups, slot_after, slot_before};
 
@@ -204,11 +208,12 @@ impl TabGroupRenderer for GroupedTabs {
             .filter(|(_, p)| p.visible(cx))
             .map(|(ix, _)| ix)
             .collect();
-        let grouped = visible.iter().any(|ix| {
+        let tabs = self.tabs.read(cx);
+        let marked = visible.iter().any(|ix| {
             let id = group.panels()[*ix].panel_id(cx);
-            groups.iter().any(|g| g.members.contains(&id))
+            tabs.is_pinned(id) || groups.iter().any(|g| g.members.contains(&id))
         });
-        if visible.len() < 2 && !grouped {
+        if visible.len() < 2 && !marked {
             return self.inner.render_tab_bar(group, window, cx);
         }
         self.bar(group, &groups, &visible, window, cx)
@@ -290,14 +295,28 @@ impl Render for TabPreview {
     }
 }
 
-/// The terminal behind a tab, for its context menu. A screen tab has no menu.
-fn pane_of(panel: &Arc<dyn BasePanelView>, cx: &App) -> Option<PaneRef> {
+/// The object of the context menu of a tab: the terminal behind a terminal tab, else the tab.
+fn target_of(panel: &Arc<dyn BasePanelView>, cx: &App) -> Target {
     let state = panel.dump(cx);
-    let id = layout::terminal_of(&state)?.to_string();
-    Some(PaneRef {
-        host: layout::host_of(&state).map(String::from),
-        id,
-    })
+    match layout::terminal_of(&state) {
+        Some(id) => Target::Pane(PaneRef {
+            host: layout::host_of(&state).map(String::from),
+            id: id.to_string(),
+        }),
+        None => Target::Tab(panel.panel_id(cx)),
+    }
+}
+
+/// What a pinned tab shows: the icon and the state mark of its panel.
+fn mark_of(panel: &Arc<dyn BasePanelView>, cx: &App) -> AnyElement {
+    let view = panel.view();
+    match view.downcast::<TerminalPanel>() {
+        Ok(t) => t.read(cx).mark(cx),
+        Err(view) => match view.downcast::<ScreenPanel>() {
+            Ok(s) => s.read(cx).mark(cx),
+            Err(_) => Icon::new(IconName::LayoutDashboard).into_any_element(),
+        },
+    }
 }
 
 fn title_of(panel: &Arc<dyn BasePanelView>, window: &mut Window, cx: &mut App) -> AnyElement {
@@ -471,10 +490,16 @@ impl GroupedTabs {
             .then(|| group.drag_panel(ix, cx))
             .flatten();
         let preview = PanelHandle::of(&panel).map(PanelHandle::panel);
-        let title = title_of(&panel, window, cx);
-        let closable = !bar_collapsed && group.is_panel_closable(id, cx);
-        let last_active = &self.last_active;
-        let _ = last_active;
+        let pinned = self.tabs.read(cx).is_pinned(id);
+        let title = if pinned {
+            div()
+                .debug_selector(move || format!("tab-pinned:{}", id.as_u64()))
+                .child(mark_of(&panel, cx))
+                .into_any_element()
+        } else {
+            title_of(&panel, window, cx)
+        };
+        let closable = !pinned && !bar_collapsed && group.is_panel_closable(id, cx);
 
         Tab::new()
             .debug_selector(move || format!("tab:{}", id.as_u64()))
@@ -518,11 +543,7 @@ impl GroupedTabs {
             .selected(!bar_collapsed && displayed == Some(id))
             .on_mouse_down(MouseButton::Right, {
                 let panel = panel.clone();
-                move |e, _, cx| {
-                    if let Some(pane) = pane_of(&panel, cx) {
-                        menus::request(cx, Target::Pane(pane), e.position)
-                    }
-                }
+                move |e, _, cx| menus::request(cx, target_of(&panel, cx), e.position)
             })
             .on_click({
                 let group = group.clone();
@@ -567,7 +588,11 @@ impl GroupedTabs {
         });
         let toolbar_zoom = control.is_some_and(|c: PanelControl| c.toolbar_visible());
         let menu_zoom = control.is_some_and(|c: PanelControl| c.menu_visible());
-        let closable = group.is_closable();
+        // A pinned tab closes only from its menu, behind a Confirm.
+        let closable = group.is_closable()
+            && group
+                .active_panel()
+                .is_none_or(|p| !self.tabs.read(cx).is_pinned(p.panel_id(cx)));
         let buttons = handle.and_then(|h| h.toolbar_buttons(window, cx));
         let suffix = handle.and_then(|h| h.title_suffix(window, cx));
         let panel = handle.map(|h| h.panel());
