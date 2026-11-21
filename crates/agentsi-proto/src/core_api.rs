@@ -62,6 +62,7 @@ pub enum Topic {
     Models,
     Desk,
     Git,
+    Files,
 }
 
 impl Topic {

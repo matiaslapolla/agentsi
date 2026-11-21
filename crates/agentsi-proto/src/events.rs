@@ -13,6 +13,7 @@ pub fn register(c: &mut Catalog) {
         .event::<DataChanged>()
         .event::<GitChanged>()
         .event::<GitProgress>()
+        .event::<FilesChanged>()
         .event::<MeetingEvent>()
         .event::<VoiceSpeak>()
         .event::<VoiceStop>()
@@ -129,6 +130,24 @@ impl Event for GitChanged {
         the folder, the HEAD, the index and the refs of each product, reads a summary at most \
         once every 2 s, and sends this only when the summary differs.";
     type Params = GitChangedParams;
+}
+
+pub struct FilesChanged;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FilesChangedParams {
+    pub product: String,
+    /// The folder whose entries changed, from the folder of the product. Empty for the folder
+    /// itself.
+    pub path: String,
+}
+
+impl Event for FilesChanged {
+    const NAME: &'static str = "files.changed";
+    const DESCRIPTION: &'static str = "An entry of a folder that files.list read was made, \
+        changed, renamed or removed. The core sends at most one for a folder in 150 ms, and \
+        none for a folder that git ignores.";
+    type Params = FilesChangedParams;
 }
 
 pub struct GitProgress;
