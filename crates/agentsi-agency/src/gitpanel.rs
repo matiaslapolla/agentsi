@@ -415,7 +415,12 @@ pub fn log(repo: &Path, limit: u32) -> Result<Vec<GitCommitInfo>> {
 /// The git summary of the repo that holds `dir`. A folder outside a repo gives `None`.
 /// Untracked files count in the normal mode of git: a new folder counts once.
 pub fn summary(dir: &Path) -> Result<Option<GitSummaryInfo>> {
-    let top = git(dir, &["rev-parse", "--show-toplevel"], true, LIMIT);
+    // The text of the refusal decides, so it must be in English.
+    let c = [
+        ("GIT_OPTIONAL_LOCKS".to_string(), "0".to_string()),
+        ("LC_ALL".to_string(), "C".to_string()),
+    ];
+    let top = git_limited(dir, &["rev-parse", "--show-toplevel"], &c, LIMIT);
     if !top.ok {
         if top.stderr.contains("not a git repository") {
             return Ok(None);
@@ -691,7 +696,13 @@ pub fn branch_create(repo: &Path, name: &str, from: Option<&str>) -> Result<()> 
         }
         None => "HEAD",
     };
-    must(git(repo, &["branch", name, start], false, LIMIT), "branch").map(drop)
+    // A branch from a remote branch tracks nothing, so a push never sends it to the
+    // remote branch of another name.
+    must(
+        git(repo, &["branch", "--no-track", name, start], false, LIMIT),
+        "branch",
+    )
+    .map(drop)
 }
 
 fn joined(out: &Out) -> String {
@@ -703,15 +714,20 @@ fn joined(out: &Out) -> String {
         .join("\n")
 }
 
-/// Switches to a local branch, or to a new local branch that tracks a remote one. A tree
+/// Switches to a local branch, or to a new local branch that tracks a remote one. A remote
+/// branch whose local branch exists switches to that local branch. A tree
 /// with a staged or unstaged change gives `dirty` and those files. Untracked files stay, as
 /// `git switch` keeps them.
 pub fn switch(repo: &Path, name: &str) -> Result<GitSwitchResult> {
     check_rev(name)?;
+    let local = name.split_once('/').map(|(_, short)| short);
     let args: Vec<&str> = if has_ref(repo, &format!("refs/heads/{name}")) {
         vec!["switch", "--no-guess", name]
     } else if has_ref(repo, &format!("refs/remotes/{name}")) {
-        vec!["switch", "--track", name]
+        match local.filter(|l| has_ref(repo, &format!("refs/heads/{l}"))) {
+            Some(l) => vec!["switch", "--no-guess", l],
+            None => vec!["switch", "--track", name],
+        }
     } else {
         return Err(Error::Invalid(format!(
             "{name} is not a branch of the repo."
@@ -771,11 +787,30 @@ fn target(repo: &Path) -> Result<Target> {
     }
     let remote = config_value(repo, &format!("branch.{branch}.remote"));
     let merge = config_value(repo, &format!("branch.{branch}.merge"));
-    if let (Some(remote), Some(remote_ref)) = (remote, merge) {
+    let own = format!("refs/heads/{branch}");
+    if let (Some(remote), Some(merge)) = (remote, merge) {
+        let push_remote = config_value(repo, &format!("branch.{branch}.pushRemote"))
+            .or_else(|| config_value(repo, "remote.pushDefault"));
+        // As `push.default=simple`: a push to the upstream needs the same name, and a
+        // push to another remote goes to the branch of the same name.
+        if let Some(other) = push_remote.filter(|r| *r != remote) {
+            return Ok(Target {
+                branch,
+                remote: other,
+                remote_ref: own,
+                set_upstream: false,
+            });
+        }
+        if merge != own {
+            return Err(Error::Invalid(format!(
+                "The upstream of {branch} is {merge} on {remote}, a branch of another name. \
+                 Push it in a terminal."
+            )));
+        }
         return Ok(Target {
             branch,
             remote,
-            remote_ref,
+            remote_ref: merge,
             set_upstream: false,
         });
     }
@@ -785,7 +820,7 @@ fn target(repo: &Path) -> Result<Target> {
         ));
     }
     Ok(Target {
-        remote_ref: format!("refs/heads/{branch}"),
+        remote_ref: own,
         branch,
         remote: "origin".into(),
         set_upstream: true,
@@ -795,11 +830,17 @@ fn target(repo: &Path) -> Result<Target> {
 /// The branch, the remote and the commits that `push` sends.
 pub fn outgoing(repo: &Path) -> Result<GitOutgoingResult> {
     let t = target(repo)?;
-    let upstream = format!("{}@{{upstream}}", t.branch);
-    let not = if t.set_upstream {
-        format!("--remotes={}", t.remote)
+    let tracking = format!(
+        "refs/remotes/{}/{}",
+        t.remote,
+        t.remote_ref
+            .strip_prefix("refs/heads/")
+            .unwrap_or(&t.remote_ref)
+    );
+    let not = if has_ref(repo, &tracking) {
+        tracking
     } else {
-        upstream
+        format!("--remotes={}", t.remote)
     };
     let range = ["HEAD", "--not", not.as_str()];
     let mut count_args = vec!["rev-list", "--count"];
@@ -812,7 +853,9 @@ pub fn outgoing(repo: &Path) -> Result<GitOutgoingResult> {
     let mut log_args = vec!["log", "-n", &n, LOG_FORMAT];
     log_args.extend(range);
     let commits = parse_log(&must(git(repo, &log_args, true, LIMIT), "log")?);
+    let head = must(git(repo, &["rev-parse", "HEAD"], true, LIMIT), "rev-parse")?;
     Ok(GitOutgoingResult {
+        head: head.trim().into(),
         remote_branch: t
             .remote_ref
             .strip_prefix("refs/heads/")
@@ -849,8 +892,11 @@ pub fn pull(repo: &Path, progress: &mut dyn FnMut(&str)) -> GitSyncResult {
         &["pull", "--ff-only", "--no-rebase", "--progress"],
         progress,
     );
+    let refused =
+        out.stderr.contains("Not possible to fast-forward") || out.stderr.contains("diverg");
     let mut result = synced(out);
     if result.outcome == GitOutcome::Failed
+        && refused
         && let Ok(s) = status(repo)
         && s.ahead.unwrap_or(0) > 0
         && s.behind.unwrap_or(0) > 0
@@ -861,9 +907,22 @@ pub fn pull(repo: &Path, progress: &mut dyn FnMut(&str)) -> GitSyncResult {
 }
 
 /// Pushes the current branch, with no force. A branch with no upstream goes to origin with
-/// `--set-upstream`.
-pub fn push(repo: &Path, progress: &mut dyn FnMut(&str)) -> Result<GitSyncResult> {
+/// `--set-upstream`. With `expect` (branch, head id), the push runs only while the branch and
+/// its head are still the ones that the owner confirmed.
+pub fn push(
+    repo: &Path,
+    expect: Option<(&str, &str)>,
+    progress: &mut dyn FnMut(&str),
+) -> Result<GitSyncResult> {
     let t = target(repo)?;
+    if let Some((branch, head)) = expect {
+        let now = must(git(repo, &["rev-parse", "HEAD"], true, LIMIT), "rev-parse")?;
+        if branch != t.branch || head != now.trim() {
+            return Err(Error::Invalid(
+                "The branch or its head changed since the confirm. Ask the push again.".into(),
+            ));
+        }
+    }
     let spec = format!("refs/heads/{}:{}", t.branch, t.remote_ref);
     let mut args = vec!["push", "--progress"];
     if t.set_upstream {
@@ -896,6 +955,8 @@ fn streamed_within(
         .args(args)
         .current_dir(repo)
         .env("GIT_TERMINAL_PROMPT", "0")
+        // `pull` reads the text of a refusal.
+        .env("LC_ALL", "C")
         .envs(git_env::env_for_cwd(repo))
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
