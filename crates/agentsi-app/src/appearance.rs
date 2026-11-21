@@ -1,14 +1,16 @@
-//! `<config>/agentsi/appearance.toml`: the density, the corners, the text size, the color theme
-//! and the motion.
+//! `<config>/agentsi/appearance.toml`: the density, the corners, the text offset, the color
+//! theme and the motion.
 //!
 //! ```toml
 //! density = "compact"   # compact, normal or comfortable
 //! corners = "round"     # square, subtle or round
-//! text = "large"        # small, medium or large
+//! text_offset = 2       # -2 to 4 px
 //! theme = "light"       # system, dark or light
 //! motion = "reduced"    # system, reduced or full
 //! ```
 //!
+//! - The old key `text = "small|medium|large"` reads as the offset -1, 0 or 2. A save writes
+//!   `text_offset` in its place.
 //! - A missing file means the defaults. An unknown key, an unknown value or a file that does
 //!   not parse gives the default for that part and one line in [`note`]. The app starts anyway.
 //! - [`change`] applies a choice at once and saves it. A file that does not parse is not
@@ -16,7 +18,9 @@
 
 use std::path::{Path, PathBuf};
 
-use agentsi_ui::appearance::{Appearance, ColorTheme, Corners, Density, Motion, TextSize};
+use agentsi_ui::appearance::{
+    Appearance, ColorTheme, Corners, Density, Motion, TEXT_OFFSETS, text_offset_of_size,
+};
 use gpui_kit::{App, Global};
 use toml_edit::{DocumentMut, Item, value};
 
@@ -67,6 +71,7 @@ fn parse(text: &str, path: &Path) -> (Look, Option<String>) {
     };
     let mut problems = Vec::new();
     let mut look = Look::default();
+    let mut offset_key = false;
     for (key, item) in doc.iter() {
         match key {
             "density" => pick(
@@ -85,14 +90,30 @@ fn parse(text: &str, path: &Path) -> (Look, Option<String>) {
                 &mut look.appearance.corners,
                 &Corners::ALL.map(Corners::key),
             ),
-            "text" => pick(
+            // `text_offset` wins over the old key, in any order of the file.
+            "text" if !offset_key => pick(
                 key,
                 item,
                 &mut problems,
-                TextSize::from_key,
-                &mut look.appearance.text,
-                &TextSize::ALL.map(TextSize::key),
+                text_offset_of_size,
+                &mut look.appearance.text_offset,
+                &["small", "medium", "large"],
             ),
+            "text" => {}
+            "text_offset" => {
+                offset_key = true;
+                look.appearance.text_offset = 0;
+                match item.as_integer() {
+                    Some(n) if TEXT_OFFSETS.contains(&n.try_into().unwrap_or(i8::MAX)) => {
+                        look.appearance.text_offset = n as i8;
+                    }
+                    _ => problems.push(format!(
+                        "text_offset must be a whole number from {} to {}.",
+                        TEXT_OFFSETS.start(),
+                        TEXT_OFFSETS.end()
+                    )),
+                }
+            }
             "theme" => pick(
                 key,
                 item,
@@ -200,7 +221,8 @@ fn write(path: &Path, look: Look) -> Result<(), String> {
     crate::keys::edit(path, |doc| {
         doc["density"] = value(look.appearance.density.key());
         doc["corners"] = value(look.appearance.corners.key());
-        doc["text"] = value(look.appearance.text.key());
+        doc.remove("text");
+        doc["text_offset"] = value(i64::from(look.appearance.text_offset));
         doc["theme"] = value(look.theme.key());
         doc["motion"] = value(look.motion.key());
         Ok(())
@@ -234,18 +256,18 @@ mod tests {
 
     #[test]
     fn each_word_of_the_file_picks_its_choice() {
-        let (a, note) = of("density = \"compact\"\ncorners = \"round\"\ntext = \"large\"\n");
+        let (a, note) = of("density = \"compact\"\ncorners = \"round\"\ntext_offset = 4\n");
         assert_eq!(
             a.appearance,
             Appearance {
                 density: Density::Compact,
                 corners: Corners::Round,
-                text: TextSize::Large
+                text_offset: 4,
             }
         );
         assert_eq!(note, None);
-        let (a, _) = of("text = \"small\"");
-        assert_eq!(a.appearance.text, TextSize::Small);
+        let (a, _) = of("text_offset = -2");
+        assert_eq!(a.appearance.text_offset, -2);
         assert_eq!(a.appearance.density, Density::Normal);
         assert_eq!((a.theme, a.motion), (ColorTheme::Dark, Motion::System));
         let (a, note) = of("theme = \"light\"\nmotion = \"reduced\"\n");
@@ -262,13 +284,14 @@ mod tests {
 
     #[test]
     fn a_bad_value_keeps_its_default_and_the_good_ones_stay() {
-        let (a, note) = of("density = \"huge\"\ncorners = \"round\"\ntext = 3\nfont = \"x\"\n");
+        let (a, note) =
+            of("density = \"huge\"\ncorners = \"round\"\ntext_offset = 5\nfont = \"x\"\n");
         assert_eq!(a.appearance.density, Density::Normal);
         assert_eq!(a.appearance.corners, Corners::Round);
-        assert_eq!(a.appearance.text, TextSize::Medium);
+        assert_eq!(a.appearance.text_offset, 0);
         let note = note.expect("one note");
         assert!(note.contains("density \"huge\" is not a choice (compact, normal, comfortable)"));
-        assert!(note.contains("text must be text"));
+        assert!(note.contains("text_offset must be a whole number from -2 to 4"));
         assert!(note.contains("font: no setting has this name"));
         assert_eq!(note.lines().count(), 1, "one note, one line: {note}");
     }
@@ -289,7 +312,7 @@ mod tests {
             appearance: Appearance {
                 density: Density::Compact,
                 corners: Corners::Square,
-                text: TextSize::Large,
+                text_offset: 3,
             },
             theme: ColorTheme::Light,
             motion: Motion::Full,
@@ -301,6 +324,26 @@ mod tests {
                 .unwrap()
                 .contains("# my look")
         );
+    }
+
+    #[test]
+    fn the_old_text_key_reads_as_its_offset_and_a_save_replaces_it() {
+        for (word, offset) in [("small", -1), ("medium", 0), ("large", 2)] {
+            let (a, note) = of(&format!("text = \"{word}\""));
+            assert_eq!((a.appearance.text_offset, note), (offset, None), "{word}");
+        }
+        let (a, _) = of("text_offset = 3\ntext = \"small\"\n");
+        assert_eq!(a.appearance.text_offset, 3, "the new key wins");
+        let (a, _) = of("text = \"small\"\ntext_offset = 3\n");
+        assert_eq!(a.appearance.text_offset, 3, "in either order");
+
+        let path = tempdir("old").join(FILE_NAME);
+        std::fs::write(&path, "text = \"large\"\n").unwrap();
+        let (look, _) = read(&path);
+        write(&path, look).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert!(!text.contains("text ="), "{text}");
+        assert!(text.contains("text_offset = 2"), "{text}");
     }
 
     #[test]

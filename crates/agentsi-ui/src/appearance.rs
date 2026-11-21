@@ -1,4 +1,4 @@
-//! The three choices of the Appearance setting: density, corners and text size.
+//! The choices of the Appearance setting: density, corners and the text offset.
 //!
 //! The choice lives in the gpui global [`Appearance`]. The token functions `space`,
 //! `size::*`, `radius::*` and `control::*` read it through [`current`], with no `cx`, so a
@@ -71,15 +71,6 @@ choice! {
         Subtle = "subtle", "Subtle";
         Round = "round", "Round";
     } default Subtle
-}
-
-choice! {
-    /// The size of the text and of the icons of controls. A terminal pane keeps its own.
-    TextSize {
-        Small = "small", "Small";
-        Medium = "medium", "Medium";
-        Large = "large", "Large";
-    } default Medium
 }
 
 choice! {
@@ -161,12 +152,26 @@ impl Motion {
     }
 }
 
+/// The steps of the text offset, in px. Each step adds to each size of `size::xs` to `xl`.
+pub const TEXT_OFFSETS: std::ops::RangeInclusive<i8> = -2..=4;
+
+/// The text offset of a word of the old `text` key: small, medium or large.
+pub fn text_offset_of_size(word: &str) -> Option<i8> {
+    match word {
+        "small" => Some(-1),
+        "medium" => Some(0),
+        "large" => Some(2),
+        _ => None,
+    }
+}
+
 /// The three choices together. The default gives the look that the app had before the setting.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Appearance {
     pub density: Density,
     pub corners: Corners,
-    pub text: TextSize,
+    /// One of [`TEXT_OFFSETS`]: the px added to each text size, and that moves the icons.
+    pub text_offset: i8,
 }
 
 impl Global for Appearance {}
@@ -182,7 +187,7 @@ thread_local! {
         Cell::new(Appearance {
             density: Density::Normal,
             corners: Corners::Subtle,
-            text: TextSize::Medium,
+            text_offset: 0,
         })
     };
 }
@@ -199,14 +204,14 @@ pub(crate) fn set_for_test(a: Appearance) {
 }
 
 impl Appearance {
-    /// The 27 combinations.
+    /// The 63 combinations: 3 densities, 3 corners and 7 text offsets.
     pub fn all() -> impl Iterator<Item = Appearance> {
         Density::ALL.into_iter().flat_map(|density| {
             Corners::ALL.into_iter().flat_map(move |corners| {
-                TextSize::ALL.into_iter().map(move |text| Appearance {
+                TEXT_OFFSETS.map(move |text_offset| Appearance {
                     density,
                     corners,
-                    text,
+                    text_offset,
                 })
             })
         })
@@ -248,7 +253,7 @@ mod tests {
         cx.update(|cx| Appearance::default().apply(cx));
         assert_eq!(seen.get(), 0, "the default is in effect already");
         let large = Appearance {
-            text: TextSize::Large,
+            text_offset: 2,
             ..Appearance::default()
         };
         cx.update(|cx| large.apply(cx));

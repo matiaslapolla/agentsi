@@ -6,7 +6,7 @@ use std::cell::Cell;
 
 use gpui_kit::{Hsla, Pixels, Rgba, px};
 
-use crate::appearance::{Corners, Density, TextSize, current};
+use crate::appearance::{Corners, Density, current};
 
 /// A color token, `0xRRGGBB`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -508,18 +508,14 @@ pub mod font {
     pub const MONO: &str = "JetBrains Mono";
 }
 
-/// Type sizes, in px. The text size of the appearance moves `XS` to `XL`, and `MONO` stays.
+/// Type sizes, in px. The text offset of the appearance moves `xs` to `xl`, and `MONO` stays.
 pub mod size {
-    use super::{TextSize, current};
+    use super::current;
     use gpui_kit::{Pixels, px};
 
-    /// The size of the step `base` px at medium, for the text size in effect.
+    /// The size of the step `base` px at offset 0, for the text offset in effect.
     fn step(base: f32) -> Pixels {
-        px(match current().text {
-            TextSize::Small => base - 1.,
-            TextSize::Medium => base,
-            TextSize::Large => base + 2.,
-        })
+        px(base + f32::from(current().text_offset))
     }
     /// Meta text, key hints, tags.
     pub fn xs() -> Pixels {
@@ -682,7 +678,7 @@ pub mod label {
 
 /// Fixed sizes of controls and the shell.
 pub mod control {
-    use super::{Density, TextSize, current};
+    use super::{Density, current};
     use gpui_kit::{Pixels, px};
 
     fn by_density(compact: f32, normal: f32, comfortable: f32) -> Pixels {
@@ -692,11 +688,14 @@ pub mod control {
             Density::Comfortable => comfortable,
         })
     }
-    fn by_text(small: f32, medium: f32, large: f32) -> Pixels {
-        px(match current().text {
-            TextSize::Small => small,
-            TextSize::Medium => medium,
-            TextSize::Large => large,
+    /// An icon of `base` px at offset 0. A smaller text takes the icon 2 px smaller, and a
+    /// larger text grows the icon with it.
+    fn by_text(base: f32) -> Pixels {
+        let offset = f32::from(current().text_offset);
+        px(if offset < 0. {
+            base - 2.
+        } else {
+            base + offset
         })
     }
     /// The height of a small button.
@@ -707,9 +706,11 @@ pub mod control {
     pub fn height_md() -> Pixels {
         by_density(28., 32., 36.)
     }
-    /// The height of a list row.
+    /// The height of a list row. Above a text offset of 2, the row grows 3 px for each px of
+    /// text, so its two lines still fit in the compact row.
     pub fn row() -> Pixels {
-        by_density(32., 44., 52.)
+        let grow = (f32::from(current().text_offset) - 2.).max(0.) * 3.;
+        by_density(32., 44., 52.) + px(grow)
     }
     /// The vertical padding of a row of the sidebar and of the tree.
     pub fn row_pad() -> Pixels {
@@ -717,11 +718,11 @@ pub mod control {
     }
     /// The icon next to a small text.
     pub fn icon_sm() -> Pixels {
-        by_text(12., 14., 16.)
+        by_text(14.)
     }
     /// The icon next to a normal text.
     pub fn icon_md() -> Pixels {
-        by_text(14., 16., 18.)
+        by_text(16.)
     }
     pub const FOCUS_RING: Pixels = px(2.);
     /// The edge of a glow, and the alpha of the edge at rest. At rest the edge still
@@ -1103,11 +1104,11 @@ mod tests {
         }
     }
 
-    fn at(density: Density, corners: Corners, text: TextSize) -> Measures {
+    fn at(density: Density, corners: Corners, text_offset: i8) -> Measures {
         set_for_test(Appearance {
             density,
             corners,
-            text,
+            text_offset,
         });
         let m = measures();
         set_for_test(Appearance::default());
@@ -1128,12 +1129,12 @@ mod tests {
                 icons: [px(14.), px(16.)],
             }
         );
-        assert_eq!(Appearance::default(), Appearance::all().nth(13).unwrap());
+        assert_eq!(Appearance::default(), Appearance::all().nth(30).unwrap());
     }
 
     #[test]
     fn each_choice_gives_the_values_of_the_spec() {
-        let (n, s, m) = (Density::Normal, Corners::Subtle, TextSize::Medium);
+        let (n, s, m) = (Density::Normal, Corners::Subtle, 0);
         let d = |d| at(d, s, m);
         assert_eq!(d(Density::Compact).space, px(3.));
         assert_eq!(d(Density::Comfortable).space, px(5.));
@@ -1147,24 +1148,41 @@ mod tests {
         assert_eq!(c(Corners::Square), [px(0.), px(2.), px(2.)]);
         assert_eq!(c(Corners::Round), [px(8.), px(12.), px(16.)]);
         let t = |t| at(n, s, t);
+        // The old sizes: small is -1, large is +2.
         assert_eq!(
-            t(TextSize::Small).sizes,
+            t(-1).sizes,
             [px(11.), px(12.), px(13.), px(15.), px(19.), px(27.)]
         );
         assert_eq!(
-            t(TextSize::Large).sizes,
+            t(2).sizes,
             [px(14.), px(15.), px(16.), px(18.), px(22.), px(30.)]
         );
-        assert_eq!(t(TextSize::Small).icons, [px(12.), px(14.)]);
-        assert_eq!(t(TextSize::Large).icons, [px(16.), px(18.)]);
+        assert_eq!(t(-1).icons, [px(12.), px(14.)]);
+        assert_eq!(t(2).icons, [px(16.), px(18.)]);
+        assert_eq!(
+            t(-2).sizes,
+            [px(10.), px(11.), px(12.), px(14.), px(18.), px(26.)]
+        );
+        assert_eq!(t(-2).icons, [px(12.), px(14.)]);
+        assert_eq!(
+            t(4).sizes,
+            [px(16.), px(17.), px(18.), px(20.), px(24.), px(32.)]
+        );
+        assert_eq!(t(4).icons, [px(18.), px(20.)]);
+        assert_eq!(
+            t(2).heights,
+            t(0).heights,
+            "up to +2 the rows keep their height"
+        );
+        assert_eq!(t(4).heights[2], px(50.));
     }
 
     #[test]
     fn only_the_listed_groups_change_with_a_choice() {
-        let base = at(Density::Normal, Corners::Subtle, TextSize::Medium);
-        let denser = at(Density::Compact, Corners::Subtle, TextSize::Medium);
-        let rounder = at(Density::Normal, Corners::Round, TextSize::Medium);
-        let larger = at(Density::Normal, Corners::Subtle, TextSize::Large);
+        let base = at(Density::Normal, Corners::Subtle, 0);
+        let denser = at(Density::Compact, Corners::Subtle, 0);
+        let rounder = at(Density::Normal, Corners::Round, 0);
+        let larger = at(Density::Normal, Corners::Subtle, 2);
         assert_eq!(
             (denser.sizes, denser.radii, denser.icons),
             (base.sizes, base.radii, base.icons)
@@ -1180,7 +1198,7 @@ mod tests {
     }
 
     #[test]
-    fn the_fixed_heights_hold_their_text_in_each_of_the_27_combinations() {
+    fn the_fixed_heights_hold_their_text_in_each_of_the_63_combinations() {
         use crate::appearance::INK_EM;
         let ink = |p: Pixels| f32::from(p) * INK_EM;
         let mut failures = Vec::new();
@@ -1230,6 +1248,6 @@ mod tests {
             assert_eq!(text_pairs(Palette::DARK), pairs, "{a:?}");
         }
         set_for_test(Appearance::default());
-        assert_eq!(Appearance::all().count(), 27);
+        assert_eq!(Appearance::all().count(), 63);
     }
 }

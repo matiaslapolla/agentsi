@@ -1,9 +1,10 @@
-//! The Appearance section: density, corners and text size, with a sample row.
+//! The Appearance section: density, corners, the text offset, the color theme and the motion,
+//! with a sample row.
 //!
 //! A click applies the choice to the whole app at once and saves it in `appearance.toml`
 //! (see `crate::appearance`).
 
-use agentsi_ui::appearance::{ColorTheme, Corners, Density, Motion, TextSize};
+use agentsi_ui::appearance::{ColorTheme, Corners, Density, Motion, TEXT_OFFSETS};
 use agentsi_ui::components::{Button, ListRow, status_tag};
 use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{Status, WorkState, control, size, space};
@@ -18,13 +19,13 @@ use crate::screens::parts::section;
 pub(super) const SAMPLE: &str = "appearance-sample";
 
 impl SettingsScreen {
-    /// One row of three buttons. The current choice has the accent fill.
+    /// One row of buttons, one for each choice. The current choice has the accent fill.
     fn choices<T: Copy + PartialEq + 'static>(
         &self,
         group: &'static str,
-        all: [T; 3],
+        all: impl IntoIterator<Item = T>,
         current: T,
-        label: fn(T) -> &'static str,
+        label: fn(T) -> SharedString,
         set: fn(&mut Look, T),
         cx: &mut Context<Self>,
     ) -> Div {
@@ -67,7 +68,7 @@ impl SettingsScreen {
                     "appearance-density",
                     Density::ALL,
                     now.appearance.density,
-                    Density::label,
+                    |v| Density::label(v).into(),
                     |a, v| a.appearance.density = v,
                     cx,
                 ),
@@ -78,7 +79,7 @@ impl SettingsScreen {
                     "appearance-corners",
                     Corners::ALL,
                     now.appearance.corners,
-                    Corners::label,
+                    |v| Corners::label(v).into(),
                     |a, v| a.appearance.corners = v,
                     cx,
                 ),
@@ -87,10 +88,10 @@ impl SettingsScreen {
                 "Text size",
                 self.choices(
                     "appearance-text",
-                    TextSize::ALL,
-                    now.appearance.text,
-                    TextSize::label,
-                    |a, v| a.appearance.text = v,
+                    TEXT_OFFSETS,
+                    now.appearance.text_offset,
+                    offset_label,
+                    |a, v| a.appearance.text_offset = v,
                     cx,
                 ),
             ))
@@ -100,7 +101,7 @@ impl SettingsScreen {
                     "appearance-theme",
                     ColorTheme::ALL,
                     now.theme,
-                    ColorTheme::label,
+                    |v| ColorTheme::label(v).into(),
                     |a, v| a.theme = v,
                     cx,
                 ),
@@ -111,7 +112,7 @@ impl SettingsScreen {
                     "appearance-motion",
                     Motion::ALL,
                     now.motion,
-                    Motion::label,
+                    |v| Motion::label(v).into(),
                     |a, v| a.motion = v,
                     cx,
                 ),
@@ -126,6 +127,15 @@ impl SettingsScreen {
                         .child(n),
                 )
             })
+    }
+}
+
+/// The px of a text offset, with its sign: "−2 px", "0 px", "+4 px".
+fn offset_label(offset: i8) -> SharedString {
+    match offset {
+        n if n < 0 => format!("\u{2212}{} px", -n).into(),
+        0 => "0 px".into(),
+        n => format!("+{n} px").into(),
     }
 }
 
@@ -157,7 +167,7 @@ fn sample() -> Stateful<Div> {
 
 #[cfg(test)]
 mod tests {
-    use agentsi_ui::appearance::{Appearance, Corners, Density, INK_EM, TextSize};
+    use agentsi_ui::appearance::{Appearance, Corners, Density, INK_EM};
     use agentsi_ui::tokens::{control, size};
     use gpui::{Bounds, Modifiers, Pixels, TestAppContext, VisualTestContext};
 
@@ -210,7 +220,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn the_settings_screen_lays_out_in_each_of_the_27_combinations(cx: &mut TestAppContext) {
+    fn the_settings_screen_lays_out_in_each_of_the_63_combinations(cx: &mut TestAppContext) {
         let (_t, cx) = setup(cx, None);
         app_size(cx);
         let window = Bounds::new(
@@ -232,16 +242,16 @@ mod tests {
             let pad = agentsi_ui::tokens::space(8);
             let inner = (column.left() + pad, column.right() - pad);
 
-            // Three groups of three buttons, one under the other, inside the column.
+            // Three groups of buttons, one under the other, inside the column.
             let mut tops = Vec::new();
-            for group in ["density", "corners", "text"] {
+            for (group, count) in [("density", 3), ("corners", 3), ("text", 7)] {
                 let g = bounds(cx, &format!("appearance-group:appearance-{group}"));
                 assert!(
                     g.left() >= inner.0 && g.right() <= inner.1,
                     "{ctx}: {group} group"
                 );
                 let mut last_right = g.left();
-                for i in 0..3 {
+                for i in 0..count {
                     let b = bounds(cx, &format!("button:appearance-{group}-{i}"));
                     assert_eq!(b.size.height, control::height_sm(), "{ctx}: {group} {i}");
                     assert!(b.left() >= last_right, "{ctx}: two buttons overlap");
@@ -285,7 +295,11 @@ mod tests {
             assert!(mid - ink / 2. >= f32::from(row.top()), "{ctx}");
             assert!(mid + ink / 2. <= f32::from(row.bottom()), "{ctx}");
         }
-        assert_eq!(row_heights.len(), 3, "the sample followed the density");
+        assert_eq!(
+            row_heights.len(),
+            9,
+            "3 densities, and the rows grow above +2"
+        );
     }
 
     #[gpui::test]
@@ -297,14 +311,14 @@ mod tests {
         let before = bounds(cx, "list-row:appearance-sample-row").size.height;
         assert_eq!(before, control::row());
 
-        // Compact (button 0 of density), Round (2 of corners), Large (2 of text).
+        // Compact (button 0 of density), Round (2 of corners), +2 (4 of text).
         click(cx, "button:appearance-density-0");
         click(cx, "button:appearance-corners-2");
-        click(cx, "button:appearance-text-2");
+        click(cx, "button:appearance-text-4");
         let want = Appearance {
             density: Density::Compact,
             corners: Corners::Round,
-            text: TextSize::Large,
+            text_offset: 2,
         };
         assert_eq!(cx.update(|_, cx| Appearance::get(cx)), want);
         assert_eq!(cx.update(|_, _| agentsi_ui::appearance::current()), want);

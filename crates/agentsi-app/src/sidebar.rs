@@ -1106,7 +1106,7 @@ mod tests {
     }
 
     #[gpui::test]
-    fn the_sidebar_lays_out_in_each_of_the_27_combinations(cx: &mut TestAppContext) {
+    fn the_sidebar_lays_out_in_each_of_the_63_combinations(cx: &mut TestAppContext) {
         let (_core_end, cx) = fixture(cx);
         let mut heights = std::collections::BTreeSet::new();
         for a in Appearance::all() {
@@ -1151,7 +1151,7 @@ mod tests {
             assert!(mid - ink / 2. >= f32::from(rows[0].top()), "{ctx}");
             assert!(mid + ink / 2. <= f32::from(rows[0].bottom()), "{ctx}");
         }
-        assert_eq!(heights.len(), 3, "the rows followed the density");
+        assert_eq!(heights.len(), 9, "3 densities, and the rows grow above +2");
     }
 
     mod tree_tests {

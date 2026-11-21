@@ -261,7 +261,7 @@ fn bounds(cx: &mut VisualTestContext, selector: &str) -> gpui::Bounds<gpui::Pixe
 }
 
 #[gpui::test]
-fn each_component_has_the_height_of_the_tokens_in_each_of_the_27_combinations(
+fn each_component_has_the_height_of_the_tokens_in_each_of_the_63_combinations(
     cx: &mut TestAppContext,
 ) {
     use crate::appearance::{Appearance, INK_EM};
@@ -335,7 +335,7 @@ fn each_component_has_the_height_of_the_tokens_in_each_of_the_27_combinations(
         );
     }
     // The drawn rows moved with the density: the test would pass with a stale look otherwise.
-    assert_eq!(rows.len(), 3);
+    assert_eq!(rows.len(), 9, "3 densities, and the rows grow above +2");
 }
 
 #[gpui::test]
