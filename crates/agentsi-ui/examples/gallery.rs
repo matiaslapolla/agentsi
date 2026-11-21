@@ -322,8 +322,8 @@ impl StatesPanel {
                         .child(
                             div()
                                 .font_family(font::mono())
-                                .text_size(size::MONO)
-                                .text_color(tokens::terminal::FOREGROUND.hsla())
+                                .text_size(size::mono())
+                                .text_color(tokens::terminal::colors().foreground.hsla())
                                 .child("agentsi › claude --model haiku   ▁▂▃▅▇ ┌─┐ ⣿"),
                         ),
                 ),

@@ -37,6 +37,7 @@ pub(crate) fn apply_metrics(cx: &mut App) {
         t.font_size = size::base();
         t.radius = radius::md();
         t.radius_lg = radius::lg();
+        t.mono_font_size = size::mono();
     });
 }
 
@@ -55,7 +56,6 @@ pub(crate) fn apply(cx: &mut App, mode: ThemeMode) {
         let c = |c: Color| c.hsla();
         t.font_family = font::ui();
         t.mono_font_family = font::mono();
-        t.mono_font_size = size::MONO;
         t.shadow = false;
         t.focus_ring = true;
         t.cursor_blink =

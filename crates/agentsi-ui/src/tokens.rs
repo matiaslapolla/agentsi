@@ -466,34 +466,101 @@ pub fn danger_fill_press() -> Color {
     status::danger().over(surface::raised(), status::DANGER_PRESS_ALPHA)
 }
 
-/// Colors of a terminal pane. `ANSI` holds the 16 colors, normal then bright.
+/// The colors and the metrics of a terminal pane. The Terminal section of the settings picks
+/// the palette, the font size and the line height.
 pub mod terminal {
-    use super::Color;
+    use super::{Color, Palette, current_palette};
+    use crate::appearance::{TerminalPalette, with_terminal};
     use gpui_kit::{Pixels, px};
-    pub const BACKGROUND: Color = Color(0x0b0c0f);
-    pub const FOREGROUND: Color = Color(0xdcdde2);
-    pub const CURSOR: Color = Color(0x8b7cf6);
-    pub const SELECTION: Color = Color(0x2f2a52);
-    pub const ANSI: [Color; 16] = [
-        Color(0x1e2027),
-        Color(0xf87171),
-        Color(0x4ade80),
-        Color(0xf2b84b),
-        Color(0x60a5fa),
-        Color(0xb69cf8),
-        Color(0x5ccfe6),
-        Color(0xc8cad0),
-        Color(0x5c616d),
-        Color(0xfca5a5),
-        Color(0x86efac),
-        Color(0xfcd38d),
-        Color(0x93c5fd),
-        Color(0xd2c2fb),
-        Color(0x99e3f0),
-        Color(0xf4f5f7),
-    ];
-    /// The height of a row of cells, as a factor of `size::MONO`.
-    pub const LINE_HEIGHT: f32 = 1.25;
+
+    /// The colors of one terminal palette. `ansi` holds the 16 colors, normal then bright.
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct Colors {
+        pub background: Color,
+        pub foreground: Color,
+        pub cursor: Color,
+        pub selection: Color,
+        pub ansi: [Color; 16],
+    }
+
+    impl Colors {
+        /// `agentsi-dark`.
+        pub const DARK: Colors = Colors {
+            background: Color(0x0b0c0f),
+            foreground: Color(0xdcdde2),
+            cursor: Color(0x8b7cf6),
+            selection: Color(0x2f2a52),
+            ansi: [
+                Color(0x1e2027),
+                Color(0xf87171),
+                Color(0x4ade80),
+                Color(0xf2b84b),
+                Color(0x60a5fa),
+                Color(0xb69cf8),
+                Color(0x5ccfe6),
+                Color(0xc8cad0),
+                Color(0x5c616d),
+                Color(0xfca5a5),
+                Color(0x86efac),
+                Color(0xfcd38d),
+                Color(0x93c5fd),
+                Color(0xd2c2fb),
+                Color(0x99e3f0),
+                Color(0xf4f5f7),
+            ],
+        };
+
+        /// `agentsi-light`. Each of the 16 colors reaches 4.5:1 on the background, so a
+        /// program that writes in white stays readable.
+        pub const LIGHT: Colors = Colors {
+            background: Color(0xfbfbfc),
+            foreground: Color(0x24262d),
+            cursor: Color(0x6d5ae6),
+            selection: Color(0xd9d3fb),
+            ansi: [
+                Color(0x24262d),
+                Color(0xc4262e),
+                Color(0x1a7f37),
+                Color(0x8a6100),
+                Color(0x0969da),
+                Color(0x8250df),
+                Color(0x1b7c83),
+                Color(0x68707a),
+                Color(0x57606a),
+                Color(0xa40e26),
+                Color(0x116329),
+                Color(0x704f00),
+                Color(0x0550ae),
+                Color(0x6639ba),
+                Color(0x0f6068),
+                Color(0x5c6470),
+            ],
+        };
+
+        /// The palette that follows the color theme `palette` of the app.
+        pub fn of_theme(palette: Palette) -> Colors {
+            if palette == Palette::LIGHT {
+                Colors::LIGHT
+            } else {
+                Colors::DARK
+            }
+        }
+    }
+
+    /// The colors in effect: the palette of the settings, or the one of the color theme.
+    pub fn colors() -> Colors {
+        match with_terminal(|t| t.palette) {
+            TerminalPalette::AgentsiDark => Colors::DARK,
+            TerminalPalette::AgentsiLight => Colors::LIGHT,
+            TerminalPalette::FollowTheme => Colors::of_theme(current_palette()),
+        }
+    }
+
+    /// The height of a row of cells, as a factor of `size::mono()`.
+    pub fn line_height() -> f32 {
+        with_terminal(|t| t.line_height)
+    }
+
     /// The space between the edge of a pane and its cells. It does not follow the density.
     pub const PADDING: Pixels = super::grid(2);
     /// The width of a bar cursor, and the height of an underline cursor.
@@ -525,7 +592,8 @@ pub mod font {
     }
 }
 
-/// Type sizes, in px. The text offset of the appearance moves `xs` to `xl`, and `MONO` stays.
+/// Type sizes, in px. The text offset of the appearance moves `xs` to `xl`, and `mono` follows
+/// the terminal settings.
 pub mod size {
     use super::current;
     use gpui_kit::{Pixels, px};
@@ -562,8 +630,10 @@ pub mod size {
     pub fn xl() -> Pixels {
         step(28.)
     }
-    /// Terminal cells.
-    pub const MONO: Pixels = px(13.);
+    /// Terminal cells: the font size of the terminal settings. The text offset does not move it.
+    pub fn mono() -> Pixels {
+        px(f32::from(crate::appearance::with_terminal(|t| t.font_size)))
+    }
 }
 
 /// Font weights.
@@ -914,21 +984,20 @@ fn text_pairs_in_effect() -> Vec<(String, Color, Color)> {
         status::danger(),
         danger_fill_press(),
     ));
-    // The terminal keeps its dark colors in both color themes.
+    // The terminal palette that follows this color theme.
+    let light = current_palette() == Palette::LIGHT;
+    let t = terminal::Colors::of_theme(current_palette());
+    pairs.push(("terminal foreground".into(), t.foreground, t.background));
     pairs.push((
-        "terminal::FOREGROUND".into(),
-        terminal::FOREGROUND,
-        terminal::BACKGROUND,
+        "terminal foreground on the selection".into(),
+        t.foreground,
+        t.selection,
     ));
-    pairs.push((
-        "terminal::FOREGROUND on terminal::SELECTION".into(),
-        terminal::FOREGROUND,
-        terminal::SELECTION,
-    ));
-    for (i, &c) in terminal::ANSI.iter().enumerate().skip(1) {
-        // Color 0 is black and color 8 is dark grey. Programs use them as fills.
-        if i != 8 {
-            pairs.push((format!("terminal::ANSI[{i}]"), c, terminal::BACKGROUND));
+    for (i, &c) in t.ansi.iter().enumerate() {
+        // In the dark palette, color 0 is black and color 8 is dark grey: programs use them as
+        // fills. Each color of the light palette is text.
+        if light || (i != 0 && i != 8) {
+            pairs.push((format!("terminal ansi[{i}]"), c, t.background));
         }
     }
     pairs
