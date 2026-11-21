@@ -24,7 +24,7 @@ use agentsi_proto::voice_api::{
 };
 use agentsi_term_view::{Link as PaneLink, PaneEvent, PaneOptions, PaneOutput, TerminalPane};
 use agentsi_ui::bench::Bench;
-use agentsi_ui::components::{StateMark, StatusDot, Switch, state_icon, status_tag};
+use agentsi_ui::components::{ChangesDot, StateMark, StatusDot, Switch, state_icon, status_tag};
 use agentsi_ui::style::{self, StyleExt as _};
 use agentsi_ui::tokens::WorkState;
 use agentsi_ui::tokens::label::Hue;
@@ -36,6 +36,7 @@ use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
 use crate::alerts::{AlertTarget, Alerts, Name};
+use crate::git_marks::{self, MarkChanged, Source};
 use crate::layout::{TERMINAL_PANEL, terminal_info};
 use crate::link::{CallError, Link, StreamItem};
 use crate::look::LookGlobal;
@@ -291,6 +292,14 @@ impl TerminalPanel {
         let mut subscriptions = subscriptions;
         if let Some(center) = Alerts::try_get(cx) {
             subscriptions.push(cx.observe(&center, |_, _, cx| cx.notify()));
+        }
+        if let Some(git) = core.read(cx).git.clone() {
+            subscriptions.push(cx.subscribe(&git, |this, _, e: &MarkChanged, cx| {
+                let cwd = this.core.read(cx).terminals.get(&this.id).map(|t| &t.cwd);
+                if matches!(&e.0, Source::Folder(f) if Some(f) == cwd) {
+                    cx.notify();
+                }
+            }));
         }
         let header = cx.new(|cx| PaneHeader::new(id.clone(), core.clone(), probe, cx));
         let mut panel = TerminalPanel {
@@ -882,7 +891,12 @@ impl TerminalPanel {
     pub fn mark(&self, cx: &App) -> AnyElement {
         let core = self.core.read(cx);
         let term = core.terminals.get(&self.id);
-        let title = shown(core, &self.id, cx).title;
+        let git = git_marks::of_terminal(core, &self.id, cx);
+        let dirty = git.is_some_and(|g| g.changed > 0);
+        let title = tooltip_lines([
+            Some(shown(core, &self.id, cx).title),
+            git.map(git_marks::tooltip),
+        ]);
         let glow = glow_with_alert(term, core.remote.as_deref(), &self.id, cx);
         let glow_key = format!("tab-glow:{}:{}", self.id, glow.map_or(0, |g| g.1));
         div()
@@ -902,11 +916,26 @@ impl TerminalPanel {
                     .text_color(Hsla::from(text::secondary())),
             )
             .child(StatusDot(status_of(term)))
-            .tooltip(move |window, cx| {
-                gpui_kit::component::tooltip::Tooltip::new(title.clone()).build(window, cx)
+            .when(dirty, |el| el.child(changes_dot(&self.id)))
+            .when_some(title, |el, title| {
+                el.tooltip(move |window, cx| {
+                    gpui_kit::component::tooltip::Tooltip::new(title.clone()).build(window, cx)
+                })
             })
             .into_any_element()
     }
+}
+
+/// The tree of the terminal folder has changes.
+fn changes_dot(id: &str) -> impl IntoElement {
+    let selector = format!("tab-git-dot:{id}");
+    div().debug_selector(move || selector).child(ChangesDot)
+}
+
+/// The lines that are there, one under the other, or `None` with no line.
+fn tooltip_lines<const N: usize>(lines: [Option<String>; N]) -> Option<String> {
+    let lines: Vec<String> = lines.into_iter().flatten().collect();
+    (!lines.is_empty()).then(|| lines.join("\n"))
 }
 
 impl Panel for TerminalPanel {
@@ -920,6 +949,9 @@ impl Panel for TerminalPanel {
             None => shown.title,
         };
         let work = work_state_of(term);
+        let git = git_marks::of_terminal(core, &self.id, cx);
+        let dirty = git.is_some_and(|g| g.changed > 0);
+        let tooltip = tooltip_lines([shown.tooltip, git.map(git_marks::tooltip)]);
         let glow = glow_with_alert(term, core.remote.as_deref(), &self.id, cx);
         let glow_key = format!("tab-glow:{}:{}", self.id, glow.map_or(0, |g| g.1));
         div()
@@ -950,14 +982,15 @@ impl Panel for TerminalPanel {
                     .id(SharedString::from(format!("tab-title:{}", self.id)))
                     .min_w_0()
                     .truncate()
-                    .when_some(shown.tooltip, |el, program| {
+                    .when_some(tooltip, |el, tooltip| {
                         el.tooltip(move |window, cx| {
-                            gpui_kit::component::tooltip::Tooltip::new(program.clone())
+                            gpui_kit::component::tooltip::Tooltip::new(tooltip.clone())
                                 .build(window, cx)
                         })
                     })
                     .child(title),
             )
+            .when(dirty, |el| el.child(changes_dot(&self.id)))
     }
 
     fn inner_padding(&self, _: &App) -> bool {
@@ -1161,6 +1194,78 @@ mod tests {
         });
         cx.run_until_parked();
         assert_eq!(methods(&mut fake), ["terminal.attach"]);
+    }
+
+    /// The tab title of a panel, as the tab bar draws it.
+    struct TitleOf(Entity<TerminalPanel>);
+
+    impl gpui_kit::Render for TitleOf {
+        fn render(
+            &mut self,
+            window: &mut gpui_kit::Window,
+            cx: &mut gpui_kit::Context<Self>,
+        ) -> impl gpui_kit::IntoElement {
+            use gpui_kit::IntoElement as _;
+            use gpui_kit::component::dock::Panel as _;
+            self.0
+                .update(cx, |p, cx| p.title(window, cx).into_any_element())
+        }
+    }
+
+    #[gpui::test]
+    fn the_tab_shows_a_dot_when_the_tree_of_its_folder_has_changes(cx: &mut TestAppContext) {
+        use crate::git_marks::{GitMarks, Source};
+        use agentsi_proto::git_api::GitSummaryInfo;
+        cx.update(agentsi_ui::init);
+        let (link, _socket) = host_link();
+        let core = cx.new(|_| CoreState::new(link));
+        core.update(cx, |s, _| {
+            s.put(
+                serde_json::from_value(serde_json::json!({
+                    "id": "t1-a", "argv": ["sh"], "cwd": "/w/sub", "product": "a", "pid": 1,
+                    "cols": 80, "rows": 24, "title": "", "state": null, "running": true,
+                    "code": null,
+                }))
+                .unwrap(),
+            )
+        });
+        let marks = cx.update(|cx| GitMarks::install(&core, cx));
+        let c = core.clone();
+        let (view, cx) = cx.add_window_view(|window, cx| {
+            TitleOf(cx.new(|cx| TerminalPanel::new("t1-a".into(), c, None, None, window, cx)))
+        });
+        let panel = view.read_with(cx, |v, _| v.0.clone());
+        let told = std::rc::Rc::new(std::cell::Cell::new(0));
+        let t = told.clone();
+        cx.update(|_, cx| cx.observe(&panel, move |_, _| t.set(t.get() + 1)).detach());
+        let summary = |changed| {
+            Ok(Some(GitSummaryInfo {
+                repo: "/w".into(),
+                branch: Some("main".into()),
+                changed,
+                ..Default::default()
+            }))
+        };
+        let dot = |cx: &mut gpui::VisualTestContext| {
+            cx.update(|window, cx| window.draw(cx).clear(cx));
+            cx.debug_bounds("tab-git-dot:t1-a").is_some()
+        };
+        assert!(!dot(cx));
+        marks.update(cx, |m, cx| {
+            m.loaded(Source::Folder("/w/sub".into()), summary(2), cx)
+        });
+        assert_eq!(told.get(), 1);
+        assert!(dot(cx));
+        // A summary of another source does not redraw the tab.
+        marks.update(cx, |m, cx| {
+            m.loaded(Source::Product("a".into()), summary(5), cx)
+        });
+        assert_eq!(told.get(), 1);
+        marks.update(cx, |m, cx| {
+            m.loaded(Source::Folder("/w/sub".into()), summary(0), cx)
+        });
+        assert_eq!(told.get(), 2);
+        assert!(!dot(cx));
     }
 
     #[test]
