@@ -13,9 +13,9 @@ The app shows a diff only on the story screen. The owner must open a pane and ty
 
 ## Non-goals
 
-- Push, pull, fetch and any remote. The owner does them in a pane.
+- Push, pull, fetch and any remote. The owner does them in a pane. `agentsi-desktop-git-more.md` amends this: the git screen fetches, pulls with `--ff-only` and pushes with a confirm.
+- A file watcher. The screen reads again on focus and after each action. `agentsi-desktop-git-more.md` adds a watcher that sends `git.changed`.
 - Merge, rebase, conflicts, stash and history edits.
-- A file watcher. The screen reads again on focus and after each action.
 - macOS. U18 stands by.
 - A change to the `.git/config` of a repo or to the owner's `~/.gitconfig`. AgentSI writes only in its own config folder.
 - Git config on an SSH host from this device. Each core reads its own file.
