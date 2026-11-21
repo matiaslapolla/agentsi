@@ -63,9 +63,9 @@ mod alert_tests;
 mod menu_actions;
 #[cfg(test)]
 mod menu_tests;
-mod tab_actions;
 #[cfg(test)]
 mod roles_tests;
+mod tab_actions;
 #[cfg(test)]
 mod ticket_tests;
 

@@ -449,7 +449,9 @@ pub const ENTRIES: &[Entry] = &[
     Entry {
         label: "Roles: New general role",
         icon: IconName::Plus,
-        keywords: &["roles", "general", "global", "new", "role", "products", "shared"],
+        keywords: &[
+            "roles", "general", "global", "new", "role", "products", "shared",
+        ],
         action: || Box::new(NewGeneralRole),
     },
     Entry {

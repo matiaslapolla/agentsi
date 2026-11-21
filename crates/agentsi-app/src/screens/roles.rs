@@ -10,12 +10,12 @@
 use agentsi_proto::agency_api::{AuditParams, AuditReport, DataAudit};
 use agentsi_proto::method::Method;
 use agentsi_proto::roles_api::{
-    ApplyPlan, RoleDef, BriefView, ChangeStatus, CommitInfo, GeneralCreate, GeneralDelete,
+    ApplyPlan, BriefView, ChangeStatus, CommitInfo, GeneralCreate, GeneralDelete,
     GeneralDeleteParams, GeneralEntry, GeneralList, GeneralListParams, GeneralListResult,
-    GeneralPromote, GeneralPromoteParams, GeneralRole, GeneralUpdate, ResetPlan, RoleSource,
-    RolesBrief, RolesBriefParams, RolesList, RolesListParams, RolesListResult, RolesReset,
-    RolesResetParams, RolesRoster, RolesRosterParams, RolesValidate, RolesValidateParams,
-    RolesValidateResult, RosterEntry,
+    GeneralPromote, GeneralPromoteParams, GeneralRole, GeneralUpdate, ResetPlan, RoleDef,
+    RoleSource, RolesBrief, RolesBriefParams, RolesList, RolesListParams, RolesListResult,
+    RolesReset, RolesResetParams, RolesRoster, RolesRosterParams, RolesValidate,
+    RolesValidateParams, RolesValidateResult, RosterEntry,
 };
 use agentsi_ui::components::{Button, Card, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
@@ -98,7 +98,11 @@ pub fn picker_groups(
         .collect();
     custom.sort();
     custom.dedup();
-    [("Builtin", builtins), ("General", general), ("Custom", custom)]
+    [
+        ("Builtin", builtins),
+        ("General", general),
+        ("Custom", custom),
+    ]
 }
 
 /// `roster` with `id` taken out, or added at the end.
@@ -428,13 +432,37 @@ impl RolesScreen {
             GeneralForm::New => Form::new("roles-general", "New general role", "Create", cx)
                 .field("Id", "designer", true, window, cx)
                 .field("Name", "Designer", false, window, cx)
-                .field("Description", "What the role looks at, in one line", false, window, cx)
-                .area("Definition", "You are the designer of the agency…", true, window, cx),
+                .field(
+                    "Description",
+                    "What the role looks at, in one line",
+                    false,
+                    window,
+                    cx,
+                )
+                .area(
+                    "Definition",
+                    "You are the designer of the agency…",
+                    true,
+                    window,
+                    cx,
+                ),
             GeneralForm::Edit(role) => {
                 let mut f = Form::new("roles-general", "Edit the general role", "Save", cx)
                     .field("Name", "Designer", false, window, cx)
-                    .field("Description", "What the role looks at, in one line", false, window, cx)
-                    .area("Definition", "You are the designer of the agency…", true, window, cx);
+                    .field(
+                        "Description",
+                        "What the role looks at, in one line",
+                        false,
+                        window,
+                        cx,
+                    )
+                    .area(
+                        "Definition",
+                        "You are the designer of the agency…",
+                        true,
+                        window,
+                        cx,
+                    );
                 f.set_value(0, &role.name, window, cx);
                 f.set_value(1, &role.description, window, cx);
                 f.set_area_value(0, &role.body, window, cx);
@@ -464,7 +492,12 @@ impl RolesScreen {
                 };
                 self.send::<GeneralCreate>(
                     &role,
-                    |r| done_line(&format!("General role {} created", r.role.id), Some(r.commit)),
+                    |r| {
+                        done_line(
+                            &format!("General role {} created", r.role.id),
+                            Some(r.commit),
+                        )
+                    },
                     true,
                     cx,
                 );
@@ -558,35 +591,41 @@ impl RolesScreen {
                 },
             )
             .child(
-                div().flex().justify_end().gap(space(2)).child(
-                    Button::new(("roles-definition", i))
-                        .ghost()
-                        .small()
-                        .icon(IconName::FileText)
-                        .label("Definition")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.show_definition(definition_of.clone(), cx);
-                        })),
-                ).children(promote.map(|agent| {
-                    Button::new(("roles-make-general", i))
-                        .ghost()
-                        .small()
-                        .icon(IconName::Globe)
-                        .label("Make general")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.pending = Some(Pending::Promote(agent.clone()));
-                            cx.notify();
-                        }))
-                })).child(
-                    Button::new(("roles-reset", i))
-                        .ghost()
-                        .small()
-                        .icon(IconName::RotateCw)
-                        .label("Reset to the global role")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.plan_reset(Some(id.clone()), false, cx);
-                        })),
-                ),
+                div()
+                    .flex()
+                    .justify_end()
+                    .gap(space(2))
+                    .child(
+                        Button::new(("roles-definition", i))
+                            .ghost()
+                            .small()
+                            .icon(IconName::FileText)
+                            .label("Definition")
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.show_definition(definition_of.clone(), cx);
+                            })),
+                    )
+                    .children(promote.map(|agent| {
+                        Button::new(("roles-make-general", i))
+                            .ghost()
+                            .small()
+                            .icon(IconName::Globe)
+                            .label("Make general")
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.pending = Some(Pending::Promote(agent.clone()));
+                                cx.notify();
+                            }))
+                    }))
+                    .child(
+                        Button::new(("roles-reset", i))
+                            .ghost()
+                            .small()
+                            .icon(IconName::RotateCw)
+                            .label("Reset to the global role")
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.plan_reset(Some(id.clone()), false, cx);
+                            })),
+                    ),
             )
     }
 
@@ -715,12 +754,7 @@ impl RolesScreen {
         let Load::Ready(general) = &self.general else {
             return None;
         };
-        let roster: Vec<String> = r
-            .roster
-            .iter()
-            .flatten()
-            .map(|e| e.id.clone())
-            .collect();
+        let roster: Vec<String> = r.roster.iter().flatten().map(|e| e.id.clone()).collect();
         let mut n = 0usize;
         let groups: Vec<Div> = picker_groups(&r.globals, &general.builtin, &r.overlays, &roster)
             .into_iter()
@@ -780,8 +814,14 @@ impl RolesScreen {
             Pending::Promote(agent) => (
                 format!("Make {agent} a general role"),
                 vec![
-                    format!("Move the custom role {agent} of {} to plugin/agents/{agent}.md", self.product),
-                    format!("The roster of {} keeps {agent}, and each product can add it.", self.product),
+                    format!(
+                        "Move the custom role {agent} of {} to plugin/agents/{agent}.md",
+                        self.product
+                    ),
+                    format!(
+                        "The roster of {} keeps {agent}, and each product can add it.",
+                        self.product
+                    ),
                 ],
             ),
         };
@@ -1300,14 +1340,18 @@ mod tests {
 
     #[gpui::test]
     fn the_general_roles_the_picker_and_their_plans_draw(cx: &mut TestAppContext) {
-        screen(cx, |s| s.pending = Some(Pending::DeleteGeneral("writer".into())));
+        screen(cx, |s| {
+            s.pending = Some(Pending::DeleteGeneral("writer".into()))
+        });
         screen(cx, |s| s.pending = Some(Pending::Promote("seo".into())));
         screen(cx, |s| s.want_form = Some(GeneralForm::New));
         screen(cx, |s| s.want_form = Some(GeneralForm::Edit(designer())));
         screen(cx, |s| s.general = Load::Failed("no core".into()));
         screen(cx, |s| s.general = Load::Loading);
         screen(cx, |s| {
-            s.general = Load::Ready(serde_json::from_value(serde_json::json!({"roles": [], "builtin": []})).unwrap())
+            s.general = Load::Ready(
+                serde_json::from_value(serde_json::json!({"roles": [], "builtin": []})).unwrap(),
+            )
         });
     }
 
@@ -1326,7 +1370,10 @@ mod tests {
         while let Some(r) = request(&mut other) {
             reads.push(r["method"].as_str().unwrap_or_default().to_string());
         }
-        assert!(reads.contains(&"role.general.list".to_string()), "{reads:?}");
+        assert!(
+            reads.contains(&"role.general.list".to_string()),
+            "{reads:?}"
+        );
         screen.update(cx, |s, cx| {
             s.data = Load::Ready(serde_json::from_str(LIST).unwrap());
             s.general = Load::Ready(serde_json::from_str(GENERAL).unwrap());
@@ -1343,12 +1390,20 @@ mod tests {
         cx.update(|window, cx| window.draw(cx).clear(cx));
         let form = screen.read_with(cx, |s, _| s.form.as_ref().map(|(f, _, _)| f.clone()));
         let form = form.expect("the next draw makes the form");
-        assert!(!form.read_with(cx, |f, cx| f.ready(cx)), "the id and the body are required");
+        assert!(
+            !form.read_with(cx, |f, cx| f.ready(cx)),
+            "the id and the body are required"
+        );
         form.update_in(cx, |f, window, cx| {
             f.set_value(0, "designer", window, cx);
             f.set_value(1, "Designer", window, cx);
             f.set_value(2, "Reads the screens.", window, cx);
-            f.set_area_value(0, "You are the designer.\nYou read the screens.", window, cx);
+            f.set_area_value(
+                0,
+                "You are the designer.\nYou read the screens.",
+                window,
+                cx,
+            );
         });
         form.update(cx, |f, cx| f.submit(cx));
         let r = request(&mut other).expect("role.general.create");
@@ -1367,8 +1422,13 @@ mod tests {
         let (screen, cx, mut other) = opened(cx);
         screen.update(cx, |s, cx| s.open_form(GeneralForm::Edit(designer()), cx));
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        let form = screen.read_with(cx, |s, _| s.form.as_ref().map(|(f, _, _)| f.clone())).unwrap();
-        assert_eq!(form.read_with(cx, |f, cx| f.area_value(0, cx)), "You are the designer.");
+        let form = screen
+            .read_with(cx, |s, _| s.form.as_ref().map(|(f, _, _)| f.clone()))
+            .unwrap();
+        assert_eq!(
+            form.read_with(cx, |f, cx| f.area_value(0, cx)),
+            "You are the designer."
+        );
         form.update_in(cx, |f, window, cx| f.set_value(0, "UX", window, cx));
         form.update(cx, |f, cx| f.submit(cx));
         let r = request(&mut other).expect("role.general.update");
@@ -1381,7 +1441,9 @@ mod tests {
     #[gpui::test]
     fn the_picker_make_general_and_delete_send_their_writes(cx: &mut TestAppContext) {
         let (screen, cx, mut other) = opened(cx);
-        screen.update(cx, |s, cx| s.set_roster(toggled(&ids(&["pm", "seo"]), "designer"), cx));
+        screen.update(cx, |s, cx| {
+            s.set_roster(toggled(&ids(&["pm", "seo"]), "designer"), cx)
+        });
         let r = request(&mut other).expect("roles.roster");
         assert_eq!(r["method"], "roles.roster");
         assert_eq!(
@@ -1390,7 +1452,10 @@ mod tests {
         );
 
         screen.update(cx, |s, cx| s.set_roster(vec!["pm".into()], cx));
-        assert!(request(&mut other).is_none(), "a write waits for the reply of the last one");
+        assert!(
+            request(&mut other).is_none(),
+            "a write waits for the reply of the last one"
+        );
 
         screen.update(cx, |s, cx| {
             s.writing = false;
@@ -1399,7 +1464,10 @@ mod tests {
         });
         let r = request(&mut other).expect("role.general.promote");
         assert_eq!(r["method"], "role.general.promote");
-        assert_eq!(r["params"], serde_json::json!({"product": "demo", "agent": "seo"}));
+        assert_eq!(
+            r["params"],
+            serde_json::json!({"product": "demo", "agent": "seo"})
+        );
 
         screen.update(cx, |s, cx| {
             s.writing = false;
