@@ -10,6 +10,7 @@
 //! palette = "follow-theme"  # agentsi-dark, agentsi-light or follow-theme
 //! copy_on_select = false
 //! option_as_meta = true
+//! link_modifier = "ctrl"   # ctrl or none: what a click on a link needs to open it
 //! ```
 //!
 //! - A missing file means the defaults. An unknown key, a bad value or a file that does not
@@ -19,7 +20,9 @@
 
 use std::path::{Path, PathBuf};
 
-use agentsi_ui::appearance::{CursorBlink, CursorStyle, TerminalPalette, TerminalSettings};
+use agentsi_ui::appearance::{
+    CursorBlink, CursorStyle, LinkModifier, TerminalPalette, TerminalSettings,
+};
 use gpui_kit::{App, Global, SharedString};
 use toml_edit::{DocumentMut, Item, value};
 
@@ -121,6 +124,13 @@ fn parse(text: &str, path: &Path) -> (TerminalSettings, Option<String>) {
                 Some(b) => t.option_as_meta = b,
                 None => bad("must be true or false.".into()),
             },
+            "link_modifier" => match item.as_str().and_then(LinkModifier::from_key) {
+                Some(v) => t.link_modifier = v,
+                None => bad(format!(
+                    "must be one of {}.",
+                    LinkModifier::ALL.map(LinkModifier::key).join(", ")
+                )),
+            },
             other => problems.push(format!("{other}: no setting has this name.")),
         }
     }
@@ -203,6 +213,7 @@ fn write(path: &Path, t: &TerminalSettings) -> Result<(), String> {
         doc["palette"] = value(t.palette.key());
         doc["copy_on_select"] = value(t.copy_on_select);
         doc["option_as_meta"] = value(t.option_as_meta);
+        doc["link_modifier"] = value(t.link_modifier.key());
         Ok(())
     })
 }
@@ -245,6 +256,7 @@ mod tests {
         );
         assert!(t.shell.is_empty());
         assert!(!t.copy_on_select && t.option_as_meta);
+        assert_eq!(t.link_modifier, LinkModifier::Ctrl);
     }
 
     #[test]
@@ -252,7 +264,7 @@ mod tests {
         let (t, note) = of(
             "font_size = 16\nline_height = 1.4\ncursor_style = \"bar\"\ncursor_blink = \"off\"\n\
              scrollback_mb = 50\nshell = \"/usr/bin/fish\"\npalette = \"agentsi-light\"\n\
-             copy_on_select = true\noption_as_meta = false\n",
+             copy_on_select = true\noption_as_meta = false\nlink_modifier = \"none\"\n",
         );
         assert_eq!(note, None);
         assert_eq!(
@@ -267,6 +279,7 @@ mod tests {
                 palette: TerminalPalette::AgentsiLight,
                 copy_on_select: true,
                 option_as_meta: false,
+                link_modifier: LinkModifier::None,
             }
         );
         assert_eq!(of("line_height = 1").0.line_height, 1.0);
@@ -293,6 +306,12 @@ mod tests {
             assert_eq!(t.line_height, 1.25, "{bad}");
             assert!(note.unwrap().contains("steps of 0.05"), "{bad}");
         }
+        let (t, note) = of("link_modifier = \"alt\"");
+        assert_eq!(t.link_modifier, LinkModifier::Ctrl);
+        assert!(
+            note.unwrap()
+                .contains("link_modifier must be one of ctrl, none")
+        );
         let (t, note) = of("scrollback_mb = 0\ncopy_on_select = \"yes\"\nfont_size = 12\n");
         assert_eq!(
             (t.scrollback_mb, t.copy_on_select, t.font_size),

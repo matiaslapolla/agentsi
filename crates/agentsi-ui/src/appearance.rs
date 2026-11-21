@@ -342,6 +342,39 @@ impl CursorStyle {
     }
 }
 
+/// The key that, held, makes a click on a link of a terminal pane open it. With `None`, a plain
+/// click opens a link.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LinkModifier {
+    /// Ctrl, and Cmd on macOS.
+    #[default]
+    Ctrl,
+    None,
+}
+
+impl LinkModifier {
+    pub const ALL: [LinkModifier; 2] = [LinkModifier::Ctrl, LinkModifier::None];
+
+    /// The word in `terminal.toml`.
+    pub const fn key(self) -> &'static str {
+        match self {
+            LinkModifier::Ctrl => "ctrl",
+            LinkModifier::None => "none",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            LinkModifier::Ctrl => "Ctrl+click",
+            LinkModifier::None => "Click",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<LinkModifier> {
+        LinkModifier::ALL.into_iter().find(|c| c.key() == key)
+    }
+}
+
 /// The values of the Terminal section of the settings. The terminal tokens read them.
 #[derive(Clone, Debug, PartialEq)]
 pub struct TerminalSettings {
@@ -361,6 +394,8 @@ pub struct TerminalSettings {
     pub copy_on_select: bool,
     /// Option sends Alt (ESC and the key) on macOS. Other systems always send Alt.
     pub option_as_meta: bool,
+    /// What a click on a link needs to open it.
+    pub link_modifier: LinkModifier,
 }
 
 impl TerminalSettings {
@@ -381,6 +416,7 @@ impl Default for TerminalSettings {
             palette: TerminalPalette::FollowTheme,
             copy_on_select: false,
             option_as_meta: true,
+            link_modifier: LinkModifier::Ctrl,
         }
     }
 }
