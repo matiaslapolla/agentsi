@@ -1,15 +1,24 @@
 //! The git screen of a product: the branch, the changed files and their diff, stage and
-//! unstage, and the commit. A History tab lists the last commits. A Config tab edits the git
-//! config of the product (see `git_config`). Spec: `docs/specs/agentsi-desktop-git.md`.
+//! unstage, and the commit. A History tab lists the last commits and shows the files and the
+//! diff of one (`history`). A Branches tab lists, makes and switches branches, and lists the
+//! worktrees (`branches`). The header fetches, pulls and pushes, and a push asks a confirm
+//! that lists the commits that go out (`sync`). A Config tab edits the git config of the
+//! product (see `git_config`). Specs: `docs/specs/agentsi-desktop-git.md`,
+//! `docs/specs/agentsi-desktop-git-more.md`.
 //!
 //! The screen reads `git.status` when it opens, when it gets the focus (`show`), after each
-//! action, and when the core sends `data.changed` (the shell reloads each screen of the host).
-//! It has no push, pull or fetch: the owner does them in a pane.
+//! action, when the core sends `data.changed` (the shell reloads each screen of the host), and
+//! on `git.changed` of its product while it is in view.
 
+mod branches;
+mod history;
+mod sync;
+
+use agentsi_proto::events::{GitChanged, GitProgress};
 use agentsi_proto::git_api::{
-    GitCommit, GitCommitInfo, GitCommitParams, GitCommitResult, GitDiff, GitDiffParams,
-    GitDiffResult, GitDone, GitLog, GitLogParams, GitLogResult, GitPathsParams, GitRepoParams,
-    GitStage, GitStatus, GitStatusResult, GitUnstage,
+    GitBranchesResult, GitCommit, GitCommitInfo, GitCommitParams, GitCommitResult, GitDiff,
+    GitDiffParams, GitDiffResult, GitDone, GitLog, GitLogParams, GitLogResult, GitPathsParams,
+    GitRepoParams, GitStage, GitStatus, GitStatusResult, GitUnstage,
 };
 use agentsi_ui::components::{Button, ListRow, neutral_tag, status_tag};
 use agentsi_ui::style::StyleExt as _;
@@ -22,12 +31,15 @@ use gpui_kit::*;
 use super::git_config::GitConfigEditor;
 use super::minutes::cursor_after;
 use super::parts::{Load, first_screen_ready, mono, notice};
-use crate::model::CoreState;
+use crate::model::{CoreState, GitNotice};
+use agentsi_proto::Event as _;
+use agentsi_proto::rpc::Notification;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Tab {
     Changes,
     History,
+    Branches,
     Config,
 }
 
@@ -116,6 +128,10 @@ pub struct GitScreen {
     busy: bool,
     visible: bool,
     config: Entity<GitConfigEditor>,
+    history: history::History,
+    branches: Load<GitBranchesResult>,
+    branch: branches::Branches,
+    sync: sync::Sync,
     focus: FocusHandle,
     scroll: UniformListScrollHandle,
     _inputs: Vec<Subscription>,
@@ -127,6 +143,7 @@ impl GitScreen {
             let (product, core) = (product.clone(), core.clone());
             cx.new(|cx| GitConfigEditor::new(Some(product), core, cx))
         };
+        let notices = cx.subscribe(&core, |this, _, e: &GitNotice, cx| this.take(&e.0, cx));
         let mut screen = GitScreen {
             product,
             core,
@@ -142,9 +159,13 @@ impl GitScreen {
             busy: false,
             visible: false,
             config,
+            history: history::History::default(),
+            branches: Load::Loading,
+            branch: branches::Branches::default(),
+            sync: sync::Sync::default(),
             focus: cx.focus_handle().tab_stop(true),
             scroll: UniformListScrollHandle::new(),
-            _inputs: Vec::new(),
+            _inputs: vec![notices],
         };
         screen.reload(cx);
         screen
@@ -178,10 +199,29 @@ impl GitScreen {
             let _ = this.update(cx, |this, cx| this.status_loaded(result, cx));
         })
         .detach();
+        self.load_tab(cx);
+    }
+
+    fn load_tab(&mut self, cx: &mut Context<Self>) {
         match self.tab {
             Tab::History => self.load_log(cx),
+            Tab::Branches => self.load_branches(cx),
             Tab::Config => self.config.update(cx, |c, cx| c.reload(cx)),
             Tab::Changes => {}
+        }
+    }
+
+    /// One `git.*` event of the core. It acts only on an event of this product.
+    fn take(&mut self, n: &Notification, cx: &mut Context<Self>) {
+        if n.params.get("product").and_then(|p| p.as_str()) != Some(self.product.as_str()) {
+            return;
+        }
+        if n.method == GitChanged::NAME {
+            if self.visible {
+                self.reload(cx);
+            }
+        } else if let Some(p) = n.parse::<GitProgress>() {
+            self.take_progress(p, cx);
         }
     }
 
@@ -271,23 +311,7 @@ impl GitScreen {
             }
             Ok(d) => {
                 shown.truncated = d.truncated;
-                shown.view = if d.patch.trim().is_empty() {
-                    DiffView::Text(vec!["This side has no text change to show.".into()])
-                } else {
-                    let options = DiffParseOptions::new().truncated_hunks(d.truncated);
-                    match DiffFile::parse_with(&d.patch, options) {
-                        Ok(files) if !files.is_empty() => {
-                            match &self.diff {
-                                Some(state) => state.update(cx, |s, cx| s.set_files(files, cx)),
-                                None => self.diff = Some(cx.new(|cx| DiffState::new(files, cx))),
-                            }
-                            DiffView::Patch
-                        }
-                        _ => DiffView::Text(
-                            d.patch.lines().take(TEXT_LINES).map(String::from).collect(),
-                        ),
-                    }
-                };
+                shown.view = patch_view(&d.patch, d.truncated, &mut self.diff, cx);
             }
         }
         cx.notify();
@@ -311,13 +335,9 @@ impl GitScreen {
         cx.notify();
     }
 
-    fn set_tab(&mut self, tab: Tab, cx: &mut Context<Self>) {
+    pub fn set_tab(&mut self, tab: Tab, cx: &mut Context<Self>) {
         self.tab = tab;
-        match tab {
-            Tab::History => self.load_log(cx),
-            Tab::Config => self.config.update(cx, |c, cx| c.reload(cx)),
-            Tab::Changes => {}
-        }
+        self.load_tab(cx);
         cx.notify();
     }
 
@@ -487,6 +507,60 @@ impl GitScreen {
     }
 }
 
+/// The view of a patch: the diff viewer when it takes the patch, else its first lines.
+fn patch_view(
+    patch: &str,
+    truncated: bool,
+    state: &mut Option<Entity<DiffState>>,
+    cx: &mut App,
+) -> DiffView {
+    if patch.trim().is_empty() {
+        return DiffView::Text(vec!["This side has no text change to show.".into()]);
+    }
+    let options = DiffParseOptions::new().truncated_hunks(truncated);
+    match DiffFile::parse_with(patch, options) {
+        Ok(files) if !files.is_empty() => {
+            match state {
+                Some(s) => s.update(cx, |s, cx| s.set_files(files, cx)),
+                None => *state = Some(cx.new(|cx| DiffState::new(files, cx))),
+            }
+            DiffView::Patch
+        }
+        _ => DiffView::Text(patch.lines().take(TEXT_LINES).map(String::from).collect()),
+    }
+}
+
+fn diff_body(id: &'static str, view: &DiffView, state: Option<&Entity<DiffState>>) -> AnyElement {
+    match (view, state) {
+        (DiffView::Loading, _) => notice("Reading the diff…", None).into_any_element(),
+        (DiffView::Text(lines), _) => div()
+            .id(id)
+            .size_full()
+            .overflow_y_scroll()
+            .p(space(3))
+            .flex()
+            .flex_col()
+            .gap(space(1))
+            .children(lines.iter().map(|l| mono(l.clone())))
+            .into_any_element(),
+        (DiffView::Patch, Some(state)) => div()
+            .size_full()
+            .child(Diff::new(state).header_visible(false).size_full())
+            .into_any_element(),
+        (DiffView::Patch, None) => div().into_any_element(),
+    }
+}
+
+fn cut_line(selector: &'static str) -> Div {
+    div()
+        .debug_selector(move || selector.into())
+        .pad_x(space(3))
+        .py(space(1))
+        .text_size(size::sm())
+        .text_color(Status::Warn.color())
+        .child("The diff is cut at 512 KiB. Read the rest with git in a pane.")
+}
+
 /// `date` of a commit time.
 fn day(secs: i64) -> String {
     crate::format::date_from_secs(secs)
@@ -509,9 +583,6 @@ impl GitScreen {
                     format!("detached at {}", s.head.clone().unwrap_or_default())
                 });
                 let mut tags = Vec::new();
-                if let (Some(a), Some(b)) = (s.ahead, s.behind) {
-                    tags.push(neutral_tag(format!("ahead {a} · behind {b}")));
-                }
                 if s.worktrees.len() > 1 {
                     tags.push(neutral_tag(format!("{} worktrees", s.worktrees.len())));
                 }
@@ -548,8 +619,10 @@ impl GitScreen {
             .children(head.2)
             .when_some(head.1, |el, up| el.child(mono(up)))
             .child(div().flex_1())
+            .children(self.sync_buttons(cx))
             .child(tab("git-tab-changes", "Changes", Tab::Changes, cx))
             .child(tab("git-tab-history", "History", Tab::History, cx))
+            .child(tab("git-tab-branches", "Branches", Tab::Branches, cx))
             .child(tab("git-tab-config", "Config", Tab::Config, cx))
             .child(
                 Button::new("git-refresh")
@@ -678,38 +751,9 @@ impl GitScreen {
                     .disabled(self.busy)
                     .on_click(cx.listener(|this, _, _, cx| this.toggle_selected(cx))),
             );
-        let body = match (&shown.view, &self.diff) {
-            (DiffView::Loading, _) => notice("Reading the diff…", None).into_any_element(),
-            (DiffView::Text(lines), _) => div()
-                .id("git-text")
-                .size_full()
-                .overflow_y_scroll()
-                .p(space(3))
-                .flex()
-                .flex_col()
-                .gap(space(1))
-                .children(lines.iter().map(|l| mono(l.clone())))
-                .into_any_element(),
-            (DiffView::Patch, Some(state)) => div()
-                .size_full()
-                .child(Diff::new(state).header_visible(false).size_full())
-                .into_any_element(),
-            (DiffView::Patch, None) => div().into_any_element(),
-        };
+        let body = diff_body("git-text", &shown.view, self.diff.as_ref());
         pane.child(header)
-            .when(shown.truncated, |el| {
-                el.child(
-                    div()
-                        .debug_selector(|| "git-cut".into())
-                        .pad_x(space(3))
-                        .py(space(1))
-                        .text_size(size::sm())
-                        .text_color(Status::Warn.color())
-                        .child(
-                            "The diff is cut at 512 KiB. Read the rest with git diff in a pane.",
-                        ),
-                )
-            })
+            .when(shown.truncated, |el| el.child(cut_line("git-cut")))
             .child(
                 div()
                     .debug_selector(|| "git-diff".into())
@@ -772,34 +816,6 @@ impl GitScreen {
                 })
             })
     }
-
-    fn history(&self) -> AnyElement {
-        match &self.log {
-            Load::Loading => notice("Reading the history…", None).into_any_element(),
-            Load::Failed(e) => {
-                notice(format!("The history did not load: {e}"), None).into_any_element()
-            }
-            Load::Ready(commits) if commits.is_empty() => {
-                notice("No commit yet.", None).into_any_element()
-            }
-            Load::Ready(commits) => div()
-                .id("git-history")
-                .size_full()
-                .overflow_y_scroll()
-                .p(space(1))
-                .children(commits.iter().enumerate().map(|(i, c)| {
-                    div().pad_x(space(1)).child(
-                        ListRow::new(("git-commit-row", i), c.subject.clone()).meta(format!(
-                            "{} · {} · {}",
-                            c.id.chars().take(8).collect::<String>(),
-                            c.author,
-                            day(c.time)
-                        )),
-                    )
-                }))
-                .into_any_element(),
-        }
-    }
 }
 
 impl Render for GitScreen {
@@ -842,7 +858,8 @@ impl Render for GitScreen {
                 )
                 .child(self.commit_bar(window, cx))
                 .into_any_element(),
-            (_, Tab::History) => self.history(),
+            (_, Tab::History) => self.history_view(cx),
+            (_, Tab::Branches) => self.branches_view(window, cx),
             (_, Tab::Config) => div()
                 .id("git-config")
                 .size_full()
@@ -852,6 +869,7 @@ impl Render for GitScreen {
                 .into_any_element(),
         };
         root.child(self.toolbar(cx))
+            .children(self.sync_strip(cx))
             .child(div().flex_1().min_h_0().child(body))
     }
 }
@@ -862,7 +880,9 @@ mod tests {
     use crate::link::Link;
     use crate::link::tests::FakeCore;
     use crate::model::CoreState;
+    use agentsi_proto::events::{GitChanged, GitChangedParams, GitProgress, GitProgressParams};
     use agentsi_proto::git_api::{GitCommitResult, GitDiffResult, GitDone, GitStatusResult};
+    use agentsi_proto::rpc::Notification;
     use gpui::{AppContext as _, Entity, TestAppContext, VisualTestContext};
     use serde_json::{Value, json};
     use std::os::unix::net::UnixStream;
@@ -927,6 +947,7 @@ mod tests {
 
     struct Ui<'a> {
         screen: Entity<GitScreen>,
+        core: Entity<CoreState>,
         fake: FakeCore,
         cx: &'a mut VisualTestContext,
     }
@@ -937,9 +958,13 @@ mod tests {
         cx.update(agentsi_ui::init);
         let (end, other) = UnixStream::pair().unwrap();
         let core = cx.new(|_| CoreState::new(Arc::new(Link::for_tests(end))));
-        let (screen, cx) = cx.add_window_view(|_, cx| GitScreen::new("alpha".into(), core, cx));
+        let (screen, cx) = {
+            let core = core.clone();
+            cx.add_window_view(|_, cx| GitScreen::new("alpha".into(), core, cx))
+        };
         let mut ui = Ui {
             screen,
+            core,
             fake: FakeCore(other),
             cx,
         };
@@ -981,6 +1006,27 @@ mod tests {
         fn can_commit(&mut self) -> bool {
             self.screen.read_with(self.cx, |s, cx| s.can_commit(cx))
         }
+
+        /// True when the screen sent no request that the test did not read.
+        fn no_request(&mut self) -> bool {
+            self.fake.0.set_nonblocking(true).unwrap();
+            let none = agentsi_proto::frame::read_frame(&mut self.fake.0).is_err();
+            self.fake.0.set_nonblocking(false).unwrap();
+            none
+        }
+
+        fn shows(&mut self, selector: &'static str) -> bool {
+            self.cx.debug_bounds(selector).is_some()
+        }
+
+        fn emit(&mut self, n: Notification) {
+            self.core
+                .update(self.cx, |_, cx| cx.emit(crate::model::GitNotice(n)));
+        }
+    }
+
+    fn commit(id: &str, subject: &str) -> Value {
+        json!({"id": id, "subject": subject, "author": "Ada", "time": 1_700_000_000})
     }
 
     #[gpui::test]
@@ -1182,5 +1228,237 @@ mod tests {
         ui.draw();
         ui.screen.update(ui.cx, |s, cx| s.set_tab(Tab::Config, cx));
         ui.draw();
+    }
+
+    #[gpui::test]
+    fn a_click_on_a_commit_shows_its_files_and_the_diff_of_each_file(cx: &mut TestAppContext) {
+        let mut ui = ui(cx);
+        ui.screen.update(ui.cx, |s, cx| s.set_tab(Tab::History, cx));
+        assert_eq!(ui.methods(1), ["git.log"]);
+        let log = serde_json::from_value(json!({"commits": [
+            commit("1111111111111111", "feat: two files"), commit("2222222222222222", "first")]}))
+        .unwrap();
+        ui.screen.update(ui.cx, |s, cx| s.log_loaded(Ok(log), cx));
+        ui.draw();
+        assert!(ui.shows("git-history"));
+        assert!(!ui.shows("git-commit-files"));
+
+        ui.screen.update(ui.cx, |s, cx| {
+            s.select_commit("1111111111111111".into(), cx)
+        });
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "git.show");
+        assert_eq!(
+            req["params"],
+            json!({"product": "alpha", "commit": "1111111111111111"})
+        );
+        let patch = "diff --git a/a.txt b/a.txt\n--- a/a.txt\n+++ b/a.txt\n@@ -1 +1 @@\n-a\n+b\n\
+            diff --git a/b.txt b/b.txt\nnew file mode 100644\n--- /dev/null\n+++ b/b.txt\n@@ -0,0 +1 @@\n+new\n";
+        let show: agentsi_proto::git_api::GitShowResult = serde_json::from_value(json!({
+            "commit": commit("1111111111111111", "feat: two files"),
+            "files": [{"path": "a.txt", "letter": "M"}, {"path": "b.txt", "letter": "A"}],
+            "patch": patch, "truncated": false}))
+        .unwrap();
+        // An answer for a commit that is no longer selected changes nothing.
+        ui.screen.update(ui.cx, |s, cx| {
+            s.show_loaded("2222222222222222", Ok(show.clone()), cx)
+        });
+        ui.draw();
+        assert!(!ui.shows("git-commit-diff"));
+        ui.screen.update(ui.cx, |s, cx| {
+            s.show_loaded("1111111111111111", Ok(show), cx)
+        });
+        ui.draw();
+        let (files, diff) = (
+            ui.cx.debug_bounds("git-commit-files").unwrap(),
+            ui.cx.debug_bounds("git-commit-diff").unwrap(),
+        );
+        // The files are at the left of the diff.
+        assert!(f32::from(files.right()) <= f32::from(diff.left()) + 1.);
+        assert!(f32::from(diff.size.width) > 200., "{diff:?}");
+        ui.screen.read_with(ui.cx, |s, _| {
+            assert_eq!(s.history.file, 0);
+            assert!(matches!(s.history.view, Some(super::DiffView::Patch)));
+        });
+        ui.screen.update(ui.cx, |s, cx| s.select_commit_file(1, cx));
+        ui.draw();
+        ui.screen.read_with(ui.cx, |s, _| {
+            assert_eq!(s.history.file, 1);
+            assert!(matches!(s.history.view, Some(super::DiffView::Patch)));
+        });
+        assert!(ui.no_request(), "a file of a loaded commit needs no call");
+    }
+
+    fn branches() -> Value {
+        json!({
+            "local": [
+                {"name": "main", "head": "abc12345", "subject": "first", "current": true,
+                 "upstream": "origin/main", "ahead": 1, "behind": 0},
+                {"name": "feat", "head": "def67890", "subject": "wip", "current": false,
+                 "upstream": null, "ahead": null, "behind": null}],
+            "remote": [{"name": "origin/main", "head": "abc12345", "subject": "first",
+                        "current": false, "upstream": null, "ahead": null, "behind": null}],
+            "worktrees": [{"path": "/r", "branch": "main", "head": "abc12345"},
+                          {"path": "/r-wt", "branch": "feat", "head": "def67890"}],
+        })
+    }
+
+    #[gpui::test]
+    fn the_branches_tab_lists_switches_shows_dirty_and_makes_a_branch(cx: &mut TestAppContext) {
+        let mut ui = ui(cx);
+        ui.screen
+            .update(ui.cx, |s, cx| s.set_tab(Tab::Branches, cx));
+        assert_eq!(ui.methods(1), ["git.branches"]);
+        let list = serde_json::from_value(branches()).unwrap();
+        ui.screen
+            .update(ui.cx, |s, cx| s.branches_loaded(Ok(list), cx));
+        ui.draw();
+        assert!(ui.shows("git-branches"));
+        assert!(ui.shows("git-worktree"));
+        // The current branch is selected first.
+        ui.screen.read_with(ui.cx, |s, _| {
+            assert_eq!(s.branch.selected.as_deref(), Some("main"))
+        });
+
+        ui.screen.update(ui.cx, |s, cx| s.select_branch("feat", cx));
+        ui.screen
+            .update(ui.cx, |s, cx| s.switch_to("feat".into(), cx));
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "git.switch");
+        assert_eq!(req["params"], json!({"product": "alpha", "name": "feat"}));
+        let dirty = serde_json::from_value(json!({"outcome": "dirty", "output": "",
+            "files": [{"path": "a.txt", "staged": null, "unstaged": "M"}]}))
+        .unwrap();
+        ui.screen
+            .update(ui.cx, |s, cx| s.switched("feat", Ok(dirty), cx));
+        // The screen reads the status and the branches again.
+        assert_eq!(ui.methods(2), ["git.status", "git.branches"]);
+        ui.draw();
+        assert!(ui.shows("git-dirty"));
+
+        let done =
+            serde_json::from_value(json!({"outcome": "done", "output": "", "files": []})).unwrap();
+        ui.screen
+            .update(ui.cx, |s, cx| s.switched("feat", Ok(done), cx));
+        assert_eq!(ui.methods(2), ["git.status", "git.branches"]);
+        ui.draw();
+        assert!(!ui.shows("git-dirty"));
+        assert!(ui.shows("git-sync-note"));
+
+        ui.screen.update_in(ui.cx, |s, window, cx| {
+            s.open_new_branch(Some("origin/main".into()), window, cx)
+        });
+        ui.draw();
+        assert!(ui.shows("git-new-branch"));
+        ui.screen.update_in(ui.cx, |s, window, cx| {
+            let input = s.branch.form.as_ref().unwrap().input.clone();
+            input.update(cx, |i, cx| i.set_value("topic", window, cx));
+        });
+        ui.screen.update(ui.cx, |s, cx| s.create_branch(cx));
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "git.branch.create");
+        assert_eq!(
+            req["params"],
+            json!({"product": "alpha", "name": "topic", "from": "origin/main"})
+        );
+        ui.screen
+            .update(ui.cx, |s, cx| s.branch_created("topic", Ok(GitDone {}), cx));
+        assert_eq!(ui.methods(1), ["git.branches"]);
+        ui.draw();
+        assert!(!ui.shows("git-new-branch"));
+    }
+
+    #[gpui::test]
+    fn push_asks_a_confirm_that_lists_the_outgoing_commits_and_pushes_after_it(
+        cx: &mut TestAppContext,
+    ) {
+        let mut ui = ui(cx);
+        ui.status(status(&[]));
+        ui.screen.update(ui.cx, |s, cx| s.ask_push(cx));
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "git.outgoing");
+        let out = serde_json::from_value(json!({
+            "branch": "main", "remote": "origin", "remote_branch": "main", "set_upstream": false,
+            "count": 2, "commits": [commit("aaaaaaaa11", "two"), commit("bbbbbbbb22", "one")]}))
+        .unwrap();
+        ui.screen
+            .update(ui.cx, |s, cx| s.outgoing_loaded(Ok(out), cx));
+        ui.draw();
+        assert!(ui.shows("git-push-confirm"));
+        assert!(ui.no_request(), "nothing is pushed before the confirm");
+
+        ui.screen.update(ui.cx, |s, cx| s.confirm_push(cx));
+        let req = ui.fake.request();
+        assert_eq!(req["method"], "git.push");
+        assert_eq!(req["params"], json!({"product": "alpha"}));
+        ui.draw();
+        assert!(!ui.shows("git-push-confirm"));
+        assert!(ui.shows("git-progress"));
+
+        // A progress line of this product shows, one of another product does not.
+        let line = |product: &str, text: &str| {
+            Notification::of::<GitProgress>(&GitProgressParams {
+                product: product.into(),
+                op: "push".into(),
+                line: text.into(),
+            })
+        };
+        ui.emit(line("beta", "other"));
+        ui.emit(line("alpha", "Writing objects: 100% (3/3)"));
+        ui.screen.read_with(ui.cx, |s, _| {
+            assert_eq!(
+                s.sync.progress.as_deref(),
+                Some("Writing objects: 100% (3/3)")
+            )
+        });
+        let done = serde_json::from_value(json!({"outcome": "done", "output": ""})).unwrap();
+        ui.screen
+            .update(ui.cx, |s, cx| s.synced(super::sync::Op::Push, Ok(done), cx));
+        assert_eq!(ui.methods(1), ["git.status"]);
+        ui.draw();
+        assert!(!ui.shows("git-progress"));
+        assert!(ui.shows("git-sync-note"));
+
+        // A cancel sends nothing.
+        ui.screen.update(ui.cx, |s, cx| s.ask_push(cx));
+        assert_eq!(ui.methods(1), ["git.outgoing"]);
+        ui.screen.update(ui.cx, |s, cx| s.cancel_push(cx));
+        ui.draw();
+        assert!(!ui.shows("git-push-confirm"));
+        assert!(ui.no_request());
+    }
+
+    #[gpui::test]
+    fn a_diverged_pull_tells_the_owner_to_use_a_terminal(cx: &mut TestAppContext) {
+        let mut ui = ui(cx);
+        ui.screen.update(ui.cx, |s, cx| s.pull(cx));
+        assert_eq!(ui.methods(1), ["git.pull"]);
+        let r = serde_json::from_value(json!({"outcome": "diverged", "output": "fatal"})).unwrap();
+        ui.screen
+            .update(ui.cx, |s, cx| s.synced(super::sync::Op::Pull, Ok(r), cx));
+        ui.screen.read_with(ui.cx, |s, _| {
+            let note = s.sync.note.clone().unwrap().unwrap_err();
+            assert!(note.contains("terminal"), "{note}");
+        });
+    }
+
+    #[gpui::test]
+    fn git_changed_of_its_product_reads_again_only_while_the_screen_is_in_view(
+        cx: &mut TestAppContext,
+    ) {
+        let mut ui = ui(cx);
+        let changed = |product: &str| {
+            Notification::of::<GitChanged>(&GitChangedParams {
+                product: product.into(),
+            })
+        };
+        ui.emit(changed("alpha"));
+        assert!(ui.no_request(), "a hidden screen reads on show");
+        ui.screen.update(ui.cx, |s, cx| s.show(true, cx));
+        assert_eq!(ui.methods(1), ["git.status"]);
+        ui.emit(changed("beta"));
+        assert!(ui.no_request());
+        ui.emit(changed("alpha"));
+        assert_eq!(ui.methods(1), ["git.status"]);
     }
 }
