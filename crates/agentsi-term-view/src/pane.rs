@@ -121,7 +121,7 @@ fn px_u32(p: Pixels) -> u32 {
 }
 
 fn mono(bold: bool, italic: bool) -> Font {
-    let mut f = gpui_kit::font(font::MONO);
+    let mut f = gpui_kit::font(font::mono());
     if bold {
         f.weight = FontWeight::BOLD;
     }

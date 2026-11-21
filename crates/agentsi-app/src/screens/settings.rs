@@ -41,6 +41,7 @@ mod alerts;
 mod appearance;
 mod data;
 mod dictation;
+mod fonts;
 mod git;
 mod guide;
 mod health;
@@ -54,6 +55,7 @@ use dictation::DictationKey;
 pub enum Section {
     Owner,
     Appearance,
+    Fonts,
     Alerts,
     VoiceModels,
     Vocabulary,
@@ -69,9 +71,10 @@ pub enum Section {
 
 impl Section {
     /// The sections in the order of the list.
-    pub const ALL: [Section; 13] = [
+    pub const ALL: [Section; 14] = [
         Section::Owner,
         Section::Appearance,
+        Section::Fonts,
         Section::Alerts,
         Section::VoiceModels,
         Section::Vocabulary,
@@ -90,6 +93,7 @@ impl Section {
         match self {
             Section::Owner => "owner",
             Section::Appearance => "appearance",
+            Section::Fonts => "fonts",
             Section::Alerts => "alerts",
             Section::VoiceModels => "voice-models",
             Section::Vocabulary => "vocabulary",
@@ -108,6 +112,7 @@ impl Section {
         match self {
             Section::Owner => "Owner",
             Section::Appearance => "Appearance",
+            Section::Fonts => "Fonts",
             Section::Alerts => "Alerts",
             Section::VoiceModels => "Voice models",
             Section::Vocabulary => "Vocabulary",
@@ -317,6 +322,8 @@ pub struct SettingsScreen {
     owner_state: owner::OwnerState,
     /// The error of the last save of the Appearance section.
     appearance_error: Option<String>,
+    /// The Fonts section: the families, the search fields and the filter.
+    fonts: fonts::FontsState,
     /// The error of the last save of the Alerts section.
     alerts_error: Option<String>,
     /// The shared table of the git config file: the section "Git".
@@ -494,6 +501,7 @@ impl SettingsScreen {
             health: health::HealthState::default(),
             owner_state: owner::OwnerState::default(),
             appearance_error: None,
+            fonts: fonts::FontsState::default(),
             alerts_error: None,
             keys_note: None,
             models: Load::Loading,
@@ -1254,7 +1262,7 @@ fn voice_rows(v: &VoicesResult) -> Div {
             .gap(space(1))
             .child(
                 div()
-                    .font_family(font::MONO)
+                    .font_family(font::mono())
                     .text_size(size::sm())
                     .text_color(text::secondary())
                     .child(voice.to_string()),
@@ -1411,6 +1419,7 @@ impl SettingsScreen {
         match s {
             Section::Owner => self.owner_section(window, cx),
             Section::Appearance => self.appearance_section(cx),
+            Section::Fonts => self.fonts_section(window, cx),
             Section::Alerts => self.alerts_section(cx),
             Section::VoiceModels => self.voice_models_section(cx),
             Section::Vocabulary => self.vocabulary_section(window, cx),

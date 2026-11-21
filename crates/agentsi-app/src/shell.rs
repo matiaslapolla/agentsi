@@ -1441,7 +1441,7 @@ impl Render for Shell {
             .relative()
             .bg(surface::panel())
             .text_color(text::primary())
-            .font_family(font::UI)
+            .font_family(font::ui())
             .text_size(size::base())
             .on_action(cx.listener(|this, _: &actions::TogglePalette, window, cx| this.toggle_palette(window, cx)))
             .on_action(cx.listener(|this, _: &actions::NewTerminal, window, cx| {

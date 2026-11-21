@@ -644,7 +644,7 @@ fn cell(s: impl Into<SharedString>) -> Div {
         .w(control::NUM_COLUMN)
         .flex_none()
         .text_right()
-        .font_family(font::MONO)
+        .font_family(font::mono())
         .text_size(size::sm())
         .text_color(text::secondary())
         .child(s.into())

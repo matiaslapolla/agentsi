@@ -502,10 +502,27 @@ pub mod terminal {
     pub const FAINT_ALPHA: f32 = 0.6;
 }
 
-/// Font families. `theme::load_fonts` registers the bundled files.
+/// Font families. `theme::load_fonts` registers the bundled files. The owner picks other
+/// families in the appearance, and `ui` and `mono` give the ones in effect.
 pub mod font {
-    pub const UI: &str = "Inter";
-    pub const MONO: &str = "JetBrains Mono";
+    use gpui_kit::SharedString;
+
+    use crate::appearance::current_fonts;
+
+    pub const UI_DEFAULT: &str = "Inter";
+    pub const MONO_DEFAULT: &str = "JetBrains Mono";
+    /// The bundled families. The text system knows them on every machine.
+    pub const BUNDLED: [&str; 2] = [UI_DEFAULT, MONO_DEFAULT];
+
+    /// The family of the text of the app.
+    pub fn ui() -> SharedString {
+        current_fonts().ui
+    }
+
+    /// The family of the terminals, the ids and the code.
+    pub fn mono() -> SharedString {
+        current_fonts().mono
+    }
 }
 
 /// Type sizes, in px. The text offset of the appearance moves `xs` to `xl`, and `MONO` stays.

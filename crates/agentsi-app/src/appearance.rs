@@ -7,8 +7,12 @@
 //! text_offset = 2       # -2 to 4 px
 //! theme = "light"       # system, dark or light
 //! motion = "reduced"    # system, reduced or full
+//! ui_font = "Inter"     # a family that the text system knows
+//! mono_font = "JetBrains Mono"
 //! ```
 //!
+//! - A family that the text system does not know gives the default family and a note, as a
+//!   bad value does: GPUI stops at the first line in a family that it cannot find.
 //! - The old key `text = "small|medium|large"` reads as the offset -1, 0 or 2. A save writes
 //!   `text_offset` in its place.
 //! - A missing file means the defaults. An unknown key, an unknown value or a file that does
@@ -19,17 +23,19 @@
 use std::path::{Path, PathBuf};
 
 use agentsi_ui::appearance::{
-    Appearance, ColorTheme, Corners, Density, Motion, TEXT_OFFSETS, text_offset_of_size,
+    Appearance, ColorTheme, Corners, Density, Fonts, Motion, TEXT_OFFSETS, text_offset_of_size,
 };
-use gpui_kit::{App, Global};
+use agentsi_ui::tokens::font;
+use gpui_kit::{App, Global, SharedString};
 use toml_edit::{DocumentMut, Item, value};
 
 /// Everything that `appearance.toml` holds.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Look {
     pub appearance: Appearance,
     pub theme: ColorTheme,
     pub motion: Motion,
+    pub fonts: Fonts,
 }
 
 pub const FILE_NAME: &str = "appearance.toml";
@@ -130,6 +136,17 @@ fn parse(text: &str, path: &Path) -> (Look, Option<String>) {
                 &mut look.motion,
                 &Motion::ALL.map(Motion::key),
             ),
+            "ui_font" | "mono_font" => match item.as_str().map(str::trim) {
+                Some(name) if !name.is_empty() => {
+                    let slot = if key == "ui_font" {
+                        &mut look.fonts.ui
+                    } else {
+                        &mut look.fonts.mono
+                    };
+                    *slot = SharedString::from(name.to_string());
+                }
+                _ => problems.push(format!("{key} must be the name of a font family.")),
+            },
             other => problems.push(format!("{other}: no setting has this name.")),
         }
     }
@@ -162,6 +179,37 @@ fn pick<T>(
     }
 }
 
+/// The families that the text system knows: the bundled ones first, then the others, sorted.
+pub fn families(cx: &App) -> Vec<SharedString> {
+    let mut names: Vec<SharedString> = font::BUNDLED.iter().map(|f| (*f).into()).collect();
+    for name in cx.text_system().all_font_names() {
+        if !font::BUNDLED.contains(&name.as_str()) {
+            names.push(name.into());
+        }
+    }
+    names
+}
+
+/// `fonts` with each family that `known` does not name replaced by its default, and one line
+/// for each.
+fn known_fonts(fonts: Fonts, known: &[SharedString]) -> (Fonts, Vec<String>) {
+    let default = Fonts::default();
+    let mut problems = Vec::new();
+    let mut check = |key: &str, name: SharedString, default: SharedString| {
+        if known.contains(&name) {
+            name
+        } else {
+            problems.push(format!(
+                "{key} \"{name}\" is not a font of this system, so {default} stays."
+            ));
+            default
+        }
+    };
+    let ui = check("ui_font", fonts.ui, default.ui);
+    let mono = check("mono_font", fonts.mono, default.mono);
+    (Fonts { ui, mono }, problems)
+}
+
 /// The file and the line about it, kept as a global so the settings screen shows them.
 #[derive(Clone, Debug, Default)]
 pub struct Setting {
@@ -173,10 +221,19 @@ impl Global for Setting {}
 
 /// Reads the file at `path` and makes it the look of the app. The app calls this once, at start.
 pub fn install(cx: &mut App, path: Option<PathBuf>) {
-    let (look, note) = match &path {
+    let (mut look, mut note) = match &path {
         Some(p) => read(p),
         None => (Look::default(), None),
     };
+    let (fonts, problems) = known_fonts(look.fonts, &families(cx));
+    look.fonts = fonts;
+    if !problems.is_empty() {
+        let line = problems.join(" ");
+        note = Some(match note {
+            Some(n) => format!("{n} {line}"),
+            None => line,
+        });
+    }
     cx.set_global(Setting { path, note });
     apply(cx, look);
 }
@@ -191,9 +248,9 @@ pub fn note(cx: &App) -> Option<String> {
 pub fn change(cx: &mut App, f: impl FnOnce(&mut Look)) -> Result<(), String> {
     let mut next = current(cx);
     f(&mut next);
-    apply(cx, next);
+    apply(cx, next.clone());
     let saved = match cx.try_global::<Setting>().and_then(|s| s.path.clone()) {
-        Some(path) => write(&path, next),
+        Some(path) => write(&path, &next),
         None => Err("There is no config folder, so the look cannot be saved.".into()),
     };
     let mut setting = cx.try_global::<Setting>().cloned().unwrap_or_default();
@@ -208,6 +265,7 @@ pub fn current(cx: &App) -> Look {
         appearance: Appearance::get(cx),
         theme: ColorTheme::get(cx),
         motion: Motion::get(cx),
+        fonts: Fonts::get(cx),
     }
 }
 
@@ -215,9 +273,10 @@ fn apply(cx: &mut App, look: Look) {
     look.appearance.apply(cx);
     look.theme.apply(cx);
     look.motion.apply(cx);
+    look.fonts.apply(cx);
 }
 
-fn write(path: &Path, look: Look) -> Result<(), String> {
+fn write(path: &Path, look: &Look) -> Result<(), String> {
     crate::keys::edit(path, |doc| {
         doc["density"] = value(look.appearance.density.key());
         doc["corners"] = value(look.appearance.corners.key());
@@ -225,6 +284,8 @@ fn write(path: &Path, look: Look) -> Result<(), String> {
         doc["text_offset"] = value(i64::from(look.appearance.text_offset));
         doc["theme"] = value(look.theme.key());
         doc["motion"] = value(look.motion.key());
+        doc["ui_font"] = value(look.fonts.ui.as_ref());
+        doc["mono_font"] = value(look.fonts.mono.as_ref());
         Ok(())
     })
 }
@@ -316,8 +377,12 @@ mod tests {
             },
             theme: ColorTheme::Light,
             motion: Motion::Full,
+            fonts: Fonts {
+                ui: "Noto Sans".into(),
+                mono: "Fira Mono".into(),
+            },
         };
-        write(&path, a).unwrap();
+        write(&path, &a).unwrap();
         assert_eq!(read(&path), (a, None));
         assert!(
             std::fs::read_to_string(&path)
@@ -340,17 +405,50 @@ mod tests {
         let path = tempdir("old").join(FILE_NAME);
         std::fs::write(&path, "text = \"large\"\n").unwrap();
         let (look, _) = read(&path);
-        write(&path, look).unwrap();
+        write(&path, &look).unwrap();
         let text = std::fs::read_to_string(&path).unwrap();
         assert!(!text.contains("text ="), "{text}");
         assert!(text.contains("text_offset = 2"), "{text}");
     }
 
     #[test]
+    fn a_font_family_reads_as_text_and_an_unknown_one_gives_the_default() {
+        let (a, note) = of("ui_font = \"Noto Sans\"\nmono_font = \" Fira Mono \"\n");
+        assert_eq!(note, None);
+        assert_eq!(
+            (a.fonts.ui.as_ref(), a.fonts.mono.as_ref()),
+            ("Noto Sans", "Fira Mono")
+        );
+        let (a, note) = of("ui_font = 3\nmono_font = \"\"\n");
+        assert_eq!(a.fonts, Fonts::default());
+        let note = note.unwrap();
+        assert!(
+            note.contains("ui_font must be the name of a font family"),
+            "{note}"
+        );
+        assert!(note.contains("mono_font must be the name"), "{note}");
+
+        let known: Vec<SharedString> = ["Inter", "JetBrains Mono", "Fira Mono"]
+            .map(SharedString::from)
+            .to_vec();
+        let (fonts, problems) = known_fonts(
+            Fonts {
+                ui: "Comic Mono".into(),
+                mono: "Fira Mono".into(),
+            },
+            &known,
+        );
+        assert_eq!(fonts.ui.as_ref(), "Inter");
+        assert_eq!(fonts.mono.as_ref(), "Fira Mono");
+        assert_eq!(problems.len(), 1);
+        assert!(problems[0].contains("ui_font \"Comic Mono\" is not a font of this system"));
+    }
+
+    #[test]
     fn a_file_that_does_not_parse_is_not_overwritten() {
         let path = tempdir("broken").join(FILE_NAME);
         std::fs::write(&path, "density = = x").unwrap();
-        assert!(write(&path, Look::default()).is_err());
+        assert!(write(&path, &Look::default()).is_err());
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "density = = x");
     }
 }

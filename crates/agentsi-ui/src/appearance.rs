@@ -1,4 +1,5 @@
-//! The choices of the Appearance setting: density, corners and the text offset.
+//! The choices of the Appearance setting: density, corners, the text offset and the font
+//! families.
 //!
 //! The choice lives in the gpui global [`Appearance`]. The token functions `space`,
 //! `size::*`, `radius::*` and `control::*` read it through [`current`], with no `cx`, so a
@@ -6,10 +7,10 @@
 //! writer. It sets the global and the copy that `current` reads in the same call.
 //! GPUI draws all views on the main thread, so the copy is thread-local. Each test thread
 //! then has its own.
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 
 use gpui_kit::component::ThemeMode;
-use gpui_kit::{App, Global, WindowAppearance};
+use gpui_kit::{App, Global, SharedString, WindowAppearance};
 
 use crate::theme;
 use crate::tokens::{Palette, current_palette, set_palette};
@@ -231,6 +232,52 @@ impl Appearance {
         CURRENT.with(|c| c.set(self));
         cx.set_global(self);
         theme::apply_metrics(cx);
+        cx.refresh_windows();
+    }
+}
+
+/// The family of the text of the app, and the family of the terminals and the ids.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Fonts {
+    pub ui: SharedString,
+    pub mono: SharedString,
+}
+
+impl Default for Fonts {
+    fn default() -> Self {
+        Fonts {
+            ui: crate::tokens::font::UI_DEFAULT.into(),
+            mono: crate::tokens::font::MONO_DEFAULT.into(),
+        }
+    }
+}
+
+impl Global for Fonts {}
+
+thread_local! {
+    static FONTS: RefCell<Option<Fonts>> = const { RefCell::new(None) };
+}
+
+/// The fonts in effect on this thread. Before the first [`Fonts::apply`], the default.
+pub fn current_fonts() -> Fonts {
+    FONTS.with_borrow(|f| f.clone()).unwrap_or_default()
+}
+
+impl Fonts {
+    pub fn get(cx: &App) -> Fonts {
+        cx.try_global::<Fonts>().cloned().unwrap_or_default()
+    }
+
+    /// Makes `self` the fonts of the app. Each window draws again, and only when a family
+    /// changes, so the idle app draws nothing. The caller checks that the text system knows
+    /// each family: GPUI stops at the first line in a family that it cannot find.
+    pub fn apply(self, cx: &mut App) {
+        if Fonts::get(cx) == self && current_fonts() == self {
+            return;
+        }
+        FONTS.with_borrow_mut(|f| *f = Some(self.clone()));
+        cx.set_global(self);
+        theme::apply_fonts(cx);
         cx.refresh_windows();
     }
 }
