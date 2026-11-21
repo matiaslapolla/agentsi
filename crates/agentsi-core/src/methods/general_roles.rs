@@ -105,11 +105,18 @@ async fn general_create(ctx: Ctx, p: GeneralRole) -> Result<GeneralWriteResult, 
 async fn general_update(ctx: Ctx, p: GeneralRole) -> Result<GeneralWriteResult, RpcError> {
     let done = blocking(&ctx, move |w| {
         let role = general::update(&w.root, &p)?;
-        let file = general::rel_path(&role.id);
+        let users = read(&w.store, |c| {
+            general::used_by(c, &w.registry.products, &role.id)
+        })?;
         let message = format!("role({}): edit the general role", role.id);
-        Ok(committed(&w, &[&file], message, role))
+        Ok((committed(&w, &[general::FOLDER], message, role), users))
     })
     .await?;
+    let (done, users) = done;
+    // A desk process holds the roles of its start.
+    for product in &users {
+        crate::desk::stop(&ctx.core, product);
+    }
     changed(&ctx, "");
     Ok(done)
 }
@@ -121,7 +128,7 @@ async fn general_delete(ctx: Ctx, p: GeneralDeleteParams) -> Result<GeneralDelet
         })?;
         let commit = commit::commit_files(
             &w.root,
-            &[&general::rel_path(&p.id)],
+            &[general::FOLDER],
             &format!("role({}): delete the general role", p.id),
         );
         Ok(GeneralDeleteResult { id: p.id, commit })

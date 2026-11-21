@@ -57,14 +57,18 @@ pub fn write_roster(
 
     let file = root.join(FILE);
     let text = std::fs::read_to_string(&file)
-        .map_err(|e| super::Error::Invalid(format!("cannot read {}: {e}", file.display())))?;
+        .map_err(|e| unavailable(format!("cannot read {}: {e}", file.display())))?;
     let patch = Patch {
         roles: Some(roster.to_vec()),
         ..Patch::default()
     };
     let edited = update_product(&text, &product.id, &patch).map_err(super::Error::Invalid)?;
     registry::write_file(root, &edited)
-        .map_err(|e| super::Error::Invalid(format!("cannot write {}: {e}", file.display())))
+        .map_err(|e| unavailable(format!("cannot write {}: {e}", file.display())))
+}
+
+fn unavailable(text: String) -> super::Error {
+    super::Error::Agency(crate::error::Error::Unavailable(text))
 }
 
 /// The message of the commit of the registry.

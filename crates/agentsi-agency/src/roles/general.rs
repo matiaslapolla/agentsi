@@ -42,12 +42,22 @@ fn ensure_dir(root: &Path) -> Result<PathBuf> {
     let names = before
         .names()
         .map_err(|e| Error::Agency(crate::error::Error::Unavailable(e)))?;
-    std::fs::create_dir_all(&own).map_err(|e| io("make", &own, e))?;
-    for name in names {
-        if let Some(text) = before.read(&name) {
-            write_atomic(&own.join(format!("{name}.md")), &text)?;
+    // `RoleFiles::at` switches to the folder as soon as it exists, so the folder appears
+    // whole, by one rename, or not at all.
+    let tmp = own.with_file_name(".agents.tmp");
+    let _ = std::fs::remove_dir_all(&tmp);
+    let fill = || -> Result<()> {
+        std::fs::create_dir_all(&tmp).map_err(|e| io("make", &tmp, e))?;
+        for name in names {
+            if let Some(text) = before.read(&name) {
+                write_atomic(&tmp.join(format!("{name}.md")), &text)?;
+            }
         }
-    }
+        std::fs::rename(&tmp, &own).map_err(|e| io("make", &own, e))
+    };
+    fill().inspect_err(|_| {
+        let _ = std::fs::remove_dir_all(&tmp);
+    })?;
     Ok(own)
 }
 
@@ -198,7 +208,10 @@ pub fn create(root: &Path, role: &GeneralRole) -> Result<GeneralRole> {
 
 pub fn update(root: &Path, role: &GeneralRole) -> Result<GeneralRole> {
     let role = check(role)?;
-    let file = dir(root).join(format!("{}.md", role.id));
+    if !RoleFiles::at(root).has(&role.id) {
+        return Err(not_found(&role.id));
+    }
+    let file = ensure_dir(root)?.join(format!("{}.md", role.id));
     let text = match std::fs::read_to_string(&file) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
@@ -216,12 +229,14 @@ fn not_found(id: &str) -> Error {
     )))
 }
 
-/// True when agent `agent` of a roster plays role `id`: the agent is the role, a specialist
-/// of it, or its overlay extends it.
+/// True when agent `agent` of a roster plays role `id`: its overlay extends the role, or it
+/// has no overlay and is the role or a specialist of it. An overlay with no `extends` is a
+/// custom role of its product, whatever its id.
 fn plays(agent: &str, id: &str, overlay: Option<&String>) -> bool {
-    agent.split('.').next() == Some(id)
-        || overlay
-            .is_some_and(|o| parse_agent_file(o).0.get("extends").map(String::as_str) == Some(id))
+    match overlay {
+        Some(o) => parse_agent_file(o).0.get("extends").map(String::as_str) == Some(id),
+        None => agent.split('.').next() == Some(id),
+    }
 }
 
 /// The products whose roster plays role `id`, in registry order.
@@ -241,8 +256,7 @@ pub fn delete(c: &Connection, root: &Path, registry: &Registry, id: &str) -> Res
     if is_builtin(id) {
         return invalid(format!("\"{id}\" is a builtin role. It cannot be deleted."));
     }
-    let file = dir(root).join(format!("{id}.md"));
-    if !is_role_id(id) || !file.exists() {
+    if !is_role_id(id) || !RoleFiles::at(root).has(id) {
         return Err(not_found(id));
     }
     let users = used_by(c, &registry.products, id)?;
@@ -252,6 +266,7 @@ pub fn delete(c: &Connection, root: &Path, registry: &Registry, id: &str) -> Res
             users.join(", ")
         ));
     }
+    let file = ensure_dir(root)?.join(format!("{id}.md"));
     std::fs::remove_file(&file).map_err(|e| io("delete", &file, e))
 }
 
@@ -296,8 +311,9 @@ pub fn promote(
         [product.id.as_str(), agent],
     )?;
     let mut keys = String::new();
-    for key in ["model", "effort", "tools"] {
-        if let Some(v) = fm.get(key).filter(|v| !v.is_empty()) {
+    for (key, v) in &fm {
+        let own = ["name", "title", "description", "extends"].contains(&key.as_str());
+        if !own && !v.is_empty() {
             keys.push_str(&format!("{key}: {v}\n"));
         }
     }
@@ -429,6 +445,11 @@ mod tests {
             [],
         )
         .unwrap();
+        conn.execute(
+            "insert into agent_overlays (product, agent, body) values ('e', 'designer', 'Own.')",
+            [],
+        )
+        .unwrap();
         create(dir.path(), &role("designer")).unwrap();
         let registry = |products: Vec<Product>| Registry {
             owner: Registry::parse("{}").unwrap().owner,
@@ -439,6 +460,7 @@ mod tests {
             product("b", &["pm", "designer.web"]),
             product("c", &["ux"]),
             product("d", &["pm"]),
+            product("e", &["designer"]),
         ]);
         assert_eq!(
             message(delete(&conn, dir.path(), &users, "designer")),
@@ -463,7 +485,7 @@ mod tests {
         for (agent, body) in [
             (
                 "seo",
-                "---\nmodel: haiku\ndescription: Search\n---\nYou rank pages.",
+                "---\nmodel: haiku\nmaxTurns: 4\ndescription: Search\n---\nYou rank pages.",
             ),
             ("dev", "---\nextends: dev\n---\nUse Go."),
             ("growth.data", "Count users."),
@@ -499,5 +521,8 @@ mod tests {
             (RoleSource::Global, "haiku", "You rank pages.")
         );
         assert_eq!(list(dir.path()).unwrap()[0].id, "seo");
+        let text = std::fs::read_to_string(dir.path().join("plugin/agents/seo.md")).unwrap();
+        assert!(text.contains("maxTurns: 4\n"), "{text}");
+        assert!(!dir.path().join("plugin/.agents.tmp").exists());
     }
 }
