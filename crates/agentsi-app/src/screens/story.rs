@@ -4,12 +4,12 @@
 //! Changes opens a form with a note field and the check box "The PM rewrites the story".
 //! "Record a merge" opens a form with the commit. Archive and Restore write at once.
 
+use agentsi_proto::marks_api::{ArchiveArchive, ArchiveKind, ArchiveParams, ArchiveRestore};
 use agentsi_proto::story_api::{
     Story, StoryAccept, StoryApprove, StoryChanges, StoryChangesParams, StoryConfig,
     StoryConfigGet, StoryConfigParams, StoryDiscard, StoryGet, StoryGetResult, StoryIdParams,
     StoryReject, StoryRejectParams, StoryResultParams, StoryResultSet, StoryReview, StoryRun,
 };
-use agentsi_proto::marks_api::{ArchiveArchive, ArchiveKind, ArchiveParams, ArchiveRestore};
 use agentsi_ui::components::{Button, Card, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -224,7 +224,11 @@ impl StoryScreen {
             }
             "changes" | "merge" => {
                 self.pending = None;
-                self.want_form = Some(if action == "merge" { "merge" } else { "changes" });
+                self.want_form = Some(if action == "merge" {
+                    "merge"
+                } else {
+                    "changes"
+                });
                 self.form = None;
                 cx.notify();
                 return;
@@ -409,12 +413,16 @@ impl StoryScreen {
             } else {
                 "merged_unchanged"
             };
-            let call = self.core.read(cx).link.call::<StoryResultSet>(&StoryResultParams {
-                product: self.product.clone(),
-                id: self.id.clone(),
-                kind: kind.into(),
-                commit: text,
-            });
+            let call = self
+                .core
+                .read(cx)
+                .link
+                .call::<StoryResultSet>(&StoryResultParams {
+                    product: self.product.clone(),
+                    id: self.id.clone(),
+                    kind: kind.into(),
+                    commit: text,
+                });
             let id = self.id.clone();
             let task = cx.background_spawn(async move {
                 call.await

@@ -59,7 +59,12 @@ fn row(c: &DoctorCheck) -> Div {
                 .child(c.name.clone()),
         )
         .child(div().w(space(20)).flex_none().child(tag))
-        .child(div().w(space(20)).flex_none().child(mono(level_word(c.level))))
+        .child(
+            div()
+                .w(space(20))
+                .flex_none()
+                .child(mono(level_word(c.level))),
+        )
         .child(div().flex_1().min_w_0().child(mono(detail)))
 }
 
@@ -76,7 +81,9 @@ impl SettingsScreen {
         let call = self.core.read(cx).link.call::<CoreDoctor>(&Empty {});
         cx.spawn(async move |this, cx| {
             let result = call.await.map(|r: CoreDoctorResult| r.checks);
-            let _ = this.update(cx, |this, cx| this.finish_health(result.map_err(|e| e.to_string()), cx));
+            let _ = this.update(cx, |this, cx| {
+                this.finish_health(result.map_err(|e| e.to_string()), cx)
+            });
         })
         .detach();
         cx.notify();
@@ -230,6 +237,11 @@ mod tests {
         t.screen.update(cx, |s, cx| {
             s.finish_backup(Err(CallError::Link("closed".into())), cx)
         });
-        assert!(t.screen.read_with(cx, |s, _| s.clear.backup.clone()).unwrap().is_err());
+        assert!(
+            t.screen
+                .read_with(cx, |s, _| s.clear.backup.clone())
+                .unwrap()
+                .is_err()
+        );
     }
 }
