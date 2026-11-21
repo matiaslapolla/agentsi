@@ -13,6 +13,7 @@ use crate::screens::call::{CallScreen, Calls};
 use crate::screens::desk::DeskScreen;
 use crate::screens::minute::MinuteScreen;
 use crate::screens::parts::Live;
+use crate::screens::settings::Section;
 
 gpui_kit::actions!(
     agentsi,
@@ -381,6 +382,19 @@ pub fn bind(cx: &mut App) {
 pub fn bind_from(cx: &mut App, path: Option<std::path::PathBuf>) {
     on_writes(cx);
     crate::keys::install(cx, path);
+}
+
+/// Opens the settings at one section. The palette has one entry for each section that the app
+/// shows, so the action has no key and no JSON form.
+#[derive(Clone, Copy, Debug, PartialEq, gpui::Action)]
+#[action(namespace = agentsi, no_json)]
+pub struct OpenSettingsSection {
+    pub section: Section,
+}
+
+/// The label of the palette entry of `section`, for example "Settings: Terminal".
+pub fn settings_entry(section: Section) -> String {
+    format!("Settings: {}", section.title())
 }
 
 /// One palette entry: a label, an icon, extra search words and the action.

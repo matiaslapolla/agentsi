@@ -199,6 +199,7 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         let (mut t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Health);
         assert!(methods(&mut t).contains(&"core.doctor".to_string()));
         t.screen.update(cx, |s, cx| {
             s.finish_health(Ok(vec![check("core", "ok"), check("git", "missing")]), cx)
@@ -217,6 +218,7 @@ mod tests {
     #[gpui::test]
     fn back_up_now_calls_data_backup_and_shows_both_paths(cx: &mut TestAppContext) {
         let (mut t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Data);
         methods(&mut t);
         click(&t, cx, "button:backup-now");
         assert_eq!(methods(&mut t), ["data.backup"]);

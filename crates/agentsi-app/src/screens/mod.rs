@@ -415,7 +415,7 @@ impl ScreenPanel {
         }
     }
 
-    /// Scrolls the Data section of a settings screen into view. With a product, it selects
+    /// Opens the Data section of a settings screen. With a product, it selects
     /// the "Product" row for it.
     pub fn reveal_data(&self, product: Option<String>, cx: &mut App) {
         if let ScreenView::Settings(v) = &self.view {
@@ -423,10 +423,10 @@ impl ScreenPanel {
         }
     }
 
-    /// Scrolls the Owner section of a settings screen into view.
-    pub fn reveal_owner(&self, cx: &mut App) {
+    /// Opens a settings screen at `section`.
+    pub fn open_settings_section(&self, section: settings::Section, cx: &mut App) {
         if let ScreenView::Settings(v) = &self.view {
-            v.update(cx, |s, cx| s.reveal_owner(cx));
+            v.update(cx, |s, cx| s.open_section(section, cx));
         }
     }
 
@@ -437,7 +437,7 @@ impl ScreenPanel {
         }
     }
 
-    /// Starts a backup from a settings screen, and scrolls its Data section into view.
+    /// Starts a backup from a settings screen, and opens its Data section.
     pub fn back_up_now(&self, cx: &mut App) {
         if let ScreenView::Settings(v) = &self.view {
             v.update(cx, |s, cx| {

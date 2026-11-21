@@ -6,9 +6,6 @@
 //! a date drops the plan, so the Confirm always names the counts of the plan that the
 //! core will check.
 
-use std::cell::Cell;
-use std::rc::Rc;
-
 use agentsi_proto::clear_api::{
     ClearItem, ClearItemPlan, ClearKind, DataClear, DataClearParams, DataClearPlan,
     DataClearPlanParams, DataClearPlanResult, DataClearResult,
@@ -170,8 +167,6 @@ pub(super) struct ClearState {
     backing_up: bool,
     /// The outcome of the last "Back up now": the lines to show, or the error.
     pub(super) backup: Option<Result<Vec<String>, String>>,
-    /// Set by the palette: the next draw scrolls the section into view.
-    reveal: Rc<Cell<bool>>,
 }
 
 impl Default for ClearState {
@@ -185,7 +180,6 @@ impl Default for ClearState {
             error: None,
             backing_up: false,
             backup: None,
-            reveal: Rc::default(),
         }
     }
 }
@@ -545,8 +539,7 @@ impl SettingsScreen {
         cx.notify();
     }
 
-    /// Scrolls the Data section into view on the next draw. With a product, it selects the
-    /// "Product" row for it.
+    /// Opens the Data section. With a product, it selects the "Product" row for it.
     pub fn reveal_data(&mut self, product: Option<String>, cx: &mut Context<Self>) {
         if let Some(p) = product {
             let row = row_of(ClearKind::Product);
@@ -555,8 +548,7 @@ impl SettingsScreen {
             self.clear.checked.push(ClearKind::Product);
             self.drop_plan();
         }
-        self.clear.reveal.set(true);
-        cx.notify();
+        self.open_section(super::Section::Data, cx);
     }
 
     fn data_row(
@@ -746,35 +738,12 @@ impl SettingsScreen {
             Phase::Done(d) => Some(Self::done_card(d)),
             _ => None,
         };
-        let reveal = self.clear.reveal.clone();
-        let scroll = self.scroll.clone();
         div()
             .debug_selector(|| "clear-section".into())
             .relative()
             .flex()
             .flex_col()
             .gap(space(3))
-            // Zero size, at the top of the section: its bounds tell where to scroll.
-            .child(
-                canvas(
-                    move |bounds, window, _| {
-                        if reveal.replace(false) {
-                            let content_top = scroll.bounds().top() + scroll.offset().y;
-                            scroll.set_offset(point(
-                                Pixels::ZERO,
-                                -(bounds.top() - content_top),
-                            ));
-                            window.refresh();
-                        }
-                    },
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .top_0()
-                .left_0()
-                .w_full()
-                .h(space(1)),
-            )
             .child(section("Data", None))
             .child(
                 div()
@@ -980,6 +949,7 @@ mod tests {
     #[gpui::test]
     fn the_section_selects_reviews_confirms_and_shows_the_backup(cx: &mut TestAppContext) {
         let (mut t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Data);
         app_size(cx);
         with_products(&t, cx);
         draw(cx);
@@ -1058,6 +1028,7 @@ mod tests {
     #[gpui::test]
     fn a_change_after_the_review_drops_the_plan_and_a_refusal_keeps_it(cx: &mut TestAppContext) {
         let (mut t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Data);
         app_size(cx);
         with_products(&t, cx);
         draw(cx);
@@ -1130,25 +1101,24 @@ mod tests {
     }
 
     #[gpui::test]
-    fn the_palette_entry_scrolls_to_the_data_section_and_a_product_selects_its_row(
+    fn the_palette_entry_opens_the_data_section_and_a_product_selects_its_row(
         cx: &mut TestAppContext,
     ) {
         let (t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Owner);
         app_size(cx);
         with_products(&t, cx);
         draw(cx);
-        let window = f32::from(agentsi_ui::tokens::control::WINDOW_HEIGHT);
-        let top =
-            |cx: &mut VisualTestContext| f32::from(cx.debug_bounds("clear-section").unwrap().top());
         assert!(
-            top(cx) > window,
-            "the Data section is below the first screen"
+            cx.debug_bounds("clear-section").is_none(),
+            "the Owner section shows alone"
         );
         t.screen
             .update(cx, |s, cx| s.reveal_data(Some("beta".into()), cx));
         draw(cx);
-        draw(cx);
-        assert!(top(cx) < window / 2., "the section is in view: {}", top(cx));
+        let window = f32::from(agentsi_ui::tokens::control::WINDOW_HEIGHT);
+        let top = f32::from(cx.debug_bounds("clear-section").unwrap().top());
+        assert!(top < window / 2., "the section is in view: {top}");
         let (checked, choice) = t
             .screen
             .read_with(cx, |s, cx| (s.clear.checked.clone(), s.product_of(0, cx)));

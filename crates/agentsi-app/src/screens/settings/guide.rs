@@ -54,6 +54,7 @@ mod tests {
         let (nav, mut requests) = Nav::channel();
         cx.update(|cx| cx.set_global(nav));
         let (_t, cx) = setup(cx, None);
+        _t.open(cx, crate::screens::settings::Section::Guide);
         // A tall window draws the whole screen, so the Guide line is in view.
         cx.simulate_resize(gpui::size(
             agentsi_ui::tokens::control::WINDOW_WIDTH,

@@ -201,8 +201,11 @@ mod tests {
     }
 
     #[gpui::test]
-    fn the_default_look_keeps_the_top_of_the_settings_screen_as_before(cx: &mut TestAppContext) {
-        let (_t, cx) = setup(cx, None);
+    fn the_default_look_draws_the_list_of_sections_and_the_section_beside_it(
+        cx: &mut TestAppContext,
+    ) {
+        let (t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Appearance);
         app_size(cx);
         let got = |cx: &mut VisualTestContext, name: &str| {
             let b = bounds(cx, name);
@@ -212,16 +215,19 @@ mod tests {
                 f32::from(b.size.width),
             ]
         };
-        // x, y and width, measured on the commit before the setting (59b4872). The section
-        // comes after the header, so the header and the column keep their place.
+        // The list takes its fixed width at the left, and the column of the section keeps the
+        // content width, centered in the rest.
         assert_eq!(got(cx, "settings-root"), [0., 0., 1280.]);
-        assert_eq!(got(cx, "screen-column"), [200., 0., 880.]);
-        assert_eq!(got(cx, "settings-header"), [232., 32., 816.]);
+        assert_eq!(got(cx, "settings-nav"), [0., 0., 200.]);
+        assert_eq!(got(cx, "screen-column"), [300., 0., 880.]);
+        // The border at the right of the list takes 1 px.
+        assert_eq!(got(cx, "settings-header"), [12., 12., 175.]);
     }
 
     #[gpui::test]
     fn the_settings_screen_lays_out_in_each_of_the_63_combinations(cx: &mut TestAppContext) {
         let (_t, cx) = setup(cx, None);
+        _t.open(cx, crate::screens::settings::Section::Appearance);
         app_size(cx);
         let window = Bounds::new(
             gpui::point(Pixels::ZERO, Pixels::ZERO),
@@ -305,6 +311,7 @@ mod tests {
     #[gpui::test]
     fn a_click_applies_the_choice_at_once_and_a_restart_reads_it(cx: &mut TestAppContext) {
         let (t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Appearance);
         app_size(cx);
         let file = appearance_file(&t);
         assert!(!file.exists(), "no file until the owner picks");
@@ -359,6 +366,7 @@ mod tests {
         use agentsi_ui::appearance::{ColorTheme, Motion};
         use agentsi_ui::tokens::{Palette, current_palette};
         let (t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Appearance);
         app_size(cx);
         assert_eq!(current_palette(), Palette::DARK, "no file gives Dark");
         click(cx, "button:appearance-theme-2");
@@ -381,6 +389,7 @@ mod tests {
     #[gpui::test]
     fn an_invalid_file_gives_the_defaults_and_one_note(cx: &mut TestAppContext) {
         let (t, cx) = setup(cx, None);
+        t.open(cx, crate::screens::settings::Section::Appearance);
         app_size(cx);
         assert!(
             cx.debug_bounds("appearance-note").is_none(),

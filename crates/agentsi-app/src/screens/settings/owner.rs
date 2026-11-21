@@ -1,9 +1,6 @@
 //! The Owner section: the name and the language of the owner. `registry.get` reads them and
 //! `registry.update` saves them in `agentsi.config.json`. The prompts of the roles use both.
 
-use std::cell::Cell;
-use std::rc::Rc;
-
 use agentsi_proto::agency_api::Owner;
 use agentsi_proto::registry_api::{
     OwnerChange, RegistryGet, RegistryResult, RegistryUpdate, RegistryUpdateParams,
@@ -25,7 +22,6 @@ pub(super) struct OwnerState {
     fill: Option<Owner>,
     note: Option<Flash>,
     saving: bool,
-    reveal: Rc<Cell<bool>>,
 }
 
 impl SettingsScreen {
@@ -114,12 +110,6 @@ impl SettingsScreen {
         cx.notify();
     }
 
-    /// Scrolls the Owner section into view on the next draw.
-    pub fn reveal_owner(&mut self, cx: &mut Context<Self>) {
-        self.owner_state.reveal.set(true);
-        cx.notify();
-    }
-
     pub(super) fn owner_section(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let (name, language) = self
             .owner_state
@@ -154,8 +144,6 @@ impl SettingsScreen {
             Some(Load::Failed(e)) => Some(mono(format!("The owner did not load: {e}"))),
             Some(Load::Ready(_)) => None,
         };
-        let reveal = self.owner_state.reveal.clone();
-        let scroll = self.scroll.clone();
         let saving = self.owner_state.saving;
         div()
             .debug_selector(|| "owner-section".into())
@@ -163,24 +151,6 @@ impl SettingsScreen {
             .flex()
             .flex_col()
             .gap(space(3))
-            // Zero size, at the top of the section: its bounds tell where to scroll.
-            .child(
-                canvas(
-                    move |bounds, window, _| {
-                        if reveal.replace(false) {
-                            let content_top = scroll.bounds().top() + scroll.offset().y;
-                            scroll.set_offset(point(Pixels::ZERO, -(bounds.top() - content_top)));
-                            window.refresh();
-                        }
-                    },
-                    |_, _, _, _| {},
-                )
-                .absolute()
-                .top_0()
-                .left_0()
-                .w_full()
-                .h(space(1)),
-            )
             .child(section("Owner", None))
             .child(
                 div()
