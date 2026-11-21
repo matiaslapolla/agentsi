@@ -2586,7 +2586,7 @@ mod tests {
                 "the Git section shows"
             );
             assert!(
-                at(cx, "appearance-sample").is_none(),
+                at(cx, "owner-section").is_none(),
                 "and only the Git section"
             );
             cx.dispatch_action(actions::OpenSettingsSection {

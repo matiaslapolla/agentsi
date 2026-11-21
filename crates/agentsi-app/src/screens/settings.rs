@@ -390,10 +390,8 @@ impl SettingsScreen {
 
     /// Shows `section` from its top, and keeps it for the next start.
     pub fn open_section(&mut self, section: Section, cx: &mut Context<Self>) {
-        if section != self.section {
-            self.section = section;
-            self.scroll.set_offset(Point::default());
-        }
+        self.section = section;
+        self.scroll.set_offset(Point::default());
         if cx.try_global::<OpenedSection>() != Some(&OpenedSection(section)) {
             cx.set_global(OpenedSection(section));
         }
@@ -406,9 +404,13 @@ impl SettingsScreen {
         }
         let shown = Section::shown(cx);
         let now = self.shown_section(&shown);
-        if let Some(next) = section_after(e.keystroke.key.as_str(), &shown, now) {
-            self.open_section(next, cx);
-            cx.stop_propagation();
+        match section_after(e.keystroke.key.as_str(), &shown, now) {
+            Some(next) => {
+                self.open_section(next, cx);
+                cx.stop_propagation();
+            }
+            // Page Up, Page Down, Home and End scroll the section from the list too.
+            None => self.scroll_key(e, cx),
         }
     }
 
@@ -496,7 +498,7 @@ impl SettingsScreen {
             section: cx
                 .try_global::<OpenedSection>()
                 .map_or(Section::ALL[0], |s| s.0),
-            nav_focus: cx.focus_handle(),
+            nav_focus: cx.focus_handle().tab_index(0).tab_stop(true),
             focus: cx.focus_handle(),
             keys_filter: None,
             capture: None,

@@ -225,7 +225,13 @@ pub fn install(cx: &mut App, path: Option<PathBuf>) {
         Some(p) => read(p),
         None => (Look::default(), None),
     };
-    let (fonts, problems) = known_fonts(look.fonts, &families(cx));
+    // The bundled families need no list of the system: that list costs time at each start.
+    let bundled = |f: &SharedString| font::BUNDLED.contains(&f.as_ref());
+    let (fonts, problems) = if bundled(&look.fonts.ui) && bundled(&look.fonts.mono) {
+        (look.fonts, Vec::new())
+    } else {
+        known_fonts(look.fonts, &families(cx))
+    };
     look.fonts = fonts;
     if !problems.is_empty() {
         let line = problems.join(" ");
