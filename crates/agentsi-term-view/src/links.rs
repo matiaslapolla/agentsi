@@ -80,6 +80,14 @@ pub(crate) fn link_at(grid: &Grid, row: usize, col: u16) -> Option<Found> {
     };
     if let Some(id) = cells[usize::from(col)].link {
         let uri = grid.link(id)?;
+        // A program chooses the target of an OSC 8 link and its text separately, so only the
+        // schemes of the finder open: no `vscode:`, `ssh:` or `smb:` behind a harmless word.
+        if !SCHEMES
+            .iter()
+            .any(|s| starts_with_ci(&uri.chars().collect::<Vec<_>>(), s))
+        {
+            return None;
+        }
         let mut spans = Vec::new();
         for (r, cells) in grid.rows.iter().enumerate().take(last + 1).skip(first) {
             let mut x = 0;
@@ -469,6 +477,13 @@ mod tests {
             })
         );
         assert_eq!(link_at(&g, 0, 1), None);
+        t.write(b"\r\n\x1b]8;;vscode://x/y\x1b\\docs\x1b]8;;\x1b\\");
+        let g = t.grid().unwrap();
+        assert_eq!(
+            link_at(&g, 1, 1),
+            None,
+            "an OSC 8 target of another scheme opens nothing"
+        );
         assert_eq!(
             link_at(&g, 0, 12).map(|f| f.link),
             Some(url("https://x.org"))

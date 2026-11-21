@@ -1003,7 +1003,13 @@ pub fn editor_argv(
             editor.into(),
         ]);
     }
-    argv.extend([format!("+{line}"), path.into()]);
+    // A path that starts with `-` would read as an option of the editor.
+    let path = if path.starts_with('-') {
+        format!("./{path}")
+    } else {
+        path.to_string()
+    };
+    argv.extend([format!("+{line}"), path]);
     Some(argv)
 }
 
@@ -1141,6 +1147,7 @@ mod tests {
             .output()
             .unwrap();
         assert_eq!(String::from_utf8_lossy(&out.stdout), "+12 a b; rm -rf x\n");
+        assert_eq!(editor_argv("-x.rs", 1, true, None).unwrap()[5], "./-x.rs");
         assert_eq!(editor_argv("a.rs", 1, false, None), None);
         assert_eq!(editor_argv("a.rs", 1, false, Some(" ")), None);
         let host = editor_argv("a.rs", 3, true, None).unwrap();

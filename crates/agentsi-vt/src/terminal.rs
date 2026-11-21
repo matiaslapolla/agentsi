@@ -818,7 +818,8 @@ impl Terminal {
                 ))?;
                 let mut read = read_cell(self.cell_iter)?;
                 if has_links && has_link(cell)? {
-                    let uri = hyperlink_uri(self.raw, x, y)?;
+                    // A URI that cannot be read is no link: the row still draws.
+                    let uri = hyperlink_uri(self.raw, x, y).unwrap_or_default();
                     read.link = match &last {
                         Some((l, id)) if *l == uri => Some(*id),
                         _ if uri.is_empty() => None,

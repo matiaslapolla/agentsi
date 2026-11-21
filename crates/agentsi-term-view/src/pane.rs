@@ -213,6 +213,8 @@ struct Screen {
     wheel_rest: f32,
     /// False until the pane reported its first size from its layout.
     sized: bool,
+    /// The screen changed under an underlined link: the next draw of the cells finds it again.
+    hover_stale: bool,
     /// The size of the last RESIZE from the core, when it is not the size of the pane.
     source: Option<(u16, u16)>,
     /// True while a first paint at `source` arrives. It ends at the next RESIZE.
@@ -359,6 +361,7 @@ impl TerminalPane {
             selecting: false,
             wheel_rest: 0.,
             sized: false,
+            hover_stale: false,
             source: None,
             painting: false,
         }));
@@ -513,9 +516,10 @@ impl TerminalPane {
     fn redraw(&mut self, cx: &mut Context<Self>) {
         self.cells.update(cx, |_, cx| cx.notify());
         self.cursor.update(cx, |_, cx| cx.notify());
-        // The text under an underlined link may have changed or moved.
+        // The text under an underlined link may have changed or moved. The cells view looks
+        // again once per frame, not once per feed.
         if self.links.read(cx).hover.is_some() {
-            self.update_hover(cx);
+            self.screen.borrow_mut().hover_stale = true;
         }
     }
 
@@ -1103,12 +1107,19 @@ struct CellsView {
 }
 
 impl Render for CellsView {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let (frame, metrics) = {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (frame, metrics, rehover) = {
             let mut s = self.screen.borrow_mut();
             s.refresh();
-            (s.frame().clone(), s.metrics.clone())
+            let rehover = std::mem::take(&mut s.hover_stale);
+            (s.frame().clone(), s.metrics.clone(), rehover)
         };
+        if rehover {
+            let pane = self.pane.clone();
+            cx.defer(move |cx| {
+                let _ = pane.update(cx, |p, cx| p.update_hover(cx));
+            });
+        }
         let blinking = frame.cursor.as_ref().is_some_and(|c| c.blinking);
         let screen = self.screen.clone();
         let pane = self.pane.clone();
