@@ -48,6 +48,8 @@ tokio = { version = "1", features = ["rt", "net", "io-util", "sync", "time", "ma
 notify = "8.2"
 # The git watcher walks only the folders git does not ignore. globwalk already builds this version.
 ignore = "0.4.34"
+# files.trash: the freedesktop trash on Linux and the Finder trash on macOS, with no shell-out to gio.
+trash = "=5.4.0"
 
 [profile.release]
 debug = false
