@@ -7,7 +7,7 @@ exit: 0
 ## story accept S001
 exit: 0
 --- stdout
-Story S001 merged into the main branch as d1322e45567beac0e30f5eb76094ed0c7d250251 (merged_unchanged).
+Story S001 merged into the main branch as 57e2fb0457153728cb569c7b1081f1751531de68 (merged_unchanged).
 
 --- stderr
 
@@ -31,12 +31,12 @@ exit: 0
 S001 Filter mail
 Session: ready, attempt 1, branch story/S001-filter-mail
 Worktree: <WORK>/repos/beta/.worktrees/S001-filter-mail
-Tests commit: bb569c76d6956a20abcc452e9b38f5150f596237
-Final commit: e5d9a17965178ea2d505acff2ae7fb725ad3e840
+Tests commit: 933106a9c849667faf6a9518c184c46481872da6
+Final commit: 4db1053cba5e73be121f204280d53a3b7f621a9c
 Checks: the criterion tests failed before the work, no test file changed, the tests pass and each gate command passes.
 Log: story_logs beta/S001
 
-Diff: git -C <WORK>/repos/beta diff 80db04af1de62e8788c59e8f999e41200be92331..story/S001-filter-mail
+Diff: git -C <WORK>/repos/beta diff 318c346d466e736d9350b89aab7083870bec86de..story/S001-filter-mail
 Merge: agentsi story accept S001
 Discard: agentsi story reject S001
 

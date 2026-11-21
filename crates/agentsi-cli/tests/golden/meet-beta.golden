@@ -264,7 +264,7 @@ exit: 0
   ],
   "snapshots": [
     {
-      "body": "# Snapshot: Beta\n\n- Product: beta (planned)\n- Active roles: pm, dev, scout\n- Paths: <WORK>/repos/beta\n\n## North star and guidelines\n\n### CLAUDE.md\n\n# Beta guidelines\n\n- Keep each change small.\n- Write the test first.\n\n### README.md\n\n# Beta\n\nA second made-up product. It has one git repo and a few docs.\n\n## Stories\n\n- S001 Filter mail — not_implemented, approval approved, session ready\n- S002 Star mail — not_implemented, approval pending, session none\n- T003 Drop the old cache — not_implemented, approval approved, session none\n- S004 Mark mail as read — not_implemented, approval approved, session none\n- S005 Pin mail — not_implemented, approval approved, session failed\n- S006 Snooze mail — not_implemented, approval approved, session work\n- S007 Archive mail — not_implemented, approval changes_requested, session none\n\nImplemented: 1. Discarded: 0.\n\n## Open issues\n\n- #9 Fix the typo in the README\n- #7 Add a health route\n\n## Last minutes, priorities and marks\n\n### beta-001 — Is Beta ready?\n\n- #0 [x] Write the docs\n\n## Pending decisions\n\n- [8] Publish the docs → Push the docs\n\n## Commits, last 14 days\n\n2 commits\n\n- 5e79613 2099-01-01 docs: write the launch plan\n- db41f71 2099-01-01 feat: first route\n\n## Journal tail\n\n# Journal\n\n- Session 1: wrote the API spec.\n- Session 2: wrote the launch plan.\n\n## Docs index\n\n- docs/ideas/widget.md — A widget idea\n- docs/specs/api.md — The API spec\n- docs/plans/launch.md — Launch plan\n- CLAUDE.md — Beta guidelines\n- README.md — Beta\n",
+      "body": "# Snapshot: Beta\n\n- Product: beta (planned)\n- Active roles: pm, dev, scout\n- Paths: <WORK>/repos/beta\n\n## North star and guidelines\n\n### CLAUDE.md\n\n# Beta guidelines\n\n- Keep each change small.\n- Write the test first.\n\n### README.md\n\n# Beta\n\nA second made-up product. It has one git repo and a few docs.\n\n## Stories\n\n- S001 Filter mail — not_implemented, approval approved, session ready\n- S002 Star mail — not_implemented, approval pending, session none\n- T003 Drop the old cache — not_implemented, approval approved, session none\n- S004 Mark mail as read — not_implemented, approval approved, session none\n- S005 Pin mail — not_implemented, approval approved, session failed\n- S006 Snooze mail — not_implemented, approval approved, session work\n- S007 Archive mail — not_implemented, approval changes_requested, session none\n\nImplemented: 1. Discarded: 0.\n\n## Open issues\n\n- #9 Fix the typo in the README\n- #7 Add a health route\n\n## Last minutes, priorities and marks\n\n### beta-001 — Is Beta ready?\n\n- #0 [x] Write the docs\n\n## Pending decisions\n\n- [8] Publish the docs → Push the docs\n\n## Commits, last 14 days\n\n2 commits\n\n- b043daa 2099-01-01 docs: write the launch plan\n- 2b8244c 2099-01-01 feat: first route\n\n## Journal tail\n\n# Journal\n\n- Session 1: wrote the API spec.\n- Session 2: wrote the launch plan.\n\n## Docs index\n\n- docs/ideas/widget.md — A widget idea\n- docs/specs/api.md — The API spec\n- docs/plans/launch.md — Launch plan\n- CLAUDE.md — Beta guidelines\n- README.md — Beta\n",
       "minutes_id": "<STAMP>-gitrepo-is-it-ready",
       "product": "beta"
     }
@@ -615,7 +615,7 @@ gitrepo-is-it-ready
 
 ## dev
 
-{"answer":"Listo.","priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"80db04af1de62e8788c59e8f999e41200be92331"},{"type":"commit","ref":"abcdef0"}]}],"concerns":[]}
+{"answer":"Listo.","priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"318c346d466e736d9350b89aab7083870bec86de"},{"type":"commit","ref":"abcdef0"}]}],"concerns":[]}
 
 # Brief of the product
 <brief>
@@ -717,7 +717,7 @@ Failures:
 - No priority cites a north star declared in the brief (docs/missing.md).
 
 Previous output:
-{"priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"80db04af1de62e8788c59e8f999e41200be92331"},{"type":"path","ref":"docs/specs/api.md"}],"owner_role":"dev","objective":"b1"}],"disagreements":[],"decisions":[],"script":[{"role":"pm","text":"Beta está lista."}]}
+{"priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"318c346d466e736d9350b89aab7083870bec86de"},{"type":"path","ref":"docs/specs/api.md"}],"owner_role":"dev","objective":"b1"}],"disagreements":[],"decisions":[],"script":[{"role":"pm","text":"Beta está lista."}]}
 === synthesis
 DISABLE_PROMPT_CACHING=1
 cwd=<WORK>/repos/beta
@@ -755,7 +755,7 @@ gitrepo-is-it-ready
 
 ## dev
 
-{"answer":"Listo.","priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"80db04af1de62e8788c59e8f999e41200be92331"},{"type":"commit","ref":"abcdef0"}]}],"concerns":[]}
+{"answer":"Listo.","priorities":[{"title":"Publicar","why":"Está listo.","sources":[{"type":"commit","ref":"318c346d466e736d9350b89aab7083870bec86de"},{"type":"commit","ref":"abcdef0"}]}],"concerns":[]}
 
 # Brief of the product
 <brief>
