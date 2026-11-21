@@ -78,8 +78,24 @@ esac"#,
             .contains("no database yet")
     );
     assert_eq!(row("claude")["status"], "ok");
-    assert_eq!(row("claude")["detail"], "9.9.9 (Claude Code)");
-    assert_eq!(row("git")["detail"], "git version 2.99.0");
+    let at = |name: &str| bin.join(name).display().to_string();
+    assert_eq!(
+        row("claude")["detail"],
+        format!("9.9.9 (Claude Code), {}", at("claude"))
+    );
+    assert_eq!(
+        row("git")["detail"],
+        format!("git version 2.99.0, {}", at("git"))
+    );
+    assert_eq!(
+        row("core")["detail"]
+            .as_str()
+            .unwrap()
+            .split_once(", ")
+            .unwrap()
+            .1,
+        format!("PATH process: {}", bin.display())
+    );
     assert_eq!(row("bwrap")["level"], "stories");
     assert_eq!(row("bwrap")["status"], "missing");
     assert_eq!(row("bwrap")["detail"], "");

@@ -105,6 +105,7 @@ fn agentsi_env(
         .env("XDG_DATA_HOME", w.dir.path().join("data"))
         .env("AGENTSI_CORE_SOCKET", &w.socket)
         .env("AGENTSI_CORE_BIN", &w.core)
+        .env("AGENTSI_NO_SHELL_PATH", "1")
         .envs(extra.iter().copied())
         .output()
         .expect("agentsi runs");
@@ -170,14 +171,14 @@ fn doctor_reports_each_check_and_passes_when_the_required_ones_do() {
     assert_eq!(err, "");
     assert_eq!(code, 0, "{out}");
     let expected = format!("\
-ok       core                            agentsi-core <VERSION>
+ok       core                            agentsi-core <VERSION>, PATH process: <WORK>/bin
 ok       data root                       <WORK>/root, schema {}
-ok       claude                          2.1.0 (Claude Code)
-ok       git                             git version 2.50.0
+ok       claude                          2.1.0 (Claude Code), <WORK>/bin/claude
+ok       git                             git version 2.50.0, <WORK>/bin/git
 missing  bwrap (stories)                 Not found. It blocks story sessions (agentsi story run).
-ok       gh (optional)                   gh version 2.80.0
+ok       gh (optional)                   gh version 2.80.0, <WORK>/bin/gh
 missing  codebase-memory-mcp (optional)  Not found. It blocks the code graph of meetings and story sessions.
-ok       espeak-ng (optional)            eSpeak NG text-to-speech: 1.52
+ok       espeak-ng (optional)            eSpeak NG text-to-speech: 1.52, <WORK>/bin/espeak-ng
 fail     voice models (optional)         0 of <N> downloaded. Download them in the app. It blocks voice mode and calls.
 ok       audio devices (optional)        1 output(s) (pactl)
 
