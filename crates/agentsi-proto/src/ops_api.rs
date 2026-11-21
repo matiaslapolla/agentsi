@@ -58,7 +58,8 @@ pub enum PathSource {
     Process,
     /// The `PATH` that the core started with, followed by the new folders of the login shell.
     Merged,
-    /// The `PATH` that the core started with, because the login shell gave none in time.
+    /// The `PATH` that the core started with, because the login shell gave none: no `$SHELL`, a
+    /// shell that failed, or no `PATH` in time.
     ShellReadFailed,
 }
 
