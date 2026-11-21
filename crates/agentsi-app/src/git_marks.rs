@@ -105,8 +105,13 @@ impl GitMarks {
         }
     }
 
+    /// A read that runs on a link that broke may never answer: each source reads anew.
     fn read_all(&mut self, cx: &mut Context<Self>) {
         let all: Vec<Source> = self.entries.keys().cloned().collect();
+        for entry in self.entries.values_mut() {
+            entry.reading = false;
+            entry.again = false;
+        }
         for source in all {
             self.read(source, cx);
         }
