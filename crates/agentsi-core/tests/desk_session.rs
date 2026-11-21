@@ -440,7 +440,10 @@ fn object_views_name_objects_of_the_product_and_accept_on_a_priority_writes_no_o
     ] {
         let r = show(&mut c, view);
         assert_eq!(kind(&r), "not_found", "{r}");
-        assert!(r["error"]["message"].as_str().unwrap().contains(word), "{r}");
+        assert!(
+            r["error"]["message"].as_str().unwrap().contains(word),
+            "{r}"
+        );
     }
     let r = show(&mut c, json!({"kind": "story"}));
     assert_eq!(kind(&r), "invalid", "{r}");
@@ -519,7 +522,10 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
         let m = r["error"]["message"].as_str().unwrap();
         assert!(m.contains(word), "{m}");
     }
-    let r = show(&mut c, json!({"kind": "chart", "chart": "donut", "title": "C", "labels": [], "values": []}));
+    let r = show(
+        &mut c,
+        json!({"kind": "chart", "chart": "donut", "title": "C", "labels": [], "values": []}),
+    );
     assert_eq!(kind(&r), "invalid", "{r}");
     assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
 
@@ -542,10 +548,22 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
         json!({"kind": "note", "text": "The owner checked 2 of 3 items of Launch: tag, post."})
     );
     for (params, want) in [
-        (json!({"product": "alpha", "seq": 5, "checked": [3]}), "invalid"),
-        (json!({"product": "alpha", "seq": 4, "checked": [0]}), "invalid"),
-        (json!({"product": "alpha", "seq": 99, "checked": []}), "not_found"),
-        (json!({"product": "nope", "seq": 5, "checked": []}), "not_found"),
+        (
+            json!({"product": "alpha", "seq": 5, "checked": [3]}),
+            "invalid",
+        ),
+        (
+            json!({"product": "alpha", "seq": 4, "checked": [0]}),
+            "invalid",
+        ),
+        (
+            json!({"product": "alpha", "seq": 99, "checked": []}),
+            "not_found",
+        ),
+        (
+            json!({"product": "nope", "seq": 5, "checked": []}),
+            "not_found",
+        ),
     ] {
         let r = c.call("desk.check", params);
         assert_eq!(kind(&r), want, "{r}");
@@ -553,7 +571,10 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
 
     // A page: the events and the history give its length. desk.page gives the HTML.
     let html = "<h1>Report</h1>";
-    let r = show(&mut c, json!({"kind": "page", "title": "Report", "html": html}));
+    let r = show(
+        &mut c,
+        json!({"kind": "page", "title": "Report", "html": html}),
+    );
     assert_eq!(r["result"]["view_id"], 7);
     let e = c.next_event("desk.item");
     assert_eq!(
@@ -604,7 +625,10 @@ fn a_tickets_view_names_tickets_of_the_product() {
     };
     let r = show(&mut c, json!([id, "C999"]));
     assert_eq!(kind(&r), "not_found", "{r}");
-    assert!(r["error"]["message"].as_str().unwrap().contains("C999"), "{r}");
+    assert!(
+        r["error"]["message"].as_str().unwrap().contains("C999"),
+        "{r}"
+    );
     let r = show(&mut c, json!([]));
     assert_eq!(kind(&r), "invalid", "{r}");
     assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);

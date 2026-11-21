@@ -457,13 +457,23 @@ pub const ENTRIES: &[Entry] = &[
     Entry {
         label: "Set up a new product",
         icon: IconName::Plus,
-        keywords: &["setup", "new", "product", "register", "add", "brief", "folder"],
+        keywords: &[
+            "setup", "new", "product", "register", "add", "brief", "folder",
+        ],
         action: || Box::new(NewProduct),
     },
     Entry {
         label: "Update the brief of the active product",
         icon: IconName::FileText,
-        keywords: &["setup", "brief", "roster", "objectives", "stories", "update", "apply"],
+        keywords: &[
+            "setup",
+            "brief",
+            "roster",
+            "objectives",
+            "stories",
+            "update",
+            "apply",
+        ],
         action: || Box::new(UpdateBrief),
     },
     Entry {

@@ -327,7 +327,11 @@ mod tests {
         samples[2_000] = -8_192;
         s.append(&samples);
         s.seek(2_400. / f64::from(RATE));
-        assert_eq!(s.peak(0.05), 0.25, "50 ms is 1 200 samples: the loud one at 100 is out");
+        assert_eq!(
+            s.peak(0.05),
+            0.25,
+            "50 ms is 1 200 samples: the loud one at 100 is out"
+        );
         assert_eq!(s.peak(0.2), 0.5);
         s.seek(0.0);
         assert_eq!(s.peak(0.05), 0.0);

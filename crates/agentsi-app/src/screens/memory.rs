@@ -1074,8 +1074,7 @@ mod tests {
         cx: &mut TestAppContext,
     ) {
         use serde_json::json;
-        let (screen, mut other, cx) =
-            screen(cx, Load::Ready(serde_json::from_str(DATA).unwrap()));
+        let (screen, mut other, cx) = screen(cx, Load::Ready(serde_json::from_str(DATA).unwrap()));
         screen.update(cx, |s, cx| {
             s.memory_only = true;
             s.ask_reflect(cx);

@@ -164,6 +164,11 @@ fn git_at(dir: &Path, args: &[&str], secs_ago: Option<u64>) {
             "user.email=golden@example.invalid",
             "-c",
             "commit.gpgsign=false",
+            // `GIT_CONFIG_GLOBAL` does not stop the default excludes file
+            // (`$XDG_CONFIG_HOME/git/ignore`). One that ignores `.claude/` left
+            // `.claude/JOURNAL.md` of `beta` out of its commits, and gave other hashes.
+            "-c",
+            "core.excludesFile=/dev/null",
         ])
         .args(args)
         .current_dir(dir)

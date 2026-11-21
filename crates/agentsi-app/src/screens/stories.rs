@@ -11,8 +11,8 @@ use agentsi_ui::tokens::{Status, control, line, size, space, surface, text, weig
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::minutes::cursor_after;
 use super::form::{Form, FormEvent};
+use super::minutes::cursor_after;
 use super::parts::{Flash, Load, first_screen_ready, flash_line, notice};
 use crate::model::CoreState;
 use crate::nav::{Nav, ScreenRequest};
@@ -107,7 +107,13 @@ impl StoriesScreen {
         }
         let form = cx.new(|cx| {
             Form::new("stories-new", "New story", "Shape the story", cx)
-                .field("Text", "Describe the story. The PM shapes it.", true, window, cx)
+                .field(
+                    "Text",
+                    "Describe the story. The PM shapes it.",
+                    true,
+                    window,
+                    cx,
+                )
                 .pick("Type", &["The PM picks", "Story", "Task"])
                 .confirm("The PM calls the model, which costs money.")
         });
@@ -171,10 +177,7 @@ impl StoriesScreen {
     fn propose(
         &mut self,
         call: impl std::future::Future<
-            Output = Result<
-                agentsi_proto::story_api::StoryProposeResult,
-                crate::link::CallError,
-            >,
+            Output = Result<agentsi_proto::story_api::StoryProposeResult, crate::link::CallError>,
         > + 'static,
         cx: &mut Context<Self>,
     ) {
