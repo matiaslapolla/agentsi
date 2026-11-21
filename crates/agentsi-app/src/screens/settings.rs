@@ -46,6 +46,7 @@ mod git;
 mod guide;
 mod health;
 mod owner;
+mod terminal;
 use crate::model::{CoreState, HostState};
 pub use dictation::DictationGlobal;
 use dictation::DictationKey;
@@ -56,6 +57,7 @@ pub enum Section {
     Owner,
     Appearance,
     Fonts,
+    Terminal,
     Alerts,
     VoiceModels,
     Vocabulary,
@@ -71,10 +73,11 @@ pub enum Section {
 
 impl Section {
     /// The sections in the order of the list.
-    pub const ALL: [Section; 14] = [
+    pub const ALL: [Section; 15] = [
         Section::Owner,
         Section::Appearance,
         Section::Fonts,
+        Section::Terminal,
         Section::Alerts,
         Section::VoiceModels,
         Section::Vocabulary,
@@ -94,6 +97,7 @@ impl Section {
             Section::Owner => "owner",
             Section::Appearance => "appearance",
             Section::Fonts => "fonts",
+            Section::Terminal => "terminal",
             Section::Alerts => "alerts",
             Section::VoiceModels => "voice-models",
             Section::Vocabulary => "vocabulary",
@@ -113,6 +117,7 @@ impl Section {
             Section::Owner => "Owner",
             Section::Appearance => "Appearance",
             Section::Fonts => "Fonts",
+            Section::Terminal => "Terminal",
             Section::Alerts => "Alerts",
             Section::VoiceModels => "Voice models",
             Section::Vocabulary => "Vocabulary",
@@ -324,6 +329,8 @@ pub struct SettingsScreen {
     appearance_error: Option<String>,
     /// The Fonts section: the families, the search fields and the filter.
     fonts: fonts::FontsState,
+    /// The Terminal section: the sample pane, the shell field and the last error.
+    terminal: terminal::TerminalState,
     /// The error of the last save of the Alerts section.
     alerts_error: Option<String>,
     /// The shared table of the git config file: the section "Git".
@@ -502,6 +509,7 @@ impl SettingsScreen {
             owner_state: owner::OwnerState::default(),
             appearance_error: None,
             fonts: fonts::FontsState::default(),
+            terminal: terminal::TerminalState::default(),
             alerts_error: None,
             keys_note: None,
             models: Load::Loading,
@@ -1420,6 +1428,7 @@ impl SettingsScreen {
             Section::Owner => self.owner_section(window, cx),
             Section::Appearance => self.appearance_section(cx),
             Section::Fonts => self.fonts_section(window, cx),
+            Section::Terminal => self.terminal_section(window, cx),
             Section::Alerts => self.alerts_section(cx),
             Section::VoiceModels => self.voice_models_section(cx),
             Section::Vocabulary => self.vocabulary_section(window, cx),

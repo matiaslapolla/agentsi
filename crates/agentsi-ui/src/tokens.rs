@@ -837,6 +837,8 @@ pub mod control {
     /// The widest trailing element of a list row. The title keeps the rest.
     pub const TRAILING_MAX: Pixels = px(160.);
     pub const SIDEBAR_WIDTH: Pixels = px(248.);
+    /// The sample pane of the Terminal section: 4 rows at the largest font size and line height.
+    pub const TERMINAL_SAMPLE_HEIGHT: Pixels = px(176.);
     /// The list of the sections of the settings screen.
     pub const SETTINGS_NAV_WIDTH: Pixels = px(200.);
     /// The desk conversation: the right column of the front desk.

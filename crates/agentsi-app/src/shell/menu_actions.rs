@@ -363,7 +363,7 @@ impl Shell {
     ) {
         match cmd {
             Cmd::NewTerminal => {
-                let argv = shell_argv_for(p.host.is_some());
+                let argv = shell_argv_for(p.host.is_some(), cx);
                 self.open_terminal_in(Some(p), argv, window, cx)
             }
             Cmd::OpenDesk => self.select_product(&p, window, cx),
@@ -612,7 +612,7 @@ impl Shell {
         let beside = self
             .pane_panel(&pane, cx)
             .map(|p| (PanelId::from(p.entity_id()), placement));
-        let argv = shell_argv_for(pane.host.is_some());
+        let argv = shell_argv_for(pane.host.is_some(), cx);
         self.create_terminal(core, t.cwd, argv, t.product, beside, window, cx);
     }
 
@@ -787,7 +787,7 @@ impl Shell {
             };
             let _ = this.update_in(cx, |this, window, cx| match worktree {
                 Some(dir) => {
-                    let argv = shell_argv_for(p.host.is_some());
+                    let argv = shell_argv_for(p.host.is_some(), cx);
                     this.create_terminal(core, dir, argv, Some(p.id), None, window, cx)
                 }
                 None => this.notice(&format!("{id} has no session yet."), cx),

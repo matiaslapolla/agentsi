@@ -998,7 +998,7 @@ impl Shell {
             .active
             .as_ref()
             .is_some_and(|p| p.host.is_some());
-        shell_argv_for(remote)
+        shell_argv_for(remote, cx)
     }
 
     /// The panel with the keyboard focus, else the panel in view that had it last: the palette
@@ -1414,14 +1414,15 @@ impl Shell {
     }
 }
 
-/// The program of a new shell. `remote` is true for a terminal on an SSH host.
-fn shell_argv_for(remote: bool) -> Vec<String> {
+/// The program of a new shell. `remote` is true for a terminal on an SSH host: a path of this
+/// device may not exist there, so the shell of the settings is for this device only.
+fn shell_argv_for(remote: bool, cx: &App) -> Vec<String> {
     if remote {
         return ["/bin/sh", "-c", "exec \"${SHELL:-/bin/sh}\""]
             .map(String::from)
             .to_vec();
     }
-    vec![std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".into())]
+    vec![crate::terminal_settings::local_shell(cx)]
 }
 
 impl Render for Shell {
