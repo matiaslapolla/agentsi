@@ -16,6 +16,7 @@ use agentsi_agency::registry::{Product, Registry};
 use agentsi_agency::{Error as AgencyError, clock};
 use agentsi_proto::RpcError;
 use agentsi_proto::events::{DataChanged, DataChangedParams};
+use agentsi_proto::path;
 use agentsi_proto::reflect_api::{
     MemoryList, MemoryListParams, MemoryListResult, MemoryRetire, MemoryRetireParams,
     MemoryRetireResult, ReflectCancel, ReflectCancelParams, ReflectCancelResult, ReflectRevert,
@@ -25,9 +26,6 @@ use agentsi_proto::rpc::ErrorKind;
 use agentsi_store::Store;
 use std::path::PathBuf;
 use std::sync::Arc;
-
-/// The program of each call. Tests put a fake one first on the `PATH`.
-const CLAUDE: &str = "claude";
 
 /// The name of the reflection of a product among the running work of the core. A core
 /// that stops cancels it there. One name for a product: two reflections would apply
@@ -141,12 +139,14 @@ async fn run(ctx: Ctx, p: ReflectRunParams) -> Result<ReflectRunResult, RpcError
     let done: ReflectOutcome = blocking(&ctx, move |w| {
         // The blocking work owns its entry: an aborted handler must not free the product.
         let _entry = entry;
+        let claude = path::claude().map_err(ReflectError::Failed)?;
+        let claude = claude.to_string_lossy();
         let env = Env {
             store: &w.store,
             root: &w.root,
             registry: &w.registry,
             cancel: &cancel,
-            claude: CLAUDE,
+            claude: &claude,
         };
         let mut done = run_reflection(&env, &product, &options)?;
         if done.entry.is_some() {

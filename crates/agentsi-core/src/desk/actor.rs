@@ -2,7 +2,7 @@
 //! what it writes and applies the time limits. The process gets SIGKILL when this thread ends.
 
 use super::{
-    CLAUDE, Cmd, Delivery, Limits, RUNNING, check_auth, mark_sent, set_auth, set_state, store_item,
+    Cmd, Delivery, Limits, RUNNING, check_auth, mark_sent, set_auth, set_state, store_item,
 };
 use crate::state::{Core, lock};
 use agentsi_agency::desk::args::user_line;
@@ -98,15 +98,25 @@ impl Actor {
     }
 
     fn run(self) {
-        let end = match DeskProcess::start(CLAUDE, &self.s.args, &self.s.cwd, &[]) {
-            Ok(process) => self.serve(process),
-            Err(e) => {
-                let message = if e.kind() == std::io::ErrorKind::NotFound {
-                    set_auth(&self.core, Auth::of(AuthState::Missing));
-                    AuthState::Missing.message().unwrap_or_default().to_string()
+        let started = super::claude().and_then(|program| {
+            DeskProcess::start(&program, &self.s.args, &self.s.cwd, &[]).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    Auth::of(AuthState::Missing)
                 } else {
-                    format!("AgentSI cannot start claude: {e}")
-                };
+                    Auth {
+                        state: AuthState::Unknown,
+                        message: Some(format!("AgentSI cannot start claude: {e}")),
+                    }
+                }
+            })
+        });
+        let end = match started {
+            Ok(process) => self.serve(process),
+            Err(auth) => {
+                let message = auth.message.clone().unwrap_or_default();
+                if auth.state == AuthState::Missing {
+                    set_auth(&self.core, auth);
+                }
                 self.error(&message);
                 End {
                     state: DeskState::Failed,

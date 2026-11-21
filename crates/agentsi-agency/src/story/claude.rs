@@ -342,7 +342,12 @@ pub fn run_claude(
     on_start: &dyn Fn(Option<u32>),
 ) -> Result<Value, String> {
     use std::os::unix::process::CommandExt;
-    let mut command = Command::new("claude");
+    let path = env
+        .iter()
+        .find(|(k, _)| *k == "PATH")
+        .map(|(_, v)| v.into())
+        .or_else(agentsi_proto::path::current);
+    let mut command = Command::new(agentsi_proto::path::claude_in(path)?);
     command
         .args(args)
         .current_dir(cwd)

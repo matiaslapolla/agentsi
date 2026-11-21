@@ -18,6 +18,7 @@ use agentsi_proto::meeting_api::{
     MeetingCancelResult, MeetingProgress, MeetingProgressParams, MeetingStart, MeetingStartParams,
     MeetingStartResult, MinutesCheck, MinutesCheckParams, MinutesCheckResult,
 };
+use agentsi_proto::path;
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_store::{Store, read};
 use serde_json::Value;
@@ -25,8 +26,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-/// The program of each role. Tests put a fake one first on the `PATH`.
-const CLAUDE: &str = "claude";
 /// A line of a role can hold a whole file. A longer line stays out of the events, so
 /// no subscriber queue holds it. The result line never needs this size.
 const MAX_EVENT_LINE: usize = 1 << 20;
@@ -109,6 +108,12 @@ fn work(core: &Core) -> meeting::Result<Work> {
 }
 
 /// Runs `f` off the event loop.
+/// The `claude` program of each role. Tests put a fake one first on the `PATH`.
+fn claude() -> meeting::Result<String> {
+    let program = path::claude().map_err(MeetingError::Failed)?;
+    Ok(program.to_string_lossy().into_owned())
+}
+
 async fn blocking<T: Send + 'static>(
     ctx: &Ctx,
     f: impl FnOnce(Arc<Core>, Work) -> meeting::Result<T> + Send + 'static,
@@ -149,6 +154,7 @@ async fn start(ctx: Ctx, p: MeetingStartParams) -> Result<MeetingStartResult, Rp
     let entry = register_meeting(p.meeting.clone(), &p.product)?;
     let name = entry.name.clone();
     let outcome = blocking(&ctx, move |core, w| {
+        let claude = claude()?;
         let events = Events {
             core: core.clone(),
             meeting: entry.name.clone(),
@@ -160,7 +166,7 @@ async fn start(ctx: Ctx, p: MeetingStartParams) -> Result<MeetingStartResult, Rp
                 registry: &w.registry,
                 sink: &events,
                 cancel: &entry.cancel,
-                claude: CLAUDE,
+                claude: &claude,
             },
             &MeetingOptions {
                 meeting: entry.name.clone(),
@@ -189,6 +195,7 @@ async fn start(ctx: Ctx, p: MeetingStartParams) -> Result<MeetingStartResult, Rp
 async fn ask(ctx: Ctx, p: MeetingAskParams) -> Result<MeetingAskResult, RpcError> {
     let entry = register_meeting(p.meeting.clone(), &p.product)?;
     let outcome = blocking(&ctx, move |core, w| {
+        let claude = claude()?;
         let events = Events {
             core,
             meeting: entry.name.clone(),
@@ -200,7 +207,7 @@ async fn ask(ctx: Ctx, p: MeetingAskParams) -> Result<MeetingAskResult, RpcError
                 registry: &w.registry,
                 sink: &events,
                 cancel: &entry.cancel,
-                claude: CLAUDE,
+                claude: &claude,
             },
             &p.product,
             p.scope.as_deref(),

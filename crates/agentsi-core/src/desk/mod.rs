@@ -17,6 +17,7 @@ use agentsi_proto::desk_session_api::{
     AuthState, DeskItem, DeskItemEvent, DeskItemParams, DeskState, DeskStateEvent, DeskStateParams,
     View,
 };
+use agentsi_proto::path;
 use agentsi_proto::rpc::{ErrorKind, RpcError};
 use agentsi_store::{Store, desk};
 use std::collections::HashMap;
@@ -25,8 +26,16 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, mpsc};
 use std::time::Duration;
 
-/// The program of the desk session. The core finds it on its PATH.
-pub const CLAUDE: &str = "claude";
+/// The program of the desk session, or the auth state that names the missing program.
+pub(crate) fn claude() -> Result<String, Auth> {
+    match path::claude() {
+        Ok(program) => Ok(program.to_string_lossy().into_owned()),
+        Err(message) => Err(Auth {
+            state: AuthState::Missing,
+            message: Some(message),
+        }),
+    }
+}
 
 /// What the actor of a process gets.
 pub(crate) enum Cmd {
@@ -193,7 +202,10 @@ fn set_state(
 
 /// Runs `claude auth status --json`, keeps the result and gives it.
 pub fn check_auth(core: &Core) -> Auth {
-    let result = auth::check(CLAUDE, AUTH_TIMEOUT);
+    let result = match claude() {
+        Ok(program) => auth::check(&program, AUTH_TIMEOUT),
+        Err(missing) => missing,
+    };
     set_auth(core, result.clone());
     result
 }
