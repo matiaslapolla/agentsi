@@ -28,7 +28,7 @@ The git screen (`screens/git.rs`) has Changes, a commit list and Config. The own
 ### Core (`agentsi-agency/src/gitpanel.rs`, `agentsi-proto/src/git_api.rs`)
 
 - `git.summary {product | cwd}` gives the git summary, from `git status --porcelain=v2 --branch`.
-- The core sends `git.changed {product}` when the summary changes. It reads the summary when `.git/HEAD`, `.git/index` or a ref changes (`notify`), and at most once every 2 s.
+- The core sends `git.changed {product}` when the summary changes. It reads the summary when `.git/HEAD`, `.git/index` or a ref changes (`notify`), and at most once every 2 s. It watches only the folders git does not ignore (never `target/`, `node_modules/` or `.git/objects`); a product whose watches cannot all be added (the inotify limit) is read every 10 s.
 - `git.show {product, commit}` gives the files of a commit and their diff, with the 512 KiB cut of `git.diff`.
 - `git.branches {product}` gives local and remote branches, with upstream, ahead and behind, and the worktrees.
 - `git.branch.create {product, name, from}` and `git.switch {product, name}`. A switch with changes in the tree returns `dirty`, and the app shows the files.

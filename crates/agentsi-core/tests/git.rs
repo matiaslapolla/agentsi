@@ -499,3 +499,57 @@ fn a_file_change_sends_git_changed_within_3_s_and_an_idle_repo_sends_nothing() {
     git(&s.beta, &["commit", "-q", "-m", "x"]);
     assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
 }
+
+#[test]
+fn a_write_in_an_ignored_target_sends_nothing_and_a_tracked_file_sends_git_changed() {
+    let dir = TempDir::new();
+    let s = setup(&dir);
+    std::fs::write(s.beta.join(".gitignore"), "target/\n").unwrap();
+    std::fs::write(s.beta.join("lib.rs"), "a").unwrap();
+    git(&s.beta, &["config", "user.name", "Test"]);
+    git(&s.beta, &["config", "user.email", "test@example.invalid"]);
+    git(&s.beta, &["add", "-A"]);
+    git(&s.beta, &["commit", "-q", "-m", "x"]);
+    let deps = s.beta.join("target/debug/deps");
+    std::fs::create_dir_all(&deps).unwrap();
+    for i in 0..200 {
+        std::fs::write(deps.join(format!("{i}.o")), "x").unwrap();
+    }
+    let core = start(&dir, &s);
+    let mut c = Framed::connect(&core.socket.path);
+    c.ok("core.subscribe", json!({"topics": ["git"]}));
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    for i in 0..50 {
+        std::fs::write(deps.join(format!("{i}.o")), "y").unwrap();
+    }
+    std::fs::create_dir_all(s.beta.join("target/release")).unwrap();
+    std::fs::write(s.beta.join("target/release/new.o"), "x").unwrap();
+    assert!(no_event_within(
+        &mut c,
+        "git.changed",
+        std::time::Duration::from_secs(4)
+    ));
+
+    let at = std::time::Instant::now();
+    std::fs::write(s.beta.join("lib.rs"), "b").unwrap();
+    assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
+    assert!(
+        at.elapsed() < std::time::Duration::from_secs(3),
+        "{:?}",
+        at.elapsed()
+    );
+
+    // A folder made after the start is watched too.
+    std::thread::sleep(std::time::Duration::from_millis(2100));
+    std::fs::create_dir_all(s.beta.join("src/deep")).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let at = std::time::Instant::now();
+    std::fs::write(s.beta.join("src/deep/new.rs"), "x").unwrap();
+    assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
+    assert!(
+        at.elapsed() < std::time::Duration::from_secs(3),
+        "{:?}",
+        at.elapsed()
+    );
+}

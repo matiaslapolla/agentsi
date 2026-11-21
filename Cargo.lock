@@ -176,6 +176,7 @@ dependencies = [
  "agentsi-store",
  "agentsi-voice",
  "agentsi-vt",
+ "ignore",
  "libc",
  "notify",
  "postgres",
