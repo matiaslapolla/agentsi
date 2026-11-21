@@ -66,14 +66,18 @@ pub struct RolesScreen {
     /// The form that the next draw makes: it needs the window.
     want_form: Option<GeneralForm>,
     form: Option<(Entity<Form>, GeneralForm, Subscription)>,
+    /// A write waits for its reply: the next one would start from the data on screen.
+    writing: bool,
 }
 
 /// The candidates of the roster picker in three groups: the builtin roles, the general roles,
-/// then the custom roles and the specialists of the product.
+/// then the custom roles and the specialists of the product. An agent of `roster` that is in no
+/// group, such as one whose role file is gone, joins the last group so the owner can untick it.
 pub fn picker_groups(
     globals: &[String],
     builtin: &[String],
     overlays: &[String],
+    roster: &[String],
 ) -> [(&'static str, Vec<String>); 3] {
     let builtins: Vec<String> = builtin
         .iter()
@@ -88,10 +92,12 @@ pub fn picker_groups(
     general.sort();
     let mut custom: Vec<String> = overlays
         .iter()
+        .chain(roster)
         .filter(|o| !globals.contains(o))
         .cloned()
         .collect();
     custom.sort();
+    custom.dedup();
     [("Builtin", builtins), ("General", general), ("Custom", custom)]
 }
 
@@ -186,6 +192,7 @@ impl RolesScreen {
             general: Load::Loading,
             want_form: None,
             form: None,
+            writing: false,
         };
         screen.reload(cx);
         screen
@@ -359,6 +366,10 @@ impl RolesScreen {
         close: bool,
         cx: &mut Context<Self>,
     ) {
+        if self.writing {
+            return;
+        }
+        self.writing = true;
         let call = self.core.read(cx).link.call::<M>(params);
         cx.spawn(async move |this, cx| {
             let result = call.await.map(done).map_err(|e| e.to_string());
@@ -368,6 +379,7 @@ impl RolesScreen {
     }
 
     fn written(&mut self, result: Result<String, String>, close: bool, cx: &mut Context<Self>) {
+        self.writing = false;
         if close && result.is_ok() {
             self.close_form(cx);
         }
@@ -710,7 +722,7 @@ impl RolesScreen {
             .map(|e| e.id.clone())
             .collect();
         let mut n = 0usize;
-        let groups: Vec<Div> = picker_groups(&r.globals, &general.builtin, &r.overlays)
+        let groups: Vec<Div> = picker_groups(&r.globals, &general.builtin, &r.overlays, &roster)
             .into_iter()
             .filter(|(_, ids)| !ids.is_empty())
             .map(|(title, ids)| {
@@ -768,7 +780,7 @@ impl RolesScreen {
             Pending::Promote(agent) => (
                 format!("Make {agent} a general role"),
                 vec![
-                    format!("Move agents/{agent}.md of {} to plugin/agents/{agent}.md", self.product),
+                    format!("Move the custom role {agent} of {} to plugin/agents/{agent}.md", self.product),
                     format!("The roster of {} keeps {agent}, and each product can add it.", self.product),
                 ],
             ),
@@ -1264,10 +1276,11 @@ mod tests {
             &ids(&["pm", "dev", "writer", "designer"]),
             &ids(&["pm", "social", "dev", "qa", "scout"]),
             &ids(&["seo", "dev", "dev.api"]),
+            &ids(&["pm", "ghost", "seo"]),
         );
         assert_eq!(groups[0], ("Builtin", ids(&["pm", "dev"])));
         assert_eq!(groups[1], ("General", ids(&["designer", "writer"])));
-        assert_eq!(groups[2], ("Custom", ids(&["dev.api", "seo"])));
+        assert_eq!(groups[2], ("Custom", ids(&["dev.api", "ghost", "seo"])));
         assert_eq!(toggled(&ids(&["pm", "dev"]), "dev"), ids(&["pm"]));
         assert_eq!(toggled(&ids(&["pm"]), "designer"), ids(&["pm", "designer"]));
     }
@@ -1376,7 +1389,11 @@ mod tests {
             serde_json::json!({"product": "demo", "roles": ["pm", "seo", "designer"]})
         );
 
+        screen.update(cx, |s, cx| s.set_roster(vec!["pm".into()], cx));
+        assert!(request(&mut other).is_none(), "a write waits for the reply of the last one");
+
         screen.update(cx, |s, cx| {
+            s.writing = false;
             s.pending = Some(Pending::Promote("seo".into()));
             s.confirm(cx);
         });
@@ -1385,6 +1402,7 @@ mod tests {
         assert_eq!(r["params"], serde_json::json!({"product": "demo", "agent": "seo"}));
 
         screen.update(cx, |s, cx| {
+            s.writing = false;
             s.pending = Some(Pending::DeleteGeneral("writer".into()));
             s.confirm(cx);
         });

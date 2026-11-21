@@ -40,5 +40,8 @@ fn the_palette_entry_opens_the_roles_at_the_form_of_a_new_general_role(cx: &mut 
     let read = methods(&mut f);
     assert!(read.contains(&"role.general.list".to_string()), "{read:?}");
     assert!(read.contains(&"roles.list".to_string()), "{read:?}");
-    assert!(at(cx, "form:roles-general").is_some(), "a reload keeps the form");
+    assert!(
+        at(cx, "form:roles-general").is_some(),
+        "a reload keeps the form"
+    );
 }
