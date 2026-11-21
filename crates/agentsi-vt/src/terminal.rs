@@ -6,8 +6,8 @@
 use crate::{
     error::{Error, Result},
     grid::{
-        Cell, CellStyle, Colors, Cursor, CursorShape, Grid, Palette, Rgb, Scroll, Scrollbar,
-        Underline, Width,
+        Cell, CellStyle, Colors, Cursor, CursorShape, Grid, LinkId, Palette, Rgb, Scroll,
+        Scrollbar, Underline, Width,
     },
     input::{MouseAction, MouseButton, MouseEvent, MouseGeometry},
     key::{KeyAction, KeyEvent},
@@ -685,11 +685,14 @@ impl Terminal {
             ))?;
             // A change of the default colors (OSC 10 and 11) leaves the rows clean, but a cell of
             // the default colors stores no color of its own.
+            // A full read also empties the link table, so the table holds only the links of
+            // rows that some update read after the last full read.
             let all = !incremental
                 || dirty == sys::RenderStateDirty::FULL
                 || grid.cols != cols
                 || grid.rows.len() != usize::from(rows)
-                || grid.colors != colors;
+                || grid.colors != colors
+                || grid.links.len() > LINK_TABLE_MAX;
             let mut damage = Damage {
                 all,
                 rows: Vec::new(),
@@ -698,6 +701,10 @@ impl Terminal {
             grid.cols = cols;
             grid.colors = colors;
             grid.rows.resize_with(usize::from(rows), Vec::new);
+            grid.wrapped.resize(usize::from(rows), false);
+            if all {
+                grid.links.clear();
+            }
             check(sys::ghostty_render_state_get(
                 self.render,
                 sys::RenderStateData::ROW_ITERATOR,
@@ -721,12 +728,13 @@ impl Terminal {
                     ))?;
                 }
                 if all || row_dirty {
-                    self.read_row(&mut grid.rows[usize::from(y)], cols)?;
+                    self.read_row(grid, y, cols)?;
                     damage.rows.push(y);
                 }
                 y += 1;
             }
             grid.rows.truncate(usize::from(y));
+            grid.wrapped.truncate(usize::from(y));
             if incremental {
                 // The next `update` reports only what changed after this copy.
                 check(sys::ghostty_render_state_clean(self.render))?;
@@ -748,16 +756,38 @@ impl Terminal {
         }
     }
 
-    /// Reads the cells of the row under the row iterator into `row`.
+    /// Reads the cells of the row under the row iterator into row `y` of `grid`, with its wrap
+    /// flag and its links.
     ///
     /// # Safety
-    /// `row_iter` is a live row iterator that `row_iterator_next` just advanced.
-    unsafe fn read_row(&mut self, row: &mut Vec<Cell>, cols: u16) -> Result<()> {
+    /// `row_iter` is a live row iterator that `row_iterator_next` just advanced, to viewport row `y`.
+    unsafe fn read_row(&mut self, grid: &mut Grid, y: u16, cols: u16) -> Result<()> {
+        let mut row = std::mem::take(&mut grid.rows[usize::from(y)]);
         row.clear();
         row.reserve(usize::from(cols));
-        // SAFETY: see the function contract. `CELLS_RAW` writes a view of `len` raw cells that stays
-        // valid until the next `update`. `CELLS` fills the live row-cells handle.
+        // SAFETY: see the function contract. `RAW` writes a row value, and `WRAP` and `HYPERLINK`
+        // write a bool. `CELLS_RAW` writes a view of `len` raw cells that stays valid until the
+        // next `update`. `CELLS` fills the live row-cells handle.
         unsafe {
+            let mut raw_row: sys::Row = 0;
+            check(sys::ghostty_render_state_row_get(
+                self.row_iter,
+                sys::RenderStateRowData::RAW,
+                ptr::from_mut(&mut raw_row).cast(),
+            ))?;
+            let mut wrap = false;
+            check(sys::ghostty_row_get(
+                raw_row,
+                sys::RowData::WRAP,
+                ptr::from_mut(&mut wrap).cast(),
+            ))?;
+            grid.wrapped[usize::from(y)] = wrap;
+            let mut has_links = false;
+            check(sys::ghostty_row_get(
+                raw_row,
+                sys::RowData::HYPERLINK,
+                ptr::from_mut(&mut has_links).cast(),
+            ))?;
             let mut view = sys::CellsView::default();
             check(sys::ghostty_render_state_row_get(
                 self.row_iter,
@@ -774,6 +804,8 @@ impl Terminal {
             } else {
                 std::slice::from_raw_parts(view.ptr, view.len)
             };
+            // Neighbor cells of one link share its URI, so the last one saves a table lookup.
+            let mut last: Option<(String, LinkId)> = None;
             for (x, &cell) in raw.iter().enumerate() {
                 if is_blank(cell)? {
                     row.push(Cell::default());
@@ -784,9 +816,23 @@ impl Terminal {
                     self.cell_iter,
                     x,
                 ))?;
-                row.push(read_cell(self.cell_iter)?);
+                let mut read = read_cell(self.cell_iter)?;
+                if has_links && has_link(cell)? {
+                    let uri = hyperlink_uri(self.raw, x, y)?;
+                    read.link = match &last {
+                        Some((l, id)) if *l == uri => Some(*id),
+                        _ if uri.is_empty() => None,
+                        _ => {
+                            let id = grid.link_id(&uri);
+                            last = Some((uri, id));
+                            Some(id)
+                        }
+                    };
+                }
+                row.push(read);
             }
         }
+        grid.rows[usize::from(y)] = row;
         Ok(())
     }
 }
@@ -807,6 +853,67 @@ pub struct Damage {
     pub rows: Vec<u16>,
     /// The id of each row of the grid.
     pub ids: Vec<RowId>,
+}
+
+/// The most URIs that the link table of a grid keeps before the next update reads every row.
+const LINK_TABLE_MAX: usize = 1024;
+
+/// # Safety
+/// `cell` is a raw cell value from the library.
+unsafe fn has_link(cell: sys::Cell) -> Result<bool> {
+    let mut on = false;
+    // SAFETY: `HAS_HYPERLINK` writes a bool.
+    check(unsafe {
+        sys::ghostty_cell_get(
+            cell,
+            sys::CellData::HAS_HYPERLINK,
+            ptr::from_mut(&mut on).cast(),
+        )
+    })?;
+    Ok(on)
+}
+
+/// The OSC 8 URI of the cell at viewport column `x` of row `y`, or an empty string.
+///
+/// # Safety
+/// `terminal` is a live terminal. The library has not changed since the render state update.
+unsafe fn hyperlink_uri(terminal: sys::Terminal, x: u16, y: u16) -> Result<String> {
+    let point = sys::Point {
+        tag: sys::PointTag::VIEWPORT,
+        value: sys::PointValue {
+            coordinate: sys::PointCoordinate { x, y: u32::from(y) },
+        },
+    };
+    let mut at = sys::GridRef {
+        size: std::mem::size_of::<sys::GridRef>(),
+        ..Default::default()
+    };
+    // SAFETY: the grid ref is read at once, before any call that changes the terminal. The
+    // library writes at most `buf_len` bytes, and `out_len` is the length of the URI.
+    unsafe {
+        check(sys::ghostty_terminal_grid_ref(terminal, point, &mut at))?;
+        let mut scratch = [0u8; 256];
+        let mut len = 0usize;
+        let code =
+            sys::ghostty_grid_ref_hyperlink_uri(&at, scratch.as_mut_ptr(), scratch.len(), &mut len);
+        let bytes = match code {
+            sys::Result::SUCCESS => scratch[..len.min(scratch.len())].to_vec(),
+            sys::Result::OUT_OF_SPACE => {
+                let mut grown = vec![0u8; len];
+                check(sys::ghostty_grid_ref_hyperlink_uri(
+                    &at,
+                    grown.as_mut_ptr(),
+                    grown.len(),
+                    &mut len,
+                ))?;
+                grown.truncate(len);
+                grown
+            }
+            sys::Result::NO_VALUE => Vec::new(),
+            other => return check(other).map(|()| String::new()),
+        };
+        Ok(String::from_utf8_lossy(&bytes).into_owned())
+    }
 }
 
 /// True for a cell with no text, no style, no color and one column: the cell of [`Cell::default`].
@@ -980,6 +1087,7 @@ unsafe fn read_cell(cells: sys::RenderStateRowCells) -> Result<Cell> {
                     _ => Underline::None,
                 },
             },
+            link: None,
         })
     }
 }

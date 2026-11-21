@@ -537,3 +537,43 @@ fn a_full_copy_leaves_the_damage_for_the_next_update() {
     let d = update(&mut t, &mut grid);
     assert!(d.rows.contains(&2), "{:?}", d.rows);
 }
+
+#[test]
+fn an_osc_8_hyperlink_reads_back_from_its_cells() {
+    let mut t = term();
+    t.write(b"\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\ plain\r\n");
+    let grid = t.grid().unwrap();
+    let row = &grid.rows[0];
+    let ids: Vec<_> = row[..4].iter().map(|c| c.link).collect();
+    let id = ids[0].expect("the first cell has a link");
+    assert!(ids.iter().all(|l| *l == Some(id)), "{ids:?}");
+    assert_eq!(grid.link(id), Some("https://example.com"));
+    assert!(row[4..].iter().all(|c| c.link.is_none()));
+}
+
+#[test]
+fn links_keep_their_uri_across_updates_and_a_long_uri_reads_whole() {
+    let mut t = term();
+    let mut grid = Grid::default();
+    let long = format!("https://example.com/{}", "a".repeat(600));
+    t.write(format!("\x1b]8;id=1;{long}\x1b\\x\x1b]8;;\x1b\\\r\n").as_bytes());
+    t.update_grid(&mut grid).unwrap();
+    t.write(b"\x1b]8;;https://two.example\x1b\\y\x1b]8;;\x1b\\\r\n");
+    t.update_grid(&mut grid).unwrap();
+    let uri = |y: usize| grid.link(grid.rows[y][0].link.expect("a link")).unwrap();
+    assert_eq!(uri(0), long);
+    assert_eq!(uri(1), "https://two.example");
+}
+
+#[test]
+fn a_soft_wrap_marks_its_row() {
+    let mut t = Terminal::new(Options {
+        cols: 10,
+        rows: 4,
+        scrollback_bytes: 10_000,
+    })
+    .unwrap();
+    t.write(b"0123456789abc\r\nshort");
+    let grid = t.grid().unwrap();
+    assert_eq!(grid.wrapped, [true, false, false, false]);
+}

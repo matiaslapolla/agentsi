@@ -19,6 +19,8 @@ let grid = term.grid()?;
 
 `grid()` copies every visible row. `update_grid(&mut grid)` brings a kept grid up to date and reads again only the rows that libghostty-vt marks dirty. It returns a `Damage`: the rows it read, `all` when it read every row, and the id of each row. A row keeps its id when a scroll moves it, so a renderer can find its old copy. A scroll of the screen marks every row dirty. `grid()` leaves the dirty marks for the next `update_grid`.
 
+Each cell of an OSC 8 hyperlink has a `link` id, and `grid.link(id)` gives its URI. `grid.wrapped[y]` is true when the text of row `y` goes on in the next row.
+
 For a pane, the terminal also moves the viewport (`scroll`, `scrollbar`), reads modes (`mode`, `mouse_tracking`, `alternate_screen`), sets the default colors (`set_palette`) and encodes mouse events, pastes and focus changes (`encode_mouse`, `encode_paste`, `encode_focus`).
 
 ## Build
