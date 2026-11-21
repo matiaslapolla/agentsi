@@ -92,8 +92,8 @@ impl Form {
         cx: &mut Context<Self>,
     ) -> Self {
         let input = cx.new(|cx| InputState::new(window, cx).placeholder(placeholder));
-        self._subs
-            .push(cx.subscribe(&input, |this, source, e: &InputEvent, cx| match e {
+        self._subs.push(
+            cx.subscribe(&input, |this, source, e: &InputEvent, cx| match e {
                 InputEvent::Change => {
                     this.armed = false;
                     cx.notify()
@@ -104,7 +104,8 @@ impl Form {
                     this.submit(cx)
                 }
                 _ => {}
-            }));
+            }),
+        );
         self.fields.push(Field {
             label,
             required,
@@ -136,7 +137,13 @@ impl Form {
     }
 
     #[cfg(test)]
-    pub fn set_value(&mut self, i: usize, value: &str, window: &mut Window, cx: &mut Context<Self>) {
+    pub fn set_value(
+        &mut self,
+        i: usize,
+        value: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         if let Some(f) = self.fields.get(i) {
             f.input.update(cx, |s, cx| s.set_value(value, window, cx));
         }
@@ -270,9 +277,9 @@ impl Render for Form {
                     Checkbox::new((SharedString::from(format!("{id}-check")), i))
                         .label(c.label)
                         .checked(c.checked)
-                        .on_click(cx.listener(move |this, on: &bool, _, cx| {
-                            this.set_checked(i, *on, cx)
-                        })),
+                        .on_click(
+                            cx.listener(move |this, on: &bool, _, cx| this.set_checked(i, *on, cx)),
+                        ),
                 )
             })
             .collect();
@@ -358,7 +365,9 @@ mod tests {
         let events = Rc::new(RefCell::new(Vec::new()));
         let log = events.clone();
         let _sub = cx.update(|_, cx| {
-            cx.subscribe(&form, move |_, e: &FormEvent, _| log.borrow_mut().push(e.clone()))
+            cx.subscribe(&form, move |_, e: &FormEvent, _| {
+                log.borrow_mut().push(e.clone())
+            })
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
         assert!(!form.read_with(cx, |f, cx| f.ready(cx)));

@@ -16,15 +16,15 @@ exit: 0
       "session": {
         "log": "story_logs beta/S001",
         "pid": null,
-        "base": "80db04af1de62e8788c59e8f999e41200be92331",
+        "base": "318c346d466e736d9350b89aab7083870bec86de",
         "state": "ready",
         "branch": "story/S001-filter-mail",
         "failure": null,
         "attempts": 1,
         "worktree": "<WORK>/repos/beta/.worktrees/S001-filter-mail",
         "started_at": "2026-10-13T10:00:00.000Z",
-        "final_commit": "e5d9a17965178ea2d505acff2ae7fb725ad3e840",
-        "tests_commit": "bb569c76d6956a20abcc452e9b38f5150f596237"
+        "final_commit": "4db1053cba5e73be121f204280d53a3b7f621a9c",
+        "tests_commit": "933106a9c849667faf6a9518c184c46481872da6"
       },
       "so_that": "the inbox stays calm",
       "sources": [],
@@ -176,7 +176,7 @@ exit: 0
       "session": {
         "log": "story_logs beta/S005",
         "pid": null,
-        "base": "80db04af1de62e8788c59e8f999e41200be92331",
+        "base": "318c346d466e736d9350b89aab7083870bec86de",
         "stop": {
           "reason": "budget",
           "cap_usd": 2
@@ -229,7 +229,7 @@ exit: 0
       "session": {
         "log": "story_logs beta/S006",
         "pid": null,
-        "base": "80db04af1de62e8788c59e8f999e41200be92331",
+        "base": "318c346d466e736d9350b89aab7083870bec86de",
         "state": "work",
         "branch": "story/S006-snooze-mail",
         "failure": null,
@@ -328,7 +328,7 @@ exit: 0
         },
         {
           "at": "2026-10-15T10:00:00.000Z",
-          "commit": "80db04af1de62e8788c59e8f999e41200be92331",
+          "commit": "318c346d466e736d9350b89aab7083870bec86de",
           "result": "merged_unchanged"
         }
       ],

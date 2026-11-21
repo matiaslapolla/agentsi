@@ -1,7 +1,7 @@
-## story result S004 merged_changed --commit 80db04af1de62e8788c59e8f999e41200be92331
+## story result S004 merged_changed --commit 318c346d466e736d9350b89aab7083870bec86de
 exit: 0
 --- stdout
-Story S004 is implemented, with the result merged_changed at 80db04af1de62e8788c59e8f999e41200be92331.
+Story S004 is implemented, with the result merged_changed at 318c346d466e736d9350b89aab7083870bec86de.
 
 --- stderr
 
@@ -19,10 +19,10 @@ S008  implemented      approved           -       dev  Sort by sender
 
 --- stderr
 
-## story result S004 merged_unchanged --commit 80db04af1de62e8788c59e8f999e41200be92331
+## story result S004 merged_unchanged --commit 318c346d466e736d9350b89aab7083870bec86de
 exit: 0
 --- stdout
-Story S004 is implemented, with the result merged_unchanged at 80db04af1de62e8788c59e8f999e41200be92331.
+Story S004 is implemented, with the result merged_unchanged at 318c346d466e736d9350b89aab7083870bec86de.
 
 --- stderr
 

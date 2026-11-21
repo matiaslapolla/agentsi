@@ -21,6 +21,7 @@ use gpui_kit::component::IconName;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::form::{Form, FormEvent};
 use super::memory::decision_flash;
 use super::minutes::cursor_after;
 use super::parts::{
@@ -28,7 +29,6 @@ use super::parts::{
     minutes_status, mono, notice, role_label, section, stat, stats, write_through,
     write_through_with,
 };
-use super::form::{Form, FormEvent};
 use crate::format;
 use crate::link::CallError;
 use crate::model::CoreState;
@@ -262,9 +262,21 @@ impl DeskScreen {
         }
         let form = cx.new(|cx| {
             Form::new("desk-new-decision", "New decision", "Add the decision", cx)
-                .field("Decision", "What should the owner decide?", true, window, cx)
+                .field(
+                    "Decision",
+                    "What should the owner decide?",
+                    true,
+                    window,
+                    cx,
+                )
                 .field("Why", "Why it matters", true, window, cx)
-                .field("Action (optional)", "What to run after the approval", false, window, cx)
+                .field(
+                    "Action (optional)",
+                    "What to run after the approval",
+                    false,
+                    window,
+                    cx,
+                )
         });
         let sub = cx.subscribe(&form, |this, form, e: &FormEvent, cx| match e {
             FormEvent::Submit => this.submit_form(&form, cx),
@@ -396,7 +408,10 @@ impl DeskScreen {
         if let Some(to) = cursor_after(&k.key, self.selected, self.items.len()) {
             self.selected = to;
         } else {
-            let priority = matches!(self.items.get(self.selected), Some(PendingItem::Priority(_)));
+            let priority = matches!(
+                self.items.get(self.selected),
+                Some(PendingItem::Priority(_))
+            );
             match (k.key.as_str(), priority) {
                 ("a", true) => self.mark_selected(Mark::Accepted, false, cx),
                 ("c", true) => self.mark_selected(Mark::Changed, false, cx),
@@ -487,7 +502,11 @@ fn priority_card(
                 .items_center()
                 .gap(space(2))
                 .child(neutral_tag("Priority"))
-                .child(mono(format!("{} · {}", p.minutes_id, role_label(&p.owner_role)))),
+                .child(mono(format!(
+                    "{} · {}",
+                    p.minutes_id,
+                    role_label(&p.owner_role)
+                ))),
         )
         .child(
             div()
@@ -504,11 +523,13 @@ fn priority_card(
         );
     let act = |button: Button, mark: Mark, is_new: bool| {
         let p = p.clone();
-        button.disabled(busy).on_click(cx.listener(move |this, _, _, cx| {
-            this.selected = i;
-            this.touch(cx);
-            this.mark(&p, mark, is_new, cx);
-        }))
+        button
+            .disabled(busy)
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.selected = i;
+                this.touch(cx);
+                this.mark(&p, mark, is_new, cx);
+            }))
     };
     card.child(
         div()
@@ -516,17 +537,26 @@ fn priority_card(
             .items_center()
             .gap(space(2))
             .child(act(
-                Button::new(("desk-accept", i)).primary().small().label("Accept"),
+                Button::new(("desk-accept", i))
+                    .primary()
+                    .small()
+                    .label("Accept"),
                 Mark::Accepted,
                 false,
             ))
             .child(act(
-                Button::new(("desk-change", i)).secondary().small().label("Change"),
+                Button::new(("desk-change", i))
+                    .secondary()
+                    .small()
+                    .label("Change"),
                 Mark::Changed,
                 false,
             ))
             .child(act(
-                Button::new(("desk-reject-priority", i)).secondary().small().label("Reject"),
+                Button::new(("desk-reject-priority", i))
+                    .secondary()
+                    .small()
+                    .label("Reject"),
                 Mark::Rejected,
                 false,
             ))
@@ -546,7 +576,11 @@ fn decision_card(
     busy: bool,
     cx: &mut Context<DeskScreen>,
 ) -> Card {
-    let kind = if d.minutes_id.is_some() { "Decision · minutes" } else { "Decision" };
+    let kind = if d.minutes_id.is_some() {
+        "Decision · minutes"
+    } else {
+        "Decision"
+    };
     let mut card = Card::new(("desk-decision", i))
         // The accent border marks the decision under the cursor.
         .force(if selected { Force::Hover } else { Force::None })
@@ -854,7 +888,11 @@ impl DeskScreen {
                                 Button::new("desk-archived")
                                     .ghost()
                                     .small()
-                                    .label(if archived_shown { "Hide archived" } else { "Show archived" })
+                                    .label(if archived_shown {
+                                        "Hide archived"
+                                    } else {
+                                        "Show archived"
+                                    })
                                     .on_click(
                                         cx.listener(|this, _, _, cx| this.toggle_archived(cx)),
                                     ),
@@ -1272,9 +1310,7 @@ mod tests {
             .map(|p| p.read_with(cx, |p, _| p.desk().unwrap()))
             .collect();
         for d in &desks {
-            d.update(cx, |s, _| {
-                load(s, serde_json::from_str(DESK).unwrap())
-            });
+            d.update(cx, |s, _| load(s, serde_json::from_str(DESK).unwrap()));
         }
         methods(&mut t.local);
         methods(&mut t.studio);
@@ -1496,7 +1532,9 @@ mod tests {
             cx.notify();
         });
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        let b = cx.debug_bounds("button:desk-run-claude").expect("the button");
+        let b = cx
+            .debug_bounds("button:desk-run-claude")
+            .expect("the button");
         cx.simulate_click(b.center(), Modifiers::none());
         let run = rx.try_recv().expect("a request");
         assert_eq!((run.product.as_str(), run.text.as_str()), ("demo", "do it"));
