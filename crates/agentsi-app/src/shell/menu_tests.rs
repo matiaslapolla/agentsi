@@ -214,6 +214,9 @@ fn each_entry_of_the_pane_menu_runs_its_action_and_a_running_pane_asks_one_confi
         [
             Cmd::Rename,
             Cmd::ColorPane,
+            Cmd::PinTab,
+            Cmd::MoveToProduct,
+            Cmd::AddToFavorites,
             Cmd::NewTabGroup,
             Cmd::AddToTabGroup,
             Cmd::TalkToPane,

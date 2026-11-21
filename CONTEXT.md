@@ -353,7 +353,7 @@ The appearance choice for the size of the text and of the icons of controls: Sma
 _Avoid_: Zoom, font scale
 
 **Item row**:
-A sidebar row under a product for one running or open thing: a pane, a meeting, a story session or a reflection. Its meta shows the state or the phase. A closed product shows the count of running items in a chip.
+A sidebar row under a product for one running or open thing: an open tab of its space, a pane, a meeting, a story session or a reflection. The open tabs come first, in the order of the top bar. Its meta shows the state or the phase. A closed product shows the count of running items in a chip.
 _Avoid_: Child row, sub-item
 
 **Product group**:
@@ -387,6 +387,18 @@ _Avoid_: Purge, wipe, reset (`roles.reset` is the reset of role files)
 **Tab group**:
 A named, colored set of tabs in one tab bar. It draws as a chip before its tabs, and its tabs carry the color of the group as a 3 px bar at the left edge. A click on the chip collapses the group to the chip, which shows the count of its tabs, or opens it. A tab is in one group at most, and a tab that leaves the bar of its group leaves the group. `layout.json` keeps the groups (`tab_groups`, from layout version 2) and the dock keeps the order of the tabs.
 _Avoid_: Tab folder, tab stack, workspace
+
+**Space**:
+The dock of one product: its tabs, its tab groups, its splits and its focus. One more space, "Home", holds the tabs of no product, such as the settings and the guide. The window draws the dock of one space. Selecting a product shows its space as the owner left it, and the terminals of the other spaces keep running. `layout.json` keeps each space (`spaces`, from layout version 3).
+_Avoid_: Workspace, tab set, window
+
+**Pinned tab**:
+A tab that the owner pinned. It sits first in its bar, shows only its icon and its state mark, joins no tab group, and has no close button. "Close others" and "Close to the right" skip it, and a close from its menu asks one Confirm.
+_Avoid_: Sticky tab, locked tab
+
+**Favorite**:
+A saved target with a label: a screen of a product, a folder, or a terminal command with its folder. `<config>/agentsi/favorites.toml` keeps the list in the order of the section "Favorites" of the sidebar. A click opens the target in the space of its product.
+_Avoid_: Bookmark, shortcut
 
 **Chip**:
 The pill of a tab group in the tab bar. It shows the arrow, the color, the name of the group and, when the group is collapsed, the count of its tabs. A dropped tab joins the group.

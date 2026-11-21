@@ -5,11 +5,12 @@
 //! does not know, and says so in the sidebar. Each change of the dock saves the
 //! layout again.
 //!
-//! The dock holds panels of each host. A panel gets the core of its product's host from
-//! `Cores`, at the moment that the shell opens it.
+//! Each product has its own space: a dock of panels (`shell/spaces.rs`). The window draws the
+//! dock of the shown space. A panel gets the core of its product's host from `Cores`, at the
+//! moment that the shell opens it.
 
 use std::cell::RefCell;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
@@ -27,9 +28,7 @@ use futures::StreamExt;
 use futures::channel::mpsc;
 use gpui_kit::component::Placement;
 use gpui_kit::component::command::{Command, CommandItem, CommandState};
-use gpui_kit::component::dock::{
-    DockArea, DockEvent, DockPlacement, PanelId, panel_handle, register_panel,
-};
+use gpui_kit::component::dock::{DockArea, DockPlacement, PanelId, panel_handle, register_panel};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -51,9 +50,10 @@ use crate::screens::memory::MemoryScreen;
 use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
 use crate::screens::settings::{ModelFeed, ModelFeedGlobal, OpenedSection, Section};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec, screen_of};
-use crate::sidebar::{NewProduct, OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged};
-use crate::tab_bar;
-use crate::tabs::{self, GroupId, TabGroups, TabsChanged};
+use crate::sidebar::{
+    CloseTab, NewProduct, OpenFavorite, OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged,
+};
+use crate::tabs::{GroupId, SpaceId, TabGroups};
 use crate::tree::ItemKey;
 use agentsi_ui::tokens::label::Hue;
 
@@ -65,14 +65,16 @@ mod menu_actions;
 mod menu_tests;
 #[cfg(test)]
 mod roles_tests;
+#[cfg(test)]
+mod space_tests;
+mod spaces;
 mod tab_actions;
 #[cfg(test)]
 mod ticket_tests;
 
 /// The time between a change of the dock and the save of the layout.
 const SAVE_DELAY: Duration = Duration::from_millis(300);
-/// The id and version of the dock in the layout file.
-const DOCK_ID: &str = "agentsi";
+/// The version of the dock of a space in the layout file.
 const DOCK_VERSION: usize = 1;
 
 /// The panels that the shell opened or restored, to find them again.
@@ -114,9 +116,9 @@ pub enum Ask {
     AddToTabGroup(PanelId),
     RenameTabGroup(GroupId),
     ColorTabGroup(GroupId),
-    /// The one Confirm before tabs close while a program runs in some of them: the tabs, and the
-    /// number that run a program.
-    CloseTabs(Vec<PanelId>, usize),
+    /// The one Confirm before tabs close while a program runs in some of them, or one is pinned:
+    /// the tabs, the number that run a program, and the number that are pinned.
+    CloseTabs(Vec<PanelId>, usize, usize),
     /// The title of a new ticket for this product.
     NewTicket(ProductRef),
     /// What the ticket waits on: the product and the ticket id.
@@ -127,6 +129,12 @@ pub enum Ask {
     /// The one Confirm before a menu command that stops a program, spends money or hides a
     /// product.
     Confirm(Target, Cmd),
+    /// The product whose space takes this terminal tab.
+    MoveTab(PanelId),
+    /// A new label for the favorite at this place.
+    RenameFavorite(usize),
+    /// The favorite that the palette entry of this command acts on.
+    PickFavorite(Cmd),
 }
 
 struct Asking {
@@ -139,8 +147,13 @@ pub struct Shell {
     /// The core of this device.
     core: Entity<CoreState>,
     cores: Cores,
+    /// The space of each product with a tab, and Home.
+    spaces: BTreeMap<SpaceId, spaces::Space>,
+    /// The space on screen.
+    shown: SpaceId,
+    /// The dock of the shown space.
     dock: Entity<DockArea>,
-    /// The tab groups of the dock.
+    /// The tab groups of the shown space.
     tabs: Entity<TabGroups>,
     sidebar: Entity<Sidebar>,
     open: Rc<RefCell<Open>>,
@@ -201,32 +214,30 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
-        let tabs = cx.new(|_| TabGroups::default());
-        let (dock, skin) =
-            tab_bar::dock_area(DOCK_ID, Some(DOCK_VERSION), tabs.clone(), window, cx);
-        skin.set_close_button_visible(true, cx);
+        let home = spaces::Space::new(&SpaceId::Home, window, cx);
+        let (dock, tabs) = (home.dock.clone(), home.tabs.clone());
         let probe = plan.as_ref().and_then(|p| p.probe.clone());
         let core = cores.local.clone();
         let sidebar = cx.new(|cx| Sidebar::new(cores.clone(), probe, cx));
         let mut subscriptions = vec![
-            cx.subscribe_in(&dock, window, |this, _, e: &DockEvent, window, cx| {
-                if matches!(e, DockEvent::LayoutChanged) {
-                    tabs::reconcile(&this.dock, &this.tabs, window, cx);
-                    this.schedule_save(cx);
-                }
-            }),
-            cx.subscribe(&tabs, |this, _, _: &TabsChanged, cx| {
-                // The bars read the groups when they draw: tell the dock to draw again.
-                this.dock.update(cx, |_, cx| cx.notify());
-                this.schedule_save(cx);
-            }),
             cx.subscribe_in(
                 &sidebar,
                 window,
                 |this, _, e: &SelectProduct, window, cx| this.select_product(&e.0, window, cx),
             ),
-            cx.subscribe_in(&sidebar, window, |this, _, e: &OpenItem, window, cx| {
-                this.open_item(&e.product, &e.item, window, cx)
+            cx.subscribe_in(
+                &sidebar,
+                window,
+                |this, _, e: &OpenItem, window, cx| match e.tab {
+                    Some(panel) => this.open_tab_row(&e.product, &e.item, panel, window, cx),
+                    None => this.open_item(&e.product, &e.item, window, cx),
+                },
+            ),
+            cx.subscribe_in(&sidebar, window, |this, _, e: &CloseTab, window, cx| {
+                this.close_unpinned(e.0, window, cx)
+            }),
+            cx.subscribe_in(&sidebar, window, |this, _, e: &OpenFavorite, window, cx| {
+                this.open_favorite(e.0, window, cx)
             }),
             cx.subscribe_in(&sidebar, window, |this, _, e: &NewProduct, window, cx| {
                 this.show_screen(ScreenSpec::setup("").on(e.0.clone()), window, cx)
@@ -285,6 +296,8 @@ impl Shell {
         let shell = Shell {
             core,
             cores,
+            spaces: BTreeMap::from([(SpaceId::Home, home)]),
+            shown: SpaceId::Home,
             dock,
             tabs,
             sidebar,
@@ -477,7 +490,21 @@ impl Shell {
                 if let Some(s) = saved.settings_section.as_deref().and_then(Section::from_id) {
                     cx.set_global(OpenedSection(s));
                 }
-                let dropped = layout::prune(&mut saved.dock, &known);
+                let mut spaces = std::mem::take(&mut saved.spaces);
+                if let Some(dock) = saved.dock.take() {
+                    spaces = layout::split_spaces(dock, &saved.tab_groups, |leaf| {
+                        self.space_of_saved(leaf, cx).key()
+                    });
+                }
+                let active = saved.active_product.map(|id| ProductRef {
+                    host: saved.active_host,
+                    id,
+                });
+                // A product that left the lists since the save gives its place to the first one,
+                // so the keys of the active product work also with panes on the screen.
+                let active = self.cores.keep_active(active.as_ref(), cx);
+                self.core.update(cx, |s, _| s.active = active.clone());
+                let dropped = self.restore_spaces(spaces, &known, window, cx);
                 if !dropped.is_empty() {
                     let note = format!(
                         "Dropped {} pane{} of terminals or hosts that this device does not know: {}. A core restart ends its terminals.",
@@ -488,21 +515,14 @@ impl Shell {
                     eprintln!("agentsi-app: {note}");
                     self.core.update(cx, |s, _| s.notices.push(note));
                 }
-                let active = saved.active_product.map(|id| ProductRef {
-                    host: saved.active_host,
-                    id,
-                });
-                // A product that left the lists since the save gives its place to the first one,
-                // so the keys of the active product work also with panes on the screen.
-                let active = self.cores.keep_active(active.as_ref(), cx);
-                self.core.update(cx, |s, _| s.active = active);
-                let (dock, groups) = (saved.dock, saved.tab_groups);
-                self.dock.update(cx, |d, cx| {
-                    if let Err(e) = d.load(dock, window, cx) {
-                        eprintln!("agentsi-app: the layout does not load: {e}");
-                    }
-                });
-                self.restore_tab_groups(&groups, window, cx);
+                let shown = match saved.shown.as_deref().map(SpaceId::from_key) {
+                    Some(SpaceId::Product(p)) if !self.has_product(&p, cx) => None,
+                    Some(s) => Some(s),
+                    None => active.map(SpaceId::Product),
+                };
+                if let Some(s) = shown {
+                    self.show_space(s, window, cx);
+                }
             }
             Ok(None) => {}
             Err(e) => {
@@ -533,6 +553,7 @@ impl Shell {
         {
             self.select_product(&p, window, cx);
         }
+        self.spaces_changed(cx);
         // The start bench waits for the first screen. A layout of terminals, and no
         // product at all, have none.
         if self.open.borrow().screens.is_empty() {
@@ -565,11 +586,13 @@ impl Shell {
             active_product,
             active_host,
             tree: self.sidebar.read(cx).open_state(),
-            tab_groups: self.tabs.read(cx).save(self.dock.read(cx), cx),
+            shown: Some(self.shown.key()),
+            spaces: self.save_spaces(cx),
             settings_section: cx
                 .try_global::<OpenedSection>()
                 .map(|s| s.0.id().to_string()),
-            dock: self.dock.read(cx).dump(cx),
+            dock: None,
+            tab_groups: Vec::new(),
         };
         if let Err(e) = layout::write(path, &layout) {
             eprintln!(
@@ -593,6 +616,7 @@ impl Shell {
         &self.core
     }
 
+    /// The dock of the shown space.
     pub fn dock(&self) -> &Entity<DockArea> {
         &self.dock
     }
@@ -605,6 +629,7 @@ impl Shell {
         &self.open
     }
 
+    /// The dock of the shown space holds the panel `id`.
     fn in_dock(&self, id: EntityId, cx: &App) -> bool {
         self.dock.read(cx).panel(PanelId::from(id)).is_some()
     }
@@ -637,7 +662,8 @@ impl Shell {
             .is_some_and(|c| c.read(cx).product(&product.id).is_some())
     }
 
-    /// Makes `product` active and shows its front desk.
+    /// Makes `product` active and shows its space as the owner left it. A space with no tab
+    /// shows the front desk.
     pub fn select_product(
         &mut self,
         product: &ProductRef,
@@ -647,12 +673,20 @@ impl Shell {
         if !self.has_product(product, cx) {
             return;
         }
-        self.core.update(cx, |s, cx| {
-            s.active = Some(product.clone());
-            cx.notify();
-        });
-        self.show_screen(ScreenSpec::desk(product), window, cx);
+        self.show_space(SpaceId::Product(product.clone()), window, cx);
+        if self.dock.read(cx).is_empty(DockPlacement::Center, cx) {
+            self.show_screen(ScreenSpec::desk(product), window, cx);
+        } else {
+            self.focus_shown(window, cx);
+        }
         self.schedule_save(cx);
+    }
+
+    /// Makes `product` active and shows its front desk.
+    pub fn open_desk(&mut self, product: &ProductRef, window: &mut Window, cx: &mut Context<Self>) {
+        if self.has_product(product, cx) {
+            self.show_screen(ScreenSpec::desk(product), window, cx);
+        }
     }
 
     /// Each product in the order of the sidebar, with its name in the palette.
@@ -703,12 +737,11 @@ impl Shell {
         }
         let found = self.open.borrow().screens.iter().find_map(|w| {
             let e = w.upgrade()?;
-            (e.read(cx).is(&spec) && self.in_dock(e.entity_id(), cx)).then_some(e)
+            (e.read(cx).is(&spec) && self.in_any(e.entity_id(), cx)).then_some(e)
         });
         let panel = match found {
             Some(p) => {
-                let id = PanelId::from(p.entity_id());
-                self.dock.update(cx, |d, cx| d.select_panel(id, window, cx));
+                self.select_tab(PanelId::from(p.entity_id()), window, cx);
                 p
             }
             None => {
@@ -716,6 +749,7 @@ impl Shell {
                     eprintln!("agentsi-app: no host {:?}", spec.host);
                     return;
                 };
+                self.show_space(SpaceId::of_screen(&spec), window, cx);
                 let p = cx.new(|cx| ScreenPanel::new(spec, core, cx));
                 self.open.borrow_mut().screens.push(p.downgrade());
                 self.dock.update(cx, |d, cx| {
@@ -814,13 +848,14 @@ impl Shell {
         }
     }
 
+    /// The screens of each space.
     fn open_screens(&self, cx: &App) -> Vec<Entity<ScreenPanel>> {
         self.open
             .borrow()
             .screens
             .iter()
             .filter_map(WeakEntity::upgrade)
-            .filter(|p| self.in_dock(p.entity_id(), cx))
+            .filter(|p| self.in_any(p.entity_id(), cx))
             .collect()
     }
 
@@ -916,9 +951,20 @@ impl Shell {
             cwd,
             argv,
             env: Default::default(),
-            product,
+            product: product.clone(),
             cols: None,
             rows: None,
+        });
+        // The tab goes to the space of the pane it sits beside, else of its product.
+        let space = match beside {
+            Some((other, _)) => self.space_of_panel(other, cx),
+            None => None,
+        }
+        .unwrap_or_else(|| {
+            SpaceId::of(product.map(|id| ProductRef {
+                host: core.read(cx).remote.clone(),
+                id,
+            }))
         });
         cx.spawn_in(window, async move |this, cx| match created.await {
             Ok(info) => {
@@ -928,7 +974,7 @@ impl Shell {
                         s.put(info);
                         cx.notify();
                     });
-                    let panel = this.add_terminal_panel(id, core, window, cx);
+                    let panel = this.add_terminal_panel_in(space, id, core, window, cx);
                     if let Some((other, placement)) = beside {
                         let new = PanelId::from(panel.entity_id());
                         this.place_beside(new, other, placement, window, cx);
@@ -964,7 +1010,9 @@ impl Shell {
         }
     }
 
-    /// Adds a panel for terminal `id` of `core` to the dock and focuses it.
+    /// Adds a panel for terminal `id` of `core` to the space of the active product, shows it and
+    /// focuses it: a new tab opens in the space of the selected product.
+    #[cfg(test)]
     pub fn add_terminal_panel(
         &mut self,
         id: String,
@@ -972,6 +1020,20 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Entity<TerminalPanel> {
+        let space = SpaceId::of(self.core.read(cx).active.clone());
+        self.add_terminal_panel_in(space, id, core, window, cx)
+    }
+
+    /// Adds a panel for terminal `id` of `core` to the dock of `space`, shows it and focuses it.
+    pub fn add_terminal_panel_in(
+        &mut self,
+        space: SpaceId,
+        id: String,
+        core: Entity<CoreState>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Entity<TerminalPanel> {
+        self.show_space(space, window, cx);
         let bench = self
             .bench
             .clone()
@@ -1097,7 +1159,38 @@ impl Shell {
             ItemKey::Reflection => {
                 self.show_screen(ScreenSpec::memory(&product.id).on(host), window, cx)
             }
+            ItemKey::Screen(kind, arg) => self.show_screen(
+                ScreenSpec {
+                    kind: *kind,
+                    host,
+                    product: product.id.clone(),
+                    arg: arg.clone(),
+                },
+                window,
+                cx,
+            ),
         }
+    }
+
+    /// A click on the row of an open tab: its space shows and the tab gets the focus.
+    fn open_tab_row(
+        &mut self,
+        product: &ProductRef,
+        item: &ItemKey,
+        panel: PanelId,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if self.space_of_panel(panel, cx).is_none() {
+            return self.open_item(product, item, window, cx);
+        }
+        if let (Some(center), Some(target)) = (
+            Alerts::try_get(cx),
+            AlertTarget::of_item(product.host.as_deref(), &product.id, item),
+        ) {
+            center.update(cx, |c, cx| c.opened(&target, cx));
+        }
+        self.select_tab(panel, window, cx);
     }
 
     /// Selects the tab of terminal `id`. A terminal with no tab gets a tab that attaches to it.
@@ -1114,20 +1207,23 @@ impl Shell {
             .terminals
             .iter()
             .filter_map(WeakEntity::upgrade)
-            .find(|p| p.read(cx).is(host.as_deref(), id, cx) && self.in_dock(p.entity_id(), cx));
+            .find(|p| p.read(cx).is(host.as_deref(), id, cx) && self.in_any(p.entity_id(), cx));
         if let Some(panel) = found {
-            let panel_id = PanelId::from(panel.entity_id());
-            self.dock
-                .update(cx, |d, cx| d.select_panel(panel_id, window, cx));
-            window.focus(&panel.focus_handle(cx), cx);
+            self.select_tab(PanelId::from(panel.entity_id()), window, cx);
             return;
         }
         let Some(core) = self.cores.of(host.as_deref()).cloned() else {
             return;
         };
-        if core.read(cx).terminals.contains_key(id) {
-            self.add_terminal_panel(id.to_string(), core, window, cx);
-        }
+        // A pane with no tab opens in the space of its product.
+        let Some(product) = core.read(cx).terminals.get(id).map(|t| t.product.clone()) else {
+            return;
+        };
+        let space = SpaceId::of(product.map(|id| ProductRef {
+            host: host.clone(),
+            id,
+        }));
+        self.add_terminal_panel_in(space, id.to_string(), core, window, cx);
     }
 
     fn toggle_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1456,7 +1552,7 @@ impl Render for Shell {
             }))
             .on_action(cx.listener(|this, _: &actions::OpenDesk, window, cx| {
                 if let Some(p) = this.core.read(cx).active.clone() {
-                    this.select_product(&p, window, cx);
+                    this.open_desk(&p, window, cx);
                 }
             }))
             .on_action(cx.listener(|this, _: &actions::OpenMinutes, window, cx| {
@@ -2113,9 +2209,10 @@ mod tests {
         // The file keeps the order of the tabs and the group with its tabs in that order.
         f.shell.read_with(cx, |s, cx| s.save_now(&layout_file, cx));
         let saved = layout::read(&layout_file).unwrap().unwrap();
-        assert_eq!(layout::terminals(&saved.dock), ["t3-b", "t2-a", "t1-a"]);
-        assert_eq!(saved.tab_groups.len(), 1);
-        let g = &saved.tab_groups[0];
+        let space = &saved.spaces["a"];
+        assert_eq!(layout::terminals(&space.dock), ["t3-b", "t2-a", "t1-a"]);
+        assert_eq!(space.tab_groups.len(), 1);
+        let g = &space.tab_groups[0];
         assert_eq!((g.name.as_str(), g.collapsed), ("Build", false));
         assert!(g.color.is_some());
         let key = |id: &str| {
@@ -2183,9 +2280,10 @@ mod tests {
         }
         let saved = layout::read(&layout_file).unwrap().unwrap();
         assert_eq!(saved.version, layout::VERSION);
-        assert_eq!(saved.tab_groups.len(), 1);
-        assert!(saved.tab_groups[0].collapsed);
-        assert_eq!(saved.tab_groups[0].color.as_deref(), Some("sky"));
+        let groups_of_a = &saved.spaces["a"].tab_groups;
+        assert_eq!(groups_of_a.len(), 1);
+        assert!(groups_of_a[0].collapsed);
+        assert_eq!(groups_of_a[0].color.as_deref(), Some("sky"));
         // A new window over the same files.
         let (f, cx) = fixture(cx, Persist::File(layout_file.clone()), &look_file);
         f.shell.update_in(cx, |s, window, cx| s.restore(window, cx));
@@ -2634,13 +2732,17 @@ mod tests {
         let file = folder("guide-top").join("look.toml");
         let (f, cx) = fixture(cx, Persist::None, &file);
         with_tabs(&f, cx);
-        let tabs = order(&f, cx).len();
         cx.dispatch_action(actions::OpenGuide);
         redraw(cx);
         redraw(cx);
         assert_eq!(active_tab(&f, cx), "screen:guide");
         assert!(at(cx, "guide-root").is_some(), "the page is drawn");
-        assert_eq!(order(&f, cx).len(), tabs + 1);
+        // The guide belongs to no product: it opens in Home, not in the space of the panes.
+        assert_eq!(order(&f, cx), ["screen:guide"]);
+        assert_eq!(
+            f.shell.read_with(cx, |s, _| s.shown_space().clone()),
+            crate::tabs::SpaceId::Home
+        );
         assert_eq!(guide_top(&f, cx), Some(0));
         assert_eq!(cx.opened_url(), None, "the browser stays closed");
         // The page keys reach the page through the shell.
@@ -2656,7 +2758,7 @@ mod tests {
         // A second entry selects the same tab.
         cx.dispatch_action(actions::OpenGuide);
         redraw(cx);
-        assert_eq!(order(&f, cx).len(), tabs + 1);
+        assert_eq!(order(&f, cx), ["screen:guide"]);
     }
 
     #[gpui::test]

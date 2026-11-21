@@ -13,6 +13,7 @@
 
 use std::rc::Rc;
 
+use gpui_kit::component::dock::PanelId;
 use gpui_kit::component::menu::{PopupMenu, PopupMenuItem};
 use gpui_kit::*;
 
@@ -35,8 +36,12 @@ pub enum Target {
     Story(ProductRef, String),
     /// A product group: its host and its name.
     Group(Option<String>, String),
-    /// A tab group of the tab bar, by id.
+    /// A tab group of the tab bar of the shown space, by id.
     TabGroup(u32),
+    /// A screen tab: its tab and its sidebar row. A terminal tab is a `Pane`.
+    Tab(PanelId),
+    /// A favorite, by its place in the list.
+    Favorite(usize),
     /// A ticket, by id, with its state when the menu opened.
     Ticket(ProductRef, String, TicketState),
 }
@@ -53,6 +58,8 @@ pub enum Kind {
     Group,
     TabGroup,
     Ticket,
+    Tab,
+    Favorite,
 }
 
 impl Target {
@@ -67,6 +74,8 @@ impl Target {
             Target::Group(..) => Kind::Group,
             Target::TabGroup(_) => Kind::TabGroup,
             Target::Ticket(..) => Kind::Ticket,
+            Target::Tab(_) => Kind::Tab,
+            Target::Favorite(_) => Kind::Favorite,
         }
     }
 }
@@ -109,6 +118,14 @@ pub enum Cmd {
     LeaveTabGroup,
     CloseOthers,
     CloseToRight,
+    PinTab,
+    UnpinTab,
+    AddToFavorites,
+    MoveToProduct,
+    CloseTab,
+    // A favorite.
+    RenameFavorite,
+    RemoveFavorite,
     // A meeting, a reflection and a story session.
     Open,
     CancelMeeting,
@@ -161,6 +178,8 @@ pub struct Facts {
     pub tabbed: bool,
     /// The tab of the pane is in a tab group.
     pub grouped: bool,
+    /// The tab is pinned.
+    pub pinned: bool,
     /// The state of the ticket.
     pub ticket: Option<TicketState>,
     /// The product is archived: its menu holds Restore only.
@@ -182,6 +201,7 @@ impl Facts {
             ready: true,
             tabbed: true,
             grouped: true,
+            pinned: false,
             ticket: Some(TicketState::Open),
             archived: false,
         }
@@ -220,6 +240,34 @@ fn when(cmd: Cmd, label: &'static str, enabled: bool) -> Item {
     })
 }
 
+/// The entries of a tab: its pin, its favorite and, for a terminal, its move to a product.
+fn tab_entries(f: &Facts, terminal: bool) -> Vec<Item> {
+    use Cmd::*;
+    let mut v = vec![if f.pinned {
+        when(UnpinTab, "Unpin tab", f.tabbed)
+    } else {
+        when(PinTab, "Pin tab", f.tabbed)
+    }];
+    if terminal {
+        v.push(when(MoveToProduct, "Move to product…", f.tabbed));
+    }
+    v.push(on(AddToFavorites, "Add to favorites"));
+    v
+}
+
+/// The tab group entries of a tab. A pinned tab joins no group.
+fn group_entries(f: &Facts) -> Vec<Item> {
+    use Cmd::*;
+    let mut v = vec![
+        when(NewTabGroup, "New tab group", f.tabbed && !f.pinned),
+        when(AddToTabGroup, "Add to tab group", f.tabbed && !f.pinned),
+    ];
+    if f.grouped {
+        v.push(when(LeaveTabGroup, "Remove from tab group", f.tabbed));
+    }
+    v
+}
+
 /// The entries of the menu of `target`.
 pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
     use Cmd::*;
@@ -253,12 +301,10 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
                 on(Rename, "Rename"),
                 on(ColorPane, "Color"),
                 Item::Separator,
-                when(NewTabGroup, "New tab group", f.tabbed),
-                when(AddToTabGroup, "Add to tab group", f.tabbed),
             ];
-            if f.grouped {
-                v.push(when(LeaveTabGroup, "Remove from tab group", f.tabbed));
-            }
+            v.extend(tab_entries(f, true));
+            v.push(Item::Separator);
+            v.extend(group_entries(f));
             v.extend([
                 Item::Separator,
                 when(TalkToPane, "Talk to this pane", f.running),
@@ -328,6 +374,23 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
             on(Ungroup, "Ungroup"),
             on(CloseGroup, "Close the group"),
         ],
+        Target::Tab(_) => {
+            let mut v = tab_entries(f, false);
+            v.push(Item::Separator);
+            v.extend(group_entries(f));
+            v.extend([
+                Item::Separator,
+                on(CloseTab, "Close"),
+                on(CloseOthers, "Close others"),
+                on(CloseToRight, "Close to the right"),
+            ]);
+            v
+        }
+        Target::Favorite(_) => vec![
+            on(Open, "Open"),
+            on(RenameFavorite, "Rename"),
+            on(RemoveFavorite, "Remove"),
+        ],
     }
 }
 
@@ -372,6 +435,14 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, LeaveTabGroup) => "Remove the active tab from its tab group",
         (_, CloseOthers) => "Close the other tabs of the bar",
         (_, CloseToRight) => "Close the tabs to the right of the active tab",
+        (_, CloseTab) => "Close the active tab",
+        (_, PinTab) => "Pin the active tab",
+        (_, UnpinTab) => "Unpin the active tab",
+        (_, AddToFavorites) => "Add the active tab to the favorites",
+        (_, MoveToProduct) => "Move the active tab to a product",
+        (Kind::Favorite, Open) => "Open a favorite",
+        (_, RenameFavorite) => "Rename a favorite",
+        (_, RemoveFavorite) => "Remove a favorite",
         (_, TabGroupRename) => "Rename the tab group of the active tab",
         (_, TabGroupColor) => "Color the tab group of the active tab",
         (_, Ungroup) => "Ungroup the tab group of the active tab",
@@ -402,7 +473,12 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
 /// a product. Accept and Reject of a story keep the Confirm of the story screen.
 pub fn confirms(cmd: Cmd, f: &Facts) -> bool {
     match cmd {
-        Cmd::Archive | Cmd::Reflect | Cmd::Suggest | Cmd::CancelMeeting | Cmd::PromoteStory => true,
+        Cmd::Archive
+        | Cmd::Reflect
+        | Cmd::Suggest
+        | Cmd::CancelMeeting
+        | Cmd::PromoteStory
+        | Cmd::RemoveFavorite => true,
         // A pane with a tab closes through the tab, which has its own Confirm.
         Cmd::ClosePane => f.running && !f.tabbed,
         _ => false,
@@ -431,6 +507,10 @@ pub fn confirm_text(cmd: Cmd, name: &str) -> (String, &'static str) {
         Cmd::PromoteStory => (
             format!("Promote {name} to a story? The PM calls the model, which costs money."),
             "Promote to story",
+        ),
+        Cmd::RemoveFavorite => (
+            format!("Remove the favorite {name}? What it opens stays as it is."),
+            "Remove",
         ),
         _ => (
             format!("Close {name}? The program in it stops."),
@@ -528,6 +608,8 @@ mod tests {
             Target::Group(None, "Work".into()),
             Target::TabGroup(1),
             Target::Ticket(product(), "C001".into(), TicketState::Open),
+            Target::Tab(gpui_kit::component::dock::PanelId::from_u64(1)),
+            Target::Favorite(0),
         ]
     }
 
@@ -572,6 +654,9 @@ mod tests {
             [
                 "Rename",
                 "Color",
+                "Pin tab",
+                "Move to product…",
+                "Add to favorites",
                 "New tab group",
                 "Add to tab group",
                 "Remove from tab group",
@@ -604,6 +689,36 @@ mod tests {
             labels(&t[6]),
             ["Rename", "Color", "Ungroup", "Close the group"]
         );
+        assert_eq!(
+            labels(&t[8]),
+            [
+                "Pin tab",
+                "Add to favorites",
+                "New tab group",
+                "Add to tab group",
+                "Remove from tab group",
+                "Close",
+                "Close others",
+                "Close to the right",
+            ]
+        );
+        assert_eq!(labels(&t[9]), ["Open", "Rename", "Remove"]);
+        // A pinned tab offers Unpin, and joins no tab group.
+        let pinned = Facts {
+            pinned: true,
+            grouped: false,
+            ..Facts::all()
+        };
+        let entries: Vec<(&str, bool)> = items(&t[8], &pinned)
+            .into_iter()
+            .filter_map(|i| match i {
+                Item::Entry(e) => Some((e.label, e.enabled)),
+                Item::Separator => None,
+            })
+            .collect();
+        assert_eq!(entries[0], ("Unpin tab", true));
+        assert!(entries.contains(&("New tab group", false)));
+        assert!(entries.contains(&("Add to tab group", false)));
         assert_eq!(
             labels(&t[7]),
             [

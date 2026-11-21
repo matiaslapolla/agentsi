@@ -6,7 +6,11 @@
 //! of a group always sit together in the dock, so the bar needs no sort. [`reconcile`] repairs
 //! that after a change that the groups did not make.
 //!
-//! The groups are layout, not look: `layout.json` keeps them (`layout::TabGroupSave`).
+//! It also keeps the pinned tabs. A pinned tab sits first in its bar and joins no group.
+//!
+//! The groups and the pins are layout, not look: `layout.json` keeps them
+//! (`layout::TabGroupSave`, and `pinned` in the panel entry). There is one `TabGroups` for each
+//! space.
 
 use std::collections::BTreeSet;
 
@@ -15,9 +19,57 @@ use gpui_kit::component::dock::{DockArea, DockPlacement, InsertTarget, NodeId, P
 use gpui_kit::{App, Context, Entity, EventEmitter, Window};
 
 use crate::layout::{self, TabGroupSave};
-use crate::look::clean_label;
+use crate::look::{self, clean_label};
+use crate::model::ProductRef;
+use crate::screens::ScreenSpec;
 
 pub type GroupId = u32;
+
+/// A space: the dock of one product, or Home for the tabs of no product.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SpaceId {
+    Home,
+    Product(ProductRef),
+}
+
+impl SpaceId {
+    /// The key of the space in `layout.json`.
+    pub fn key(&self) -> String {
+        match self {
+            SpaceId::Home => layout::HOME.to_string(),
+            SpaceId::Product(p) => look::key(p.host.as_deref(), &p.id),
+        }
+    }
+
+    pub fn from_key(key: &str) -> SpaceId {
+        match key {
+            layout::HOME | "" => SpaceId::Home,
+            k => SpaceId::Product(look::product_of_key(k)),
+        }
+    }
+
+    /// The space of a screen: its product's, or Home for a screen of no product.
+    pub fn of_screen(spec: &ScreenSpec) -> SpaceId {
+        if spec.product.is_empty() || spec.kind.of_no_product() {
+            return SpaceId::Home;
+        }
+        SpaceId::Product(ProductRef {
+            host: spec.host.clone(),
+            id: spec.product.clone(),
+        })
+    }
+
+    pub fn of(product: Option<ProductRef>) -> SpaceId {
+        product.map_or(SpaceId::Home, SpaceId::Product)
+    }
+
+    pub fn product(&self) -> Option<&ProductRef> {
+        match self {
+            SpaceId::Home => None,
+            SpaceId::Product(p) => Some(p),
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Group {
@@ -36,6 +88,7 @@ pub struct TabsChanged;
 pub struct TabGroups {
     groups: Vec<Group>,
     next: GroupId,
+    pinned: BTreeSet<PanelId>,
 }
 
 impl EventEmitter<TabsChanged> for TabGroups {}
@@ -47,6 +100,39 @@ impl TabGroups {
 
     pub fn get(&self, id: GroupId) -> Option<&Group> {
         self.groups.iter().find(|g| g.id == id)
+    }
+
+    pub fn is_pinned(&self, panel: PanelId) -> bool {
+        self.pinned.contains(&panel)
+    }
+
+    pub fn pinned(&self) -> &BTreeSet<PanelId> {
+        &self.pinned
+    }
+
+    /// Pins or unpins `panel`. A pinned tab leaves its group.
+    pub fn set_pinned(&mut self, panel: PanelId, pinned: bool, cx: &mut Context<Self>) {
+        if self.is_pinned(panel) == pinned {
+            return;
+        }
+        if pinned {
+            self.take(panel);
+            self.pinned.insert(panel);
+        } else {
+            self.pinned.remove(&panel);
+        }
+        self.changed(cx);
+    }
+
+    /// Replaces the pinned tabs, at the restore.
+    pub fn restore_pinned(&mut self, pinned: BTreeSet<PanelId>, cx: &mut Context<Self>) {
+        for p in &pinned {
+            self.take(*p);
+        }
+        if self.pinned != pinned {
+            self.pinned = pinned;
+            self.changed(cx);
+        }
     }
 
     pub fn group_of(&self, panel: PanelId) -> Option<GroupId> {
@@ -76,13 +162,17 @@ impl TabGroups {
             .unwrap_or(Hue::ALL[0])
     }
 
-    /// A group with `panel` in it. The name is cleaned as a label is. An empty name makes no group.
+    /// A group with `panel` in it. The name is cleaned as a label is. An empty name makes no group,
+    /// and neither does a pinned tab.
     pub fn create(
         &mut self,
         name: &str,
         panel: PanelId,
         cx: &mut Context<Self>,
     ) -> Option<GroupId> {
+        if self.is_pinned(panel) {
+            return None;
+        }
         let name = clean_label(name)?;
         self.take(panel);
         let id = self.next;
@@ -101,7 +191,7 @@ impl TabGroups {
 
     /// Puts `panel` in the group `id`, and out of the group it was in.
     pub fn join(&mut self, panel: PanelId, id: GroupId, cx: &mut Context<Self>) {
-        if self.get(id).is_none() || self.group_of(panel) == Some(id) {
+        if self.get(id).is_none() || self.group_of(panel) == Some(id) || self.is_pinned(panel) {
             return;
         }
         self.take(panel);
@@ -157,12 +247,13 @@ impl TabGroups {
 
     /// Drops the tabs that the dock no longer holds, and the groups that stay empty.
     fn keep_only(&mut self, alive: &BTreeSet<PanelId>, cx: &mut Context<Self>) {
-        let before = self.groups.clone();
+        let before = (self.groups.clone(), self.pinned.clone());
         for g in &mut self.groups {
             g.members.retain(|m| alive.contains(m));
         }
         self.groups.retain(|g| !g.members.is_empty());
-        if self.groups != before {
+        self.pinned.retain(|p| alive.contains(p));
+        if (&self.groups, &self.pinned) != (&before.0, &before.1) {
             self.changed(cx);
         }
     }
@@ -299,9 +390,18 @@ pub fn slot_after(panels: &[PanelId], members: &[PanelId], moving: PanelId) -> u
         .map_or(rest.len(), |at| at + 1)
 }
 
-/// The order of a bar once each group sits together: a group stands where its first tab was.
-pub fn grouped_order(panels: &[PanelId], groups: &[Group]) -> Vec<PanelId> {
-    let mut out: Vec<PanelId> = Vec::new();
+/// The order of a bar once the pinned tabs sit first and each group sits together: a group
+/// stands where its first tab was.
+pub fn grouped_order(
+    panels: &[PanelId],
+    groups: &[Group],
+    pinned: &BTreeSet<PanelId>,
+) -> Vec<PanelId> {
+    let mut out: Vec<PanelId> = panels
+        .iter()
+        .filter(|p| pinned.contains(p))
+        .copied()
+        .collect();
     for p in panels {
         if out.contains(p) {
             continue;
@@ -428,8 +528,22 @@ pub fn set_collapsed(
     tabs.update(cx, |t, cx| t.set_collapsed(id, collapsed, cx));
 }
 
+/// Pins or unpins `panel`, then puts the bar in order.
+pub fn set_pinned(
+    dock: &Entity<DockArea>,
+    tabs: &Entity<TabGroups>,
+    panel: PanelId,
+    pinned: bool,
+    window: &mut Window,
+    cx: &mut App,
+) {
+    tabs.update(cx, |t, cx| t.set_pinned(panel, pinned, cx));
+    reconcile(dock, tabs, window, cx);
+}
+
 /// Repairs the groups after a change of the dock: drops the tabs that left, takes the tabs of a
-/// group out of the bars that are not its own, and moves the tabs of a group together.
+/// group out of the bars that are not its own, and moves the pinned tabs first and the tabs of
+/// a group together.
 pub fn reconcile(
     dock: &Entity<DockArea>,
     tabs: &Entity<TabGroups>,
@@ -443,8 +557,9 @@ pub fn reconcile(
         t.keep_one_bar(&all, cx);
     });
     let groups = tabs.read(cx).groups().to_vec();
+    let pinned = tabs.read(cx).pinned().clone();
     for bar in all {
-        let want = grouped_order(&bar.panels, &groups);
+        let want = grouped_order(&bar.panels, &groups, &pinned);
         let mut now = bar.panels.clone();
         for (i, p) in want.iter().enumerate() {
             if now[i] != *p {
@@ -477,6 +592,26 @@ mod tests {
     }
 
     #[test]
+    fn a_space_key_reads_back_its_space() {
+        let studio = SpaceId::Product(ProductRef {
+            host: Some("studio".into()),
+            id: "web".into(),
+        });
+        let mine = SpaceId::Product(ProductRef {
+            host: None,
+            id: "demo".into(),
+        });
+        for s in [SpaceId::Home, studio, mine] {
+            assert_eq!(SpaceId::from_key(&s.key()), s);
+        }
+        assert_eq!(SpaceId::of_screen(&ScreenSpec::settings()), SpaceId::Home);
+        assert_eq!(
+            SpaceId::of_screen(&ScreenSpec::minutes("demo")),
+            SpaceId::from_key("demo")
+        );
+    }
+
+    #[test]
     fn a_slot_counts_after_the_moving_tab_left() {
         let bar = [p(1), p(2), p(3), p(4)];
         // Before tab 3, for tab 1: [2, 1, 3, 4] puts 1 at slot 1.
@@ -497,13 +632,23 @@ mod tests {
     fn the_tabs_of_a_group_come_together_where_its_first_tab_was() {
         let bar = [p(1), p(2), p(3), p(4), p(5)];
         let groups = [g(0, &[2, 4]), g(1, &[5])];
-        assert_eq!(grouped_order(&bar, &groups), [p(1), p(2), p(4), p(3), p(5)]);
+        let none = BTreeSet::new();
+        assert_eq!(
+            grouped_order(&bar, &groups, &none),
+            [p(1), p(2), p(4), p(3), p(5)]
+        );
         // A bar that is in order stays.
         assert_eq!(
-            grouped_order(&[p(1), p(2), p(4)], &[g(0, &[2, 4])]),
+            grouped_order(&[p(1), p(2), p(4)], &[g(0, &[2, 4])], &none),
             [p(1), p(2), p(4)]
         );
-        assert_eq!(grouped_order(&bar, &[]), bar);
+        assert_eq!(grouped_order(&bar, &[], &none), bar);
+        // The pinned tabs come first, in their order.
+        let pinned = BTreeSet::from([p(5), p(3)]);
+        assert_eq!(
+            grouped_order(&bar, &[g(0, &[2, 4])], &pinned),
+            [p(3), p(5), p(1), p(2), p(4)]
+        );
     }
 
     #[gpui::test]
@@ -552,6 +697,24 @@ mod tests {
         let gone = tabs.update(cx, |t, cx| t.ungroup(a, cx));
         assert_eq!(gone, [p(1)]);
         assert!(tabs.read_with(cx, |t, _| t.groups().is_empty()));
+    }
+
+    #[gpui::test]
+    fn a_pinned_tab_leaves_its_group_and_joins_none(cx: &mut gpui::TestAppContext) {
+        let tabs = cx.new(|_| TabGroups::default());
+        let a = tabs
+            .update(cx, |t, cx| t.create("Build", p(1), cx))
+            .unwrap();
+        tabs.update(cx, |t, cx| t.join(p(2), a, cx));
+        tabs.update(cx, |t, cx| t.set_pinned(p(1), true, cx));
+        assert!(tabs.read_with(cx, |t, _| t.is_pinned(p(1))));
+        assert_eq!(tabs.read_with(cx, |t, _| t.group_of(p(1))), None);
+        tabs.update(cx, |t, cx| t.join(p(1), a, cx));
+        assert_eq!(tabs.read_with(cx, |t, _| t.group_of(p(1))), None);
+        assert_eq!(tabs.update(cx, |t, cx| t.create("Docs", p(1), cx)), None);
+        tabs.update(cx, |t, cx| t.set_pinned(p(1), false, cx));
+        tabs.update(cx, |t, cx| t.join(p(1), a, cx));
+        assert_eq!(tabs.read_with(cx, |t, _| t.group_of(p(1))), Some(a));
     }
 
     #[gpui::test]
