@@ -470,6 +470,13 @@ impl ScreenPanel {
         }
     }
 
+    /// Opens the form of a new general role on a roles screen.
+    pub fn roles_new_general(&self, cx: &mut App) {
+        if let ScreenView::Roles(v) = &self.view {
+            v.update(cx, |s, cx| s.new_general(cx));
+        }
+    }
+
     /// Opens the form "New story" on a stories screen.
     pub fn stories_new(&self, cx: &mut App) {
         if let ScreenView::Stories(v) = &self.view {

@@ -65,6 +65,8 @@ mod menu_actions;
 mod menu_tests;
 mod tab_actions;
 #[cfg(test)]
+mod roles_tests;
+#[cfg(test)]
 mod ticket_tests;
 
 /// The time between a change of the dock and the save of the layout.
@@ -793,9 +795,10 @@ impl Shell {
         }
     }
 
-    /// Runs `f` on the meeting screen of the active product.
-    fn on_active_meeting(
+    /// Runs `f` on each open screen `spec` of the active product.
+    fn on_active(
         &self,
+        spec: fn(&str) -> ScreenSpec,
         window: &mut Window,
         cx: &mut Context<Self>,
         f: impl Fn(&mut ScreenPanel, &mut Window, &mut Context<ScreenPanel>),
@@ -803,7 +806,7 @@ impl Shell {
         let Some(p) = self.core.read(cx).active.clone() else {
             return;
         };
-        let spec = ScreenSpec::meeting(&p.id).on(p.host);
+        let spec = spec(&p.id).on(p.host);
         for panel in self.open_screens(cx) {
             if panel.read(cx).is(&spec) {
                 panel.update(cx, |p, cx| f(p, window, cx));
@@ -1462,6 +1465,12 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::OpenRoles, window, cx| {
                 this.show_active(ScreenSpec::roles, window, cx)
             }))
+            .on_action(cx.listener(|this, _: &actions::NewGeneralRole, window, cx| {
+                this.show_active(ScreenSpec::roles, window, cx);
+                this.on_active(ScreenSpec::roles, window, cx, |p, _, cx| {
+                    p.roles_new_general(cx)
+                });
+            }))
             .on_action(cx.listener(|this, _: &actions::OpenStories, window, cx| {
                 this.show_active(ScreenSpec::stories, window, cx)
             }))
@@ -1519,11 +1528,13 @@ impl Render for Shell {
             }))
             .on_action(cx.listener(|this, _: &actions::ShowMeetingContext, window, cx| {
                 this.show_active(ScreenSpec::meeting, window, cx);
-                this.on_active_meeting(window, cx, |p, _, cx| p.meeting_context(cx));
+                this.on_active(ScreenSpec::meeting, window, cx, |p, _, cx| p.meeting_context(cx));
             }))
             .on_action(cx.listener(|this, _: &actions::AskMeetingRole, window, cx| {
                 this.show_active(ScreenSpec::meeting, window, cx);
-                this.on_active_meeting(window, cx, |p, window, cx| p.meeting_ask(window, cx));
+                this.on_active(ScreenSpec::meeting, window, cx, |p, window, cx| {
+                    p.meeting_ask(window, cx)
+                });
             }))
             .on_action(cx.listener(|this, _: &actions::ToggleArchivedProducts, _, cx| {
                 let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
