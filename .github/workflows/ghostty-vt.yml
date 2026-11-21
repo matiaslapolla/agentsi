@@ -1,0 +1,57 @@
+name: libghostty-vt
+
+# Builds libghostty-vt once from the Ghostty commit pinned in crates/agentsi-vt/ghostty.lock and
+# publishes it as a prerelease. Cloud agents cannot run the Zig build behind their proxy, so they
+# download this file, check its sha256 and set AGENTSI_GHOSTTY_VT_LIB.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "crates/agentsi-vt/ghostty.lock"
+      - "crates/agentsi-vt/build.rs"
+      - "scripts/zig.sh"
+      - ".github/workflows/ghostty-vt.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            name: x86_64-linux
+          - runner: ubuntu-24.04-arm
+            name: aarch64-linux
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: System packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.99.1"
+      - name: Build
+        run: |
+          export AGENTSI_ZIG="$(scripts/zig.sh)"
+          cargo build -p agentsi-vt --release --locked
+          lib=$(ls target/release/build/agentsi-vt-*/out/zig-out/lib/libghostty-vt.a | head -1)
+          file="libghostty-vt-${{ matrix.name }}.a"
+          mkdir -p dist
+          cp "$lib" "dist/$file"
+          (cd dist && sha256sum "$file" > "$file.sha256")
+          echo "COMMIT=$(sed -n 's/^commit = //p' crates/agentsi-vt/ghostty.lock)" >> "$GITHUB_ENV"
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="ghostty-vt-${COMMIT}"
+          # The two jobs race to create the release. The loser's create fails, and its upload still works.
+          gh release view "$tag" >/dev/null 2>&1 || gh release create "$tag" --prerelease \
+            --title "libghostty-vt ${COMMIT:0:7}" \
+            --notes "libghostty-vt built by CI from the Ghostty commit pinned in crates/agentsi-vt/ghostty.lock, for AGENTSI_GHOSTTY_VT_LIB." || true
+          for i in 1 2 3; do gh release upload "$tag" dist/* --clobber && break; sleep 5; done
