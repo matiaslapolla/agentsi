@@ -1,6 +1,7 @@
 //! `git.*` and `git.config.*`: the git screen of a product, and the git config that AgentSI
 //! gives to each git command of a product. The logic is in `agentsi-agency` (`gitpanel`,
-//! `git_env`). A write sends `data.changed {product, kind: "git"}`.
+//! `git_env`). A write sends `data.changed {product, kind: "git"}`. A fetch, a pull and a
+//! push send `git.progress` while they run. `git_watch` sends `git.changed`.
 
 use super::{Ctx, Router};
 use crate::state::Core;
@@ -8,7 +9,7 @@ use agentsi_agency::git_env::{self, GitConfig};
 use agentsi_agency::gitpanel::{self, Error as PanelError};
 use agentsi_agency::registry::{Product, Registry};
 use agentsi_proto::RpcError;
-use agentsi_proto::events::{DataChanged, DataChangedParams};
+use agentsi_proto::events::{DataChanged, DataChangedParams, GitProgress, GitProgressParams};
 use agentsi_proto::git_api::*;
 use agentsi_proto::rpc::ErrorKind;
 use std::path::PathBuf;
@@ -21,6 +22,15 @@ pub fn register(r: Router) -> Router {
         .add(GitUnstage, unstage)
         .add(GitCommit, commit)
         .add(GitLog, log)
+        .add(GitSummary, summary)
+        .add(GitShow, show)
+        .add(GitBranches, branches)
+        .add(GitBranchCreate, branch_create)
+        .add(GitSwitch, switch)
+        .add(GitOutgoing, outgoing)
+        .add(GitFetch, fetch)
+        .add(GitPull, pull)
+        .add(GitPush, push)
         .add(GitConfigGet, config_get)
         .add(GitConfigSet, config_set)
 }
@@ -128,6 +138,115 @@ async fn log(_: Ctx, p: GitLogParams) -> Result<GitLogResult, RpcError> {
         gitpanel::log(&repo, p.limit).map(|commits| GitLogResult { commits })
     })
     .await
+}
+
+async fn summary(_: Ctx, p: GitSummaryParams) -> Result<GitSummaryResult, RpcError> {
+    let invalid = || {
+        RpcError::new(
+            ErrorKind::Invalid,
+            "Give a product or a cwd, not both.",
+            "git.summary reads the first path of a product, or any folder.",
+        )
+    };
+    let dir = match (p.product, p.cwd) {
+        (Some(product), None) => {
+            return in_repo(product, None, |repo| {
+                gitpanel::summary(&repo).map(|summary| GitSummaryResult { summary })
+            })
+            .await;
+        }
+        (None, Some(cwd)) => PathBuf::from(cwd),
+        _ => return Err(invalid()),
+    };
+    if !dir.is_dir() {
+        return Ok(GitSummaryResult { summary: None });
+    }
+    crate::blocking::spawn(move || {
+        gitpanel::summary(&dir)
+            .map(|summary| GitSummaryResult { summary })
+            .map_err(rpc)
+    })
+    .await
+    .map_err(|e| RpcError::internal(e.to_string()))?
+}
+
+async fn show(_: Ctx, p: GitShowParams) -> Result<GitShowResult, RpcError> {
+    in_repo(p.product, p.repo, move |repo| {
+        gitpanel::show(&repo, &p.commit)
+    })
+    .await
+}
+
+async fn branches(_: Ctx, p: GitRepoParams) -> Result<GitBranchesResult, RpcError> {
+    in_repo(p.product, p.repo, |repo| gitpanel::branches(&repo)).await
+}
+
+async fn branch_create(ctx: Ctx, p: GitBranchCreateParams) -> Result<GitDone, RpcError> {
+    let product = p.product.clone();
+    in_repo(p.product, p.repo, move |repo| {
+        gitpanel::branch_create(&repo, &p.name, p.from.as_deref())
+    })
+    .await?;
+    changed(&ctx.core, &product);
+    Ok(GitDone {})
+}
+
+async fn switch(ctx: Ctx, p: GitSwitchParams) -> Result<GitSwitchResult, RpcError> {
+    let product = p.product.clone();
+    let result = in_repo(p.product, p.repo, move |repo| {
+        gitpanel::switch(&repo, &p.name)
+    })
+    .await?;
+    if result.outcome == GitOutcome::Done {
+        changed(&ctx.core, &product);
+    }
+    Ok(result)
+}
+
+async fn outgoing(_: Ctx, p: GitRepoParams) -> Result<GitOutgoingResult, RpcError> {
+    in_repo(p.product, p.repo, |repo| gitpanel::outgoing(&repo)).await
+}
+
+/// Runs a fetch, a pull or a push, sends its progress lines, then `data.changed`: a failed
+/// call can still move the remote refs.
+async fn network(
+    ctx: Ctx,
+    p: GitRepoParams,
+    op: &'static str,
+    f: fn(&std::path::Path, &mut dyn FnMut(&str)) -> Result<GitSyncResult, PanelError>,
+) -> Result<GitSyncResult, RpcError> {
+    let (core, product, id) = (ctx.core.clone(), p.product.clone(), p.product.clone());
+    let result = in_repo(id, p.repo, move |repo| {
+        let mut progress = |line: &str| {
+            core.publish::<GitProgress>(&GitProgressParams {
+                product: product.clone(),
+                op: op.into(),
+                line: line.into(),
+            });
+        };
+        f(&repo, &mut progress)
+    })
+    .await?;
+    changed(&ctx.core, &p.product);
+    Ok(result)
+}
+
+async fn fetch(ctx: Ctx, p: GitRepoParams) -> Result<GitSyncResult, RpcError> {
+    network(ctx, p, "fetch", |repo, progress| {
+        Ok(gitpanel::fetch(repo, progress))
+    })
+    .await
+}
+
+async fn pull(ctx: Ctx, p: GitRepoParams) -> Result<GitSyncResult, RpcError> {
+    network(ctx, p, "pull", |repo, progress| {
+        Ok(gitpanel::pull(repo, progress))
+    })
+    .await
+}
+
+async fn push(ctx: Ctx, p: GitRepoParams) -> Result<GitSyncResult, RpcError> {
+    network(ctx, p, "push", gitpanel::push).await
 }
 
 fn entries(list: &[(String, String)]) -> Vec<GitConfigEntry> {

@@ -177,6 +177,7 @@ dependencies = [
  "agentsi-voice",
  "agentsi-vt",
  "libc",
+ "notify",
  "postgres",
  "rusqlite",
  "serde",
