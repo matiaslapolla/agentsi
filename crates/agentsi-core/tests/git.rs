@@ -426,7 +426,19 @@ fn the_more_git_methods_show_branches_switch_and_push_with_progress() {
     assert_eq!(out["remote"], "origin");
     assert_eq!(out["count"], 1);
     assert_eq!(out["commits"][0]["subject"], "feat: f");
-    let r = c.ok("git.push", json!({"product": "alpha"}));
+    let r = c.call(
+        "git.push",
+        json!({"product": "alpha", "branch": "feat", "head": "0000000000000000000000000000000000000000"}),
+    );
+    assert_eq!(
+        kind(&r),
+        "invalid",
+        "a head that moved since the confirm: {r}"
+    );
+    let r = c.ok(
+        "git.push",
+        json!({"product": "alpha", "branch": "feat", "head": out["head"]}),
+    );
     assert_eq!(r["outcome"], "done", "{r}");
     let p = c.next_event("git.progress");
     assert_eq!(

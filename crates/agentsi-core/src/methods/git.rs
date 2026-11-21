@@ -213,7 +213,9 @@ async fn network(
     ctx: Ctx,
     p: GitRepoParams,
     op: &'static str,
-    f: fn(&std::path::Path, &mut dyn FnMut(&str)) -> Result<GitSyncResult, PanelError>,
+    f: impl FnOnce(&std::path::Path, &mut dyn FnMut(&str)) -> Result<GitSyncResult, PanelError>
+    + Send
+    + 'static,
 ) -> Result<GitSyncResult, RpcError> {
     let (core, product, id) = (ctx.core.clone(), p.product.clone(), p.product.clone());
     let result = in_repo(id, p.repo, move |repo| {
@@ -245,8 +247,16 @@ async fn pull(ctx: Ctx, p: GitRepoParams) -> Result<GitSyncResult, RpcError> {
     .await
 }
 
-async fn push(ctx: Ctx, p: GitRepoParams) -> Result<GitSyncResult, RpcError> {
-    network(ctx, p, "push", gitpanel::push).await
+async fn push(ctx: Ctx, p: GitPushParams) -> Result<GitSyncResult, RpcError> {
+    let repo = GitRepoParams {
+        product: p.product,
+        repo: p.repo,
+    };
+    network(ctx, repo, "push", move |dir, progress| {
+        let expect = p.branch.as_deref().zip(p.head.as_deref());
+        gitpanel::push(dir, expect, progress)
+    })
+    .await
 }
 
 fn entries(list: &[(String, String)]) -> Vec<GitConfigEntry> {

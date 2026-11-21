@@ -95,7 +95,10 @@ fn run(core: Weak<Core>) {
         {
             p.dirty = false;
             p.read_at = Instant::now();
-            let now = gitpanel::summary(&p.root).ok().flatten();
+            // A read that fails keeps the last summary, so it sends nothing.
+            let Ok(now) = gitpanel::summary(&p.root) else {
+                continue;
+            };
             if now != p.last {
                 p.last = now;
                 core.publish::<GitChanged>(&GitChangedParams {
@@ -213,12 +216,10 @@ fn touches(p: &Product, path: &Path) -> bool {
 
 fn git_state(rel: &Path) -> bool {
     let names: Vec<&str> = rel.iter().filter_map(|c| c.to_str()).collect();
-    match names[..] {
-        ["HEAD" | "index" | "packed-refs"] => true,
-        ["refs", ..] => true,
-        ["worktrees", _, "HEAD" | "index"] => true,
-        _ => false,
-    }
+    matches!(
+        names[..],
+        ["HEAD" | "index" | "packed-refs"] | ["refs", ..] | ["worktrees", _, "HEAD" | "index"]
+    )
 }
 
 #[cfg(test)]
