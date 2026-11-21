@@ -14,8 +14,8 @@ mod terminal;
 
 pub use error::{Error, Result};
 pub use grid::{
-    Cell, CellStyle, Colors, Cursor, CursorShape, Grid, Palette, Rgb, Scroll, Scrollbar, Underline,
-    Width,
+    Cell, CellStyle, Colors, Cursor, CursorShape, Grid, LinkId, Palette, Rgb, Scroll, Scrollbar,
+    Underline, Width,
 };
 pub use input::{MouseAction, MouseButton, MouseEvent, MouseGeometry};
 pub use key::{Key, KeyAction, KeyEvent, Mods};

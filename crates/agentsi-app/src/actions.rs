@@ -213,6 +213,10 @@ gpui_kit::actions!(
         SplitPaneDown,
         /// Copies the folder of the focused pane to the clipboard.
         CopyPaneFolder,
+        /// Opens the link under the mouse in the focused pane.
+        OpenPaneLink,
+        /// Copies the link under the mouse in the focused pane.
+        CopyPaneLink,
         /// Closes the focused pane. A running program asks one Confirm.
         ClosePane,
         /// Opens the story session that the owner used last.
@@ -911,6 +915,20 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(CopyPaneFolder),
     },
     Entry {
+        label: "Open the link under the mouse in the focused pane",
+        icon: IconName::ExternalLink,
+        keywords: &[
+            "open", "link", "url", "browser", "editor", "pane", "terminal",
+        ],
+        action: || Box::new(OpenPaneLink),
+    },
+    Entry {
+        label: "Copy the link under the mouse in the focused pane",
+        icon: IconName::Copy,
+        keywords: &["copy", "link", "url", "pane", "terminal", "clipboard"],
+        action: || Box::new(CopyPaneLink),
+    },
+    Entry {
         label: "Close the focused pane",
         icon: IconName::Close,
         keywords: &["close", "kill", "pane", "terminal", "tab"],
@@ -1200,6 +1218,8 @@ mod tests {
             "Split the focused pane to the right",
             "Split the focused pane down",
             "Copy the folder of the focused pane",
+            "Open the link under the mouse in the focused pane",
+            "Copy the link under the mouse in the focused pane",
             "Close the focused pane",
             "Open the story session",
             "Review the story session",

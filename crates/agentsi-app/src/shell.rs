@@ -152,6 +152,8 @@ pub struct Shell {
     alerts_open: bool,
     /// The context menu that is open.
     menu: Option<menu_actions::OpenMenu>,
+    /// The link under the pointer when the menu of a pane opened, for Open link and Copy link.
+    menu_link: Option<agentsi_term_view::Link>,
     persist: Persist,
     /// false until the restore ended: a save before it would write an empty layout.
     restored: bool,
@@ -276,6 +278,8 @@ impl Shell {
         cx.set_global(nav);
         let (runs, claude_runs) = crate::nav::Runs::channel();
         cx.set_global(runs);
+        let (edits, edit_requests) = crate::nav::Edits::channel();
+        cx.set_global(edits);
         let feed = cx.new(|_| ModelFeed);
         cx.set_global(ModelFeedGlobal(feed.clone()));
         if let Some(b) = &bench {
@@ -294,6 +298,7 @@ impl Shell {
             asking: None,
             alerts_open: false,
             menu: None,
+            menu_link: None,
             persist,
             restored: false,
             save: None,
@@ -305,6 +310,7 @@ impl Shell {
         shell.pump_events(events, feed, cx);
         shell.pump_requests(requests, window, cx);
         shell.pump_claude_runs(claude_runs, window, cx);
+        shell.pump_edits(edit_requests, window, cx);
         shell.start(window, cx);
         window.focus(&shell.focus, cx);
         shell
@@ -389,6 +395,73 @@ impl Shell {
             }
         })
         .detach();
+    }
+
+    /// Opens a path link of a pane in the editor, for each link that a pane sends.
+    fn pump_edits(
+        &self,
+        mut edits: mpsc::UnboundedReceiver<crate::nav::EditRequest>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        cx.spawn_in(window, async move |this, cx| {
+            while let Some(r) = edits.next().await {
+                let editor = std::env::var("EDITOR").ok();
+                let _ =
+                    this.update_in(cx, |this, window, cx| this.edit_file(r, editor, window, cx));
+            }
+        })
+        .detach();
+    }
+
+    /// `$EDITOR +line path` in a new terminal in the folder of the pane, on its host. `editor` is
+    /// the `$EDITOR` of this device. A pane of this device with no editor opens the file as a
+    /// `file://` URL.
+    pub(super) fn edit_file(
+        &mut self,
+        r: crate::nav::EditRequest,
+        editor: Option<String>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        let Some(core) = self.cores.of(r.host.as_deref()).cloned() else {
+            return;
+        };
+        let Some(t) = core.read(cx).terminals.get(&r.pane).cloned() else {
+            self.notice("The terminal of this pane is gone.", cx);
+            return;
+        };
+        let remote = r.host.is_some();
+        let home = std::env::var("HOME").ok().filter(|_| !remote);
+        let Some(full) = crate::pane::resolve_path(&r.path, &t.cwd, home.as_deref()) else {
+            self.notice(
+                &format!(
+                    "The folder of this pane is not known, so {} cannot open.",
+                    r.path
+                ),
+                cx,
+            );
+            return;
+        };
+        if !remote && !std::path::Path::new(&full).exists() {
+            self.notice(&format!("{full} does not exist."), cx);
+            return;
+        }
+        // A relative path stays as the pane showed it, in the folder of the pane.
+        let (cwd, arg) = if r.path.starts_with('/') || r.path.starts_with("~/") {
+            let dir = std::path::Path::new(&full)
+                .parent()
+                .map(|d| d.to_string_lossy().into_owned())
+                .unwrap_or_else(|| "/".into());
+            (dir, full.clone())
+        } else {
+            (t.cwd.clone(), r.path.clone())
+        };
+        let editor = editor.filter(|_| !remote);
+        match crate::pane::editor_argv(&arg, r.line, remote, editor.as_deref()) {
+            Some(argv) => self.create_terminal(core, cwd, argv, t.product, None, window, cx),
+            None => cx.open_url(&crate::pane::file_url(&full)),
+        }
     }
 
     /// Subscribes, reads the products and the terminals, then restores the layout.

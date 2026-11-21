@@ -22,7 +22,7 @@ use agentsi_proto::terminal_api::{CloseReason, Kill, TerminalId};
 use agentsi_proto::voice_api::{
     Converse, ConverseAction, ConverseParams, FocusReport, FocusReportParams, Mode, ModeParams,
 };
-use agentsi_term_view::{PaneEvent, PaneOptions, PaneOutput, TerminalPane};
+use agentsi_term_view::{Link as PaneLink, PaneEvent, PaneOptions, PaneOutput, TerminalPane};
 use agentsi_ui::bench::Bench;
 use agentsi_ui::components::{StateMark, StatusDot, Switch, state_icon, status_tag};
 use agentsi_ui::style::{self, StyleExt as _};
@@ -328,6 +328,27 @@ impl TerminalPanel {
             .is_some_and(|t| t.running)
     }
 
+    /// The link under the pointer in the pane, for its context menu.
+    pub fn link_at_pointer(&self, cx: &App) -> Option<PaneLink> {
+        self.pane.read(cx).link_at_pointer()
+    }
+
+    /// A URL goes to the system browser. A path goes to the shell, which opens it in `$EDITOR`.
+    pub fn open_link(&self, link: PaneLink, cx: &mut App) {
+        match link {
+            PaneLink::Url(url) => cx.open_url(&url),
+            PaneLink::Path { path, line, .. } => crate::nav::Edits::send(
+                cx,
+                crate::nav::EditRequest {
+                    host: self.host(cx),
+                    pane: self.id.clone(),
+                    path,
+                    line,
+                },
+            ),
+        }
+    }
+
     fn attach(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let link = self.core.read(cx).link.clone();
         self.stream = Stream::Attaching;
@@ -516,6 +537,14 @@ impl TerminalPanel {
                 self.report_focus(*f, window, cx);
             }
             PaneEvent::Bell => self.bell(cx),
+            PaneEvent::OpenLink(link) => self.open_link(link.clone(), cx),
+            PaneEvent::ContextMenu(at) => {
+                let target = crate::menus::Target::Pane(crate::shell::PaneRef {
+                    host: self.host(cx),
+                    id: self.id.clone(),
+                });
+                crate::menus::request(cx, target, *at);
+            }
             PaneEvent::Title(_) => {}
         }
     }
@@ -936,6 +965,67 @@ impl Render for TerminalPanel {
     }
 }
 
+/// The path of a link as an absolute path: an absolute path stays, `~/` is the home folder and
+/// any other path is in `cwd`. `None` when the folder it needs is not known.
+pub fn resolve_path(path: &str, cwd: &str, home: Option<&str>) -> Option<String> {
+    if path.starts_with('/') {
+        return Some(path.to_string());
+    }
+    if let Some(rest) = path.strip_prefix("~/") {
+        return home.map(|h| format!("{}/{rest}", h.trim_end_matches('/')));
+    }
+    if cwd.is_empty() {
+        return None;
+    }
+    let rest = path.strip_prefix("./").unwrap_or(path);
+    Some(format!("{}/{rest}", cwd.trim_end_matches('/')))
+}
+
+/// The program of a new terminal that opens `path` at `line` in the editor: `editor` (the
+/// `$EDITOR` of this device) for a pane of this device, the `$EDITOR` of the host (else `vi`)
+/// for a pane of a host. `None` for a pane of this device with no editor.
+///
+/// The editor is a value, not code: `sh` splits it into words, so `code -w` works, and runs it.
+pub fn editor_argv(
+    path: &str,
+    line: u32,
+    remote: bool,
+    editor: Option<&str>,
+) -> Option<Vec<String>> {
+    let mut argv: Vec<String> = vec!["/bin/sh".into(), "-c".into()];
+    if remote {
+        argv.extend(["exec ${EDITOR:-vi} \"$@\"".into(), "sh".into()]);
+    } else {
+        let editor = editor.filter(|e| !e.trim().is_empty())?;
+        argv.extend([
+            "e=$1; shift; exec $e \"$@\"".into(),
+            "sh".into(),
+            editor.into(),
+        ]);
+    }
+    // A path that starts with `-` would read as an option of the editor.
+    let path = if path.starts_with('-') {
+        format!("./{path}")
+    } else {
+        path.to_string()
+    };
+    argv.extend([format!("+{line}"), path]);
+    Some(argv)
+}
+
+/// `file://` and the path, with each byte outside the unreserved set and `/` in `%XX` form.
+pub fn file_url(path: &str) -> String {
+    let mut url = String::from("file://");
+    for b in path.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'/' | b'-' | b'_' | b'.' | b'~') {
+            url.push(b as char);
+        } else {
+            url.push_str(&format!("%{b:02X}"));
+        }
+    }
+    url
+}
+
 #[cfg(test)]
 mod tests {
     use std::os::unix::net::UnixStream;
@@ -1025,5 +1115,43 @@ mod tests {
         });
         cx.run_until_parked();
         assert_eq!(methods(&mut fake), ["terminal.attach"]);
+    }
+
+    #[test]
+    fn a_path_link_resolves_against_the_folder_of_the_pane() {
+        use super::resolve_path;
+        let home = Some("/home/me");
+        assert_eq!(
+            resolve_path("src/main.rs", "/w/app/", home).unwrap(),
+            "/w/app/src/main.rs"
+        );
+        assert_eq!(resolve_path("./a.rs", "/w", home).unwrap(), "/w/a.rs");
+        assert_eq!(
+            resolve_path("/etc/x.conf", "", home).unwrap(),
+            "/etc/x.conf"
+        );
+        assert_eq!(resolve_path("~/n.md", "/w", home).unwrap(), "/home/me/n.md");
+        assert_eq!(resolve_path("src/main.rs", "", home), None);
+        assert_eq!(resolve_path("~/n.md", "/w", None), None);
+    }
+
+    #[test]
+    fn the_editor_runs_with_the_line_and_the_path_as_words() {
+        use super::{editor_argv, file_url};
+        let argv = editor_argv("src/main.rs", 12, false, Some("code -w")).unwrap();
+        assert_eq!(argv[..3], ["/bin/sh", "-c", "e=$1; shift; exec $e \"$@\""]);
+        assert_eq!(argv[3..], ["sh", "code -w", "+12", "src/main.rs"]);
+        let out = std::process::Command::new(&argv[0])
+            .args(&argv[1..3])
+            .args(["sh", "echo", "+12", "a b; rm -rf x"])
+            .output()
+            .unwrap();
+        assert_eq!(String::from_utf8_lossy(&out.stdout), "+12 a b; rm -rf x\n");
+        assert_eq!(editor_argv("-x.rs", 1, true, None).unwrap()[5], "./-x.rs");
+        assert_eq!(editor_argv("a.rs", 1, false, None), None);
+        assert_eq!(editor_argv("a.rs", 1, false, Some(" ")), None);
+        let host = editor_argv("a.rs", 3, true, None).unwrap();
+        assert_eq!(host[2..], ["exec ${EDITOR:-vi} \"$@\"", "sh", "+3", "a.rs"]);
+        assert_eq!(file_url("/w/my file#1.rs"), "file:///w/my%20file%231.rs");
     }
 }

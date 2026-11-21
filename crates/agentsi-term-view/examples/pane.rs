@@ -15,7 +15,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use agentsi_pty::{Pty, PtySize, SpawnOptions};
-use agentsi_term_view::{PaneEvent, PaneOptions, PaneOutput, TerminalPane};
+use agentsi_term_view::{Link, PaneEvent, PaneOptions, PaneOutput, TerminalPane};
 use agentsi_ui::bench::{Bench, BenchKind};
 use futures::StreamExt;
 use futures::channel::mpsc;
@@ -203,7 +203,10 @@ fn main() {
                     let t = t.clone();
                     let _ = handle.update(cx, |_, window, _| window.set_window_title(&t));
                 }
-                PaneEvent::Bell => {}
+                PaneEvent::OpenLink(Link::Url(url)) => cx.open_url(url),
+                PaneEvent::OpenLink(Link::Path { .. })
+                | PaneEvent::ContextMenu(_)
+                | PaneEvent::Bell => {}
             })
             .detach();
             let feed = pane.clone();

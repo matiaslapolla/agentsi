@@ -1,9 +1,9 @@
 //! The terminal pane: a GPUI view of one terminal. Bytes from the program go in with
 //! [`TerminalPane::feed`]. Typed keys, screen replies, sizes and focus come out as [`PaneEvent`]s.
 //!
-//! The pane has three views. The root takes input. The cells view draws the screen and is cached,
-//! so a frame that only moves the cursor does not draw the cells again. The cursor view draws the
-//! cursor and its blink.
+//! The pane has four views. The root takes input. The cells view draws the screen and is cached,
+//! so a frame that only moves the cursor does not draw the cells again. The link view underlines
+//! the link under the pointer. The cursor view draws the cursor and its blink.
 //!
 //! The pane reads the terminal settings and the mono font of `agentsi-ui` at each draw of the
 //! root. A change measures the cells again, builds the frame again and reports the new grid
@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use agentsi_ui::appearance::with_terminal;
+use agentsi_ui::appearance::{LinkModifier, with_terminal};
 use agentsi_ui::bench::Bench;
 use agentsi_ui::tokens::{font, motion, size, terminal};
 use agentsi_vt::{
@@ -25,15 +25,18 @@ use agentsi_vt::{
 use gpui_kit::{
     AnyView, App, AppContext as _, Bounds, ClipboardItem, Context, DispatchPhase, Entity,
     EventEmitter, FocusHandle, Focusable, Font, FontStyle, FontWeight, Hsla, InteractiveElement,
-    IntoElement, KeyDownEvent, KeyUpEvent, Modifiers, MouseButton, MouseDownEvent, MouseMoveEvent,
-    MouseUpEvent, ParentElement, Path, PathBuilder, Pixels, Point, Render, ScrollDelta,
-    ScrollEvent, ShapedLine, SharedString, StrikethroughStyle, StyleRefinement, Styled,
-    Subscription, TextAlign, TextRun, UnderlineStyle, WeakEntity, Window, canvas, div, fill,
-    outline, point, px, size as gsize,
+    IntoElement, KeyDownEvent, KeyUpEvent, Modifiers, ModifiersChangedEvent, MouseButton,
+    MouseDownEvent, MouseMoveEvent, MouseUpEvent, ParentElement, Path, PathBuilder, Pixels, Point,
+    Render, ScrollDelta, ScrollEvent, ShapedLine, SharedString, StatefulInteractiveElement,
+    StrikethroughStyle, StyleRefinement, Styled, Subscription, TextAlign, TextRun, UnderlineStyle,
+    WeakEntity, Window, canvas, div, fill, outline, point, px, size as gsize,
 };
+
+use gpui_kit::component::tooltip::Tooltip;
 
 use crate::frame::{CursorCell, Frame, FrameCache, Run};
 use crate::keys::{self, Shortcut};
+use crate::links::{self, Found, Link};
 use crate::selection::{Point as CellPoint, Selection, Unit};
 use crate::shapes::{Shape, line_width, shapes};
 
@@ -73,11 +76,16 @@ pub enum PaneOutput {
     Focus(bool),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum PaneEvent {
     Output(PaneOutput),
     Title(String),
     Bell,
+    /// A click on a link with the link key of the settings held (Ctrl by default).
+    OpenLink(Link),
+    /// A right click, when the program does not take the mouse. The position is in window
+    /// coordinates. [`TerminalPane::link_at_pointer`] tells whether it was on a link.
+    ContextMenu(Point<Pixels>),
 }
 
 /// What the pane takes from the terminal settings and the fonts.
@@ -205,6 +213,8 @@ struct Screen {
     wheel_rest: f32,
     /// False until the pane reported its first size from its layout.
     sized: bool,
+    /// The screen changed under an underlined link: the next draw of the cells finds it again.
+    hover_stale: bool,
     /// The size of the last RESIZE from the core, when it is not the size of the pane.
     source: Option<(u16, u16)>,
     /// True while a first paint at `source` arrives. It ends at the next RESIZE.
@@ -286,8 +296,13 @@ pub struct TerminalPane {
     look: Look,
     focus: FocusHandle,
     cells: Entity<CellsView>,
+    links: Entity<LinkView>,
     cursor: Entity<CursorView>,
     bench: Option<Bench>,
+    /// The last pointer position over the cells, in window coordinates.
+    pointer: Option<Point<Pixels>>,
+    /// The modifiers of the last mouse or modifier event.
+    mods: Modifiers,
     /// The last focus that the pane reported: its focus handle is focused and the window is active.
     focused: bool,
     blink: Rc<Blink>,
@@ -346,6 +361,7 @@ impl TerminalPane {
             selecting: false,
             wheel_rest: 0.,
             sized: false,
+            hover_stale: false,
             source: None,
             painting: false,
         }));
@@ -364,6 +380,10 @@ impl TerminalPane {
             screen: screen.clone(),
             blink: blink.clone(),
         });
+        let links = cx.new(|_| LinkView {
+            screen: screen.clone(),
+            hover: None,
+        });
         let subscriptions = vec![
             cx.on_focus_in(&focus, window, |p, window, cx| p.update_focus(window, cx)),
             cx.on_focus_out(&focus, window, |p, _, window, cx| {
@@ -376,8 +396,11 @@ impl TerminalPane {
             look,
             focus,
             cells,
+            links,
             cursor,
             bench: options.bench,
+            pointer: None,
+            mods: Modifiers::default(),
             focused: false,
             blink,
             blink_running: false,
@@ -493,6 +516,51 @@ impl TerminalPane {
     fn redraw(&mut self, cx: &mut Context<Self>) {
         self.cells.update(cx, |_, cx| cx.notify());
         self.cursor.update(cx, |_, cx| cx.notify());
+        // The text under an underlined link may have changed or moved. The cells view looks
+        // again once per frame, not once per feed.
+        if self.links.read(cx).hover.is_some() {
+            self.screen.borrow_mut().hover_stale = true;
+        }
+    }
+
+    /// The link of the cell at a window position, from the screen as the program left it.
+    fn link_under(&self, pos: Point<Pixels>) -> Option<Found> {
+        let mut s = self.screen.borrow_mut();
+        if !s.bounds.contains(&pos) {
+            return None;
+        }
+        // During a synchronized update the screen is half drawn: the last frame stays.
+        if !self.sync_wait {
+            s.refresh();
+        }
+        let at = s.cell_at(pos);
+        let row = usize::try_from(at.row.checked_sub(s.top)?).ok()?;
+        links::link_at(s.grid(), row, at.col)
+    }
+
+    /// The link under the pointer, held or not. The host reads it for the context menu.
+    pub fn link_at_pointer(&self) -> Option<Link> {
+        self.link_under(self.pointer?).map(|f| f.link)
+    }
+
+    /// Underlines the link under the pointer while the link key is held. Only the link view
+    /// draws again, and only when the link changes.
+    fn update_hover(&mut self, cx: &mut Context<Self>) {
+        let found = self
+            .pointer
+            .filter(|_| link_held(&self.mods, cx))
+            .and_then(|p| self.link_under(p));
+        if self.links.read(cx).hover != found {
+            self.links.update(cx, |v, cx| {
+                v.hover = found;
+                cx.notify();
+            });
+        }
+    }
+
+    fn on_modifiers(&mut self, ev: &ModifiersChangedEvent, _: &mut Window, cx: &mut Context<Self>) {
+        self.mods = ev.modifiers;
+        self.update_hover(cx);
     }
 
     fn wait_for_sync(&mut self, cx: &mut Context<Self>) {
@@ -735,6 +803,15 @@ impl TerminalPane {
         let Some(button) = vt_button(ev.button) else {
             return;
         };
+        self.pointer = Some(ev.position);
+        // Before the mouse reports: a link opens even when the program takes the mouse.
+        if button == VtButton::Left
+            && link_held(&ev.modifiers, cx)
+            && let Some(found) = self.link_under(ev.position)
+        {
+            cx.emit(PaneEvent::OpenLink(found.link));
+            return;
+        }
         if self.reports_mouse(&ev.modifiers) {
             self.pressed = Some(button);
             let pos = ev.position;
@@ -766,6 +843,7 @@ impl TerminalPane {
                 let text = cx.read_from_primary().and_then(|i| i.text());
                 self.paste(text, cx);
             }
+            VtButton::Right => cx.emit(PaneEvent::ContextMenu(ev.position)),
             _ => {}
         }
     }
@@ -813,7 +891,13 @@ impl TerminalPane {
     /// Runs for each move in the window. A move outside the pane counts only during a press that the
     /// pane took.
     fn on_mouse_move(&mut self, ev: &MouseMoveEvent, _: &mut Window, cx: &mut Context<Self>) {
-        if self.pressed.is_none() && !self.screen.borrow().bounds.contains(&ev.position) {
+        let inside = self.screen.borrow().bounds.contains(&ev.position);
+        if inside || self.pointer.is_some() {
+            self.pointer = inside.then_some(ev.position);
+            self.mods = ev.modifiers;
+            self.update_hover(cx);
+        }
+        if self.pressed.is_none() && !inside {
             return;
         }
         if self.screen.borrow().selecting {
@@ -952,14 +1036,66 @@ impl Render for TerminalPane {
             .key_context("Terminal")
             .on_key_down(cx.listener(Self::on_key_down))
             .on_key_up(cx.listener(Self::on_key_up))
+            .on_modifiers_changed(cx.listener(Self::on_modifiers))
             .on_mouse_down(MouseButton::Left, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Middle, cx.listener(Self::on_mouse_down))
             .on_mouse_down(MouseButton::Right, cx.listener(Self::on_mouse_down))
             .on_scroll(cx.listener(Self::on_scroll))
             .child(window_mouse_listeners(cx.weak_entity()))
             .child(AnyView::from(self.cells.clone()).cached(layer()))
+            .child(AnyView::from(self.links.clone()).cached(layer()))
             .child(AnyView::from(self.cursor.clone()).cached(layer()))
             .children(self.bench.as_ref().map(Bench::marker))
+    }
+}
+
+/// True when `mods` hold the key that the settings ask for a click on a link: Ctrl (Cmd on
+/// macOS), or nothing.
+fn link_held(mods: &Modifiers, cx: &App) -> bool {
+    match with_terminal(|t| t.link_modifier) {
+        LinkModifier::Ctrl => mods.secondary(cx),
+        LinkModifier::None => true,
+    }
+}
+
+/// Underlines the link under the pointer and shows its target, over the cells. It is cached, so
+/// a hover draws neither the cells nor the cursor again.
+struct LinkView {
+    screen: Rc<RefCell<Screen>>,
+    hover: Option<Found>,
+}
+
+impl Render for LinkView {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        let root = div().size_full().relative();
+        let Some(found) = &self.hover else {
+            return root;
+        };
+        let m = self.screen.borrow().metrics.clone();
+        let color = terminal::colors().foreground.hsla();
+        let line = px(line_width(f32::from(m.cell_w)));
+        let target = SharedString::from(found.link.target());
+        root.children(found.spans.iter().enumerate().map(|(i, span)| {
+            let target = target.clone();
+            div()
+                .id(("link", i))
+                .absolute()
+                .left(m.pad + m.cell_w * f32::from(span.col))
+                .top(m.pad + m.cell_h * span.row as f32)
+                .w(m.cell_w * f32::from(span.cols))
+                .h(m.cell_h)
+                .cursor_pointer()
+                .tooltip(move |window, cx| Tooltip::new(target.clone()).build(window, cx))
+                .child(
+                    div()
+                        .absolute()
+                        .bottom_0()
+                        .left_0()
+                        .w_full()
+                        .h(line)
+                        .bg(color),
+                )
+        }))
     }
 }
 
@@ -971,12 +1107,19 @@ struct CellsView {
 }
 
 impl Render for CellsView {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        let (frame, metrics) = {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let (frame, metrics, rehover) = {
             let mut s = self.screen.borrow_mut();
             s.refresh();
-            (s.frame().clone(), s.metrics.clone())
+            let rehover = std::mem::take(&mut s.hover_stale);
+            (s.frame().clone(), s.metrics.clone(), rehover)
         };
+        if rehover {
+            let pane = self.pane.clone();
+            cx.defer(move |cx| {
+                let _ = pane.update(cx, |p, cx| p.update_hover(cx));
+            });
+        }
         let blinking = frame.cursor.as_ref().is_some_and(|c| c.blinking);
         let screen = self.screen.clone();
         let pane = self.pane.clone();
@@ -1668,5 +1811,157 @@ mod tests {
         let before = pane.read_with(cx, |p, _| p.last_activity);
         pane.update(cx, |p, cx| p.feed(b"output", Instant::now(), cx));
         assert_eq!(pane.read_with(cx, |p, _| p.last_activity), before);
+    }
+
+    /// The window position of the middle of cell (`row`, `col`).
+    fn cell(
+        pane: &Entity<TerminalPane>,
+        row: u16,
+        col: u16,
+        cx: &mut VisualTestContext,
+    ) -> Point<Pixels> {
+        pane.read_with(cx, |p, _| {
+            let s = p.screen.borrow();
+            let m = &s.metrics;
+            s.bounds.origin
+                + point(
+                    m.pad + m.cell_w * (f32::from(col) + 0.5),
+                    m.pad + m.cell_h * (f32::from(row) + 0.5),
+                )
+        })
+    }
+
+    fn opened(host: &Entity<Host>, cx: &mut VisualTestContext) -> Vec<Link> {
+        host.read_with(cx, |h, _| {
+            h.events
+                .iter()
+                .filter_map(|e| match e {
+                    PaneEvent::OpenLink(l) => Some(l.clone()),
+                    _ => None,
+                })
+                .collect()
+        })
+    }
+
+    const OSC_8: &[u8] = b"\x1b]8;;https://example.com\x1b\\link\x1b]8;;\x1b\\\r\n";
+
+    #[gpui::test]
+    fn a_ctrl_click_on_a_link_opens_it_and_a_plain_click_selects(cx: &mut TestAppContext) {
+        let (host, cx) = host(cx, 40, 5);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        pane.update(cx, |p, cx| p.feed(OSC_8, Instant::now(), cx));
+        pane.update(cx, |p, cx| {
+            p.feed(b"see https://github.com/x/y). now", Instant::now(), cx)
+        });
+        draw(cx);
+        let ctrl = cx.update(|_, cx| Modifiers::secondary_key(cx));
+        let on_link = cell(&pane, 0, 1, cx);
+        cx.simulate_mouse_down(on_link, MouseButton::Left, ctrl);
+        cx.simulate_mouse_up(on_link, MouseButton::Left, ctrl);
+        let plain = cell(&pane, 1, 10, cx);
+        cx.simulate_mouse_down(plain, MouseButton::Left, ctrl);
+        cx.simulate_mouse_up(plain, MouseButton::Left, ctrl);
+        assert_eq!(
+            opened(&host, cx),
+            [
+                Link::Url("https://example.com".into()),
+                Link::Url("https://github.com/x/y".into())
+            ]
+        );
+        assert!(pane.read_with(cx, |p, _| p.screen.borrow().selection.is_none()));
+        // Ctrl on a cell with no link keeps the selection.
+        let no_link = cell(&pane, 1, 1, cx);
+        cx.simulate_mouse_down(no_link, MouseButton::Left, ctrl);
+        assert!(pane.read_with(cx, |p, _| p.screen.borrow().selection.is_some()));
+        cx.simulate_mouse_up(no_link, MouseButton::Left, ctrl);
+        let end = cell(&pane, 0, 3, cx);
+        let start = cell(&pane, 0, 0, cx);
+        cx.simulate_mouse_down(start, MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_move(end, Some(MouseButton::Left), Modifiers::default());
+        cx.simulate_mouse_up(end, MouseButton::Left, Modifiers::default());
+        assert_eq!(opened(&host, cx).len(), 2, "a plain click opens nothing");
+        let text = pane.read_with(cx, |p, _| p.screen.borrow().selected_text());
+        assert_eq!(text.as_deref(), Some("link"));
+    }
+
+    #[gpui::test]
+    fn a_ctrl_click_opens_a_link_when_the_program_takes_the_mouse(cx: &mut TestAppContext) {
+        let (host, cx) = host(cx, 40, 5);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        pane.update(cx, |p, cx| {
+            p.feed(b"\x1b[?1000h\x1b[?1006hhttps://x.org/a", Instant::now(), cx)
+        });
+        draw(cx);
+        let on_link = cell(&pane, 0, 3, cx);
+        let ctrl = cx.update(|_, cx| Modifiers::secondary_key(cx));
+        cx.simulate_mouse_down(on_link, MouseButton::Left, ctrl);
+        cx.simulate_mouse_up(on_link, MouseButton::Left, ctrl);
+        assert_eq!(opened(&host, cx), [Link::Url("https://x.org/a".into())]);
+        assert!(inputs(&host, cx).is_empty(), "the program got no click");
+        cx.simulate_mouse_down(on_link, MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_up(on_link, MouseButton::Left, Modifiers::default());
+        assert!(
+            !inputs(&host, cx).is_empty(),
+            "a plain click goes to the program"
+        );
+        assert_eq!(opened(&host, cx).len(), 1);
+    }
+
+    #[gpui::test]
+    fn a_hover_with_ctrl_underlines_the_link_and_keeps_the_frame_of_the_cells(
+        cx: &mut TestAppContext,
+    ) {
+        let (host, cx) = host(cx, 40, 5);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        pane.update(cx, |p, cx| p.feed(OSC_8, Instant::now(), cx));
+        draw(cx);
+        let hover =
+            |cx: &mut VisualTestContext| pane.read_with(cx, |p, cx| p.links.read(cx).hover.clone());
+        // A click focuses the pane: the modifier changes go to the focused view.
+        let blank = cell(&pane, 3, 3, cx);
+        cx.simulate_mouse_down(blank, MouseButton::Left, Modifiers::default());
+        cx.simulate_mouse_up(blank, MouseButton::Left, Modifiers::default());
+        draw(cx);
+        let frame = pane.read_with(cx, |p, _| p.screen.borrow().frame().clone());
+        let on_link = cell(&pane, 0, 2, cx);
+        cx.simulate_mouse_move(on_link, None, Modifiers::default());
+        assert_eq!(hover(cx), None, "no underline without Ctrl");
+        let ctrl = cx.update(|_, cx| Modifiers::secondary_key(cx));
+        cx.simulate_mouse_move(on_link, None, ctrl);
+        draw(cx);
+        let found = hover(cx).expect("an underline with Ctrl");
+        assert_eq!(found.link, Link::Url("https://example.com".into()));
+        assert_eq!(found.spans.len(), 1);
+        assert_eq!((found.spans[0].col, found.spans[0].cols), (0, 4));
+        let same = pane.read_with(cx, |p, _| Rc::ptr_eq(p.screen.borrow().frame(), &frame));
+        assert!(same, "the hover built no frame");
+        cx.simulate_modifiers_change(Modifiers::default());
+        assert_eq!(hover(cx), None, "releasing Ctrl ends the underline");
+    }
+
+    #[gpui::test]
+    fn a_right_click_asks_for_the_menu_and_tells_the_link(cx: &mut TestAppContext) {
+        let (host, cx) = host(cx, 40, 5);
+        let pane = host.read_with(cx, |h, _| h.pane.clone());
+        pane.update(cx, |p, cx| {
+            p.feed(b"open src/main.rs:12 now", Instant::now(), cx)
+        });
+        draw(cx);
+        let at = cell(&pane, 0, 8, cx);
+        cx.simulate_mouse_down(at, MouseButton::Right, Modifiers::default());
+        let asked = host.read_with(cx, |h, _| {
+            h.events
+                .iter()
+                .any(|e| matches!(e, PaneEvent::ContextMenu(p) if *p == at))
+        });
+        assert!(asked);
+        assert_eq!(
+            pane.read_with(cx, |p, _| p.link_at_pointer()),
+            Some(Link::Path {
+                path: "src/main.rs".into(),
+                line: 12,
+                col: None
+            })
+        );
     }
 }

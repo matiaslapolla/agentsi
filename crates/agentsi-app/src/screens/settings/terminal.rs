@@ -1,5 +1,5 @@
 //! The Terminal section: the font size, the line height, the cursor, the scrollback, the shell,
-//! the palette and the two switches of `terminal.toml`, with a live sample pane.
+//! the palette, the two switches and the link key of `terminal.toml`, with a live sample pane.
 //!
 //! A change applies to each open pane at once and saves the file (see
 //! `crate::terminal_settings`). The scrollback and the shell are read when a pane opens.
@@ -7,7 +7,9 @@
 use std::time::Instant;
 
 use agentsi_term_view::{PaneOptions, TerminalPane};
-use agentsi_ui::appearance::{CursorBlink, CursorStyle, TerminalPalette, TerminalSettings};
+use agentsi_ui::appearance::{
+    CursorBlink, CursorStyle, LinkModifier, TerminalPalette, TerminalSettings,
+};
 use agentsi_ui::components::{Button, Switch};
 use agentsi_ui::tokens::{Status, control, radius, size, space, text};
 use gpui_kit::component::IconName;
@@ -309,6 +311,18 @@ impl SettingsScreen {
                     })),
             ))
             .child(hint("On macOS, Option sends Alt to the program. Other systems always send Alt."))
+            .child(pair(
+                "Open links",
+                self.terminal_choices(
+                    "terminal-link",
+                    LinkModifier::ALL,
+                    t.link_modifier,
+                    LinkModifier::label,
+                    |t, v| t.link_modifier = v,
+                    cx,
+                ),
+            ))
+            .child(hint("A URL opens in the browser, and a path with a line in $EDITOR. On macOS, Ctrl is Cmd."))
             .when_some(note, |el, n| {
                 el.child(
                     div()
@@ -323,7 +337,7 @@ impl SettingsScreen {
 
 #[cfg(test)]
 mod tests {
-    use agentsi_ui::appearance::{CursorStyle, TerminalSettings};
+    use agentsi_ui::appearance::{CursorStyle, LinkModifier, TerminalSettings};
     use gpui::{Modifiers, TestAppContext, VisualTestContext};
 
     use super::{step_font_size, step_line_height, step_scrollback};
@@ -367,8 +381,10 @@ mod tests {
         click(cx, "button:terminal-font-size-1");
         click(cx, "button:terminal-font-size-1");
         click(cx, "button:terminal-cursor-2");
+        click(cx, "button:terminal-link-1");
         let now = cx.update(|_, cx| TerminalSettings::get(cx));
         assert_eq!((now.font_size, now.cursor_style), (15, CursorStyle::Bar));
+        assert_eq!(now.link_modifier, LinkModifier::None);
         assert_eq!(agentsi_ui::tokens::size::mono(), gpui::px(15.));
         let file = t.file.with_file_name(crate::terminal_settings::FILE_NAME);
         assert_eq!(crate::terminal_settings::read(&file), (now, None));

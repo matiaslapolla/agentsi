@@ -58,6 +58,7 @@ Settings is one long scroll (`screens/settings.rs:1146`), with 13 sections and n
 | `palette` | `agentsi-dark`, `agentsi-light`, `follow-theme` | `follow-theme` |
 | `copy_on_select` | bool | false |
 | `option_as_meta` | bool | true |
+| `link_modifier` | `ctrl`, `none` (see `agentsi-desktop-terminal-links.md`) | `ctrl` |
 
 - `tokens::terminal` becomes functions that read the terminal settings. `size::MONO` reads `font_size`.
 - `agentsi-light` is a new 16-color palette with the contrast test of the light theme.

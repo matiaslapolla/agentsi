@@ -51,7 +51,14 @@ pub struct Cell {
     /// `None` means the default background of [`Colors`].
     pub bg: Option<Rgb>,
     pub style: CellStyle,
+    /// The OSC 8 hyperlink of the cell. [`Grid::link`] gives its URI.
+    pub link: Option<LinkId>,
 }
+
+/// A key of the link table of a [`Grid`]. It stays valid until the next update that reads every
+/// row.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct LinkId(pub(crate) u32);
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum CursorShape {
@@ -87,9 +94,30 @@ pub struct Grid {
     pub colors: Colors,
     /// `None` when the cursor is outside the viewport.
     pub cursor: Option<Cursor>,
+    /// For each row: its text goes on in the next row (a soft wrap).
+    pub wrapped: Vec<bool>,
+    /// The URI of each [`LinkId`].
+    pub(crate) links: Vec<String>,
 }
 
 impl Grid {
+    /// The URI of an OSC 8 hyperlink of a cell.
+    pub fn link(&self, id: LinkId) -> Option<&str> {
+        self.links.get(id.0 as usize).map(String::as_str)
+    }
+
+    /// The id of `uri` in the link table, added when it is new.
+    pub(crate) fn link_id(&mut self, uri: &str) -> LinkId {
+        let i = match self.links.iter().position(|l| l == uri) {
+            Some(i) => i,
+            None => {
+                self.links.push(uri.to_string());
+                self.links.len() - 1
+            }
+        };
+        LinkId(u32::try_from(i).unwrap_or(u32::MAX))
+    }
+
     /// The text of each row, without trailing blanks. A wide cell counts once.
     pub fn text_lines(&self) -> Vec<String> {
         self.rows
