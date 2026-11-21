@@ -11,6 +11,8 @@ pub fn register(c: &mut Catalog) {
         .event::<TerminalExit>()
         .event::<TerminalTitle>()
         .event::<DataChanged>()
+        .event::<GitChanged>()
+        .event::<GitProgress>()
         .event::<MeetingEvent>()
         .event::<VoiceSpeak>()
         .event::<VoiceStop>()
@@ -112,6 +114,39 @@ impl Event for DataChanged {
     const NAME: &'static str = "data.changed";
     const DESCRIPTION: &'static str = "The core wrote data of a product.";
     type Params = DataChangedParams;
+}
+
+pub struct GitChanged;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitChangedParams {
+    pub product: String,
+}
+
+impl Event for GitChanged {
+    const NAME: &'static str = "git.changed";
+    const DESCRIPTION: &'static str = "The git summary of a product changed. The core watches \
+        the folder, the HEAD, the index and the refs of each product, reads a summary at most \
+        once every 2 s, and sends this only when the summary differs.";
+    type Params = GitChangedParams;
+}
+
+pub struct GitProgress;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitProgressParams {
+    pub product: String,
+    /// `fetch`, `pull` or `push`.
+    pub op: String,
+    /// One progress line of git, for example `Receiving objects:  40% (2/5)`.
+    pub line: String,
+}
+
+impl Event for GitProgress {
+    const NAME: &'static str = "git.progress";
+    const DESCRIPTION: &'static str = "One progress line of a fetch, pull or push that runs. \
+        The core sends at most 10 each second for one call.";
+    type Params = GitProgressParams;
 }
 
 pub struct MeetingEvent;
