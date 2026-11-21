@@ -349,10 +349,8 @@ fn with_remote(dir: &TempDir, s: &Setup) -> PathBuf {
         &dir.0,
         &["init", "-q", "--bare", "-b", "main", "remote.git"],
     );
-    for repo in [&s.alpha] {
-        git(repo, &["config", "user.name", "Test"]);
-        git(repo, &["config", "user.email", "test@example.invalid"]);
-    }
+    git(&s.alpha, &["config", "user.name", "Test"]);
+    git(&s.alpha, &["config", "user.email", "test@example.invalid"]);
     std::fs::write(s.alpha.join("a.txt"), "one\n").unwrap();
     git(&s.alpha, &["add", "-A"]);
     git(&s.alpha, &["commit", "-q", "-m", "first"]);
