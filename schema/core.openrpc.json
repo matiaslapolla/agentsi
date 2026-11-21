@@ -989,6 +989,22 @@
         ],
         "type": "object"
       },
+      "CorePath": {
+        "properties": {
+          "source": {
+            "$ref": "#/components/schemas/PathSource"
+          },
+          "value": {
+            "description": "The folders, joined with `:`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "value"
+        ],
+        "type": "object"
+      },
       "CoreStatusResult": {
         "properties": {
           "data_root": {
@@ -1005,6 +1021,18 @@
               }
             ],
             "description": "`None` while the data root has no `agentsi.db`."
+          },
+          "path": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CorePath"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The `PATH` that the core starts programs with. `None` from an older core."
           },
           "pill": {
             "default": false,
@@ -3678,6 +3706,26 @@
           }
         },
         "type": "object"
+      },
+      "PathSource": {
+        "description": "Where the `PATH` of the core comes from.",
+        "oneOf": [
+          {
+            "const": "process",
+            "description": "The `PATH` that the core started with. `AGENTSI_NO_SHELL_PATH=1` turned off the read.",
+            "type": "string"
+          },
+          {
+            "const": "merged",
+            "description": "The `PATH` that the core started with, followed by the new folders of the login shell.",
+            "type": "string"
+          },
+          {
+            "const": "shell_read_failed",
+            "description": "The `PATH` that the core started with, because the login shell gave none: no `$SHELL`, a\nshell that failed, or no `PATH` in time.",
+            "type": "string"
+          }
+        ]
       },
       "PendingDecision": {
         "description": "A decision that waits for the owner.",

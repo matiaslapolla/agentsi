@@ -1,7 +1,7 @@
 //! `agentsi web`: the web app is gone. The command opens `agentsi-app`, the desktop app.
 
 use super::Fail;
-use agentsi_proto::client::is_executable_file;
+use agentsi_proto::path::{self, is_executable_file};
 use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -18,14 +18,9 @@ fn find_app() -> Option<PathBuf> {
     let sibling = std::env::current_exe()
         .ok()
         .and_then(|exe| Some(exe.parent()?.join("agentsi-app")));
-    let on_path = std::env::var_os("PATH")
-        .into_iter()
-        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
-        .map(|dir| dir.join("agentsi-app"));
     sibling
-        .into_iter()
-        .chain(on_path)
-        .find(|p| is_executable_file(p))
+        .filter(|p| is_executable_file(p))
+        .or_else(|| path::which("agentsi-app"))
 }
 
 pub fn run(argv: &[String]) -> Result<i32, Fail> {

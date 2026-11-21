@@ -43,7 +43,7 @@ pub struct CheckResult {
     pub name: &'static str,
     pub level: Level,
     pub status: Status,
-    /// The version or the found path when ok. Why it failed otherwise. Empty when missing.
+    /// The version and the found path when ok. Why it failed otherwise. Empty when missing.
     pub detail: String,
     /// The features that a failed check blocks.
     pub blocks: &'static str,
@@ -51,6 +51,9 @@ pub struct CheckResult {
 
 /// What the checks read from the machine. The tests pass fakes.
 pub trait Probes {
+    /// The program that AgentSI starts for `cmd`, or `None` when it finds none. An error when
+    /// a setting names a program that is not there.
+    fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String>;
     /// The trimmed output of `cmd args`, or `None` when the command is missing or fails.
     fn output(&mut self, cmd: &str, args: &[&str]) -> Option<String>;
     /// True when bwrap can start a sandbox with no network.
@@ -132,9 +135,25 @@ fn missing() -> (Status, String) {
     (Status::Missing, String::new())
 }
 
+/// The program for `cmd` and the first line of `program args`.
+fn run_found(
+    p: &mut dyn Probes,
+    cmd: &str,
+    args: &[&str],
+) -> Result<(String, String), (Status, String)> {
+    let program = p.find(cmd).map_err(failed)?.ok_or_else(missing)?;
+    let program = program.to_string_lossy().into_owned();
+    match p.output(&program, args) {
+        Some(out) => Ok((program, first_line(&out))),
+        None => Err(failed(format!("{program} does not run"))),
+    }
+}
+
 fn tool(p: &mut dyn Probes, cmd: &str, args: &[&str]) -> (Status, String) {
-    p.output(cmd, args)
-        .map_or_else(missing, |out| ok(first_line(&out)))
+    match run_found(p, cmd, args) {
+        Ok((program, version)) => ok(format!("{version}, {program}")),
+        Err(e) => e,
+    }
 }
 
 fn run_one(
@@ -144,7 +163,15 @@ fn run_one(
 ) -> (Status, String) {
     match c.name {
         "core" => match core {
-            Ok(s) => ok(format!("agentsi-core {}", s.version)),
+            Ok(s) => ok(match &s.path {
+                Some(path) => format!(
+                    "agentsi-core {}, PATH {}: {}",
+                    s.version,
+                    path.source.words(),
+                    path.value
+                ),
+                None => format!("agentsi-core {}", s.version),
+            }),
             Err(e) => failed(format!("not reachable: {e}")),
         },
         "data root" => match core {
@@ -159,30 +186,30 @@ fn run_one(
             },
         },
         "claude" => {
-            let Some(version) = p.output("claude", &["--version"]) else {
-                return missing();
+            let (program, version) = match run_found(p, "claude", &["--version"]) {
+                Ok(found) => found,
+                Err(e) => return e,
             };
-            let help = p.output("claude", &["--help"]).unwrap_or_default();
+            let help = p.output(&program, &["--help"]).unwrap_or_default();
             let absent: Vec<&str> = CLAUDE_FLAGS
                 .iter()
                 .copied()
                 .filter(|f| !help.contains(f))
                 .collect();
             if absent.is_empty() {
-                ok(first_line(&version))
+                ok(format!("{version}, {program}"))
             } else {
                 failed(format!(
-                    "{} lacks {}. Update Claude Code",
-                    first_line(&version),
+                    "{version} at {program} lacks {}. Update Claude Code",
                     absent.join(", ")
                 ))
             }
         }
         "git" | "gh" | "codebase-memory-mcp" | "espeak-ng" => tool(p, c.name, &["--version"]),
-        "bwrap" => match p.output("bwrap", &["--version"]) {
-            None => missing(),
-            Some(v) if p.sandbox() => ok(first_line(&v)),
-            Some(v) => failed(format!("{} cannot start a sandbox", first_line(&v))),
+        "bwrap" => match run_found(p, "bwrap", &["--version"]) {
+            Err(e) => e,
+            Ok((program, v)) if p.sandbox() => ok(format!("{v}, {program}")),
+            Ok((program, v)) => failed(format!("{v} at {program} cannot start a sandbox")),
         },
         "voice models" => match p.models() {
             Err(e) => failed(format!("cannot ask the core: {e}")),
@@ -230,6 +257,16 @@ pub fn checks(p: &mut dyn Probes) -> Vec<CheckResult> {
             }
         })
         .collect()
+}
+
+/// The program that AgentSI starts for `cmd` on this host.
+pub fn find(cmd: &str) -> Result<Option<PathBuf>, String> {
+    if cmd == "claude"
+        && let Some(bin) = crate::path::claude_bin()
+    {
+        return bin.map(Some);
+    }
+    Ok(crate::path::which(cmd))
 }
 
 const TOOL_TIMEOUT: Duration = Duration::from_secs(15);

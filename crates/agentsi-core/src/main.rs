@@ -72,6 +72,7 @@ fn serve(detached: bool) -> ExitCode {
         eprintln!("agentsi-core: {e}");
         return ExitCode::FAILURE;
     }
+    agentsi_core::shell_path::apply();
     let runtime = match tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()

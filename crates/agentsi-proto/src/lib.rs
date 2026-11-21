@@ -22,6 +22,7 @@ pub mod meeting_api;
 pub mod method;
 pub mod models_api;
 pub mod ops_api;
+pub mod path;
 pub mod reflect_api;
 pub mod registry_api;
 pub mod roles_api;

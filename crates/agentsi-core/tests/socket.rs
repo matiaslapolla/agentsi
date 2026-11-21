@@ -28,6 +28,7 @@ fn hello_gives_protocol_1_on_the_default_socket_with_modes_700_and_600() {
     let mut child = Command::new(BIN)
         .arg("serve")
         .env_remove("AGENTSI_CORE_SOCKET")
+        .env("AGENTSI_NO_SHELL_PATH", "1")
         .env("XDG_RUNTIME_DIR", &runtime)
         .stdin(Stdio::null())
         .stderr(Stdio::null())

@@ -44,8 +44,12 @@ impl Drop for TempDir {
     }
 }
 
-pub fn wait_until(what: &str, mut ok: impl FnMut() -> bool) {
-    let deadline = Instant::now() + Duration::from_secs(5);
+pub fn wait_until(what: &str, ok: impl FnMut() -> bool) {
+    wait_within(what, Duration::from_secs(5), ok);
+}
+
+pub fn wait_within(what: &str, limit: Duration, mut ok: impl FnMut() -> bool) {
+    let deadline = Instant::now() + limit;
     while !ok() {
         assert!(Instant::now() < deadline, "timed out: {what}");
         std::thread::sleep(Duration::from_millis(10));
@@ -85,6 +89,7 @@ impl CoreProc {
         let mut c = Command::new(BIN);
         c.arg("serve")
             .env("AGENTSI_CORE_SOCKET", &socket.path)
+            .env("AGENTSI_NO_SHELL_PATH", "1")
             .stdin(Stdio::null())
             .stdout(Stdio::null());
         c
@@ -96,6 +101,11 @@ impl CoreProc {
 
     /// A core with more names in its environment.
     pub fn start_with(dir: &TempDir, env: &[(&str, &Path)]) -> CoreProc {
+        CoreProc::start_within(dir, env, Duration::from_secs(5))
+    }
+
+    /// A core that may take up to `limit` before it listens.
+    pub fn start_within(dir: &TempDir, env: &[(&str, &Path)], limit: Duration) -> CoreProc {
         let socket = dir.socket();
         let log = dir.0.join("core.err");
         let mut c = CoreProc::command(&socket);
@@ -107,7 +117,7 @@ impl CoreProc {
             socket,
             log,
         };
-        wait_until("the core listens", || {
+        wait_within("the core listens", limit, || {
             UnixStream::connect(&core.socket.path).is_ok()
         });
         core

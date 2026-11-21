@@ -14,6 +14,7 @@ pub mod methods;
 pub mod relay;
 pub mod server;
 pub mod session;
+pub mod shell_path;
 pub mod state;
 pub mod terminal;
 pub mod voice_session;

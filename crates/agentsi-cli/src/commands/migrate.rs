@@ -62,6 +62,7 @@ mod tests {
                 latest,
             }),
             pill: false,
+            path: None,
         }
     }
 

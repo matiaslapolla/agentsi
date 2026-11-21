@@ -16,6 +16,7 @@ tts = ["dep:agentsi-models", "dep:ort"]
 stt = ["dep:agentsi-models", "dep:ort"]
 
 [dependencies]
+agentsi-proto = { workspace = true }
 agentsi-models = { workspace = true, optional = true }
 ort = { workspace = true, optional = true }
 regex = { workspace = true }

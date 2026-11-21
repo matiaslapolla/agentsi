@@ -57,7 +57,7 @@ impl Espeak {
     pub fn find(voice: &str) -> Option<Espeak> {
         let program = match std::env::var_os(PROGRAM_VAR).filter(|v| !v.is_empty()) {
             Some(p) => PathBuf::from(p),
-            None => on_path(PROGRAM)?,
+            None => agentsi_proto::path::which(PROGRAM)?,
         };
         Some(Espeak::with_program(program, voice))
     }
@@ -119,12 +119,6 @@ fn choose(plain: String, after_dummy: &str) -> String {
         }
         _ => plain,
     }
-}
-
-fn on_path(name: &str) -> Option<PathBuf> {
-    std::env::split_paths(&std::env::var_os("PATH")?)
-        .map(|dir| dir.join(name))
-        .find(|p| p.is_file())
 }
 
 impl G2p for Espeak {

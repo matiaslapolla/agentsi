@@ -7,9 +7,12 @@ use super::Fail;
 use crate::args;
 use crate::core::Core;
 use agentsi_proto::core_api::Empty;
-use agentsi_proto::doctor::{CheckResult, Level, Probes, Status, checks, run_tool, sandbox_starts};
+use agentsi_proto::doctor::{
+    CheckResult, Level, Probes, Status, checks, find, run_tool, sandbox_starts,
+};
 use agentsi_proto::models_api::{ModelState, ModelsList};
 use agentsi_proto::ops_api::{CoreStatus, CoreStatusResult};
+use std::path::PathBuf;
 
 pub const USAGE: &str = "agentsi doctor";
 
@@ -73,6 +76,10 @@ impl Machine {
 }
 
 impl Probes for Machine {
+    fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
+        find(cmd)
+    }
+
     fn output(&mut self, cmd: &str, args: &[&str]) -> Option<String> {
         run_tool(cmd, args)
     }
@@ -105,7 +112,7 @@ pub fn run(argv: &[String]) -> Result<i32, Fail> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use agentsi_proto::ops_api::DatabaseStatus;
+    use agentsi_proto::ops_api::{CorePath, DatabaseStatus, PathSource};
     use std::collections::BTreeMap;
 
     #[derive(Default)]
@@ -114,10 +121,24 @@ mod tests {
         sandbox: bool,
         core: Option<CoreStatusResult>,
         models: Option<(usize, usize)>,
+        /// A program whose setting names no program, and the error.
+        bad_bin: Option<(&'static str, &'static str)>,
     }
 
     impl Probes for Fake {
+        fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
+            if let Some((name, e)) = self.bad_bin
+                && name == cmd
+            {
+                return Err(e.into());
+            }
+            Ok(self
+                .tools
+                .contains_key(cmd)
+                .then(|| PathBuf::from("/bin").join(cmd)))
+        }
         fn output(&mut self, cmd: &str, args: &[&str]) -> Option<String> {
+            let cmd = cmd.rsplit('/').next().unwrap_or(cmd);
             let key = if args.first() == Some(&"--help") {
                 "claude --help"
             } else {
@@ -146,6 +167,7 @@ mod tests {
                 latest: 3,
             }),
             pill: false,
+            path: None,
         }
     }
 
@@ -169,6 +191,7 @@ mod tests {
             sandbox: true,
             core: Some(status(3)),
             models: Some((2, 2)),
+            bad_bin: None,
         }
     }
 
@@ -185,7 +208,7 @@ mod tests {
         assert_eq!(
             text[4],
             format!(
-                "{:<7}  {:<width$}  bubblewrap 0.11.0",
+                "{:<7}  {:<width$}  bubblewrap 0.11.0, /bin/bwrap",
                 "ok", "bwrap (stories)"
             )
         );
@@ -196,6 +219,73 @@ mod tests {
                 "missing", "codebase-memory-mcp (optional)"
             )
         );
+    }
+
+    #[test]
+    fn claude_shows_its_full_path_and_the_core_its_path_source() {
+        let mut f = healthy();
+        f.core.as_mut().unwrap().path = Some(CorePath {
+            source: PathSource::Merged,
+            value: "/usr/bin:/home/me/.local/share/mise/command-wrappers/bin".into(),
+        });
+        let r = checks(&mut f);
+        assert_eq!(r[2].detail, "2.1.0 (Claude Code), /bin/claude");
+        assert_eq!(
+            r[0].detail,
+            "agentsi-core 0.1.0, PATH merged: /usr/bin:/home/me/.local/share/mise/command-wrappers/bin"
+        );
+        f.core.as_mut().unwrap().path.as_mut().unwrap().source = PathSource::ShellReadFailed;
+        assert!(
+            checks(&mut f)[0]
+                .detail
+                .contains("PATH shell read failed: /usr/bin")
+        );
+    }
+
+    #[test]
+    fn a_found_tool_that_does_not_run_fails() {
+        let mut f = healthy();
+        f.tools.insert("claude", "");
+        let mut probes = NoOutput(f);
+        let r = checks(&mut probes);
+        assert_eq!(r[2].status, Status::Fail);
+        assert_eq!(r[2].detail, "/bin/claude does not run");
+    }
+
+    #[test]
+    fn a_claude_setting_that_names_no_program_fails_with_its_reason() {
+        let mut f = healthy();
+        f.bad_bin = Some((
+            "claude",
+            "AGENTSI_CLAUDE_BIN is /none, and it is not an executable file",
+        ));
+        let r = checks(&mut f);
+        assert_eq!(r[2].status, Status::Fail);
+        assert_eq!(
+            r[2].detail,
+            "AGENTSI_CLAUDE_BIN is /none, and it is not an executable file"
+        );
+    }
+
+    /// Finds every program of the fake, and none of them runs.
+    struct NoOutput(Fake);
+
+    impl Probes for NoOutput {
+        fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
+            self.0.find(cmd)
+        }
+        fn output(&mut self, _: &str, _: &[&str]) -> Option<String> {
+            None
+        }
+        fn sandbox(&mut self) -> bool {
+            false
+        }
+        fn core(&mut self) -> Result<CoreStatusResult, String> {
+            self.0.core()
+        }
+        fn models(&mut self) -> Result<(usize, usize), String> {
+            self.0.models()
+        }
     }
 
     #[test]

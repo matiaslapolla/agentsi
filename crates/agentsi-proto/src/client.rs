@@ -2,6 +2,7 @@
 //! It needs no async runtime, so each program can use it.
 
 use crate::method::Method;
+use crate::path::{self, is_executable_file};
 use crate::rpc::{Id, Incoming, Notification, Outcome, Request, RpcError, V2};
 use crate::socket::{SOCKET_ENV, SocketPath};
 use std::collections::VecDeque;
@@ -15,8 +16,9 @@ use std::time::{Duration, Instant};
 pub const CORE_BIN_ENV: &str = "AGENTSI_CORE_BIN";
 /// The exit code of a core that finds another core on its socket.
 pub const EXIT_ALREADY_RUNNING: i32 = 3;
-/// How long a client waits for a core that it started.
-pub const START_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a client waits for a core that it started. A core reads the login shell PATH
+/// for up to 5 s before it listens.
+pub const START_TIMEOUT: Duration = Duration::from_secs(10);
 /// How long a core that stops waits for its work, as the protocol says.
 pub const CORE_STOP_WAIT: Duration = Duration::from_secs(10);
 /// The first pause before a client starts another core, after a core found the lock held.
@@ -236,17 +238,7 @@ pub fn find_core_bin() -> Option<PathBuf> {
     let sibling = std::env::current_exe()
         .ok()
         .and_then(|exe| Some(exe.parent()?.join("agentsi-core")));
-    let on_path = std::env::var_os("PATH")
-        .into_iter()
-        .flat_map(|p| std::env::split_paths(&p).collect::<Vec<_>>())
-        .map(|dir| dir.join("agentsi-core"));
     sibling
-        .into_iter()
-        .chain(on_path)
-        .find(|p| is_executable_file(p))
-}
-
-pub fn is_executable_file(path: &Path) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    std::fs::metadata(path).is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        .filter(|p| is_executable_file(p))
+        .or_else(|| path::which("agentsi-core"))
 }

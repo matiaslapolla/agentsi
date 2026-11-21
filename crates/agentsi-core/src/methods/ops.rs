@@ -6,9 +6,10 @@ use agentsi_proto::RpcError;
 use agentsi_proto::core_api::{Empty, Topic};
 use agentsi_proto::doctor::{self, Probes};
 use agentsi_proto::ops_api::{
-    CoreDoctor, CoreDoctorResult, CoreStatus, CoreStatusResult, DataBackup, DataBackupParams,
-    DataBackupResult, DatabaseStatus, DoctorCheck,
+    CoreDoctor, CoreDoctorResult, CorePath, CoreStatus, CoreStatusResult, DataBackup,
+    DataBackupParams, DataBackupResult, DatabaseStatus, DoctorCheck,
 };
+use agentsi_proto::path;
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_store::backup::{self, KEEP_BACKUPS};
 use agentsi_store::{db, paths};
@@ -57,6 +58,12 @@ fn status_of(core: &Core) -> Result<CoreStatusResult, RpcError> {
         data_root: root.display().to_string(),
         database,
         pill: core.has_subscriber(Topic::Dictation),
+        path: Some(CorePath {
+            source: crate::shell_path::source(),
+            value: path::current()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default(),
+        }),
     })
 }
 
@@ -64,6 +71,10 @@ fn status_of(core: &Core) -> Result<CoreStatusResult, RpcError> {
 struct Host(Arc<Core>);
 
 impl Probes for Host {
+    fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
+        doctor::find(cmd)
+    }
+
     fn output(&mut self, cmd: &str, args: &[&str]) -> Option<String> {
         doctor::run_tool(cmd, args)
     }

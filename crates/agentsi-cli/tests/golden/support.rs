@@ -117,7 +117,7 @@ pub fn cwd_of(work: &Path, key: &str) -> PathBuf {
 
 /// The `PATH` of a golden run: the fake `claude`, `gh` and code graph come first.
 pub fn path_of(work: &Path) -> std::ffi::OsString {
-    let old = std::env::var_os("PATH").unwrap_or_default();
+    let old = agentsi_proto::path::current().unwrap_or_default();
     let dirs = std::iter::once(work.join("bin")).chain(std::env::split_paths(&old));
     std::env::join_paths(dirs).unwrap()
 }

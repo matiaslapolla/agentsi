@@ -225,6 +225,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]
@@ -271,6 +272,7 @@ name = "agentsi-voice"
 version = "0.0.0"
 dependencies = [
  "agentsi-models",
+ "agentsi-proto",
  "ort",
  "regex",
  "serde",
