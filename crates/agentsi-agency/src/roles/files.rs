@@ -25,6 +25,14 @@ const BUILTIN: [(&str, &str); 5] = [
 /// Order of the global roster; any other global role follows alphabetically.
 const GLOBAL_ORDER: [&str; 5] = ["pm", "social", "dev", "qa", "scout"];
 
+/// The five roles that come with the build, in roster order. Any other global role is a
+/// general role.
+pub const BUILTIN_ROLES: [&str; 5] = GLOBAL_ORDER;
+
+pub fn is_builtin(role: &str) -> bool {
+    BUILTIN_ROLES.contains(&role)
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RoleFiles {
     Dir(PathBuf),
