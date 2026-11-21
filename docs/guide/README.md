@@ -158,7 +158,7 @@ Press `Ctrl+K`. The palette lists every action of the app. Type a few letters an
 | Stories | `Ctrl+Shift+S` | The stories of the product and their review |
 | Memory | `Ctrl+Shift+Y` | What each agent learned, and the reflections |
 | Roles | `Ctrl+Shift+R` | The roster, the overlays and the specialists |
-| Git | `Ctrl+Shift+B` | Branch, changed files and diff. You stage files and commit here |
+| Git | `Ctrl+Shift+B` | Branch, changed files and diff. You stage files, commit, see the diff of a commit, switch branches, fetch, pull and push here |
 | Setup | Palette: "Set up a new product" | Register a product or update its brief |
 | Settings | `Ctrl+,` | Look, voice, keys, hosts, guide, health of the tools, backup and data |
 
@@ -191,7 +191,13 @@ The Health section shows one row for each check of `agentsi doctor`: the tool, i
 
 ### The Git screen
 
-The Git screen shows the branch and the changed files of one product. You select a file to see its diff. You stage files and commit. The screen has no push, pull or fetch. You run those in a terminal.
+The Git screen shows the branch and the changed files of one product. You select a file to see its diff. You stage files and commit.
+
+- History lists the last 50 commits. Click a commit to see its files at the left and the diff of the selected file at the right.
+- Branches lists the local branches with the current one first, the remote branches and the worktrees. Select a branch for Switch, New branch from here and Copy name. If the tree has changes, the switch does not run, and the screen shows `dirty` and the files.
+- The header has Fetch, Pull and Push, with the count of commits behind and ahead. Pull only fast-forwards. If the branch and its upstream both have new commits, the screen tells you to merge or rebase in a terminal. Push shows the branch, the remote and the commits that go out, and pushes after you press Push. A branch with no upstream goes to `origin` and gets it as the upstream. The app never forces a push.
+- The palette has "Git: Fetch", "Git: Pull", "Git: Push", "Git: Switch branch…" and "Git: New branch…".
+- The screen reads again when a file, the branch or a ref of the product changes.
 
 The section "Git" of the Settings screen sets the git config for all products. A product overrides a key on its own Git screen. AgentSI never changes `.git/config` or `~/.gitconfig`.
 

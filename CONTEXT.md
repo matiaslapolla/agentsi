@@ -325,8 +325,12 @@ The one line in the compositor config that loads the bind file. AgentSI shows it
 _Avoid_: Source line, snippet
 
 **Git screen**:
-The screen of kind `Git` for one product and one repo. It shows the branch, the changed files and their diff. The owner stages files and commits from it. It has no push, pull or fetch.
+The screen of kind `Git` for one product and one repo. It shows the branch, the changed files and their diff. The owner stages files and commits from it. It shows the diff of each commit, lists and switches branches, and fetches, pulls with `--ff-only` and pushes after a confirm. It never forces a push.
 _Avoid_: Git panel, source control
+
+**Git summary**:
+The branch, the upstream, ahead, behind and the count of changed files of one folder. `git.summary` gives it, and the core sends `git.changed` when it changes.
+_Avoid_: git status line, repo state
 
 **Guide screen**:
 The screen of kind `Guide`. It belongs to no product. It draws `docs/guide/README.md` as Markdown, with its images. The program embeds the page and the PNG files, so an installed app with no checkout shows the guide. GitHub renders the same file. The palette and the line "Guide" of the Settings screen open it.
