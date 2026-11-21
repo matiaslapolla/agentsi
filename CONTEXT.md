@@ -82,6 +82,10 @@ _Avoid_: Identity, character
 What one product adds to or changes in a role for one of its agents: focus, sources, model. The role's persona stays underneath.
 _Avoid_: Fork, custom prompt
 
+**General role**:
+A role file of the data root (`plugin/agents/<id>.md`) that is not one of the five builtin roles. It is made once, and the roster of each product can list it. "Make general" moves a custom role of one product to a general role.
+_Avoid_: Shared role, template role
+
 **Brief**:
 The product as the owner defined it in setup: what it is, for whom, its stage, its objectives, its north-star docs and what is out of scope.
 _Avoid_: Profile, product config
