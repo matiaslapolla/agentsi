@@ -16,8 +16,9 @@ use std::time::{Duration, Instant};
 pub const CORE_BIN_ENV: &str = "AGENTSI_CORE_BIN";
 /// The exit code of a core that finds another core on its socket.
 pub const EXIT_ALREADY_RUNNING: i32 = 3;
-/// How long a client waits for a core that it started.
-pub const START_TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a client waits for a core that it started. A core reads the login shell PATH
+/// for up to 5 s before it listens.
+pub const START_TIMEOUT: Duration = Duration::from_secs(10);
 /// How long a core that stops waits for its work, as the protocol says.
 pub const CORE_STOP_WAIT: Duration = Duration::from_secs(10);
 /// The first pause before a client starts another core, after a core found the lock held.

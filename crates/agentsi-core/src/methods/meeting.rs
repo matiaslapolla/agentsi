@@ -107,13 +107,13 @@ fn work(core: &Core) -> meeting::Result<Work> {
     })
 }
 
-/// Runs `f` off the event loop.
 /// The `claude` program of each role. Tests put a fake one first on the `PATH`.
 fn claude() -> meeting::Result<String> {
     let program = path::claude().map_err(MeetingError::Failed)?;
     Ok(program.to_string_lossy().into_owned())
 }
 
+/// Runs `f` off the event loop.
 async fn blocking<T: Send + 'static>(
     ctx: &Ctx,
     f: impl FnOnce(Arc<Core>, Work) -> meeting::Result<T> + Send + 'static,

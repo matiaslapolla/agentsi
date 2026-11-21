@@ -44,7 +44,8 @@ fn core_with_shell(dir: &TempDir, shell: &Path, path: &str, more: &[(&str, &Path
         ("HOME", &home),
     ];
     env.extend_from_slice(more);
-    CoreProc::start_with(dir, &env)
+    // The read of a slow shell holds the start for its whole limit.
+    CoreProc::start_within(dir, &env, Duration::from_secs(10))
 }
 
 fn core_path(core: &CoreProc) -> Value {
