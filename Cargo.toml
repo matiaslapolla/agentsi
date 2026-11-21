@@ -44,6 +44,10 @@ tempfile = "3"
 toml = "0.8"
 ureq = "3"
 tokio = { version = "1", features = ["rt", "net", "io-util", "sync", "time", "macros", "signal"] }
+# The git watcher of the core. gpui-component already builds this version.
+notify = "8.2"
+# The git watcher walks only the folders git does not ignore. globwalk already builds this version.
+ignore = "0.4.34"
 
 [profile.release]
 debug = false

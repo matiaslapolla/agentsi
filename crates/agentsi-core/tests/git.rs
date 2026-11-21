@@ -1,6 +1,7 @@
 //! The `git` and `git.config` methods on a real core: the screen methods on a temporary repo,
 //! the refusals, the events, and the git config of a product in a git screen commit and in a
-//! new pane of each product. The core runs with a throwaway data root and config folder, and
+//! new pane of each product, the summary, branches, switch, push and pull with a bare remote,
+//! and the watcher. The core runs with a throwaway data root and config folder, and
 //! with no global or system git config.
 
 mod common;
@@ -315,4 +316,240 @@ fn the_config_set_keeps_the_comments_and_refuses_a_bad_key() {
     std::fs::write(&file, "[shared\n").unwrap();
     let r = c.call("git.config.get", json!({}));
     assert_eq!(kind(&r), "unavailable", "{r}");
+}
+
+/// True when no `method` event comes within `quiet`.
+fn no_event_within(c: &mut Framed, method: &str, quiet: std::time::Duration) -> bool {
+    use agentsi_proto::frame::{Kind, read_frame};
+    c.stream.set_read_timeout(Some(quiet)).unwrap();
+    let deadline = std::time::Instant::now() + quiet;
+    let mut none = true;
+    while std::time::Instant::now() < deadline {
+        match read_frame(&mut c.stream) {
+            Ok(Some(f)) if f.channel == 0 && f.kind == Kind::DATA => {
+                let v: Value = serde_json::from_slice(&f.payload).unwrap();
+                if v["method"] == method {
+                    none = false;
+                }
+            }
+            Ok(Some(_)) => {}
+            _ => break,
+        }
+    }
+    c.stream
+        .set_read_timeout(Some(std::time::Duration::from_secs(30)))
+        .unwrap();
+    none
+}
+
+/// A bare repo as the origin of `alpha`, with one commit pushed, and a second clone `other`.
+fn with_remote(dir: &TempDir, s: &Setup) -> PathBuf {
+    let bare = dir.0.join("remote.git");
+    git(
+        &dir.0,
+        &["init", "-q", "--bare", "-b", "main", "remote.git"],
+    );
+    git(&s.alpha, &["config", "user.name", "Test"]);
+    git(&s.alpha, &["config", "user.email", "test@example.invalid"]);
+    std::fs::write(s.alpha.join("a.txt"), "one\n").unwrap();
+    git(&s.alpha, &["add", "-A"]);
+    git(&s.alpha, &["commit", "-q", "-m", "first"]);
+    let url = format!("file://{}", bare.display());
+    git(&s.alpha, &["remote", "add", "origin", &url]);
+    git(&s.alpha, &["push", "-q", "-u", "origin", "main"]);
+    git(&dir.0, &["clone", "-q", &url, "other"]);
+    let other = dir.0.join("other");
+    git(&other, &["config", "user.name", "Other"]);
+    git(&other, &["config", "user.email", "other@example.invalid"]);
+    other
+}
+
+#[test]
+fn the_more_git_methods_show_branches_switch_and_push_with_progress() {
+    let dir = TempDir::new();
+    let s = setup(&dir);
+    let other = with_remote(&dir, &s);
+    let core = start(&dir, &s);
+    let mut c = Framed::connect(&core.socket.path);
+    c.ok("core.subscribe", json!({"topics": ["data", "git"]}));
+
+    let sum = c.ok("git.summary", json!({"product": "alpha"}));
+    assert_eq!(sum["summary"]["branch"], "main");
+    assert_eq!(sum["summary"]["upstream"], "origin/main");
+    assert_eq!(sum["summary"]["changed"], 0);
+    let by_cwd = c.ok("git.summary", json!({"cwd": s.alpha}));
+    assert_eq!(by_cwd, sum);
+    let none = c.ok("git.summary", json!({"cwd": dir.0.join("root")}));
+    assert_eq!(none["summary"], Value::Null);
+    assert_eq!(kind(&c.call("git.summary", json!({}))), "invalid");
+
+    let id = git(&s.alpha, &["rev-parse", "HEAD"]);
+    let shown = c.ok("git.show", json!({"product": "alpha", "commit": id}));
+    assert_eq!(shown["commit"]["subject"], "first");
+    assert_eq!(shown["files"], json!([{"path": "a.txt", "letter": "A"}]));
+    assert!(shown["patch"].as_str().unwrap().contains("+one"));
+    let r = c.call(
+        "git.show",
+        json!({"product": "alpha", "commit": "--output=/tmp/x"}),
+    );
+    assert_eq!(kind(&r), "invalid", "{r}");
+
+    c.ok(
+        "git.branch.create",
+        json!({"product": "alpha", "name": "feat"}),
+    );
+    assert_eq!(c.next_event("data.changed")["kind"], "git");
+    let b = c.ok("git.branches", json!({"product": "alpha"}));
+    assert_eq!(b["local"][0]["name"], "main");
+    assert_eq!(b["local"][0]["current"], true);
+    assert_eq!(b["local"][1]["name"], "feat");
+    assert_eq!(b["remote"][0]["name"], "origin/main");
+    assert_eq!(b["worktrees"].as_array().unwrap().len(), 1);
+
+    std::fs::write(s.alpha.join("a.txt"), "dirty\n").unwrap();
+    let r = c.ok("git.switch", json!({"product": "alpha", "name": "feat"}));
+    assert_eq!(r["outcome"], "dirty", "{r}");
+    assert_eq!(r["files"][0]["path"], "a.txt");
+    assert_eq!(git(&s.alpha, &["branch", "--show-current"]), "main");
+    git(&s.alpha, &["checkout", "--", "a.txt"]);
+    let r = c.ok("git.switch", json!({"product": "alpha", "name": "feat"}));
+    assert_eq!(r["outcome"], "done", "{r}");
+    assert_eq!(git(&s.alpha, &["branch", "--show-current"]), "feat");
+
+    std::fs::write(s.alpha.join("f.txt"), "f\n").unwrap();
+    git(&s.alpha, &["add", "-A"]);
+    git(&s.alpha, &["commit", "-q", "-m", "feat: f"]);
+    let out = c.ok("git.outgoing", json!({"product": "alpha"}));
+    assert_eq!(out["set_upstream"], true);
+    assert_eq!(out["remote"], "origin");
+    assert_eq!(out["count"], 1);
+    assert_eq!(out["commits"][0]["subject"], "feat: f");
+    let r = c.call(
+        "git.push",
+        json!({"product": "alpha", "branch": "feat", "head": "0000000000000000000000000000000000000000"}),
+    );
+    assert_eq!(
+        kind(&r),
+        "invalid",
+        "a head that moved since the confirm: {r}"
+    );
+    let r = c.ok(
+        "git.push",
+        json!({"product": "alpha", "branch": "feat", "head": out["head"]}),
+    );
+    assert_eq!(r["outcome"], "done", "{r}");
+    let p = c.next_event("git.progress");
+    assert_eq!(
+        (p["product"].as_str(), p["op"].as_str()),
+        (Some("alpha"), Some("push"))
+    );
+    assert_eq!(
+        git(&s.alpha, &["rev-parse", "--abbrev-ref", "feat@{upstream}"]),
+        "origin/feat"
+    );
+
+    // A diverged pull leaves the tree.
+    git(&s.alpha, &["switch", "-q", "main"]);
+    std::fs::write(other.join("o.txt"), "o\n").unwrap();
+    git(&other, &["add", "-A"]);
+    git(&other, &["commit", "-q", "-m", "other"]);
+    git(&other, &["push", "-q"]);
+    std::fs::write(s.alpha.join("a.txt"), "mine\n").unwrap();
+    git(&s.alpha, &["commit", "-q", "-am", "mine"]);
+    let before = git(&s.alpha, &["rev-parse", "HEAD"]);
+    let r = c.ok("git.pull", json!({"product": "alpha"}));
+    assert_eq!(r["outcome"], "diverged", "{r}");
+    assert_eq!(git(&s.alpha, &["rev-parse", "HEAD"]), before);
+    assert!(!s.alpha.join("o.txt").exists());
+    let r = c.ok("git.fetch", json!({"product": "alpha"}));
+    assert_eq!(r["outcome"], "done", "{r}");
+}
+
+#[test]
+fn a_file_change_sends_git_changed_within_3_s_and_an_idle_repo_sends_nothing() {
+    let dir = TempDir::new();
+    let s = setup(&dir);
+    let core = start(&dir, &s);
+    let mut c = Framed::connect(&core.socket.path);
+    c.ok("core.subscribe", json!({"topics": ["git"]}));
+    // The watcher reads the first summary of each product when it starts.
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    let at = std::time::Instant::now();
+    std::fs::write(s.beta.join("new.txt"), "x").unwrap();
+    assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
+    assert!(
+        at.elapsed() < std::time::Duration::from_secs(3),
+        "{:?}",
+        at.elapsed()
+    );
+
+    // A write that leaves the summary as it was sends nothing, and an idle repo neither.
+    std::fs::write(s.beta.join("new.txt"), "y").unwrap();
+    assert!(no_event_within(
+        &mut c,
+        "git.changed",
+        std::time::Duration::from_secs(5)
+    ));
+
+    // A commit changes HEAD and the count.
+    git(&s.beta, &["config", "user.name", "Test"]);
+    git(&s.beta, &["config", "user.email", "test@example.invalid"]);
+    git(&s.beta, &["add", "-A"]);
+    git(&s.beta, &["commit", "-q", "-m", "x"]);
+    assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
+}
+
+#[test]
+fn a_write_in_an_ignored_target_sends_nothing_and_a_tracked_file_sends_git_changed() {
+    let dir = TempDir::new();
+    let s = setup(&dir);
+    std::fs::write(s.beta.join(".gitignore"), "target/\n").unwrap();
+    std::fs::write(s.beta.join("lib.rs"), "a").unwrap();
+    git(&s.beta, &["config", "user.name", "Test"]);
+    git(&s.beta, &["config", "user.email", "test@example.invalid"]);
+    git(&s.beta, &["add", "-A"]);
+    git(&s.beta, &["commit", "-q", "-m", "x"]);
+    let deps = s.beta.join("target/debug/deps");
+    std::fs::create_dir_all(&deps).unwrap();
+    for i in 0..200 {
+        std::fs::write(deps.join(format!("{i}.o")), "x").unwrap();
+    }
+    let core = start(&dir, &s);
+    let mut c = Framed::connect(&core.socket.path);
+    c.ok("core.subscribe", json!({"topics": ["git"]}));
+    std::thread::sleep(std::time::Duration::from_millis(500));
+
+    for i in 0..50 {
+        std::fs::write(deps.join(format!("{i}.o")), "y").unwrap();
+    }
+    std::fs::create_dir_all(s.beta.join("target/release")).unwrap();
+    std::fs::write(s.beta.join("target/release/new.o"), "x").unwrap();
+    assert!(no_event_within(
+        &mut c,
+        "git.changed",
+        std::time::Duration::from_secs(4)
+    ));
+
+    let at = std::time::Instant::now();
+    std::fs::write(s.beta.join("lib.rs"), "b").unwrap();
+    assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
+    assert!(
+        at.elapsed() < std::time::Duration::from_secs(3),
+        "{:?}",
+        at.elapsed()
+    );
+
+    // A folder made after the start is watched too.
+    std::thread::sleep(std::time::Duration::from_millis(2100));
+    std::fs::create_dir_all(s.beta.join("src/deep")).unwrap();
+    std::thread::sleep(std::time::Duration::from_millis(300));
+    let at = std::time::Instant::now();
+    std::fs::write(s.beta.join("src/deep/new.rs"), "x").unwrap();
+    assert_eq!(c.next_event("git.changed"), json!({"product": "beta"}));
+    assert!(
+        at.elapsed() < std::time::Duration::from_secs(3),
+        "{:?}",
+        at.elapsed()
+    );
 }

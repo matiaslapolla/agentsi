@@ -61,6 +61,7 @@ pub enum Topic {
     Dictation,
     Models,
     Desk,
+    Git,
 }
 
 impl Topic {

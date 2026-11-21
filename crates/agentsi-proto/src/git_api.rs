@@ -15,6 +15,15 @@ pub fn register(c: &mut Catalog) {
         .method::<GitUnstage>()
         .method::<GitCommit>()
         .method::<GitLog>()
+        .method::<GitSummary>()
+        .method::<GitShow>()
+        .method::<GitBranches>()
+        .method::<GitBranchCreate>()
+        .method::<GitSwitch>()
+        .method::<GitOutgoing>()
+        .method::<GitFetch>()
+        .method::<GitPull>()
+        .method::<GitPush>()
         .method::<GitConfigGet>()
         .method::<GitConfigSet>();
 }
@@ -216,6 +225,288 @@ impl Method for GitLog {
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
     type Params = GitLogParams;
     type Result = GitLogResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitSummaryParams {
+    /// The product whose first path the core reads. Give this or `cwd`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product: Option<String>,
+    /// Any folder, for example the folder of a terminal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cwd: Option<String>,
+}
+
+/// The git summary of one folder: branch, upstream, ahead, behind and the count of changed
+/// files.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitSummaryInfo {
+    /// The root of the repo.
+    pub repo: String,
+    /// Null for a detached head.
+    #[serde(default)]
+    pub branch: Option<String>,
+    /// The short id of the head. Null in a repo with no commit.
+    #[serde(default)]
+    pub head: Option<String>,
+    #[serde(default)]
+    pub upstream: Option<String>,
+    /// Null when the branch has no upstream.
+    #[serde(default)]
+    pub ahead: Option<u32>,
+    #[serde(default)]
+    pub behind: Option<u32>,
+    /// The files with a staged, unstaged or untracked change.
+    pub changed: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitSummaryResult {
+    /// Null when the folder is not in a git repo.
+    #[serde(default)]
+    pub summary: Option<GitSummaryInfo>,
+}
+
+pub struct GitSummary;
+
+impl Method for GitSummary {
+    const NAME: &'static str = "git.summary";
+    const DESCRIPTION: &'static str = "Gives the git summary of a product or of a folder: \
+        branch, upstream, ahead, behind and the count of changed files. A folder outside a \
+        repo gives a null summary.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitSummaryParams;
+    type Result = GitSummaryResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitShowParams {
+    pub product: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// The id of the commit.
+    pub commit: String,
+}
+
+/// One file of a commit.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitShowFile {
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub orig_path: Option<String>,
+    /// `A` `M` `D` `R` `C` or `T`.
+    pub letter: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitShowResult {
+    pub commit: GitCommitInfo,
+    /// The files of the commit, against its first parent.
+    pub files: Vec<GitShowFile>,
+    /// The patch of all the files.
+    pub patch: String,
+    /// True when the core cut the patch at 512 KiB.
+    pub truncated: bool,
+}
+
+pub struct GitShow;
+
+impl Method for GitShow {
+    const NAME: &'static str = "git.show";
+    const DESCRIPTION: &'static str = "Gives the files of a commit and its patch against the \
+        first parent, cut at 512 KiB.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitShowParams;
+    type Result = GitShowResult;
+}
+
+/// One local or remote branch.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitBranch {
+    /// `main` for a local branch, `origin/main` for a remote one.
+    pub name: String,
+    /// The short id of the tip.
+    pub head: String,
+    /// The subject of the tip.
+    pub subject: String,
+    /// True for the branch of the worktree of the product.
+    pub current: bool,
+    #[serde(default)]
+    pub upstream: Option<String>,
+    /// Null with no upstream, or when the upstream is gone.
+    #[serde(default)]
+    pub ahead: Option<u32>,
+    #[serde(default)]
+    pub behind: Option<u32>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitBranchesResult {
+    /// The local branches, the current one first.
+    pub local: Vec<GitBranch>,
+    pub remote: Vec<GitBranch>,
+    pub worktrees: Vec<GitWorktree>,
+}
+
+pub struct GitBranches;
+
+impl Method for GitBranches {
+    const NAME: &'static str = "git.branches";
+    const DESCRIPTION: &'static str = "Gives the local and the remote branches with upstream, \
+        ahead and behind, and the worktrees of the repo.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitRepoParams;
+    type Result = GitBranchesResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitBranchCreateParams {
+    pub product: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// The name of the new local branch.
+    pub name: String,
+    /// The branch or commit to start from. Null starts from the head.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<String>,
+}
+
+pub struct GitBranchCreate;
+
+impl Method for GitBranchCreate {
+    const NAME: &'static str = "git.branch.create";
+    const DESCRIPTION: &'static str = "Makes a local branch. It does not switch to it. It sends \
+        data.changed with kind git.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitBranchCreateParams;
+    type Result = GitDone;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitSwitchParams {
+    pub product: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// A local branch, or a remote branch such as `origin/main`. A remote branch gets a
+    /// local branch that tracks it.
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum GitOutcome {
+    Done,
+    /// `git.switch`: the tree has changes, and the core did not switch.
+    Dirty,
+    /// `git.pull`: the branch and its upstream both have new commits. The tree did not change.
+    Diverged,
+    /// Git refused or failed. `output` says why.
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitSwitchResult {
+    pub outcome: GitOutcome,
+    /// The changed files of a `dirty` tree.
+    pub files: Vec<GitFile>,
+    /// The output of git.
+    pub output: String,
+}
+
+pub struct GitSwitch;
+
+impl Method for GitSwitch {
+    const NAME: &'static str = "git.switch";
+    const DESCRIPTION: &'static str = "Switches the worktree of the product to a branch. A tree \
+        with changes gives dirty and the files, and the core does not switch. It sends \
+        data.changed with kind git.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitSwitchParams;
+    type Result = GitSwitchResult;
+}
+
+/// What a push sends.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitOutgoingResult {
+    pub branch: String,
+    /// The full id of the head, for `git.push` `head`.
+    pub head: String,
+    pub remote: String,
+    /// The branch on the remote that gets the commits.
+    pub remote_branch: String,
+    /// True when the branch has no upstream: the push sets it.
+    pub set_upstream: bool,
+    /// At most 50 commits that go out, newest first.
+    pub commits: Vec<GitCommitInfo>,
+    /// The count of all the commits that go out.
+    pub count: u32,
+}
+
+pub struct GitOutgoing;
+
+impl Method for GitOutgoing {
+    const NAME: &'static str = "git.outgoing";
+    const DESCRIPTION: &'static str = "Gives the branch, the remote and the commits that \
+        git.push sends, for the confirm of the app.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitRepoParams;
+    type Result = GitOutgoingResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitSyncResult {
+    pub outcome: GitOutcome,
+    /// The output of git, progress lines left out.
+    pub output: String,
+}
+
+pub struct GitFetch;
+
+impl Method for GitFetch {
+    const NAME: &'static str = "git.fetch";
+    const DESCRIPTION: &'static str = "Fetches each remote of the repo, with a 120 s limit. It \
+        sends git.progress lines while it runs, and data.changed with kind git after.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitRepoParams;
+    type Result = GitSyncResult;
+}
+
+pub struct GitPull;
+
+impl Method for GitPull {
+    const NAME: &'static str = "git.pull";
+    const DESCRIPTION: &'static str = "Pulls the upstream with --ff-only, with a 120 s limit. A \
+        branch that cannot fast-forward gives diverged, and the tree does not change. It sends \
+        git.progress lines while it runs, and data.changed with kind git after.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitRepoParams;
+    type Result = GitSyncResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitPushParams {
+    pub product: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// The branch of the confirm. The push is refused when the branch changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// The head of the confirm, from `git.outgoing`. The push is refused when it moved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<String>,
+}
+
+pub struct GitPush;
+
+impl Method for GitPush {
+    const NAME: &'static str = "git.push";
+    const DESCRIPTION: &'static str = "Pushes the branch to its upstream, or with \
+        --set-upstream to origin when it has none, with a 120 s limit. It never forces. With \
+        branch and head, it pushes only while they are the ones of the confirm. It \
+        sends git.progress lines while it runs, and data.changed with kind git after.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = GitPushParams;
+    type Result = GitSyncResult;
 }
 
 /// One git config key and its value.

@@ -470,6 +470,14 @@ impl ScreenPanel {
         }
     }
 
+    /// The git screen of this panel, if it is one.
+    pub fn git(&self) -> Option<Entity<git::GitScreen>> {
+        match &self.view {
+            ScreenView::Git(v) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     /// Opens the form of a new general role on a roles screen.
     pub fn roles_new_general(&self, cx: &mut App) {
         if let ScreenView::Roles(v) = &self.view {

@@ -38,6 +38,16 @@ gpui_kit::actions!(
         OpenTickets,
         /// Opens the git screen of the active product.
         OpenGit,
+        /// Fetches the remotes of the active product from its git screen.
+        GitFetch,
+        /// Pulls the upstream of the active product with --ff-only from its git screen.
+        GitPull,
+        /// Asks the confirm of a push of the active product on its git screen.
+        GitPush,
+        /// Opens the Branches tab of the git screen of the active product.
+        GitSwitchBranch,
+        /// Opens the form of a new branch from the head on the git screen of the active product.
+        GitNewBranch,
         /// Opens the setup screen for a new product, on the host of the active product.
         NewProduct,
         /// Opens the setup screen to update the brief of the active product.
@@ -481,6 +491,47 @@ pub const ENTRIES: &[Entry] = &[
             "git", "branch", "commit", "stage", "unstage", "diff", "status", "history", "config",
         ],
         action: || Box::new(OpenGit),
+    },
+    Entry {
+        label: "Git: Fetch",
+        icon: IconName::RefreshCw,
+        keywords: &["git", "fetch", "remote", "origin", "download", "update"],
+        action: || Box::new(GitFetch),
+    },
+    Entry {
+        label: "Git: Pull",
+        icon: IconName::Github,
+        keywords: &[
+            "git",
+            "pull",
+            "fast-forward",
+            "upstream",
+            "behind",
+            "update",
+        ],
+        action: || Box::new(GitPull),
+    },
+    Entry {
+        label: "Git: Push",
+        icon: IconName::Github,
+        keywords: &[
+            "git", "push", "upstream", "ahead", "remote", "origin", "publish",
+        ],
+        action: || Box::new(GitPush),
+    },
+    Entry {
+        label: "Git: Switch branch…",
+        icon: IconName::Replace,
+        keywords: &[
+            "git", "switch", "checkout", "branch", "branches", "worktree",
+        ],
+        action: || Box::new(GitSwitchBranch),
+    },
+    Entry {
+        label: "Git: New branch…",
+        icon: IconName::Plus,
+        keywords: &["git", "new", "branch", "create", "make"],
+        action: || Box::new(GitNewBranch),
     },
     Entry {
         label: "Set up a new product",
@@ -1142,6 +1193,11 @@ mod tests {
             "Open the stories of the active product",
             "Open the tickets of the active product",
             "Open the git panel of the active product",
+            "Git: Fetch",
+            "Git: Pull",
+            "Git: Push",
+            "Git: Switch branch…",
+            "Git: New branch…",
             "Open the meeting of the active product",
             "Start the meeting in the question field (meeting)",
             "Open the minutes of the last meeting",
