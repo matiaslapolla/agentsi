@@ -351,3 +351,36 @@ fn a_frozen_meeting_reads_its_snapshot_and_runs_no_index() {
     assert_eq!(body, "# Snapshot\nfrozen");
     assert_eq!(count(&w, "documents"), 0);
 }
+
+const DESIGNER: &str = r##"#!/bin/sh
+prompt=$(cat)
+ok() { printf '{"type":"result","subtype":"success","total_cost_usd":0.125,"duration_ms":10,"structured_output":%s}\n' "$1"; }
+case "$prompt" in
+*"You are the designer of"*)
+  ok '{"answer":"Designer view.","priorities":[{"title":"Fix the form","why":"W","sources":[{"type":"path","ref":"docs/vision.md"}]}],"concerns":[],"memory_notes":[]}' ;;
+*) ok '{"priorities":[{"title":"Fix the form","why":"W","sources":[{"type":"path","ref":"docs/vision.md"}],"owner_role":"designer"}],"disagreements":[],"decisions":[],"script":[{"role":"designer","text":"Hello."}]}' ;;
+esac
+"##;
+
+/// A general role of the data root answers in a meeting, and the minutes cite it.
+#[test]
+fn a_general_role_answers_in_a_meeting_and_the_minutes_cite_it() {
+    let w = world(DESIGNER);
+    let root = w.dir.path().join("root");
+    crate::roles::general::create(
+        &root,
+        &agentsi_proto::roles_api::GeneralRole {
+            id: "designer".into(),
+            name: "Designer".into(),
+            description: "Reads the screens.".into(),
+            body: "You read the screens.".into(),
+        },
+    )
+    .unwrap();
+    let mut o = options("p");
+    o.roles = vec!["designer".into()];
+    let m = run(&w, &o, &Cancel::default()).unwrap().minutes;
+    assert_eq!(m["roles"]["designer"]["answer"], "Designer view.");
+    assert_eq!(m["priorities"][0]["owner_role"], "designer");
+    assert_eq!(m["status"], "valid", "{:?}", m["check"]);
+}
