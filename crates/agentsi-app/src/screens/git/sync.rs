@@ -7,7 +7,8 @@ use super::GitScreen;
 use crate::screens::parts::{Load, mono, section};
 use agentsi_proto::events::GitProgressParams;
 use agentsi_proto::git_api::{
-    GitFetch, GitOutcome, GitOutgoing, GitOutgoingResult, GitPull, GitPush, GitSyncResult,
+    GitFetch, GitOutcome, GitOutgoing, GitOutgoingResult, GitPull, GitPush, GitPushParams,
+    GitSyncResult,
 };
 use agentsi_ui::components::Button;
 use agentsi_ui::style::StyleExt as _;
@@ -43,11 +44,11 @@ pub(super) struct Sync {
 
 impl GitScreen {
     pub fn fetch(&mut self, cx: &mut Context<Self>) {
-        self.run(Op::Fetch, cx);
+        self.run(Op::Fetch, None, cx);
     }
 
     pub fn pull(&mut self, cx: &mut Context<Self>) {
-        self.run(Op::Pull, cx);
+        self.run(Op::Pull, None, cx);
     }
 
     /// Reads what a push sends and asks the confirm. Nothing is pushed before the confirm.
@@ -80,12 +81,21 @@ impl GitScreen {
         cx.notify();
     }
 
+    /// Pushes what the confirm listed: the core refuses the push when the branch or its head
+    /// moved since.
     pub fn confirm_push(&mut self, cx: &mut Context<Self>) {
-        let ready = matches!(&self.sync.confirm, Some(Load::Ready(o)) if o.count > 0);
-        if ready {
-            self.sync.confirm = None;
-            self.run(Op::Push, cx);
+        if self.sync.running.is_some() || self.busy {
+            return;
         }
+        let Some(Load::Ready(o)) = &self.sync.confirm else {
+            return;
+        };
+        if o.count == 0 {
+            return;
+        }
+        let expect = (o.branch.clone(), o.head.clone());
+        self.sync.confirm = None;
+        self.run(Op::Push, Some(expect), cx);
     }
 
     pub fn cancel_push(&mut self, cx: &mut Context<Self>) {
@@ -93,8 +103,8 @@ impl GitScreen {
         cx.notify();
     }
 
-    fn run(&mut self, op: Op, cx: &mut Context<Self>) {
-        if self.sync.running.is_some() {
+    fn run(&mut self, op: Op, expect: Option<(String, String)>, cx: &mut Context<Self>) {
+        if self.sync.running.is_some() || self.busy {
             return;
         }
         let p = self.repo();
@@ -109,7 +119,13 @@ impl GitScreen {
                 cx.background_spawn(async move { call.await.map_err(|e| e.to_string()) })
             }
             Op::Push => {
-                let call = link.call::<GitPush>(&p);
+                let (branch, head) = expect.unzip();
+                let call = link.call::<GitPush>(&GitPushParams {
+                    product: p.product,
+                    repo: p.repo,
+                    branch,
+                    head,
+                });
                 cx.background_spawn(async move { call.await.map_err(|e| e.to_string()) })
             }
         };
@@ -170,7 +186,7 @@ impl GitScreen {
             ),
             _ => (0, 0, false, false),
         };
-        let busy = self.sync.running.is_some();
+        let busy = self.sync.running.is_some() || self.busy;
         let count = |label: &str, arrow: &str, n: u32| match n {
             0 => label.to_string(),
             n => format!("{label} {arrow}{n}"),
@@ -252,7 +268,7 @@ impl GitScreen {
                                     .primary()
                                     .small()
                                     .label("Push")
-                                    .disabled(o.count == 0)
+                                    .disabled(o.count == 0 || self.sync.running.is_some())
                                     .on_click(cx.listener(|this, _, _, cx| this.confirm_push(cx))),
                             )
                             .child(cancel),

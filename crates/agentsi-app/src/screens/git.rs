@@ -1378,7 +1378,8 @@ mod tests {
         let req = ui.fake.request();
         assert_eq!(req["method"], "git.outgoing");
         let out = serde_json::from_value(json!({
-            "branch": "main", "remote": "origin", "remote_branch": "main", "set_upstream": false,
+            "branch": "main", "head": "cccccccc33", "remote": "origin", "remote_branch": "main",
+            "set_upstream": false,
             "count": 2, "commits": [commit("aaaaaaaa11", "two"), commit("bbbbbbbb22", "one")]}))
         .unwrap();
         ui.screen
@@ -1390,7 +1391,10 @@ mod tests {
         ui.screen.update(ui.cx, |s, cx| s.confirm_push(cx));
         let req = ui.fake.request();
         assert_eq!(req["method"], "git.push");
-        assert_eq!(req["params"], json!({"product": "alpha"}));
+        assert_eq!(
+            req["params"],
+            json!({"product": "alpha", "branch": "main", "head": "cccccccc33"})
+        );
         ui.draw();
         assert!(!ui.shows("git-push-confirm"));
         assert!(ui.shows("git-progress"));
