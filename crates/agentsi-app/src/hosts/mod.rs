@@ -16,6 +16,7 @@ use futures::StreamExt;
 use futures::channel::mpsc;
 use gpui_kit::*;
 
+use crate::git_marks::GitMarks;
 use crate::model::{CoreState, Cores, HostState, take_event, take_up};
 use crate::screens::meeting::{MeetingFeed, Meetings};
 use conn::{Change, Host, Limits, Update, spawn_dial, ssh_argv};
@@ -125,6 +126,9 @@ pub fn start(local: Entity<CoreState>, cx: &mut App) -> (Entity<Hosts>, Cores) {
             ..CoreState::remote(&c.name, c.products.clone())
         });
         cores.remote.push((c.name.clone(), core));
+    }
+    for c in cores.all() {
+        GitMarks::install(c, cx);
     }
     let (tx, mut rx) = mpsc::unbounded::<Update>();
     for (index, c) in configs.into_iter().enumerate() {
