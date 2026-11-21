@@ -1907,6 +1907,122 @@
         ],
         "type": "object"
       },
+      "GeneralDeleteResult": {
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/CommitInfo"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "commit"
+        ],
+        "type": "object"
+      },
+      "GeneralEntry": {
+        "description": "A general role: a role file of `<data root>/plugin/agents/` that is not one of the five\nbuiltin roles. Every product can add it to its roster.",
+        "properties": {
+          "body": {
+            "description": "The definition below the front matter.",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "description": "The role name and the file name: lowercase words joined by single hyphens.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name that a person reads, such as `Designer`.",
+            "type": "string"
+          },
+          "used_by": {
+            "description": "The products whose roster uses the role, in registry order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "body",
+          "used_by"
+        ],
+        "type": "object"
+      },
+      "GeneralListResult": {
+        "properties": {
+          "builtin": {
+            "description": "The builtin roles, in roster order.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "roles": {
+            "description": "The general roles, by id.",
+            "items": {
+              "$ref": "#/components/schemas/GeneralEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "roles",
+          "builtin"
+        ],
+        "type": "object"
+      },
+      "GeneralRole": {
+        "description": "A general role: a role file of `<data root>/plugin/agents/` that is not one of the five\nbuiltin roles. Every product can add it to its roster.",
+        "properties": {
+          "body": {
+            "description": "The definition below the front matter.",
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "id": {
+            "description": "The role name and the file name: lowercase words joined by single hyphens.",
+            "type": "string"
+          },
+          "name": {
+            "description": "The name that a person reads, such as `Designer`.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "body"
+        ],
+        "type": "object"
+      },
+      "GeneralWriteResult": {
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/CommitInfo",
+            "description": "The commit of the role file in the data root."
+          },
+          "role": {
+            "$ref": "#/components/schemas/GeneralRole"
+          }
+        },
+        "required": [
+          "role",
+          "commit"
+        ],
+        "type": "object"
+      },
       "GitCommitInfo": {
         "properties": {
           "author": {
@@ -5138,6 +5254,28 @@
         "required": [
           "plan",
           "applied"
+        ],
+        "type": "object"
+      },
+      "RolesRosterResult": {
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/CommitInfo"
+          },
+          "product": {
+            "type": "string"
+          },
+          "roster": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "product",
+          "roster",
+          "commit"
         ],
         "type": "object"
       },
@@ -9811,6 +9949,359 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/RolesResetResult"
+        }
+      }
+    },
+    {
+      "description": "Sets the roster of a product: the roster picker of the Roles screen adds and removes agents with it. Each agent must resolve. An agent that leaves loses its entry in the brief, and one that joins gets an empty entry. It writes `agentsi.config.json`, commits it and sends `data.changed` of kind `roles`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "roles.roster",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The agent ids of the new roster, in order. Each one must resolve.",
+          "name": "roles",
+          "required": true,
+          "schema": {
+            "description": "The agent ids of the new roster, in order. Each one must resolve.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/RolesRosterResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the general roles with the products that use each one, and the names of the builtin roles. It never writes.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "role.general.list",
+      "paramStructure": "by-name",
+      "params": [],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GeneralListResult"
+        }
+      }
+    },
+    {
+      "description": "Writes `<data root>/plugin/agents/<id>.md` with the front matter of the builtin roles, commits it and sends `data.changed` of kind `roles`. An id of a builtin role, of an existing role or with a bad form is `invalid`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "role.general.create",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The definition below the front matter.",
+          "name": "body",
+          "required": true,
+          "schema": {
+            "description": "The definition below the front matter.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "description",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The role name and the file name: lowercase words joined by single hyphens.",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "description": "The role name and the file name: lowercase words joined by single hyphens.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "The name that a person reads, such as `Designer`.",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "description": "The name that a person reads, such as `Designer`.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GeneralWriteResult"
+        }
+      }
+    },
+    {
+      "description": "Replaces the name, the description and the body of a general role. The other front matter keys stay. It commits the file and sends `data.changed` of kind `roles`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "role.general.update",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The definition below the front matter.",
+          "name": "body",
+          "required": true,
+          "schema": {
+            "description": "The definition below the front matter.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "description",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The role name and the file name: lowercase words joined by single hyphens.",
+          "name": "id",
+          "required": true,
+          "schema": {
+            "description": "The role name and the file name: lowercase words joined by single hyphens.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "The name that a person reads, such as `Designer`.",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "description": "The name that a person reads, such as `Designer`.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GeneralWriteResult"
+        }
+      }
+    },
+    {
+      "description": "Deletes a general role file and commits it. A role that the roster of a product uses is `invalid`, and the message names the products.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "role.general.delete",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "id",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GeneralDeleteResult"
+        }
+      }
+    },
+    {
+      "description": "Moves a custom role of a product to a general role: it writes the role file, deletes the overlay, and the roster of the product then uses the general role. It commits the file and sends `data.changed` of kind `roles`.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "role.general.promote",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "A custom role of the product: an overlay with no `extends` and no specialty.",
+          "name": "agent",
+          "required": true,
+          "schema": {
+            "description": "A custom role of the product: an overlay with no `extends` and no specialty.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GeneralWriteResult"
         }
       }
     },

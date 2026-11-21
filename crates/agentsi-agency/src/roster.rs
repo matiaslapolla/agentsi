@@ -31,6 +31,11 @@ pub fn is_agent_id(id: &str) -> bool {
     AGENT_ID.is_match(id)
 }
 
+/// An agent id with no specialty: the id of a role file.
+pub fn is_role_id(id: &str) -> bool {
+    is_agent_id(id) && !id.contains('.')
+}
+
 /// The frontmatter keys of an agent file (`key: value` lines), and its body.
 pub fn parse_agent_file(text: &str) -> (BTreeMap<String, String>, String) {
     let Some(m) = FRONTMATTER.captures(text) else {
@@ -314,6 +319,7 @@ mod tests {
         for bad in ["Pm", "dev.", "dev..x", "dev_x", "-dev", "a.b.c", ""] {
             assert!(!is_agent_id(bad), "{bad}");
         }
+        assert!(is_role_id("growth-lead") && !is_role_id("dev.backend"));
     }
 
     #[test]

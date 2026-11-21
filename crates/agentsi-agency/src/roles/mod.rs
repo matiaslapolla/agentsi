@@ -6,7 +6,9 @@
 pub mod apply;
 pub mod commit;
 pub mod files;
+pub mod general;
 pub mod load;
+pub mod picker;
 pub mod registry_edit;
 pub mod reset;
 

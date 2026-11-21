@@ -42,6 +42,8 @@ gpui_kit::actions!(
         NewProduct,
         /// Opens the setup screen to update the brief of the active product.
         UpdateBrief,
+        /// Opens the roles of the active product at the form of a new general role.
+        NewGeneralRole,
         /// Opens the meeting of the active product.
         OpenMeeting,
         /// Starts the meeting in the question field of the active product.
@@ -443,6 +445,14 @@ pub const ENTRIES: &[Entry] = &[
             "apply",
         ],
         action: || Box::new(OpenRoles),
+    },
+    Entry {
+        label: "Roles: New general role",
+        icon: IconName::Plus,
+        keywords: &[
+            "roles", "general", "global", "new", "role", "products", "shared",
+        ],
+        action: || Box::new(NewGeneralRole),
     },
     Entry {
         label: "Open the stories of the active product",
