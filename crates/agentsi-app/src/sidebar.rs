@@ -1056,6 +1056,10 @@ impl Render for Sidebar {
             .map(|h| h.read(cx).hosts.clone())
             .unwrap_or_default();
         let look_note = self.look.as_ref().and_then(|l| l.read(cx).note.clone());
+        let favorites_note = self
+            .favorites
+            .as_ref()
+            .and_then(|f| f.read(cx).note.clone());
         let (products, host_state, error, notices) = {
             let core = self.core.read(cx);
             (
@@ -1066,6 +1070,7 @@ impl Render for Sidebar {
                     .iter()
                     .cloned()
                     .chain(look_note)
+                    .chain(favorites_note)
                     .collect::<Vec<_>>(),
             )
         };

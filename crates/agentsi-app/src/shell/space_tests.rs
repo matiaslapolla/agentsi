@@ -333,6 +333,17 @@ fn the_spaces_the_pins_and_the_favorites_are_the_same_after_a_restart(cx: &mut T
     );
     let t2 = panel_of(&f, "t2-a", cx);
     assert!(f.shell.read_with(cx, |s, cx| s.is_pinned(t2, cx)));
+    // The load of the hidden space of a tells its tabs nothing that counts: none is seen.
+    let seen: Vec<String> = f
+        .open
+        .borrow()
+        .terminals
+        .iter()
+        .filter_map(gpui::WeakEntity::upgrade)
+        .filter(|p| p.read_with(cx, |p, _| p.shown))
+        .map(|p| p.read_with(cx, |p, _| p.id.clone()))
+        .collect();
+    assert_eq!(seen, ["t3-b"]);
     // The favorite shows in the sidebar.
     assert!(at(cx, "tree-row:favorite-0").is_some());
 }
@@ -454,12 +465,18 @@ fn move_to_product_takes_a_terminal_tab_to_another_space_and_keeps_the_terminal(
     select(&f, cx, "a");
     with_tabs(&f, cx);
     let _ = sent(&mut f);
+    run(&f, cx, pane("t2-a"), Cmd::PinTab);
     run(&f, cx, pane("t2-a"), Cmd::MoveToProduct);
     assert!(matches!(asking(&f, cx), Some(Ask::MoveTab(_))));
     click(cx, "prompt-choice:b");
     assert_eq!(shown(&f, cx), space("b"));
     assert_eq!(tabs_of(&f, cx, &space("a")), ["screen:desk", "t1-a"]);
     assert_eq!(tabs_of(&f, cx, &space("b")), ["t2-a"]);
+    let t2 = panel_of(&f, "t2-a", cx);
+    assert!(
+        f.shell.read_with(cx, |s, cx| s.is_pinned(t2, cx)),
+        "the pin moves with it"
+    );
     let s = sent(&mut f);
     assert!(s.iter().all(|r| r["method"] != "terminal.kill"), "{s:?}");
     assert!(

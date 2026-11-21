@@ -805,6 +805,7 @@ impl BasePanel for TerminalPanel {
 
     /// The pane of the displayed tab takes the keys, also after a restore.
     fn set_active(&mut self, active: bool, window: &mut Window, cx: &mut Context<Self>) {
+        let active = active && !crate::tabs::hidden(cx.entity_id(), cx);
         self.shown = active;
         if active {
             window.focus(&self.pane.focus_handle(cx), cx);
@@ -856,7 +857,11 @@ impl TerminalPanel {
         let glow = glow_with_alert(term, core.remote.as_deref(), &self.id, cx);
         let glow_key = format!("tab-glow:{}:{}", self.id, glow.map_or(0, |g| g.1));
         div()
-            .id(SharedString::from(format!("tab-mark:{}", self.id)))
+            .id(SharedString::from(format!(
+                "tab-mark:{}:{}",
+                core.remote.as_deref().unwrap_or_default(),
+                self.id
+            )))
             .flex()
             .items_center()
             .gap(space(1))

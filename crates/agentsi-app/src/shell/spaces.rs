@@ -18,7 +18,7 @@ use crate::layout::{self, SpaceSave, TabGroupSave};
 use crate::model::ProductRef;
 use crate::screens::screen_of;
 use crate::tab_bar;
-use crate::tabs::{self, SpaceId, TabGroups, TabsChanged};
+use crate::tabs::{self, HiddenTabs, SpaceId, TabGroups, TabsChanged};
 use crate::tree::{ItemKey, TabRow};
 
 pub(super) struct Space {
@@ -90,6 +90,7 @@ impl Shell {
     pub fn show_space(&mut self, id: SpaceId, window: &mut Window, cx: &mut Context<Self>) {
         if let SpaceId::Product(p) = &id
             && self.core.read(cx).active.as_ref() != Some(p)
+            && self.has_product(p, cx)
         {
             self.core.update(cx, |s, cx| {
                 s.active = Some(p.clone());
@@ -103,10 +104,26 @@ impl Shell {
         let old = std::mem::replace(&mut self.dock, dock);
         self.tabs = tabs;
         self.shown = id;
+        self.mark_hidden(cx);
         Self::tell_shown(&old, false, window, cx);
         Self::tell_shown(&self.dock.clone(), true, window, cx);
         self.spaces_changed(cx);
         cx.notify();
+    }
+
+    /// Records the tabs of the spaces that do not show, for `tabs::hidden`.
+    fn mark_hidden(&self, cx: &mut App) {
+        let hidden: BTreeSet<PanelId> = self
+            .spaces
+            .iter()
+            .filter(|(id, _)| **id != self.shown)
+            .flat_map(|(_, s)| {
+                tabs::bars(s.dock.read(cx))
+                    .into_iter()
+                    .flat_map(|b| b.panels)
+            })
+            .collect();
+        cx.set_global(HiddenTabs(hidden));
     }
 
     /// Tells the tab on screen of each bar of `dock` that it shows or hides.
@@ -215,6 +232,7 @@ impl Shell {
 
     /// A tab or a space changed: the sidebar lists the tabs again, and the layout saves.
     pub(super) fn spaces_changed(&mut self, cx: &mut Context<Self>) {
+        self.mark_hidden(cx);
         let rows = self.tab_rows(cx);
         self.sidebar.update(cx, |s, cx| s.set_tabs(rows, cx));
         self.schedule_save(cx);
@@ -284,6 +302,7 @@ impl Shell {
             });
             self.restore_tabs(&dock, &tabs, &s.tab_groups, &pinned, window, cx);
         }
+        self.mark_hidden(cx);
         dropped
     }
 

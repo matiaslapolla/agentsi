@@ -25,6 +25,19 @@ use crate::screens::ScreenSpec;
 
 pub type GroupId = u32;
 
+/// The tabs of the spaces that do not show. The dock of a hidden space still tells its tabs
+/// that they show (after a load, or when its bar changes), so a tab asks here first.
+#[derive(Default)]
+pub struct HiddenTabs(pub BTreeSet<PanelId>);
+
+impl gpui_kit::Global for HiddenTabs {}
+
+/// True when the panel of entity `id` sits in a space that does not show.
+pub fn hidden(id: gpui_kit::EntityId, cx: &App) -> bool {
+    cx.try_global::<HiddenTabs>()
+        .is_some_and(|h| h.0.contains(&PanelId::from(id)))
+}
+
 /// A space: the dock of one product, or Home for the tabs of no product.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SpaceId {

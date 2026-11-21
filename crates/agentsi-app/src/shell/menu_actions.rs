@@ -634,6 +634,10 @@ impl Shell {
             Cmd::CloseToRight => self.close_to_the_right(tab, window, cx),
             Cmd::CloseTab => self.close_tabs(vec![tab], window, cx),
             Cmd::AddToFavorites => self.favorite_screen(tab, cx),
+            Cmd::MoveToProduct => self.notice(
+                "Only a terminal tab moves to another product. A screen belongs to its product.",
+                cx,
+            ),
             _ => {}
         }
     }
@@ -773,9 +777,13 @@ impl Shell {
             let p = panel.read(cx);
             (p.id.clone(), p.core().clone())
         };
+        let pinned = self.is_pinned(tab, cx);
         panel.update(cx, |p, _| p.keep_terminal());
         dock.update(cx, |d, cx| d.remove_panel(panel, window, cx));
-        self.add_terminal_panel_in(to, id, core, window, cx);
+        let moved = self.add_terminal_panel_in(to, id, core, window, cx);
+        if pinned {
+            self.pin_tab(PanelId::from(moved.entity_id()), true, window, cx);
+        }
     }
 
     fn tab_group_cmd(
@@ -1087,13 +1095,21 @@ impl Shell {
                 // Enter keeps: the safe answer is the one under the cursor.
                 Some(cx.new(|cx| Prompt::pick(title, choices, 1, window, cx)))
             }
-            Ask::MoveTab(_) => {
+            Ask::MoveTab(tab) => {
+                // A terminal lives on one host: it moves only to a product of that host.
+                let host = match self.tab_target(*tab, cx) {
+                    Target::Pane(p) => p.host,
+                    _ => return None,
+                };
                 let mut choices: Vec<Choice> = self
                     .products(cx)
                     .into_iter()
+                    .filter(|(p, _)| p.host == host)
                     .map(|(p, name)| Choice::new(name, look::key(p.host.as_deref(), &p.id)))
                     .collect();
-                choices.push(Choice::new("Home", crate::layout::HOME));
+                if host.is_none() {
+                    choices.push(Choice::new("Home", crate::layout::HOME));
+                }
                 Some(cx.new(|cx| Prompt::pick("Move this tab to", choices, 0, window, cx)))
             }
             Ask::RenameFavorite(at) => {
