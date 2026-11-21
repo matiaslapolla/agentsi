@@ -13,7 +13,8 @@ use agentsi_proto::roles_api::GeneralRole;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
-const FOLDER: &str = "plugin/agents";
+/// The folder of the role files, relative to the data root.
+pub const FOLDER: &str = "plugin/agents";
 
 /// The path of a role file relative to the data root, as git names it.
 pub fn rel_path(id: &str) -> String {

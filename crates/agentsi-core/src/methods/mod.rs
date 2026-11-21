@@ -10,6 +10,7 @@ mod core_api;
 mod data;
 mod desk;
 mod desk_session;
+mod general_roles;
 mod git;
 mod hosts;
 mod knowledge;
@@ -50,6 +51,7 @@ pub fn router() -> Router {
         .group(models::register)
         .group(hosts::register)
         .group(roles::register)
+        .group(general_roles::register)
         .group(story::register)
         .group(meeting::register)
         .group(call::register)

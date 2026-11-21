@@ -58,14 +58,14 @@ fn internal(e: impl std::fmt::Display) -> RpcError {
 }
 
 /// What a handler works with.
-struct Work {
-    root: PathBuf,
-    registry: Registry,
-    store: Arc<Store>,
+pub(super) struct Work {
+    pub root: PathBuf,
+    pub registry: Registry,
+    pub store: Arc<Store>,
 }
 
 /// Runs `f` off the event loop, with the data root, the registry and the store.
-async fn blocking<T: Send + 'static>(
+pub(super) async fn blocking<T: Send + 'static>(
     ctx: &Ctx,
     f: impl FnOnce(Work) -> roles::Result<T> + Send + 'static,
 ) -> Result<T, RpcError> {
@@ -89,7 +89,7 @@ async fn blocking<T: Send + 'static>(
 }
 
 /// Runs `f` on a reader connection.
-fn read<T: Send + 'static>(
+pub(super) fn read<T: Send + 'static>(
     store: &Store,
     f: impl FnOnce(&Connection) -> roles::Result<T>,
 ) -> roles::Result<T> {
@@ -99,19 +99,30 @@ fn read<T: Send + 'static>(
         .map_err(RolesError::from)?
 }
 
-/// Runs `f` in one transaction. An error of `f` rolls the transaction back.
-fn write<T: Send + 'static>(
+/// Runs `f` in one transaction. An error of `f` rolls the transaction back and keeps its kind.
+pub(super) fn write<T: Send + 'static>(
     store: &Store,
     f: impl FnOnce(&rusqlite::Transaction) -> roles::Result<T> + Send + 'static,
 ) -> roles::Result<T> {
-    store
-        .write(move |tx| {
-            f(tx).map_err(|e| match e {
-                RolesError::Invalid(m) => agentsi_store::Error::Other(m),
-                RolesError::Agency(a) => agentsi_store::Error::Other(a.to_string()),
-            })
+    let failed = Arc::new(std::sync::Mutex::new(None));
+    let slot = failed.clone();
+    let done = store.write(move |tx| {
+        f(tx).map_err(|e| {
+            let text = match &e {
+                RolesError::Invalid(m) => m.clone(),
+                RolesError::Agency(a) => a.to_string(),
+            };
+            *slot.lock().unwrap_or_else(|p| p.into_inner()) = Some(e);
+            agentsi_store::Error::Other(text)
         })
-        .map_err(|e| RolesError::Invalid(e.to_string()))
+    });
+    done.map_err(|e| {
+        failed
+            .lock()
+            .unwrap_or_else(|p| p.into_inner())
+            .take()
+            .unwrap_or_else(|| AgencyError::from(e).into())
+    })
 }
 
 async fn roles_list(ctx: Ctx, p: RolesListParams) -> Result<RolesListResult, RpcError> {
