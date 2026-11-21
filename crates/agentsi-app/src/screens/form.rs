@@ -7,7 +7,7 @@
 use agentsi_ui::components::Button;
 use agentsi_ui::tokens::{line, radius, size, space, surface, text, weight};
 use gpui_kit::component::checkbox::Checkbox;
-use gpui_kit::component::input::{Input, InputEvent, InputState};
+use gpui_kit::component::input::{Input, InputEvent, InputState, Textarea, TextareaState};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -22,6 +22,13 @@ struct Field {
     label: &'static str,
     required: bool,
     input: Entity<InputState>,
+}
+
+/// A multi-line field. `Enter` in it starts a new line.
+struct Area {
+    label: &'static str,
+    required: bool,
+    input: Entity<TextareaState>,
 }
 
 struct Pick {
@@ -45,6 +52,7 @@ pub struct Form {
     confirm: bool,
     armed: bool,
     fields: Vec<Field>,
+    areas: Vec<Area>,
     picks: Vec<Pick>,
     checks: Vec<Check>,
     focus: FocusHandle,
@@ -68,6 +76,7 @@ impl Form {
             confirm: false,
             armed: false,
             fields: Vec::new(),
+            areas: Vec::new(),
             picks: Vec::new(),
             checks: Vec::new(),
             focus: cx.focus_handle(),
@@ -114,6 +123,31 @@ impl Form {
         self
     }
 
+    /// A multi-line field below the one-line fields.
+    pub fn area(
+        mut self,
+        label: &'static str,
+        placeholder: &'static str,
+        required: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
+        let input = cx.new(|cx| TextareaState::new(window, cx).placeholder(placeholder));
+        self._subs
+            .push(cx.subscribe(&input, |this, _, e: &InputEvent, cx| {
+                if matches!(e, InputEvent::Change) {
+                    this.armed = false;
+                    cx.notify()
+                }
+            }));
+        self.areas.push(Area {
+            label,
+            required,
+            input,
+        });
+        self
+    }
+
     pub fn pick(mut self, label: &'static str, options: &[&'static str]) -> Self {
         self.picks.push(Pick {
             label,
@@ -136,7 +170,6 @@ impl Form {
             .unwrap_or_default()
     }
 
-    #[cfg(test)]
     pub fn set_value(
         &mut self,
         i: usize,
@@ -146,6 +179,26 @@ impl Form {
     ) {
         if let Some(f) = self.fields.get(i) {
             f.input.update(cx, |s, cx| s.set_value(value, window, cx));
+        }
+    }
+
+    /// The trimmed text of multi-line field `i`.
+    pub fn area_value(&self, i: usize, cx: &App) -> String {
+        self.areas
+            .get(i)
+            .map(|a| a.input.read(cx).value().trim().to_string())
+            .unwrap_or_default()
+    }
+
+    pub fn set_area_value(
+        &mut self,
+        i: usize,
+        value: &str,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let Some(a) = self.areas.get(i) {
+            a.input.update(cx, |s, cx| s.set_value(value, window, cx));
         }
     }
 
@@ -190,6 +243,10 @@ impl Form {
         self.fields
             .iter()
             .all(|f| !f.required || !f.input.read(cx).value().trim().is_empty())
+            && self
+                .areas
+                .iter()
+                .all(|a| !a.required || !a.input.read(cx).value().trim().is_empty())
     }
 
     pub fn focus_first(&self, window: &mut Window, cx: &mut App) {
@@ -238,6 +295,24 @@ impl Render for Form {
                             .child(f.label),
                     )
                     .child(Input::new(&f.input))
+            })
+            .collect();
+        let areas: Vec<Div> = self
+            .areas
+            .iter()
+            .map(|a| {
+                div()
+                    .flex()
+                    .flex_col()
+                    .gap(space(1))
+                    .child(
+                        div()
+                            .text_size(size::xs())
+                            .font_weight(weight::MEDIUM)
+                            .text_color(text::tertiary())
+                            .child(a.label),
+                    )
+                    .child(Textarea::new(&a.input).h(space(40)))
             })
             .collect();
         let picks: Vec<Div> = self
@@ -308,6 +383,7 @@ impl Render for Form {
                     .child(self.title),
             )
             .children(fields)
+            .children(areas)
             .children(picks)
             .children(checks)
             .when_some(self.note.clone(), |el, n| {
