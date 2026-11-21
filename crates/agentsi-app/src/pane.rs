@@ -516,7 +516,7 @@ impl TerminalPanel {
                 self.report_focus(*f, window, cx);
             }
             PaneEvent::Bell => self.bell(cx),
-            PaneEvent::Title(_) => {}
+            PaneEvent::Title(_) | PaneEvent::OpenLink(_) | PaneEvent::ContextMenu(_) => {}
         }
     }
 

@@ -30,6 +30,8 @@ cx.subscribe(&pane, |pane, event, cx| match event {
     PaneEvent::Output(PaneOutput::Focus(focused)) => { /* the pane gained or lost focus */ }
     PaneEvent::Title(title) => {}
     PaneEvent::Bell => {}
+    PaneEvent::OpenLink(link) => { /* a Ctrl+click on a URL or a `path:line` */ }
+    PaneEvent::ContextMenu(position) => { /* a right click; `pane.link_at_pointer()` tells the link */ }
 }).detach();
 pane.update(cx, |p, cx| p.feed(&bytes, read_at, cx));
 ```
@@ -58,7 +60,8 @@ pane.update(cx, |p, cx| p.feed(&bytes, read_at, cx));
 - Background runs are quads. Text runs are shaped lines with a forced advance of one cell (two for a wide character).
 - Block elements (U+2580 to U+259F), box drawing (U+2500 to U+257F) and braille (U+2800 to U+28FF) are shapes from `src/shapes.rs`: quads for lines and blocks, paths for the rounded corners and the diagonals.
 - Colors, the font, the row height, the padding and the cursor bar come from `agentsi_ui::tokens`. The pane sets the token palette on its screen.
-- The pane has three views. The root takes input. The cells view is cached and draws again only after new bytes, a scroll or a selection change. The cursor view draws the cursor, so a blink frame does not draw the cells.
+- The pane has four views. The root takes input. The cells view is cached and draws again only after new bytes, a scroll or a selection change. The link view underlines the link under the pointer while the link key is held, so a hover does not draw the cells. The cursor view draws the cursor, so a blink frame does not draw the cells.
+- Links are OSC 8 hyperlinks of the grid, and the `http`, `https`, `file` and `mailto` URLs and `path:line[:col]` targets that `links.rs` finds in the text. The finder reads only the line under the pointer, with its soft-wrapped rows. A Ctrl+click on a link opens it even when the program takes the mouse. Modifier changes reach only the focused pane, so an unfocused pane underlines after the next mouse move.
 - The pane keeps the draw lists and the shaped lines of each row (`FrameCache` in `src/frame.rs`). After new bytes, it reads again only the rows that libghostty-vt marks dirty. It builds again only the rows whose cells or selection changed. A row that moved, as in a scroll, keeps its lists, because each row has an id that moves with it. New default colors build every row again.
 - The pane makes the path of a shape (a rounded corner or a diagonal) once for each character and cell size, and moves a copy to each cell.
 - The cursor blinks only when the program asks for a blinking cursor and the pane has focus. It stops after `motion::CARET_IDLE` with no typing. Output does not restart it. Without focus the cursor is a hollow block.
