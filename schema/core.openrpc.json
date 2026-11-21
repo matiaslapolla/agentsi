@@ -2023,6 +2023,89 @@
         ],
         "type": "object"
       },
+      "GitBranch": {
+        "description": "One local or remote branch.",
+        "properties": {
+          "ahead": {
+            "default": null,
+            "description": "Null with no upstream, or when the upstream is gone.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "behind": {
+            "default": null,
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "current": {
+            "description": "True for the branch of the worktree of the product.",
+            "type": "boolean"
+          },
+          "head": {
+            "description": "The short id of the tip.",
+            "type": "string"
+          },
+          "name": {
+            "description": "`main` for a local branch, `origin/main` for a remote one.",
+            "type": "string"
+          },
+          "subject": {
+            "description": "The subject of the tip.",
+            "type": "string"
+          },
+          "upstream": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "head",
+          "subject",
+          "current"
+        ],
+        "type": "object"
+      },
+      "GitBranchesResult": {
+        "properties": {
+          "local": {
+            "description": "The local branches, the current one first.",
+            "items": {
+              "$ref": "#/components/schemas/GitBranch"
+            },
+            "type": "array"
+          },
+          "remote": {
+            "items": {
+              "$ref": "#/components/schemas/GitBranch"
+            },
+            "type": "array"
+          },
+          "worktrees": {
+            "items": {
+              "$ref": "#/components/schemas/GitWorktree"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "local",
+          "remote",
+          "worktrees"
+        ],
+        "type": "object"
+      },
       "GitCommitInfo": {
         "properties": {
           "author": {
@@ -2216,6 +2299,124 @@
         ],
         "type": "object"
       },
+      "GitOutcome": {
+        "oneOf": [
+          {
+            "enum": [
+              "done"
+            ],
+            "type": "string"
+          },
+          {
+            "const": "dirty",
+            "description": "`git.switch`: the tree has changes, and the core did not switch.",
+            "type": "string"
+          },
+          {
+            "const": "diverged",
+            "description": "`git.pull`: the branch and its upstream both have new commits. The tree did not change.",
+            "type": "string"
+          },
+          {
+            "const": "failed",
+            "description": "Git refused or failed. `output` says why.",
+            "type": "string"
+          }
+        ]
+      },
+      "GitOutgoingResult": {
+        "description": "What a push sends.",
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "commits": {
+            "description": "At most 50 commits that go out, newest first.",
+            "items": {
+              "$ref": "#/components/schemas/GitCommitInfo"
+            },
+            "type": "array"
+          },
+          "count": {
+            "description": "The count of all the commits that go out.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "remote": {
+            "type": "string"
+          },
+          "remote_branch": {
+            "description": "The branch on the remote that gets the commits.",
+            "type": "string"
+          },
+          "set_upstream": {
+            "description": "True when the branch has no upstream: the push sets it.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "branch",
+          "remote",
+          "remote_branch",
+          "set_upstream",
+          "commits",
+          "count"
+        ],
+        "type": "object"
+      },
+      "GitShowFile": {
+        "description": "One file of a commit.",
+        "properties": {
+          "letter": {
+            "description": "`A` `M` `D` `R` `C` or `T`.",
+            "type": "string"
+          },
+          "orig_path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "letter"
+        ],
+        "type": "object"
+      },
+      "GitShowResult": {
+        "properties": {
+          "commit": {
+            "$ref": "#/components/schemas/GitCommitInfo"
+          },
+          "files": {
+            "description": "The files of the commit, against its first parent.",
+            "items": {
+              "$ref": "#/components/schemas/GitShowFile"
+            },
+            "type": "array"
+          },
+          "patch": {
+            "description": "The patch of all the files.",
+            "type": "string"
+          },
+          "truncated": {
+            "description": "True when the core cut the patch at 512 KiB.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "commit",
+          "files",
+          "patch",
+          "truncated"
+        ],
+        "type": "object"
+      },
       "GitStatusResult": {
         "properties": {
           "ahead": {
@@ -2281,6 +2482,125 @@
           "repo",
           "worktrees",
           "files"
+        ],
+        "type": "object"
+      },
+      "GitSummaryInfo": {
+        "description": "The git summary of one folder: branch, upstream, ahead, behind and the count of changed\nfiles.",
+        "properties": {
+          "ahead": {
+            "default": null,
+            "description": "Null when the branch has no upstream.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "behind": {
+            "default": null,
+            "format": "uint32",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "branch": {
+            "default": null,
+            "description": "Null for a detached head.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "changed": {
+            "description": "The files with a staged, unstaged or untracked change.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "head": {
+            "default": null,
+            "description": "The short id of the head. Null in a repo with no commit.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "repo": {
+            "description": "The root of the repo.",
+            "type": "string"
+          },
+          "upstream": {
+            "default": null,
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "repo",
+          "changed"
+        ],
+        "type": "object"
+      },
+      "GitSummaryResult": {
+        "properties": {
+          "summary": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GitSummaryInfo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Null when the folder is not in a git repo."
+          }
+        },
+        "type": "object"
+      },
+      "GitSwitchResult": {
+        "properties": {
+          "files": {
+            "description": "The changed files of a `dirty` tree.",
+            "items": {
+              "$ref": "#/components/schemas/GitFile"
+            },
+            "type": "array"
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/GitOutcome"
+          },
+          "output": {
+            "description": "The output of git.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "files",
+          "output"
+        ],
+        "type": "object"
+      },
+      "GitSyncResult": {
+        "properties": {
+          "outcome": {
+            "$ref": "#/components/schemas/GitOutcome"
+          },
+          "output": {
+            "description": "The output of git, progress lines left out.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "output"
         ],
         "type": "object"
       },
@@ -6403,7 +6723,8 @@
           "voice",
           "dictation",
           "models",
-          "desk"
+          "desk",
+          "git"
         ],
         "type": "string"
       },
@@ -13066,6 +13387,592 @@
       }
     },
     {
+      "description": "Gives the git summary of a product or of a folder: branch, upstream, ahead, behind and the count of changed files. A folder outside a repo gives a null summary.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.summary",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "Any folder, for example the folder of a terminal.",
+          "name": "cwd",
+          "required": false,
+          "schema": {
+            "description": "Any folder, for example the folder of a terminal.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "The product whose first path the core reads. Give this or `cwd`.",
+          "name": "product",
+          "required": false,
+          "schema": {
+            "description": "The product whose first path the core reads. Give this or `cwd`.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitSummaryResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the files of a commit and its patch against the first parent, cut at 512 KiB.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.show",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The id of the commit.",
+          "name": "commit",
+          "required": true,
+          "schema": {
+            "description": "The id of the commit.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitShowResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the local and the remote branches with upstream, ahead and behind, and the worktrees of the repo.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.branches",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitBranchesResult"
+        }
+      }
+    },
+    {
+      "description": "Makes a local branch. It does not switch to it. It sends data.changed with kind git.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.branch.create",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The branch or commit to start from. Null starts from the head.",
+          "name": "from",
+          "required": false,
+          "schema": {
+            "description": "The branch or commit to start from. Null starts from the head.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "The name of the new local branch.",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "description": "The name of the new local branch.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitDone"
+        }
+      }
+    },
+    {
+      "description": "Switches the worktree of the product to a branch. A tree with changes gives dirty and the files, and the core does not switch. It sends data.changed with kind git.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.switch",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "A local branch, or a remote branch such as `origin/main`. A remote branch gets a\nlocal branch that tracks it.",
+          "name": "name",
+          "required": true,
+          "schema": {
+            "description": "A local branch, or a remote branch such as `origin/main`. A remote branch gets a\nlocal branch that tracks it.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitSwitchResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the branch, the remote and the commits that git.push sends, for the confirm of the app.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.outgoing",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitOutgoingResult"
+        }
+      }
+    },
+    {
+      "description": "Fetches each remote of the repo, with a 120 s limit. It sends git.progress lines while it runs, and data.changed with kind git after.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.fetch",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitSyncResult"
+        }
+      }
+    },
+    {
+      "description": "Pulls the upstream with --ff-only, with a 120 s limit. A branch that cannot fast-forward gives diverged, and the tree does not change. It sends git.progress lines while it runs, and data.changed with kind git after.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.pull",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitSyncResult"
+        }
+      }
+    },
+    {
+      "description": "Pushes the branch to its upstream, or with --set-upstream to origin when it has none, with a 120 s limit. It never forces. It sends git.progress lines while it runs, and data.changed with kind git after.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "git.push",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "repo",
+          "required": false,
+          "schema": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/GitSyncResult"
+        }
+      }
+    },
+    {
       "description": "Reads the shared git config table, the table of the product, and the result for the product with the source of each value.",
       "errors": [
         {
@@ -14475,6 +15382,50 @@
           "required": true,
           "schema": {
             "description": "The kind of record that changed, for example `minutes`, `git` or `tickets`.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    {
+      "description": "The git summary of a product changed. The core watches the folder, the HEAD, the index and the refs of each product, reads a summary at most once every 2 s, and sends this only when the summary differs.",
+      "name": "git.changed",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    {
+      "description": "One progress line of a fetch, pull or push that runs. The core sends at most 10 each second for one call.",
+      "name": "git.progress",
+      "params": [
+        {
+          "description": "One progress line of git, for example `Receiving objects:  40% (2/5)`.",
+          "name": "line",
+          "required": true,
+          "schema": {
+            "description": "One progress line of git, for example `Receiving objects:  40% (2/5)`.",
+            "type": "string"
+          }
+        },
+        {
+          "description": "`fetch`, `pull` or `push`.",
+          "name": "op",
+          "required": true,
+          "schema": {
+            "description": "`fetch`, `pull` or `push`.",
             "type": "string"
           }
         },
