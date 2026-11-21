@@ -26,6 +26,14 @@ pub fn unix_secs(iso: &str) -> Option<i64> {
 
 /// The `file://` URL of `file`. Each byte outside the unreserved set and `/` becomes `%XX`,
 /// so a space or a `#` in the path stays part of the path.
+/// `~/x` as an absolute path. A product keeps the path as the owner wrote it.
+pub fn expand_home(path: &str) -> String {
+    match (path.strip_prefix("~/"), std::env::var("HOME")) {
+        (Some(rest), Ok(home)) => format!("{home}/{rest}"),
+        _ => path.to_string(),
+    }
+}
+
 pub fn file_url(file: &std::path::Path) -> String {
     use std::os::unix::ffi::OsStrExt;
     let mut url = String::from("file://");

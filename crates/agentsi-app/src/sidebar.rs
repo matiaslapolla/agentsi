@@ -32,6 +32,7 @@ use gpui_kit::*;
 use crate::actions::product_id;
 use crate::alerts::{AlertTarget, Alerts};
 use crate::favorites::{Favorites, FavoritesGlobal, Saved};
+use crate::files::{FileTree, FilesSettingChanged, RunFile};
 use crate::git_marks::{MarkChanged, Source};
 use crate::hosts::{Hosts, HostsGlobal, RemoteHost};
 use crate::keys::{self, Keys};
@@ -131,7 +132,35 @@ impl Render for DraggedProduct {
     }
 }
 
+/// What the sidebar shows. Saved in `layout.json`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum SidebarMode {
+    #[default]
+    Products,
+    Files,
+}
+
+impl SidebarMode {
+    /// The value in `layout.json`. The products have none.
+    pub fn key(self) -> Option<&'static str> {
+        match self {
+            SidebarMode::Products => None,
+            SidebarMode::Files => Some("files"),
+        }
+    }
+
+    pub fn from_key(key: Option<&str>) -> SidebarMode {
+        match key {
+            Some("files") => SidebarMode::Files,
+            _ => SidebarMode::Products,
+        }
+    }
+}
+
 pub struct Sidebar {
+    pub mode: SidebarMode,
+    /// The file tree of the Files mode.
+    pub files: Entity<FileTree>,
     core: Entity<CoreState>,
     cores: Cores,
     hosts: Option<Entity<Hosts>>,
@@ -164,9 +193,15 @@ impl EventEmitter<ShowAlerts> for Sidebar {}
 impl EventEmitter<NewProduct> for Sidebar {}
 impl EventEmitter<CloseTab> for Sidebar {}
 impl EventEmitter<OpenFavorite> for Sidebar {}
+impl EventEmitter<RunFile> for Sidebar {}
 
 impl Sidebar {
-    pub fn new(cores: Cores, probe: Option<AttentionProbe>, cx: &mut Context<Self>) -> Self {
+    pub fn new(
+        cores: Cores,
+        probe: Option<AttentionProbe>,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> Self {
         let hosts = cx.try_global::<HostsGlobal>().map(|h| h.0.clone());
         let look = cx.try_global::<LookGlobal>().map(|l| l.0.clone());
         let favorites = FavoritesGlobal::get(cx);
@@ -201,7 +236,15 @@ impl Sidebar {
         }
         // The sidebar is cached: a new key shows only after it draws again.
         observe.push(cx.observe_global::<Keys>(|_, cx| cx.notify()));
+        let local = cores.local.clone();
+        let files = cx.new(|cx| FileTree::new(local, window, cx));
+        observe.push(cx.subscribe(&files, |_, _, _: &FilesSettingChanged, cx| {
+            cx.emit(TreeChanged)
+        }));
+        observe.push(cx.subscribe(&files, |_, _, e: &RunFile, cx| cx.emit(e.clone())));
         Sidebar {
+            mode: SidebarMode::Products,
+            files,
             probe,
             hosts,
             look,
@@ -218,6 +261,23 @@ impl Sidebar {
             core: cores.local.clone(),
             cores,
         }
+    }
+
+    /// Shows the products or the file tree, and tells the shell to save.
+    pub fn set_mode(&mut self, mode: SidebarMode, cx: &mut Context<Self>) {
+        let shown = mode == SidebarMode::Files;
+        self.files.update(cx, |f, cx| f.set_shown(shown, cx));
+        if self.mode != mode {
+            self.mode = mode;
+            cx.emit(TreeChanged);
+            cx.notify();
+        }
+    }
+
+    /// Shows the file tree and gives it the keyboard focus.
+    pub fn show_files(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.set_mode(SidebarMode::Files, cx);
+        self.files.update(cx, |f, cx| f.take_focus(window, cx));
     }
 
     /// The products that the owner opened or closed, for `layout.json`.
@@ -313,12 +373,20 @@ impl Sidebar {
 
     /// The sidebar has the keyboard focus.
     pub fn has_focus(&self, window: &Window, cx: &App) -> bool {
-        self.focus.contains_focused(window, cx)
+        self.focus.contains_focused(window, cx) || self.files.read(cx).has_focus(window, cx)
     }
 
     /// Opens the menu of the row of the cursor, just under the row. Returns false when no row
     /// has the cursor.
     pub fn open_menu_at_cursor(&mut self, cx: &mut Context<Self>) -> bool {
+        if self.mode == SidebarMode::Files {
+            let Some(file) = self.files.read(cx).selected(cx) else {
+                return false;
+            };
+            let at = Point::new(space(8), control::TOOLBAR_HEIGHT * 2.);
+            menus::request(cx, Target::File(file), at);
+            return true;
+        }
         let Some(cursor) = self.cursor.clone() else {
             return false;
         };
@@ -1153,30 +1221,38 @@ impl Render for Sidebar {
                             .child(keys::hint(cx, keys::PALETTE)),
                     ),
             )
-            .child(
-                div()
-                    .id("products")
-                    .track_focus(&self.focus)
-                    .key_context("Sidebar")
-                    .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.key_down(e, cx)))
-                    .flex()
-                    .flex_col()
-                    .flex_1()
-                    .min_h_0()
-                    .overflow_y_scroll()
-                    .gap(space(1))
-                    .p(space(2))
-                    .children(favorite_rows)
-                    .children(home_rows)
-                    .child(local_header)
-                    .children(rows)
-                    .when(empty, |el| {
-                        el.child(div().pad_x(space(2)).child(caption(
-                            error.unwrap_or_else(|| "No products in the store yet.".into()),
-                        )))
-                    })
-                    .children(remote),
-            )
+            .child(self.mode_switch(cx))
+            .when(self.mode == SidebarMode::Files, |el| {
+                el.child(self.files.clone())
+            })
+            .when(self.mode == SidebarMode::Products, |el| {
+                el.child(
+                    div()
+                        .id("products")
+                        .track_focus(&self.focus)
+                        .key_context("Sidebar")
+                        .on_key_down(
+                            cx.listener(|this, e: &KeyDownEvent, _, cx| this.key_down(e, cx)),
+                        )
+                        .flex()
+                        .flex_col()
+                        .flex_1()
+                        .min_h_0()
+                        .overflow_y_scroll()
+                        .gap(space(1))
+                        .p(space(2))
+                        .children(favorite_rows)
+                        .children(home_rows)
+                        .child(local_header)
+                        .children(rows)
+                        .when(empty, |el| {
+                            el.child(div().pad_x(space(2)).child(caption(
+                                error.unwrap_or_else(|| "No products in the store yet.".into()),
+                            )))
+                        })
+                        .children(remote),
+                )
+            })
             .when(host_off.is_some() || !notices.is_empty(), |el| {
                 el.child(
                     div()
@@ -1190,6 +1266,36 @@ impl Render for Sidebar {
                         .children(notices.into_iter().map(caption)),
                 )
             })
+    }
+}
+
+impl Sidebar {
+    /// The segmented control of the two modes, under the header.
+    fn mode_switch(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let button = |mode: SidebarMode, id: &'static str, label: &'static str| {
+            let b = Button::new(id).label(label).small();
+            let b = if self.mode == mode {
+                b.secondary()
+            } else {
+                b.ghost()
+            };
+            b.on_click(cx.listener(move |this, _, window, cx| {
+                if mode == SidebarMode::Files {
+                    this.show_files(window, cx);
+                } else {
+                    this.set_mode(mode, cx);
+                }
+            }))
+        };
+        div()
+            .debug_selector(|| "sidebar-modes".into())
+            .flex()
+            .gap(space(1))
+            .p(space(2))
+            .border_b_1()
+            .border_color(line::border())
+            .child(button(SidebarMode::Products, "mode-products", "Products"))
+            .child(button(SidebarMode::Files, "mode-files", "Files"))
     }
 }
 
@@ -1278,7 +1384,8 @@ mod tests {
                 cx,
             )
         });
-        let (_, cx) = cx.add_window_view(|_, cx| Sidebar::new(Cores::new(core), None, cx));
+        let (_, cx) =
+            cx.add_window_view(|window, cx| Sidebar::new(Cores::new(core), None, window, cx));
         cx.simulate_resize(gpui::size(control::WINDOW_WIDTH, control::WINDOW_HEIGHT));
         (core_end, cx)
     }
@@ -1343,16 +1450,18 @@ mod tests {
     ) {
         let (_core_end, cx) = fixture(cx);
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        // x, y, width and height, measured with the arrow of the tree (N5).
+        // x, y, width and height, measured with the arrow of the tree (N5). The switch of the
+        // sidebar modes takes 45 px under the header.
         let before = [
             ("sidebar", [0., 0., 248., 820.]),
             ("sidebar-header", [0., 0., 247., 48.]),
-            ("tree-row:product-a", [8., 97., 231., 44.]),
-            ("tree-row:product-b", [8., 145., 231., 44.]),
-            ("tree-row:product-c", [8., 193., 231., 44.]),
-            ("tree-row:product-a:text", [46., 98.5, 115., 40.5]),
-            ("tree-row:product-b:text", [46., 156.5, 115., 21.]),
-            ("tree-row:product-c:text", [46., 194.5, 115., 40.5]),
+            ("sidebar-modes", [0., 48., 247., 45.]),
+            ("tree-row:product-a", [8., 142., 231., 44.]),
+            ("tree-row:product-b", [8., 190., 231., 44.]),
+            ("tree-row:product-c", [8., 238., 231., 44.]),
+            ("tree-row:product-a:text", [46., 143.5, 115., 40.5]),
+            ("tree-row:product-b:text", [46., 201.5, 115., 21.]),
+            ("tree-row:product-c:text", [46., 239.5, 115., 40.5]),
         ];
         for (name, want) in before {
             let b = bounds(cx, name);
@@ -1536,7 +1645,7 @@ mod tests {
             let marks = cx.update(|cx| crate::git_marks::GitMarks::install(&core, cx));
             let c = core.clone();
             let (sidebar, cx) =
-                cx.add_window_view(move |_, cx| Sidebar::new(Cores::new(c), None, cx));
+                cx.add_window_view(move |window, cx| Sidebar::new(Cores::new(c), None, window, cx));
             cx.simulate_resize(gpui::size(control::WINDOW_WIDTH, control::WINDOW_HEIGHT));
             let told: Rc<RefCell<Vec<Told>>> = Rc::default();
             let t = told.clone();
@@ -1850,6 +1959,49 @@ mod tests {
             assert!(at(cx, "new-product:").is_some());
             click(cx, "new-product:");
             assert_eq!(*t.told.borrow(), [Told::New(None)]);
+        }
+
+        #[gpui::test]
+        fn the_switch_shows_the_file_tree_of_the_selected_product_and_back(
+            cx: &mut TestAppContext,
+        ) {
+            let (t, cx) = tree(cx, "modes");
+            t.core.update(cx, |s, cx| {
+                let mut a = product("a");
+                a.path = Some("/w/a".into());
+                s.set_products(vec![a, product("b")], cx);
+                s.active = Some(mine("a"));
+                cx.notify();
+            });
+            redraw(cx);
+            assert!(at(cx, "sidebar-modes").is_some());
+            assert!(at(cx, "files").is_none());
+            click(cx, "button:mode-files");
+            assert_eq!(
+                t.sidebar.read_with(cx, |s, _| s.mode),
+                super::super::SidebarMode::Files
+            );
+            assert_eq!(*t.told.borrow(), [Told::Tree]);
+            assert!(at(cx, "files").is_some());
+            assert!(at(cx, "tree-row:product-a").is_none());
+            let files = t.sidebar.read_with(cx, |s, _| s.files.clone());
+            let names = files.read_with(cx, |f, cx| f.shown_names(cx));
+            assert_eq!(names, ["Reading…"]);
+            assert!(t.sidebar.read_with(cx, |s, cx| {
+                let selected = s.files.read(cx).selected(cx).unwrap();
+                selected.product == mine("a") && selected.path.is_empty()
+            }));
+            click(cx, "button:mode-products");
+            assert!(at(cx, "files").is_none());
+            assert!(at(cx, "tree-row:product-a").is_some());
+            assert_eq!(
+                super::super::SidebarMode::from_key(super::super::SidebarMode::Files.key()),
+                super::super::SidebarMode::Files
+            );
+            assert_eq!(
+                super::super::SidebarMode::from_key(None),
+                super::super::SidebarMode::Products
+            );
         }
 
         #[gpui::test]

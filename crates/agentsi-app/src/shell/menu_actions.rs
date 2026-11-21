@@ -21,6 +21,7 @@ use gpui_kit::*;
 use super::{Ask, PaneRef, Shell, shell_argv_for};
 use crate::actions;
 use crate::favorites::{Favorite, FavoritesGlobal, Saved};
+use crate::files::{FileRef, NameFor};
 use crate::look::{self, LookGlobal};
 use crate::menus::{self, Cmd, Facts, Item, Kind, MenuRequest, Target};
 use crate::model::ProductRef;
@@ -30,6 +31,7 @@ use crate::screens::meeting;
 use crate::screens::ticket::{self, Op};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec};
 use crate::tabs::{GroupId, SpaceId};
+use agentsi_proto::files_api::NewKind;
 
 /// The answer of the Confirm that runs the command.
 const YES: &str = "yes";
@@ -42,13 +44,7 @@ pub(super) struct OpenMenu {
     _dismiss: Subscription,
 }
 
-/// `~/x` as an absolute path. A product keeps the path as the owner wrote it.
-fn expand(path: &str) -> String {
-    match (path.strip_prefix("~/"), std::env::var("HOME")) {
-        (Some(rest), Ok(home)) => format!("{home}/{rest}"),
-        _ => path.to_string(),
-    }
-}
+use crate::format::expand_home as expand;
 
 impl Shell {
     /// The facts that decide which entries of the menu of `target` are on.
@@ -117,7 +113,8 @@ impl Shell {
             Target::Reflection(_)
             | Target::Group(..)
             | Target::TabGroup(_)
-            | Target::Favorite(_) => Facts::default(),
+            | Target::Favorite(_)
+            | Target::File(_) => Facts::default(),
         }
     }
 
@@ -278,6 +275,9 @@ impl Shell {
                     Kind::TabGroup => "The active tab is in no tab group.",
                     Kind::Tab => "No tab is open. Open a terminal first.",
                     Kind::Favorite => "No favorite yet. Use \"Add to favorites\" on a tab first.",
+                    Kind::File | Kind::Folder => {
+                        "No file tree: pick a product of this device that has a folder."
+                    }
                     _ => "No active product. Pick one in the sidebar first.",
                 },
                 cx,
@@ -314,6 +314,13 @@ impl Shell {
             Kind::Favorite => FavoritesGlobal::get(cx)
                 .filter(|f| !f.read(cx).list.is_empty())
                 .map(|_| Target::Favorite(0)),
+            Kind::File | Kind::Folder => self
+                .sidebar
+                .read(cx)
+                .files
+                .read(cx)
+                .selected(cx)
+                .map(Target::File),
             Kind::Ticket => {
                 // The ticket screens: the one with the focus, else the one in view.
                 let screens = self.open_screens(cx);
@@ -389,6 +396,7 @@ impl Shell {
             Target::TabGroup(g) => self.tab_group_cmd(g, cmd, window, cx),
             Target::Tab(tab) => self.tab_cmd(tab, cmd, window, cx),
             Target::Favorite(at) => self.favorite_cmd(at, cmd, window, cx),
+            Target::File(f) => self.file_cmd(f, cmd, window, cx),
             Target::Group(host, name) => match cmd {
                 Cmd::RenameGroup => self.ask(Ask::GroupName(host, name), window, cx),
                 Cmd::ColorGroup => self.ask(Ask::GroupColor(host, name), window, cx),
@@ -399,6 +407,101 @@ impl Shell {
                 }
                 _ => {}
             },
+        }
+    }
+
+    /// A command on a file or a folder of the file tree.
+    fn file_cmd(&mut self, f: FileRef, cmd: Cmd, window: &mut Window, cx: &mut Context<Self>) {
+        let files = self.sidebar.read(cx).files.clone();
+        let Some(abs) = files.read(cx).abs(&f.path) else {
+            self.notice("This product has no folder on this device.", cx);
+            return;
+        };
+        let folder_abs = files.read(cx).abs(&f.folder_path()).unwrap_or(abs.clone());
+        let text = |p: &std::path::Path| p.to_string_lossy().into_owned();
+        match cmd {
+            Cmd::NewFile | Cmd::NewFolder => {
+                let kind = if cmd == Cmd::NewFile {
+                    NewKind::File
+                } else {
+                    NewKind::Folder
+                };
+                self.sidebar.update(cx, |s, cx| s.show_files(window, cx));
+                files.update(cx, |t, cx| {
+                    t.start_naming(f.folder_path(), NameFor::New(kind), window, cx)
+                });
+            }
+            Cmd::Rename | Cmd::MoveToTrash if f.path.is_empty() => self.notice(
+                "The folder of the product keeps its name and its place.",
+                cx,
+            ),
+            Cmd::Rename => {
+                self.sidebar.update(cx, |s, cx| s.show_files(window, cx));
+                files.update(cx, |t, cx| {
+                    t.start_naming(
+                        crate::files::parent(&f.path).to_string(),
+                        NameFor::Rename(f.path.clone()),
+                        window,
+                        cx,
+                    )
+                });
+            }
+            Cmd::MoveToTrash => files.update(cx, |t, cx| t.trash(f.path.clone(), cx)),
+            Cmd::TerminalHere => {
+                let core = self.cores.local.clone();
+                let argv = shell_argv_for(false, cx);
+                self.create_terminal(
+                    core,
+                    text(&folder_abs),
+                    argv,
+                    Some(f.product.id.clone()),
+                    None,
+                    window,
+                    cx,
+                );
+            }
+            Cmd::CopyFilePath => cx.write_to_clipboard(ClipboardItem::new_string(text(&abs))),
+            Cmd::Reveal => cx.reveal_path(&abs),
+            Cmd::Open if f.folder => {
+                self.sidebar.update(cx, |s, cx| s.show_files(window, cx));
+            }
+            Cmd::Open => cx.open_with_system(&abs),
+            Cmd::OpenInEditor => {
+                let editor = std::env::var("EDITOR").ok();
+                match crate::pane::editor_argv(&text(&abs), 1, false, editor.as_deref()) {
+                    Some(argv) => {
+                        let core = self.cores.local.clone();
+                        let dir = abs.parent().map(text).unwrap_or_else(|| text(&folder_abs));
+                        self.create_terminal(
+                            core,
+                            dir,
+                            argv,
+                            Some(f.product.id.clone()),
+                            None,
+                            window,
+                            cx,
+                        );
+                    }
+                    None => self.notice("$EDITOR is not set, so no editor opens.", cx),
+                }
+            }
+            Cmd::AddToFavorites => {
+                let Some(list) = FavoritesGlobal::get(cx) else {
+                    return;
+                };
+                let saved = Saved::Folder(text(&folder_abs));
+                list.update(cx, |l, cx| {
+                    l.add(
+                        Favorite {
+                            label: String::new(),
+                            product: Some(f.product.clone()),
+                            saved,
+                        },
+                        cx,
+                    )
+                });
+            }
+            _ => {}
         }
     }
 
@@ -1124,6 +1227,7 @@ impl Shell {
                     Target::Favorite(at) => FavoritesGlobal::get(cx)
                         .and_then(|l| l.read(cx).list.get(*at).map(|f| f.label.clone()))
                         .unwrap_or_default(),
+                    Target::File(f) => f.path.clone(),
                 };
                 let (title, verb) = menus::confirm_text(*cmd, &name);
                 let choices = vec![Choice::new(verb, YES), Choice::new("Keep it as it is", NO)];
@@ -1296,6 +1400,16 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         UnpinTab => (Tab, UnpinTab),
         AddTabToFavorites => (Tab, AddToFavorites),
         MoveTabToProduct => (Tab, MoveToProduct),
+        NewFile => (Folder, NewFile),
+        NewFolder => (Folder, NewFolder),
+        OpenSelectedFile => (File, Open),
+        OpenSelectedFileInEditor => (File, OpenInEditor),
+        RenameSelectedFile => (File, Rename),
+        TrashSelectedFile => (File, MoveToTrash),
+        TerminalInSelectedFolder => (Folder, TerminalHere),
+        CopySelectedFilePath => (File, CopyFilePath),
+        RevealSelectedFile => (File, Reveal),
+        AddSelectedFolderToFavorites => (Folder, AddToFavorites),
     );
     // A favorite of the palette is picked first.
     root.on_action(cx.listener(|this, _: &actions::OpenFavorite, window, cx| {

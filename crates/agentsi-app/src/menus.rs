@@ -19,6 +19,7 @@ use gpui_kit::*;
 
 use agentsi_proto::ticket_api::TicketState;
 
+use crate::files::FileRef;
 use crate::model::ProductRef;
 use crate::shell::PaneRef;
 
@@ -44,6 +45,8 @@ pub enum Target {
     Favorite(usize),
     /// A ticket, by id, with its state when the menu opened.
     Ticket(ProductRef, String, TicketState),
+    /// A file or a folder of the file tree of the sidebar.
+    File(FileRef),
 }
 
 /// The kind of a target, to find the target of a palette entry.
@@ -60,6 +63,8 @@ pub enum Kind {
     Ticket,
     Tab,
     Favorite,
+    File,
+    Folder,
 }
 
 impl Target {
@@ -76,6 +81,8 @@ impl Target {
             Target::Ticket(..) => Kind::Ticket,
             Target::Tab(_) => Kind::Tab,
             Target::Favorite(_) => Kind::Favorite,
+            Target::File(f) if f.folder => Kind::Folder,
+            Target::File(_) => Kind::File,
         }
     }
 }
@@ -146,6 +153,14 @@ pub enum Cmd {
     PromoteStory,
     PromoteDecision,
     CopyId,
+    // A file or a folder of the file tree.
+    NewFile,
+    NewFolder,
+    OpenInEditor,
+    MoveToTrash,
+    TerminalHere,
+    CopyFilePath,
+    Reveal,
     // A product group.
     RenameGroup,
     ColorGroup,
@@ -404,6 +419,35 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
             on(RenameFavorite, "Rename"),
             on(RemoveFavorite, "Remove"),
         ],
+        // The folder of the product itself keeps its name and its place.
+        Target::File(file) if file.folder => {
+            let mut v = vec![on(NewFile, "New file"), on(NewFolder, "New folder")];
+            if !file.path.is_empty() {
+                v.extend([
+                    Item::Separator,
+                    on(Rename, "Rename"),
+                    on(MoveToTrash, "Move to trash"),
+                ]);
+            }
+            v.extend([
+                Item::Separator,
+                on(TerminalHere, "Open terminal here"),
+                on(CopyFilePath, "Copy path"),
+                on(Reveal, "Reveal in system"),
+                on(AddToFavorites, "Add to favorites"),
+            ]);
+            v
+        }
+        Target::File(_) => vec![
+            on(Open, "Open"),
+            on(OpenInEditor, "Open with $EDITOR in a terminal"),
+            Item::Separator,
+            on(Rename, "Rename"),
+            on(MoveToTrash, "Move to trash"),
+            Item::Separator,
+            on(CopyFilePath, "Copy path"),
+            on(Reveal, "Reveal in system"),
+        ],
     }
 }
 
@@ -435,6 +479,16 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, DeleteData) => "Delete the data of the active product",
         (_, Archive) => "Archive the active product",
         (_, RestoreProduct) => "Restore the archived product",
+        (_, NewFile) => "New file",
+        (_, NewFolder) => "New folder",
+        (Kind::File | Kind::Folder, Open) => "Open the selected file",
+        (_, OpenInEditor) => "Open the selected file with $EDITOR in a terminal",
+        (Kind::File | Kind::Folder, Rename) => "Rename the selected file or folder",
+        (_, MoveToTrash) => "Move the selected file or folder to the trash",
+        (_, TerminalHere) => "Open a terminal in the selected folder",
+        (_, CopyFilePath) => "Copy the path of the selected file or folder",
+        (_, Reveal) => "Reveal the selected file or folder in the system",
+        (Kind::Folder, AddToFavorites) => "Add the selected folder to the favorites",
         (_, OpenLink) => "Open the link under the mouse in the focused pane",
         (_, CopyLink) => "Copy the link under the mouse in the focused pane",
         (_, Rename) => "Rename the active pane",
@@ -493,7 +547,8 @@ pub fn confirms(cmd: Cmd, f: &Facts) -> bool {
         | Cmd::Suggest
         | Cmd::CancelMeeting
         | Cmd::PromoteStory
-        | Cmd::RemoveFavorite => true,
+        | Cmd::RemoveFavorite
+        | Cmd::MoveToTrash => true,
         // A pane with a tab closes through the tab, which has its own Confirm.
         Cmd::ClosePane => f.running && !f.tabbed,
         _ => false,
@@ -526,6 +581,10 @@ pub fn confirm_text(cmd: Cmd, name: &str) -> (String, &'static str) {
         Cmd::RemoveFavorite => (
             format!("Remove the favorite {name}? What it opens stays as it is."),
             "Remove",
+        ),
+        Cmd::MoveToTrash => (
+            format!("Move {name} to the trash? The system trash keeps it."),
+            "Move to trash",
         ),
         _ => (
             format!("Close {name}? The program in it stops."),
@@ -625,7 +684,18 @@ mod tests {
             Target::Ticket(product(), "C001".into(), TicketState::Open),
             Target::Tab(gpui_kit::component::dock::PanelId::from_u64(1)),
             Target::Favorite(0),
+            Target::File(file("docs", true)),
+            Target::File(file("docs/a.md", false)),
+            Target::File(file("", true)),
         ]
+    }
+
+    fn file(path: &str, folder: bool) -> crate::files::FileRef {
+        crate::files::FileRef {
+            product: product(),
+            path: path.into(),
+            folder,
+        }
     }
 
     fn labels(target: &Target) -> Vec<&'static str> {
@@ -720,6 +790,33 @@ mod tests {
             ]
         );
         assert_eq!(labels(&t[9]), ["Open", "Rename", "Remove"]);
+        assert_eq!(
+            labels(&t[10]),
+            [
+                "New file",
+                "New folder",
+                "Rename",
+                "Move to trash",
+                "Open terminal here",
+                "Copy path",
+                "Reveal in system",
+                "Add to favorites",
+            ]
+        );
+        assert_eq!(
+            labels(&t[11]),
+            [
+                "Open",
+                "Open with $EDITOR in a terminal",
+                "Rename",
+                "Move to trash",
+                "Copy path",
+                "Reveal in system",
+            ]
+        );
+        // The folder of the product keeps its name and its place.
+        assert!(!labels(&t[12]).contains(&"Rename"));
+        assert!(!labels(&t[12]).contains(&"Move to trash"));
         // A pinned tab offers Unpin, and joins no tab group.
         let pinned = Facts {
             pinned: true,
@@ -837,6 +934,7 @@ mod tests {
             Cmd::Reflect,
             Cmd::CancelMeeting,
             Cmd::PromoteStory,
+            Cmd::MoveToTrash,
         ] {
             assert!(confirms(cmd, &idle), "{cmd:?}");
         }

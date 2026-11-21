@@ -262,6 +262,28 @@ gpui_kit::actions!(
         ColorGroup,
         /// Removes the product group of the active product and keeps its products.
         RemoveGroup,
+        /// Shows the Files mode of the sidebar and puts the focus in the tree.
+        ShowFiles,
+        /// Shows the inline name field of a new file in the selected folder of the file tree.
+        NewFile,
+        /// Shows the inline name field of a new folder in the selected folder of the file tree.
+        NewFolder,
+        /// Opens the selected file of the file tree with the program of the system.
+        OpenSelectedFile,
+        /// Opens the selected file of the file tree with `$EDITOR` in a new terminal.
+        OpenSelectedFileInEditor,
+        /// Shows the inline name field on the selected entry of the file tree.
+        RenameSelectedFile,
+        /// Moves the selected entry of the file tree to the system trash, after one Confirm.
+        TrashSelectedFile,
+        /// Opens a terminal in the selected folder of the file tree, in the space of its product.
+        TerminalInSelectedFolder,
+        /// Copies the absolute path of the selected entry of the file tree.
+        CopySelectedFilePath,
+        /// Shows the selected entry of the file tree in the file manager.
+        RevealSelectedFile,
+        /// Saves the selected folder of the file tree as a favorite.
+        AddSelectedFolderToFavorites,
         /// Closes the window. The core and its terminals keep running.
         Quit,
         SelectProduct1,
@@ -341,6 +363,7 @@ key_table! {
     ("stories", "Stories", "secondary-shift-s", || Box::new(OpenStories)),
     ("tickets", "Tickets", "secondary-shift-i", || Box::new(OpenTickets)),
     ("git", "Git", "secondary-shift-b", || Box::new(OpenGit)),
+    ("files", "Files of the sidebar", "secondary-shift-e", || Box::new(ShowFiles)),
     ("meeting", "Meeting", "secondary-shift-g", || Box::new(OpenMeeting)),
     ("memory", "Memory", "secondary-shift-y", || Box::new(OpenMemory)),
     ("call", "Call", "secondary-shift-p", || Box::new(OpenCall)),
@@ -1245,6 +1268,72 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(OpenGuideStart),
     },
     Entry {
+        label: "Show files",
+        icon: IconName::Folder,
+        keywords: &["files", "explorer", "tree", "sidebar", "folder"],
+        action: || Box::new(ShowFiles),
+    },
+    Entry {
+        label: "New file",
+        icon: IconName::Plus,
+        keywords: &["files", "create", "touch", "file"],
+        action: || Box::new(NewFile),
+    },
+    Entry {
+        label: "New folder",
+        icon: IconName::Plus,
+        keywords: &["files", "create", "mkdir", "folder", "directory"],
+        action: || Box::new(NewFolder),
+    },
+    Entry {
+        label: "Open the selected file",
+        icon: IconName::File,
+        keywords: &["files", "open", "system"],
+        action: || Box::new(OpenSelectedFile),
+    },
+    Entry {
+        label: "Open the selected file with $EDITOR in a terminal",
+        icon: IconName::SquareTerminal,
+        keywords: &["files", "edit", "editor", "vim", "nvim"],
+        action: || Box::new(OpenSelectedFileInEditor),
+    },
+    Entry {
+        label: "Rename the selected file or folder",
+        icon: IconName::Replace,
+        keywords: &["files", "rename", "move"],
+        action: || Box::new(RenameSelectedFile),
+    },
+    Entry {
+        label: "Move the selected file or folder to the trash",
+        icon: IconName::Close,
+        keywords: &["files", "delete", "remove", "trash"],
+        action: || Box::new(TrashSelectedFile),
+    },
+    Entry {
+        label: "Open a terminal in the selected folder",
+        icon: IconName::SquareTerminal,
+        keywords: &["files", "terminal", "shell", "here"],
+        action: || Box::new(TerminalInSelectedFolder),
+    },
+    Entry {
+        label: "Copy the path of the selected file or folder",
+        icon: IconName::Copy,
+        keywords: &["files", "copy", "path", "clipboard"],
+        action: || Box::new(CopySelectedFilePath),
+    },
+    Entry {
+        label: "Reveal the selected file or folder in the system",
+        icon: IconName::FolderOpen,
+        keywords: &["files", "reveal", "file manager", "show"],
+        action: || Box::new(RevealSelectedFile),
+    },
+    Entry {
+        label: "Add the selected folder to the favorites",
+        icon: IconName::Star,
+        keywords: &["files", "favorite", "folder", "save"],
+        action: || Box::new(AddSelectedFolderToFavorites),
+    },
+    Entry {
         label: "Close the window (terminals keep running)",
         icon: IconName::Close,
         keywords: &["quit", "exit"],
@@ -1358,6 +1447,9 @@ mod tests {
             "Color the product group of the active product",
             "Remove the product group of the active product",
             "Open the context menu of the focused row or pane",
+            "Show files",
+            "New file",
+            "New folder",
         ] {
             assert!(
                 ENTRIES.iter().any(|e| e.label == label),
