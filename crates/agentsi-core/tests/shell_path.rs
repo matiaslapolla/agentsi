@@ -34,16 +34,18 @@ fn base_path(bin: &Path) -> String {
     format!("{}:/usr/bin:/bin", bin.display())
 }
 
-fn core_with_shell(dir: &TempDir, shell: &Path, path: &str, more: &[(&str, &Path)]) -> CoreProc {
+/// A core on the data root `root` that reads the login shell `shell`.
+fn core_with_shell(dir: &TempDir, shell: &Path, path: &str, root: &Path) -> CoreProc {
     let home = dir.0.join("home");
     std::fs::create_dir_all(&home).unwrap();
-    let mut env: Vec<(&str, &Path)> = vec![
+    std::fs::create_dir_all(root).unwrap();
+    let env: [(&str, &Path); 5] = [
         ("AGENTSI_NO_SHELL_PATH", Path::new("0")),
         ("SHELL", shell),
         ("PATH", Path::new(path)),
         ("HOME", &home),
+        ("AGENTSI_HOME", root),
     ];
-    env.extend_from_slice(more);
     // The read of a slow shell holds the start for its whole limit.
     CoreProc::start_within(dir, &env, Duration::from_secs(10))
 }
@@ -59,7 +61,7 @@ fn the_core_adds_the_folders_of_the_login_shell_after_its_own() {
     std::fs::create_dir_all(&bin).unwrap();
     let path = base_path(&bin);
     let shell = noisy_shell(&dir.0, &extra);
-    let core = core_with_shell(&dir, &shell, &path, &[]);
+    let core = core_with_shell(&dir, &shell, &path, &dir.0.join("root"));
     assert_eq!(
         core_path(&core),
         json!({"source": "merged", "value": format!("{path}:{}", extra.display())})
@@ -75,7 +77,7 @@ fn a_slow_shell_keeps_the_process_path() {
     script(&shell, "sleep 30");
     let path = base_path(&bin);
     let start = Instant::now();
-    let core = core_with_shell(&dir, &shell, &path, &[]);
+    let core = core_with_shell(&dir, &shell, &path, &dir.0.join("root"));
     assert!(
         start.elapsed() < Duration::from_secs(6),
         "{:?}",
@@ -177,7 +179,7 @@ fn a_meeting_starts_the_claude_that_only_the_login_shell_finds() {
     assert!(!started.exists());
 
     let shell = noisy_shell(&dir.0, &extra);
-    let core = core_with_shell(&dir, &shell, &path, &[("AGENTSI_HOME", root.as_path())]);
+    let core = core_with_shell(&dir, &shell, &path, &root);
     let reply = ask(&core);
     assert!(started.exists(), "{reply}");
 }
