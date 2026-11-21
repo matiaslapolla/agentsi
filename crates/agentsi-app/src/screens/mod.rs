@@ -131,11 +131,11 @@ impl ScreenKind {
     }
 
     /// The settings and the guide belong to no product.
-    fn of_no_product(self) -> bool {
+    pub fn of_no_product(self) -> bool {
         matches!(self, ScreenKind::Settings | ScreenKind::Guide)
     }
 
-    fn title(self, arg: Option<&str>) -> String {
+    pub fn title(self, arg: Option<&str>) -> String {
         match self {
             ScreenKind::Desk => "Front desk".into(),
             ScreenKind::Minutes => "Minutes".into(),
