@@ -51,8 +51,9 @@ pub struct CheckResult {
 
 /// What the checks read from the machine. The tests pass fakes.
 pub trait Probes {
-    /// The program that AgentSI starts for `cmd`, or `None` when it finds none.
-    fn find(&mut self, cmd: &str) -> Option<PathBuf>;
+    /// The program that AgentSI starts for `cmd`, or `None` when it finds none. An error when
+    /// a setting names a program that is not there.
+    fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String>;
     /// The trimmed output of `cmd args`, or `None` when the command is missing or fails.
     fn output(&mut self, cmd: &str, args: &[&str]) -> Option<String>;
     /// True when bwrap can start a sandbox with no network.
@@ -140,7 +141,7 @@ fn run_found(
     cmd: &str,
     args: &[&str],
 ) -> Result<(String, String), (Status, String)> {
-    let program = p.find(cmd).ok_or_else(missing)?;
+    let program = p.find(cmd).map_err(failed)?.ok_or_else(missing)?;
     let program = program.to_string_lossy().into_owned();
     match p.output(&program, args) {
         Some(out) => Ok((program, first_line(&out))),
@@ -259,12 +260,13 @@ pub fn checks(p: &mut dyn Probes) -> Vec<CheckResult> {
 }
 
 /// The program that AgentSI starts for `cmd` on this host.
-pub fn find(cmd: &str) -> Option<PathBuf> {
-    if cmd == "claude" {
-        crate::path::claude().ok()
-    } else {
-        crate::path::which(cmd)
+pub fn find(cmd: &str) -> Result<Option<PathBuf>, String> {
+    if cmd == "claude"
+        && let Some(bin) = crate::path::claude_bin()
+    {
+        return bin.map(Some);
     }
+    Ok(crate::path::which(cmd))
 }
 
 const TOOL_TIMEOUT: Duration = Duration::from_secs(15);

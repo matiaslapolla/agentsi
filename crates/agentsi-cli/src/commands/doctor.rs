@@ -76,7 +76,7 @@ impl Machine {
 }
 
 impl Probes for Machine {
-    fn find(&mut self, cmd: &str) -> Option<PathBuf> {
+    fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
         find(cmd)
     }
 
@@ -121,13 +121,21 @@ mod tests {
         sandbox: bool,
         core: Option<CoreStatusResult>,
         models: Option<(usize, usize)>,
+        /// A program whose setting names no program, and the error.
+        bad_bin: Option<(&'static str, &'static str)>,
     }
 
     impl Probes for Fake {
-        fn find(&mut self, cmd: &str) -> Option<PathBuf> {
-            self.tools
+        fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
+            if let Some((name, e)) = self.bad_bin
+                && name == cmd
+            {
+                return Err(e.into());
+            }
+            Ok(self
+                .tools
                 .contains_key(cmd)
-                .then(|| PathBuf::from("/bin").join(cmd))
+                .then(|| PathBuf::from("/bin").join(cmd)))
         }
         fn output(&mut self, cmd: &str, args: &[&str]) -> Option<String> {
             let cmd = cmd.rsplit('/').next().unwrap_or(cmd);
@@ -183,6 +191,7 @@ mod tests {
             sandbox: true,
             core: Some(status(3)),
             models: Some((2, 2)),
+            bad_bin: None,
         }
     }
 
@@ -243,11 +252,26 @@ mod tests {
         assert_eq!(r[2].detail, "/bin/claude does not run");
     }
 
+    #[test]
+    fn a_claude_setting_that_names_no_program_fails_with_its_reason() {
+        let mut f = healthy();
+        f.bad_bin = Some((
+            "claude",
+            "AGENTSI_CLAUDE_BIN is /none, and it is not an executable file",
+        ));
+        let r = checks(&mut f);
+        assert_eq!(r[2].status, Status::Fail);
+        assert_eq!(
+            r[2].detail,
+            "AGENTSI_CLAUDE_BIN is /none, and it is not an executable file"
+        );
+    }
+
     /// Finds every program of the fake, and none of them runs.
     struct NoOutput(Fake);
 
     impl Probes for NoOutput {
-        fn find(&mut self, cmd: &str) -> Option<PathBuf> {
+        fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
             self.0.find(cmd)
         }
         fn output(&mut self, _: &str, _: &[&str]) -> Option<String> {

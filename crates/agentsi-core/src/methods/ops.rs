@@ -71,7 +71,7 @@ fn status_of(core: &Core) -> Result<CoreStatusResult, RpcError> {
 struct Host(Arc<Core>);
 
 impl Probes for Host {
-    fn find(&mut self, cmd: &str) -> Option<PathBuf> {
+    fn find(&mut self, cmd: &str) -> Result<Option<PathBuf>, String> {
         doctor::find(cmd)
     }
 

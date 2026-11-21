@@ -47,17 +47,26 @@ pub fn claude_in(path: Option<OsString>) -> Result<PathBuf, String> {
     claude_with(std::env::var_os(CLAUDE_BIN_ENV), path)
 }
 
+/// The program that `AGENTSI_CLAUDE_BIN` names, or `None` when it is not set.
+pub fn claude_bin() -> Option<Result<PathBuf, String>> {
+    bin_of(std::env::var_os(CLAUDE_BIN_ENV))
+}
+
+fn bin_of(bin: Option<OsString>) -> Option<Result<PathBuf, String>> {
+    let bin = PathBuf::from(bin.filter(|b| !b.is_empty())?);
+    Some(if is_executable_file(&bin) {
+        Ok(bin)
+    } else {
+        Err(format!(
+            "{CLAUDE_BIN_ENV} is {}, and it is not an executable file",
+            bin.display()
+        ))
+    })
+}
+
 fn claude_with(bin: Option<OsString>, path: Option<OsString>) -> Result<PathBuf, String> {
-    if let Some(bin) = bin.filter(|b| !b.is_empty()) {
-        let bin = PathBuf::from(bin);
-        return if is_executable_file(&bin) {
-            Ok(bin)
-        } else {
-            Err(format!(
-                "{CLAUDE_BIN_ENV} is {}, and it is not an executable file",
-                bin.display()
-            ))
-        };
+    if let Some(bin) = bin_of(bin) {
+        return bin;
     }
     which_in("claude", path.as_deref()).ok_or_else(|| {
         format!(
