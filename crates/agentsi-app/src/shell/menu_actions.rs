@@ -80,6 +80,7 @@ impl Shell {
                 Facts {
                     running: t.running,
                     voice: t.voice,
+                    link: self.menu_link.is_some(),
                     folder: !t.cwd.is_empty(),
                     local: p.host.is_none(),
                     tabbed: tab.is_some(),
@@ -116,6 +117,12 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.menu_link = match &request.target {
+            Target::Pane(p) => self
+                .pane_panel(p, cx)
+                .and_then(|panel| panel.read(cx).link_at_pointer(cx)),
+            _ => None,
+        };
         let items = menus::items(&request.target, &self.menu_facts(&request.target, cx));
         let shell = cx.weak_entity();
         let target = request.target;
@@ -224,6 +231,11 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        if matches!(cmd, Cmd::OpenLink | Cmd::CopyLink) {
+            self.menu_link = self
+                .focused_terminal(window, cx)
+                .and_then(|p| p.read(cx).link_at_pointer(cx));
+        }
         match self.palette_target(kind, window, cx) {
             Some(target) => self.run_menu(target, cmd, window, cx),
             None => self.notice(
@@ -527,6 +539,29 @@ impl Shell {
 
     fn pane_cmd(&mut self, pane: PaneRef, cmd: Cmd, window: &mut Window, cx: &mut Context<Self>) {
         match cmd {
+            Cmd::OpenLink | Cmd::CopyLink => {
+                let Some(link) = self.menu_link.take() else {
+                    self.notice("The mouse is on no link of this pane.", cx);
+                    return;
+                };
+                match link {
+                    _ if cmd == Cmd::CopyLink => {
+                        cx.write_to_clipboard(ClipboardItem::new_string(link.target()))
+                    }
+                    agentsi_term_view::Link::Url(url) => cx.open_url(&url),
+                    agentsi_term_view::Link::Path { path, line, .. } => self.edit_file(
+                        crate::nav::EditRequest {
+                            host: pane.host,
+                            pane: pane.id,
+                            path,
+                            line,
+                        },
+                        std::env::var("EDITOR").ok(),
+                        window,
+                        cx,
+                    ),
+                }
+            }
             Cmd::Rename => self.ask(Ask::PaneLabel(pane), window, cx),
             Cmd::ColorPane => self.ask(Ask::PaneColor(pane), window, cx),
             Cmd::TalkToPane | Cmd::VoiceMode => {
@@ -976,6 +1011,8 @@ pub(super) fn handlers(root: Stateful<Div>, cx: &mut Context<Shell>) -> Stateful
         SplitPaneRight => (Pane, SplitRight),
         SplitPaneDown => (Pane, SplitDown),
         CopyPaneFolder => (Pane, CopyFolder),
+        OpenPaneLink => (Pane, OpenLink),
+        CopyPaneLink => (Pane, CopyLink),
         ClosePane => (Pane, ClosePane),
         OpenStorySession => (Story, Open),
         ReviewStory => (Story, Review),

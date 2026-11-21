@@ -693,3 +693,66 @@ fn an_archived_product_has_one_menu_entry_and_restore_calls_archive_restore(
     assert_eq!(restore["params"]["product"], "b");
     assert_eq!(restore["params"]["kind"], "product");
 }
+
+#[gpui::test]
+fn the_pane_menu_on_a_link_opens_and_copies_it_and_a_path_opens_in_the_editor(
+    cx: &mut TestAppContext,
+) {
+    use agentsi_term_view::Link;
+    let dir = folder("menu-link");
+    std::fs::create_dir_all(dir.join("src")).unwrap();
+    std::fs::write(dir.join("src/main.rs"), "fn main() {}\n").unwrap();
+    let (mut f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    four_tabs(&f, cx);
+    let cwd = dir.display().to_string();
+    f.core.update(cx, |s, _| {
+        s.terminals.get_mut("t2-a").unwrap().cwd = cwd.clone();
+    });
+    let t2 = || pane("t2-a");
+    let set_link = |f: &Fixture, cx: &mut VisualTestContext, link: Option<Link>| {
+        f.shell.update(cx, |s, _| s.menu_link = link);
+    };
+    assert!(!entries(&f, cx, &t2()).contains(&Cmd::OpenLink));
+    let url = Link::Url("https://example.com".into());
+    set_link(&f, cx, Some(url.clone()));
+    assert_eq!(entries(&f, cx, &t2())[..2], [Cmd::OpenLink, Cmd::CopyLink]);
+    run(&f, cx, t2(), Cmd::CopyLink);
+    let copied = cx.read_from_clipboard().and_then(|c| c.text());
+    assert_eq!(copied.as_deref(), Some("https://example.com"));
+    set_link(&f, cx, Some(url));
+    run(&f, cx, t2(), Cmd::OpenLink);
+    assert_eq!(cx.opened_url().as_deref(), Some("https://example.com"));
+
+    // A path with a line: `$EDITOR +12 src/main.rs` in a new terminal in the folder of the pane.
+    let _ = sent(&mut f);
+    let edit = |f: &Fixture, cx: &mut VisualTestContext, path: &str, editor: Option<&str>| {
+        let r = crate::nav::EditRequest {
+            host: None,
+            pane: "t2-a".into(),
+            path: path.into(),
+            line: 12,
+        };
+        f.shell.update_in(cx, |s, window, cx| {
+            s.edit_file(r, editor.map(String::from), window, cx)
+        });
+        redraw(cx);
+    };
+    edit(&f, cx, "src/main.rs", Some("vim"));
+    let create = call(&sent(&mut f), "terminal.create").expect("a terminal is created");
+    assert_eq!(create["params"]["cwd"], cwd.as_str());
+    assert_eq!(create["params"]["product"], "a");
+    let argv: Vec<String> = serde_json::from_value(create["params"]["argv"].clone()).unwrap();
+    assert_eq!(argv[3..], ["sh", "vim", "+12", "src/main.rs"]);
+    // No $EDITOR: the file opens as a file URL. A missing file opens nothing and says so.
+    edit(&f, cx, "src/main.rs", None);
+    let want = crate::pane::file_url(&format!("{cwd}/src/main.rs"));
+    assert_eq!(cx.opened_url(), Some(want));
+    edit(&f, cx, "src/gone.rs", Some("vim"));
+    assert!(call(&sent(&mut f), "terminal.create").is_none());
+    let noted = f.core.read_with(cx, |s, _| {
+        s.notices
+            .iter()
+            .any(|n| n.contains("gone.rs does not exist"))
+    });
+    assert!(noted);
+}

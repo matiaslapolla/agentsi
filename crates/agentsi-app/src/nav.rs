@@ -250,6 +250,37 @@ impl Runs {
     }
 }
 
+/// A path link that the owner opened in a pane: the shell opens `$EDITOR +line path` in a new
+/// terminal, in the folder of the pane.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct EditRequest {
+    pub host: Option<String>,
+    /// The terminal id of the pane.
+    pub pane: String,
+    pub path: String,
+    pub line: u32,
+}
+
+/// The sender side of `EditRequest`. The panels of a restored layout have no handle on the
+/// shell, so they reach it through this global.
+pub struct Edits(mpsc::UnboundedSender<EditRequest>);
+
+impl Global for Edits {}
+
+impl Edits {
+    pub fn channel() -> (Edits, mpsc::UnboundedReceiver<EditRequest>) {
+        let (tx, rx) = mpsc::unbounded();
+        (Edits(tx), rx)
+    }
+
+    /// Asks the shell to open `request`. Without a shell nothing happens.
+    pub fn send(cx: &App, request: EditRequest) {
+        if let Some(edits) = cx.try_global::<Edits>() {
+            let _ = edits.0.unbounded_send(request);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

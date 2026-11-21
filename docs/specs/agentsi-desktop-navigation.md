@@ -66,7 +66,7 @@ Each menu uses `PopupMenu` of `gpui-component`. Each entry also has a palette en
 | Object | Entries |
 |---|---|
 | Product | New terminal, Open desk, Start meeting, New story, New ticket, Open tickets, Reflect, Open the git panel, Label and color, Move to group, Copy path, Open folder, Archive |
-| Pane (tab or item row) | Rename, Color, Add to tab group, Talk to this pane, Voice mode, Split right, Split down, Copy folder, Close, Close others, Close to the right |
+| Pane (tab or item row) | Open link and Copy link (on a link, see `agentsi-desktop-terminal-links.md`), Rename, Color, Add to tab group, Talk to this pane, Voice mode, Split right, Split down, Copy folder, Close, Close others, Close to the right |
 | Story session | Open, Review, Accept, Reject, Open a terminal in the worktree |
 | Ticket (a row of the Tickets screen, the Ticket screen) | Open, Done, Wait, Drop, Reopen, Promote to story, Promote to decision, Copy id |
 | Meeting | Open, Cancel |

@@ -95,6 +95,8 @@ pub enum Cmd {
     Archive,
     RestoreProduct,
     // A pane.
+    OpenLink,
+    CopyLink,
     Rename,
     ColorPane,
     TalkToPane,
@@ -165,6 +167,8 @@ pub struct Facts {
     pub ticket: Option<TicketState>,
     /// The product is archived: its menu holds Restore only.
     pub archived: bool,
+    /// The menu of a pane opened with the pointer on a link.
+    pub link: bool,
 }
 
 impl Facts {
@@ -184,6 +188,7 @@ impl Facts {
             grouped: true,
             ticket: Some(TicketState::Open),
             archived: false,
+            link: true,
         }
     }
 }
@@ -249,13 +254,21 @@ pub fn items(target: &Target, f: &Facts) -> Vec<Item> {
             on(Archive, "Archive"),
         ],
         Target::Pane(_) => {
-            let mut v = vec![
+            let mut v = Vec::new();
+            if f.link {
+                v.extend([
+                    on(OpenLink, "Open link"),
+                    on(CopyLink, "Copy link"),
+                    Item::Separator,
+                ]);
+            }
+            v.extend([
                 on(Rename, "Rename"),
                 on(ColorPane, "Color"),
                 Item::Separator,
                 when(NewTabGroup, "New tab group", f.tabbed),
                 when(AddToTabGroup, "Add to tab group", f.tabbed),
-            ];
+            ]);
             if f.grouped {
                 v.push(when(LeaveTabGroup, "Remove from tab group", f.tabbed));
             }
@@ -359,6 +372,8 @@ pub fn palette(kind: Kind, cmd: Cmd) -> &'static str {
         (_, DeleteData) => "Delete the data of the active product",
         (_, Archive) => "Archive the active product",
         (_, RestoreProduct) => "Restore the archived product",
+        (_, OpenLink) => "Open the link under the mouse in the focused pane",
+        (_, CopyLink) => "Copy the link under the mouse in the focused pane",
         (_, Rename) => "Rename the active pane",
         (_, ColorPane) => "Color the active pane",
         (_, TalkToPane) => "Talk to this pane",
@@ -570,6 +585,8 @@ mod tests {
         assert_eq!(
             labels(&t[1]),
             [
+                "Open link",
+                "Copy link",
                 "Rename",
                 "Color",
                 "New tab group",
