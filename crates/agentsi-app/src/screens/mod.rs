@@ -607,6 +607,7 @@ impl BasePanel for ScreenPanel {
     }
 
     fn set_active(&mut self, active: bool, _: &mut Window, cx: &mut Context<Self>) {
+        let active = active && !crate::tabs::hidden(cx.entity_id(), cx);
         self.shown = active;
         if active && let Some(center) = Alerts::try_get(cx) {
             if let Some(target) = self.alert_target() {
@@ -644,9 +645,11 @@ impl ScreenPanel {
         let tip = self.kind.title(self.arg.as_deref());
         div()
             .id(SharedString::from(format!(
-                "tab-mark:{}:{}",
+                "tab-mark:{}:{}:{}:{}",
                 self.kind.name(),
-                self.product
+                self.host.as_deref().unwrap_or_default(),
+                self.product,
+                self.arg.as_deref().unwrap_or_default()
             )))
             .flex()
             .items_center()

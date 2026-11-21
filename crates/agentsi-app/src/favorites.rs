@@ -16,8 +16,8 @@
 //! ```
 //!
 //! - The order of the file is the order of the sidebar.
-//! - The app reads what it knows. An entry that it cannot use is skipped with a note, and a key
-//!   that it does not know stays in the file of the next write. A file that does not parse is
+//! - The app reads what it knows. An entry that it cannot use is skipped with a note and stays
+//!   at the end of the file of the next write, and so does a key that it does not know. A file that does not parse is
 //!   not overwritten.
 
 use std::path::{Path, PathBuf};
@@ -317,6 +317,14 @@ fn write(path: &Path, list: &[Favorite]) -> Result<(), String> {
             };
             array.push(t);
         }
+        // An entry that the app skipped at the read stays for the owner to fix.
+        for t in old.iter().filter(|t| entry(t).is_err()) {
+            let mut kept = Table::new();
+            for (k, v) in t.iter() {
+                kept.insert(k, v.clone());
+            }
+            array.push(kept);
+        }
         if array.is_empty() {
             doc.remove(ENTRY);
         } else {
@@ -504,11 +512,11 @@ target = "desk"
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(
             &path,
-            "# mine\ntheme = 1\n\n[[favorite]]\nlabel = \"Src\"\nkind = \"folder\"\ntarget = \"/src\"\nicon = \"star\"\n",
+            "# mine\ntheme = 1\n\n[[favorite]]\nlabel = \"Src\"\nkind = \"folder\"\ntarget = \"/src\"\nicon = \"star\"\n\n[[favorite]]\nkind = \"portal\"\ntarget = \"x\"\n",
         )
         .unwrap();
         let (mut list, note) = read(&path);
-        assert_eq!(note, None);
+        assert!(note.unwrap().contains("portal"));
         list.insert(
             0,
             Favorite {
@@ -528,9 +536,13 @@ target = "desk"
         );
         assert!(text.contains("icon = \"star\""), "{text}");
         assert!(text.find("Claude") < text.find("Src"), "{text}");
-        let (back, note) = read(&path);
-        assert_eq!(note, None);
+        assert!(
+            text.contains("kind = \"portal\""),
+            "a skipped entry stays: {text}"
+        );
+        let (back, _) = read(&path);
         assert_eq!(back, list);
+        std::fs::write(&path, "").unwrap();
         write(&path, &[]).unwrap();
         assert!(!std::fs::read_to_string(&path).unwrap().contains("favorite"));
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
