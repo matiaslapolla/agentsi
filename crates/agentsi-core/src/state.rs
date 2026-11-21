@@ -103,6 +103,8 @@ pub struct Core {
     dictating: AtomicBool,
     /// The desk session of each product.
     pub desks: crate::desk::Desks,
+    /// The folders of the file trees that the clients read.
+    pub files: crate::methods::files_watch::FileWatch,
     /// The conversation mode that runs, if any.
     pub(crate) converse: Mutex<Option<crate::converse::Active>>,
     /// The prompt of the running turn of each session outside the app that has voice mode on.
@@ -129,6 +131,7 @@ impl Core {
             focus: Mutex::default(),
             dictating: AtomicBool::new(false),
             desks: crate::desk::Desks::default(),
+            files: Default::default(),
             converse: Mutex::default(),
             session_prompts: Mutex::default(),
             subscribers: Mutex::default(),

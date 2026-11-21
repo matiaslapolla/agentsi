@@ -8,12 +8,12 @@
 //! Spec: `docs/specs/agentsi-desktop-git-more.md`.
 
 use crate::state::Core;
+use agentsi_agency::files::{ignored, walker};
 use agentsi_agency::gitpanel;
 use agentsi_agency::registry::Registry;
 use agentsi_proto::core_api::Topic;
 use agentsi_proto::events::{GitChanged, GitChangedParams};
 use agentsi_proto::git_api::GitSummaryInfo;
-use ignore::WalkBuilder;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -280,18 +280,6 @@ fn watch_tree(mut watcher: Option<&mut RecommendedWatcher>, p: &mut Product, sta
     }
 }
 
-fn walker(start: &Path) -> WalkBuilder {
-    let mut w = WalkBuilder::new(start);
-    w.hidden(false)
-        .ignore(false)
-        .parents(true)
-        .git_ignore(true)
-        .git_exclude(true)
-        .git_global(true)
-        .follow_links(false);
-    w
-}
-
 /// `start` and each folder under it that git does not ignore, with no `.git` folder.
 fn tree_dirs(start: &Path) -> HashSet<PathBuf> {
     walker(start)
@@ -300,23 +288,6 @@ fn tree_dirs(start: &Path) -> HashSet<PathBuf> {
         .filter_map(Result::ok)
         .map(|e| e.into_path())
         .collect()
-}
-
-/// True when git ignores the folder `dir`.
-fn ignored(dir: &Path) -> bool {
-    let Some(parent) = dir.parent() else {
-        return false;
-    };
-    if dir.file_name().is_some_and(|n| n == ".git") {
-        return true;
-    }
-    let target = dir.to_path_buf();
-    !walker(parent)
-        .max_depth(Some(1))
-        .filter_entry(move |e| e.depth() == 0 || e.path() == target)
-        .build()
-        .filter_map(Result::ok)
-        .any(|e| e.depth() == 1)
 }
 
 fn subdirs(dir: &Path) -> Vec<PathBuf> {

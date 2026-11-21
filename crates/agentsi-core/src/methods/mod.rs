@@ -10,6 +10,8 @@ mod core_api;
 mod data;
 mod desk;
 mod desk_session;
+mod files;
+pub mod files_watch;
 mod general_roles;
 mod git;
 pub mod git_watch;
@@ -60,6 +62,7 @@ pub fn router() -> Router {
         .group(data::register)
         .group(reflect::register)
         .group(git::register)
+        .group(files::register)
         .group(tickets::register)
         .group(registry::register)
         .group(setup::register)
