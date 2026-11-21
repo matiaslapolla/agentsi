@@ -5,22 +5,22 @@
 
 use agentsi_proto::agency_api::{AuditParams, AuditReport, DataAudit};
 use agentsi_proto::roles_api::{
-    ApplyPlan, RoleDef, BriefView, ChangeStatus, ResetPlan, RoleSource,
-    RolesBrief, RolesBriefParams, RolesList, RolesListParams, RolesListResult, RolesReset,
-    RolesResetParams, RolesValidate, RolesValidateParams, RolesValidateResult, RosterEntry,
+    ApplyPlan, BriefView, ChangeStatus, ResetPlan, RoleDef, RoleSource, RolesBrief,
+    RolesBriefParams, RolesList, RolesListParams, RolesListResult, RolesReset, RolesResetParams,
+    RolesValidate, RolesValidateParams, RolesValidateResult, RosterEntry,
 };
 use agentsi_ui::components::{Button, Card, neutral_tag, status_tag};
 use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
-use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::component::IconName;
+use gpui_kit::component::checkbox::Checkbox;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
+use super::ScreenSpec;
 use super::parts::{Load, column, first_screen_ready, mono, notice, role_label, section};
 use super::roles_report;
 use crate::model::CoreState;
 use crate::nav::Nav;
-use super::ScreenSpec;
 
 /// A plan that waits for the owner to confirm it.
 #[derive(Clone)]
@@ -206,10 +206,10 @@ impl RolesScreen {
             agent: Some(agent.clone()),
         });
         cx.spawn(async move |this, cx| {
-            let result = call
-                .await
-                .map_err(|e| e.to_string())
-                .and_then(|r| r.agent.ok_or_else(|| "The core sent no definition.".to_string()));
+            let result = call.await.map_err(|e| e.to_string()).and_then(|r| {
+                r.agent
+                    .ok_or_else(|| "The core sent no definition.".to_string())
+            });
             let _ = this.update(cx, |this, cx| {
                 this.definition = Some((agent, result));
                 cx.notify();
@@ -336,25 +336,30 @@ impl RolesScreen {
                 },
             )
             .child(
-                div().flex().justify_end().gap(space(2)).child(
-                    Button::new(("roles-definition", i))
-                        .ghost()
-                        .small()
-                        .icon(IconName::FileText)
-                        .label("Definition")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.show_definition(definition_of.clone(), cx);
-                        })),
-                ).child(
-                    Button::new(("roles-reset", i))
-                        .ghost()
-                        .small()
-                        .icon(IconName::RotateCw)
-                        .label("Reset to the global role")
-                        .on_click(cx.listener(move |this, _, _, cx| {
-                            this.plan_reset(Some(id.clone()), false, cx);
-                        })),
-                ),
+                div()
+                    .flex()
+                    .justify_end()
+                    .gap(space(2))
+                    .child(
+                        Button::new(("roles-definition", i))
+                            .ghost()
+                            .small()
+                            .icon(IconName::FileText)
+                            .label("Definition")
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.show_definition(definition_of.clone(), cx);
+                            })),
+                    )
+                    .child(
+                        Button::new(("roles-reset", i))
+                            .ghost()
+                            .small()
+                            .icon(IconName::RotateCw)
+                            .label("Reset to the global role")
+                            .on_click(cx.listener(move |this, _, _, cx| {
+                                this.plan_reset(Some(id.clone()), false, cx);
+                            })),
+                    ),
             )
     }
 
@@ -427,7 +432,9 @@ impl RolesScreen {
                     d.role,
                     d.source,
                     d.model,
-                    d.effort.as_ref().map_or(String::new(), |e| format!(" · {e}"))
+                    d.effort
+                        .as_ref()
+                        .map_or(String::new(), |e| format!(" · {e}"))
                 )];
                 if let Some(t) = &d.tools {
                     lines.push(format!("Tools: {}", t.join(", ")));
@@ -451,7 +458,10 @@ impl RolesScreen {
                 .border_1()
                 .border_color(line::border())
                 .bg(surface::raised())
-                .child(section(&format!("Definition of {}", role_label(agent)), None))
+                .child(section(
+                    &format!("Definition of {}", role_label(agent)),
+                    None,
+                ))
                 .children(body.into_iter().map(mono)),
         )
     }
@@ -551,7 +561,9 @@ impl Render for RolesScreen {
                             .danger()
                             .small()
                             .label("Reset all")
-                            .on_click(cx.listener(|this, _, _, cx| this.plan_reset(None, false, cx))),
+                            .on_click(
+                                cx.listener(|this, _, _, cx| this.plan_reset(None, false, cx)),
+                            ),
                     ),
             );
 
@@ -800,7 +812,10 @@ mod tests {
         screen.update(cx, |s, cx| s.show_definition("dev.api".into(), cx));
         let r = request(&mut other).expect("roles.list");
         assert_eq!(r["method"], "roles.list");
-        assert_eq!(r["params"], serde_json::json!({"product": "demo", "agent": "dev.api"}));
+        assert_eq!(
+            r["params"],
+            serde_json::json!({"product": "demo", "agent": "dev.api"})
+        );
 
         screen.update(cx, |s, cx| s.plan_reset(Some("dev.api".into()), true, cx));
         let r = request(&mut other).expect("roles.reset");
