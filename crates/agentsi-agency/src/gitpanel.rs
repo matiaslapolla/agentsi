@@ -4,9 +4,9 @@
 //! Specs: `docs/specs/agentsi-desktop-git.md`, `docs/specs/agentsi-desktop-git-more.md`.
 //! No call forces: a push sends full ref names, so no refspec can start with `+`.
 
+use crate::git_env;
 use crate::registry::Product;
 use crate::story::git::{Out, git_limited};
-use crate::git_env;
 use agentsi_proto::git_api::{
     DIFF_MAX_BYTES, GitBranch, GitBranchesResult, GitCommitInfo, GitCommitResult, GitDiffResult,
     GitFile, GitOutcome, GitOutgoingResult, GitShowFile, GitShowResult, GitStatusResult,
@@ -403,7 +403,10 @@ pub fn log(repo: &Path, limit: u32) -> Result<Vec<GitCommitInfo>> {
         return Ok(Vec::new());
     }
     let n = limit.clamp(1, LOG_MAX).to_string();
-    let out = must(git(repo, &["log", "-n", &n, LOG_FORMAT], true, LIMIT), "log")?;
+    let out = must(
+        git(repo, &["log", "-n", &n, LOG_FORMAT], true, LIMIT),
+        "log",
+    )?;
     Ok(parse_log(&out))
 }
 
@@ -440,6 +443,29 @@ pub fn summary(dir: &Path) -> Result<Option<GitSummaryInfo>> {
     }))
 }
 
+/// The git folder of the worktree and the common git folder of the repo, absolute. They
+/// are the same folder outside a linked worktree.
+pub fn git_dirs(repo: &Path) -> Result<Vec<PathBuf>> {
+    let out = must(
+        git(
+            repo,
+            &["rev-parse", "--absolute-git-dir", "--git-common-dir"],
+            true,
+            LIMIT,
+        ),
+        "rev-parse",
+    )?;
+    let mut dirs: Vec<PathBuf> = Vec::new();
+    for line in out.lines().filter(|l| !l.is_empty()) {
+        let dir = repo.join(line);
+        let dir = dir.canonicalize().unwrap_or(dir);
+        if !dirs.contains(&dir) {
+            dirs.push(dir);
+        }
+    }
+    Ok(dirs)
+}
+
 /// A branch, a commit id or another revision that git cannot read as an option.
 fn check_rev(rev: &str) -> Result<()> {
     let bad = rev.is_empty()
@@ -447,7 +473,9 @@ fn check_rev(rev: &str) -> Result<()> {
         || rev.contains("..")
         || rev.chars().any(|c| c.is_whitespace() || c.is_control());
     if bad {
-        return Err(Error::Invalid(format!("{rev:?} is not a branch or a commit.")));
+        return Err(Error::Invalid(format!(
+            "{rev:?} is not a branch or a commit."
+        )));
     }
     Ok(())
 }
@@ -458,12 +486,20 @@ fn commit_id(repo: &Path, rev: &str) -> Result<String> {
     let spec = format!("{rev}^{{commit}}");
     let out = git(
         repo,
-        &["rev-parse", "--verify", "--quiet", "--end-of-options", &spec],
+        &[
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            "--end-of-options",
+            &spec,
+        ],
         true,
         LIMIT,
     );
     if !out.ok {
-        return Err(Error::Invalid(format!("{rev} is not a commit of the repo.")));
+        return Err(Error::Invalid(format!(
+            "{rev} is not a commit of the repo."
+        )));
     }
     Ok(out.stdout.trim().into())
 }
@@ -513,7 +549,12 @@ pub fn show(repo: &Path, rev: &str) -> Result<GitShowResult> {
     ) {
         p if p.ok => p.stdout.trim().to_string(),
         _ => must(
-            git(repo, &["hash-object", "-t", "tree", "/dev/null"], true, LIMIT),
+            git(
+                repo,
+                &["hash-object", "-t", "tree", "/dev/null"],
+                true,
+                LIMIT,
+            ),
             "hash-object",
         )?
         .trim()
@@ -522,7 +563,15 @@ pub fn show(repo: &Path, rev: &str) -> Result<GitShowResult> {
     let names = must(
         git(
             repo,
-            &["diff", "--no-ext-diff", "-M", "--name-status", "-z", &base, &id],
+            &[
+                "diff",
+                "--no-ext-diff",
+                "-M",
+                "--name-status",
+                "-z",
+                &base,
+                &id,
+            ],
             true,
             LIMIT,
         ),
@@ -628,7 +677,9 @@ pub fn branch_create(repo: &Path, name: &str, from: Option<&str>) -> Result<()> 
     let valid = !name.starts_with('-')
         && git(repo, &["check-ref-format", "--branch", name], true, LIMIT).ok;
     if !valid {
-        return Err(Error::Invalid(format!("{name:?} is not a valid branch name.")));
+        return Err(Error::Invalid(format!(
+            "{name:?} is not a valid branch name."
+        )));
     }
     if has_ref(repo, &format!("refs/heads/{name}")) {
         return Err(Error::Invalid(format!("The branch {name} exists.")));
@@ -662,7 +713,9 @@ pub fn switch(repo: &Path, name: &str) -> Result<GitSwitchResult> {
     } else if has_ref(repo, &format!("refs/remotes/{name}")) {
         vec!["switch", "--track", name]
     } else {
-        return Err(Error::Invalid(format!("{name} is not a branch of the repo.")));
+        return Err(Error::Invalid(format!(
+            "{name} is not a branch of the repo."
+        )));
     };
     let dirty: Vec<GitFile> = status(repo)?
         .files
@@ -704,7 +757,12 @@ struct Target {
 }
 
 fn target(repo: &Path) -> Result<Target> {
-    let head = git(repo, &["symbolic-ref", "--quiet", "--short", "HEAD"], true, LIMIT);
+    let head = git(
+        repo,
+        &["symbolic-ref", "--quiet", "--short", "HEAD"],
+        true,
+        LIMIT,
+    );
     let branch = head.stdout.trim().to_string();
     if !head.ok || branch.is_empty() {
         return Err(Error::Invalid(

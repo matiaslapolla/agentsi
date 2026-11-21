@@ -12,6 +12,7 @@ mod desk;
 mod desk_session;
 mod general_roles;
 mod git;
+pub mod git_watch;
 mod hosts;
 mod knowledge;
 mod marks;

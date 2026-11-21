@@ -117,6 +117,7 @@ async fn run(socket: &SocketPath) -> (ExitCode, Option<server::HeldLock>) {
     eprintln!("core: listening on {}", socket.path.display());
     let core = Core::new();
     tokio::spawn(agentsi_core::backup::daily(core.clone()));
+    agentsi_core::methods::git_watch::start(&core);
     let served = bound.serve(core.clone(), server::euid(), stop).await;
     let stopped_at = Instant::now();
     // A request in flight gets its grace to answer, while the work stops.

@@ -131,10 +131,7 @@ fn show_gives_the_files_and_the_patch_of_a_commit_and_of_the_first_commit() {
     files.sort();
     assert_eq!(
         files,
-        vec![
-            ("A", "b c.txt", None),
-            ("R", "moved.txt", Some("a.txt"))
-        ]
+        vec![("A", "b c.txt", None), ("R", "moved.txt", Some("a.txt"))]
     );
     assert!(r.patch.contains("+two"), "{}", r.patch);
     assert!(!r.truncated);
@@ -163,14 +160,20 @@ fn branches_lists_the_current_branch_first_the_remote_ones_and_the_worktrees() {
     ));
     for bad in ["-x", "a b", "a..b", ""] {
         assert!(
-            matches!(gitpanel::branch_create(&n.a, bad, None), Err(Error::Invalid(_))),
+            matches!(
+                gitpanel::branch_create(&n.a, bad, None),
+                Err(Error::Invalid(_))
+            ),
             "{bad:?}"
         );
     }
     write(&n.a, "a.txt", "two\n");
     commit_all(&n.a, "ahead");
     let wt = n.a.parent().unwrap().join("wt");
-    git(&n.a, &["worktree", "add", "-q", wt.to_str().unwrap(), "aaa"]);
+    git(
+        &n.a,
+        &["worktree", "add", "-q", wt.to_str().unwrap(), "aaa"],
+    );
 
     let r = gitpanel::branches(&n.a).unwrap();
     let local: Vec<_> = r.local.iter().map(|b| b.name.as_str()).collect();
@@ -203,7 +206,10 @@ fn a_switch_with_a_clean_tree_works_and_a_switch_with_changes_gives_dirty() {
     let paths: Vec<_> = r.files.iter().map(|f| f.path.as_str()).collect();
     assert_eq!(paths, ["a.txt"]);
     assert_eq!(git(&n.a, &["branch", "--show-current"]), "feat");
-    assert_eq!(std::fs::read_to_string(n.a.join("a.txt")).unwrap(), "changed\n");
+    assert_eq!(
+        std::fs::read_to_string(n.a.join("a.txt")).unwrap(),
+        "changed\n"
+    );
 
     assert!(matches!(
         gitpanel::switch(&n.a, "nope"),
@@ -279,7 +285,11 @@ fn push_lists_the_outgoing_commits_and_sets_the_upstream_of_a_new_branch() {
     commit_all(&n.a, "two out");
     let o = gitpanel::outgoing(&n.a).unwrap();
     assert_eq!(
-        (o.branch.as_str(), o.remote.as_str(), o.remote_branch.as_str()),
+        (
+            o.branch.as_str(),
+            o.remote.as_str(),
+            o.remote_branch.as_str()
+        ),
         ("main", "origin", "main")
     );
     assert!(!o.set_upstream);
@@ -291,7 +301,10 @@ fn push_lists_the_outgoing_commits_and_sets_the_upstream_of_a_new_branch() {
     let r = gitpanel::push(&n.a, &mut |l: &str| lines.push(l.to_string())).unwrap();
     assert_eq!(r.outcome, GitOutcome::Done, "{}", r.output);
     assert!(!lines.is_empty(), "the push sent no progress line");
-    assert_eq!(git(&n.b, &["ls-remote", "origin", "main"])[..40], head(&n.a));
+    assert_eq!(
+        git(&n.b, &["ls-remote", "origin", "main"])[..40],
+        head(&n.a)
+    );
     assert_eq!(gitpanel::outgoing(&n.a).unwrap().count, 0);
 
     git(&n.a, &["switch", "-q", "-c", "new-branch"]);
@@ -303,7 +316,10 @@ fn push_lists_the_outgoing_commits_and_sets_the_upstream_of_a_new_branch() {
     let r = gitpanel::push(&n.a, &mut quiet).unwrap();
     assert_eq!(r.outcome, GitOutcome::Done, "{}", r.output);
     assert_eq!(
-        git(&n.a, &["rev-parse", "--abbrev-ref", "new-branch@{upstream}"]),
+        git(
+            &n.a,
+            &["rev-parse", "--abbrev-ref", "new-branch@{upstream}"]
+        ),
         "origin/new-branch"
     );
 }
@@ -319,7 +335,10 @@ fn a_push_that_the_remote_refuses_fails_and_does_not_force() {
     let r = gitpanel::push(&n.a, &mut quiet).unwrap();
     assert_eq!(r.outcome, GitOutcome::Failed);
     assert!(r.output.contains("rejected"), "{}", r.output);
-    assert_eq!(git(&n.a, &["ls-remote", "origin", "main"])[..40], head(&n.b));
+    assert_eq!(
+        git(&n.a, &["ls-remote", "origin", "main"])[..40],
+        head(&n.b)
+    );
 
     git(&n.a, &["switch", "-q", "--detach"]);
     assert!(matches!(
