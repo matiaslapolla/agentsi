@@ -404,6 +404,14 @@ _Avoid_: Sticky tab, locked tab
 A saved target with a label: a screen of a product, a folder, or a terminal command with its folder. `<config>/agentsi/favorites.toml` keeps the list in the order of the section "Favorites" of the sidebar. A click opens the target in the space of its product.
 _Avoid_: Bookmark, shortcut
 
+**Sidebar mode**:
+What the sidebar shows: Products (the tree of the products and their items) or Files (the file tree of the selected product). A switch at the top of the sidebar changes it, and `layout.json` keeps it (`sidebar_mode`).
+_Avoid_: Sidebar tab, sidebar view
+
+**File tree**:
+The folders and files of the selected product, as the core reads them one folder at a time (`files.list`). A row shows the name, an icon of its kind and the color of its git state: changed, new or ignored. New file, New folder and Rename show an inline name field. Move to trash moves to the system trash, and nothing deletes for good. The core refuses a path that leaves the folder of the product.
+_Avoid_: File explorer (in the code), project panel, file browser
+
 **Chip**:
 The pill of a tab group in the tab bar. It shows the arrow, the color, the name of the group and, when the group is collapsed, the count of its tabs. A dropped tab joins the group.
 _Avoid_: Badge, header

@@ -85,10 +85,11 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 | `hook` | `event {terminal, session, event, payload}` |
 | `focus` | `report {terminal?}` |
 | `models` | `list`, `download {id}`, `delete {id}`, `voices` (U15c) |
+| `files` | `list {product, path}`, `create {product, path, kind}`, `rename {product, from, to}`, `trash {product, path}` (file tree, `agentsi-desktop-files.md`) |
 
 ### Events
 
-`core.subscribe {topics}` starts notifications on channel 0. The topics are the event namespaces: `terminal`, `data`, `meeting`, `voice`, `dictation`, `models` and `desk`. A second call adds topics. The events are:
+`core.subscribe {topics}` starts notifications on channel 0. The topics are the event namespaces: `terminal`, `data`, `meeting`, `voice`, `dictation`, `models`, `desk`, `git` and `files`. A second call adds topics. The events are:
 
 - `terminal.state {id, state, kind?, msg?}`, `terminal.exit {id, code}`, `terminal.title {id, title}`.
 - `data.changed {product, kind}` after each write. The kind `tickets` follows each write of a ticket. `ticket.promote` sends `stories` or `decision` first.
@@ -97,6 +98,7 @@ Each method that the CLI uses returns the same JSON as the `--json` output of th
 - `dictation.target {terminal?}`, `dictation.start {at_us}` and `dictation.stop {at_us}` (U14). `at_us` is when the key edge happened, in microseconds since the Unix epoch.
 - `desk.state {product, state, message?}`, `desk.delta {product, text}` and `desk.item {product, seq, at, item}` (desk conversation).
 - `models.progress {id, bytes, total, verifying}`, `models.done {id}` and `models.error {id, error, message, file?}` (U15c).
+- `files.changed {product, path}` names a folder that `files.list` read and whose entries changed. The core watches no folder that git ignores (file tree).
 - `core.lagged {missed}` goes to each subscriber. The core keeps 1024 events of the topics of each connection. Past that, it drops the events, and then sends `core.lagged` where they are missing. Then the client must read the state again.
 
 ### Additions of protocol 1

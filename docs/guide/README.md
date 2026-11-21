@@ -122,6 +122,15 @@ You give a label and a color to a product, a pane or a tab. You put products int
 
 *The sidebar tree. A product shows its terminals, its meeting and its story sessions.*
 
+The switch at the top of the sidebar shows Products or Files. Files shows the folders and files of the selected product. `Ctrl+Shift+E` shows Files too.
+
+- A folder reads its entries when you open it. A file that a terminal makes shows within a second.
+- The color of a name shows its git state: changed, new or ignored. The eye button shows or hides the ignored entries.
+- The field at the top filters the names that the tree read.
+- The menu of a folder has New file, New folder, Rename, Move to trash, Open terminal here, Copy path, Reveal in system and Add to favorites. The menu of a file has Open, Open with `$EDITOR` in a terminal, Rename, Move to trash, Copy path and Reveal in system.
+- New file, New folder and Rename show a name field in the tree. `Enter` makes the change. `Escape` cancels. A name such as `docs/tmp` makes each folder on the way.
+- Move to trash asks one Confirm and moves to the system trash. Nothing deletes for good.
+
 ### Tabs
 
 - Drag a tab to a new place in its tab bar, to another bar, or to a screen edge to split the dock.
