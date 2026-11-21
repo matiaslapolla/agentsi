@@ -18,7 +18,9 @@ The settings screen has a section "Appearance" with three choices. Each change a
 
 - Colors and themes. The dark theme of `agentsi-ui` stays the only theme.
 - A free number for each choice. Three fixed steps keep each step tested for contrast and fit.
+  `agentsi-desktop-settings-nav.md` changes this for the text size: a text offset from −2 to +4 px.
 - The text size of the terminal. A pane keeps its own font size.
+  `agentsi-desktop-settings-nav.md` changes this: the section "Terminal" sets the font size of the panes.
 - The pill. It keeps its own sizes.
 
 ## Terms

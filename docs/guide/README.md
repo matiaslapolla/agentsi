@@ -168,19 +168,26 @@ The app binds no key that a terminal program needs, such as `Ctrl+C` or `Ctrl+W`
 
 ### Settings and the look
 
-The Settings screen has a section "Appearance". It has three choices, and each applies at once:
+The Settings screen lists its sections at the left. A click shows one section at the right. When the list has the focus, `Up` and `Down` move in it. The palette has one entry for each section, for example "Settings: Terminal". The app opens the section that you opened last.
+
+The section "Appearance" has these choices, and each applies at once:
 
 - Density: Compact, Normal or Comfortable.
 - Corners: Square, Subtle or Round.
-- Text size: Small, Medium or Large. A terminal pane keeps its own font size.
+- Text size: from −2 px to +4 px.
+- Color theme and Motion.
 
-The Settings screen has a section "Owner" with your name and language. It also has the voice models, the vocabulary, the keys, the SSH hosts, the Git config, the Health section and the Data section. The line "Guide" opens this page.
+The section "Fonts" picks the font family of the app and the font family of the terminals. Each list shows the bundled fonts first, then the fonts of your system, with a search field.
+
+The section "Terminal" sets the font size, the line height, the cursor, the colors, the scrollback, the shell and two switches of the terminal panes. A sample pane shows the result. A change applies to each open pane at once. The scrollback and the shell apply to new panes. AgentSI keeps the values in `<config>/agentsi/terminal.toml`.
+
+The Settings screen also has the sections "Owner" with your name and language, the voice models, the vocabulary, the keys, the SSH hosts, the Git config, Health and Data. The section "Guide" opens this page.
 
 The Health section shows one row for each check of `agentsi doctor`: the tool, its status and what a failed check blocks. "Check again" runs the checks again. In the Data section, "Back up now" copies the database and the registry into the backups folder, and shows the paths of both copies.
 
 ![The Settings screen. The section Owner shows the name and the language, and the section Appearance shows Density, Corners and Text size below it.](img/settings.png)
 
-*The Settings screen. The section "Appearance" comes first.*
+*The Settings screen. This shot is from before the list of sections.*
 
 ### The Git screen
 

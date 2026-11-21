@@ -136,6 +136,14 @@ _Avoid_: Dialog, wizard
 The section of the settings screen that shows the result of `core.doctor`: one row for each tool check, with its status and what it blocks.
 _Avoid_: Doctor screen
 
+**Settings section**:
+One page of the settings screen, with an id (`appearance`, `terminal`…) and a title. The list at the left of the screen names each section.
+_Avoid_: Tab, pane, page (when you mean the section)
+
+**Terminal settings**:
+The values of the settings section "Terminal": font size, line height, cursor, scrollback, shell, colors and two switches. `<config>/agentsi/terminal.toml` keeps them.
+_Avoid_: Terminal config, pane settings
+
 **Synthesis**:
 The last step of a meeting, in which the PM reads the answers of the roles and writes the minutes.
 _Avoid_: Summary, wrap-up
