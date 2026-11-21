@@ -151,13 +151,7 @@ pub fn north_stars(dir: &Path) -> Vec<String> {
 
 /// True when `name` is an executable file in a folder of `PATH`.
 pub fn on_path(name: &str) -> bool {
-    use std::os::unix::fs::PermissionsExt;
-    std::env::var_os("PATH").is_some_and(|paths| {
-        std::env::split_paths(&paths).any(|d| {
-            std::fs::metadata(d.join(name))
-                .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
-        })
-    })
+    agentsi_proto::path::which(name).is_some()
 }
 
 /// Reads the folder. `registry` is `None` when the data root has no readable registry.
