@@ -13,6 +13,7 @@ mod atomic;
 mod bench;
 mod chime;
 mod dictation_bind;
+mod favorites;
 mod format;
 mod guide;
 mod hosts;
@@ -98,6 +99,7 @@ fn main() -> ExitCode {
             actions::bind_from(cx, keys::path());
             if persist_look {
                 look::install(cx, look::path());
+                favorites::install(cx, favorites::path());
                 // Only the normal run plays tones: a bench or a test never opens the device.
                 alerts_file::install(cx, alerts_file::path());
                 cx.set_global(chime::ChimeGlobal(Rc::new(RefCell::new(

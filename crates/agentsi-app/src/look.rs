@@ -34,6 +34,8 @@ use agentsi_ui::tokens::label::Hue;
 use gpui_kit::{App, AppContext as _, Context, Entity, Global};
 use toml_edit::{Array, ArrayOfTables, DocumentMut, Item, Table, value};
 
+use crate::model::ProductRef;
+
 pub const FILE_NAME: &str = "look.toml";
 /// The longest label, in characters.
 pub const LABEL_MAX: usize = 40;
@@ -48,6 +50,20 @@ pub fn key(host: Option<&str>, id: &str) -> String {
     match host {
         None => id.to_string(),
         Some(h) => format!("@{h}/{id}"),
+    }
+}
+
+/// The product of a key made by [`key`].
+pub fn product_of_key(key: &str) -> ProductRef {
+    match key.strip_prefix('@').and_then(|r| r.split_once('/')) {
+        Some((host, id)) => ProductRef {
+            host: Some(host.to_string()),
+            id: id.to_string(),
+        },
+        None => ProductRef {
+            host: None,
+            id: key.to_string(),
+        },
     }
 }
 
