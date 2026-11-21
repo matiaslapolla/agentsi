@@ -3,6 +3,9 @@
 //! `agentsi reset` call. `roles.apply` and `roles.reset` write only when
 //! `yes` is true. The field order of each struct is the key order of the
 //! TypeScript output where the CLI prints the struct as it is.
+//!
+//! `roles.roster` and `role.general.*` are the writes of the roles screen. Spec:
+//! `docs/specs/agentsi-desktop-global-roles.md`. Each write sends `data.changed` of kind `roles`.
 
 use crate::method::{Catalog, Method};
 use crate::rpc::ErrorKind;
@@ -16,7 +19,13 @@ pub fn register(c: &mut Catalog) {
         .method::<RolesBrief>()
         .method::<RolesValidate>()
         .method::<RolesApply>()
-        .method::<RolesReset>();
+        .method::<RolesReset>()
+        .method::<RolesRoster>()
+        .method::<GeneralList>()
+        .method::<GeneralCreate>()
+        .method::<GeneralUpdate>()
+        .method::<GeneralDelete>()
+        .method::<GeneralPromote>();
 }
 
 /// Where the definition of an agent comes from.
@@ -330,4 +339,162 @@ impl Method for RolesReset {
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
     type Params = RolesResetParams;
     type Result = RolesResetResult;
+}
+
+pub struct RolesRoster;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct RolesRosterParams {
+    pub product: String,
+    /// The agent ids of the new roster, in order. Each one must resolve.
+    pub roles: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct RolesRosterResult {
+    pub product: String,
+    pub roster: Vec<String>,
+    pub commit: CommitInfo,
+}
+
+impl Method for RolesRoster {
+    const NAME: &'static str = "roles.roster";
+    const DESCRIPTION: &'static str = "Sets the roster of a product: the roster picker of the \
+        Roles screen adds and removes agents with it. Each agent must resolve. An agent that \
+        leaves loses its entry in the brief, and one that joins gets an empty entry. It writes \
+        `agentsi.config.json`, commits it and sends `data.changed` of kind `roles`.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Invalid,
+        ErrorKind::Unavailable,
+    ];
+    type Params = RolesRosterParams;
+    type Result = RolesRosterResult;
+}
+
+/// A general role: a role file of `<data root>/plugin/agents/` that is not one of the five
+/// builtin roles. Every product can add it to its roster.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralRole {
+    /// The role name and the file name: lowercase words joined by single hyphens.
+    pub id: String,
+    /// The name that a person reads, such as `Designer`.
+    pub name: String,
+    pub description: String,
+    /// The definition below the front matter.
+    pub body: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralEntry {
+    #[serde(flatten)]
+    pub role: GeneralRole,
+    /// The products whose roster uses the role, in registry order.
+    pub used_by: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralListParams {}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralListResult {
+    /// The general roles, by id.
+    pub roles: Vec<GeneralEntry>,
+    /// The builtin roles, in roster order.
+    pub builtin: Vec<String>,
+}
+
+pub struct GeneralList;
+
+impl Method for GeneralList {
+    const NAME: &'static str = "role.general.list";
+    const DESCRIPTION: &'static str = "Gives the general roles with the products that use each \
+        one, and the names of the builtin roles. It never writes.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::Unavailable];
+    type Params = GeneralListParams;
+    type Result = GeneralListResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralWriteResult {
+    pub role: GeneralRole,
+    /// The commit of the role file in the data root.
+    pub commit: CommitInfo,
+}
+
+pub struct GeneralCreate;
+
+impl Method for GeneralCreate {
+    const NAME: &'static str = "role.general.create";
+    const DESCRIPTION: &'static str = "Writes `<data root>/plugin/agents/<id>.md` with the front \
+        matter of the builtin roles, commits it and sends `data.changed` of kind `roles`. An id \
+        of a builtin role, of an existing role or with a bad form is `invalid`.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::Invalid, ErrorKind::Unavailable];
+    type Params = GeneralRole;
+    type Result = GeneralWriteResult;
+}
+
+pub struct GeneralUpdate;
+
+impl Method for GeneralUpdate {
+    const NAME: &'static str = "role.general.update";
+    const DESCRIPTION: &'static str = "Replaces the name, the description and the body of a \
+        general role. The other front matter keys stay. It commits the file and sends \
+        `data.changed` of kind `roles`.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Invalid,
+        ErrorKind::Unavailable,
+    ];
+    type Params = GeneralRole;
+    type Result = GeneralWriteResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralDeleteParams {
+    pub id: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralDeleteResult {
+    pub id: String,
+    pub commit: CommitInfo,
+}
+
+pub struct GeneralDelete;
+
+impl Method for GeneralDelete {
+    const NAME: &'static str = "role.general.delete";
+    const DESCRIPTION: &'static str = "Deletes a general role file and commits it. A role that \
+        the roster of a product uses is `invalid`, and the message names the products.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Invalid,
+        ErrorKind::Unavailable,
+    ];
+    type Params = GeneralDeleteParams;
+    type Result = GeneralDeleteResult;
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GeneralPromoteParams {
+    pub product: String,
+    /// A custom role of the product: an overlay with no `extends` and no specialty.
+    pub agent: String,
+}
+
+pub struct GeneralPromote;
+
+impl Method for GeneralPromote {
+    const NAME: &'static str = "role.general.promote";
+    const DESCRIPTION: &'static str = "Moves a custom role of a product to a general role: it \
+        writes the role file, deletes the overlay, and the roster of the product then uses the \
+        general role. It commits the file and sends `data.changed` of kind `roles`.";
+    const ERRORS: &'static [ErrorKind] = &[
+        ErrorKind::NotFound,
+        ErrorKind::Invalid,
+        ErrorKind::Unavailable,
+    ];
+    type Params = GeneralPromoteParams;
+    type Result = GeneralWriteResult;
 }
