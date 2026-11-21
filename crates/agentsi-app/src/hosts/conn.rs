@@ -479,6 +479,7 @@ impl Host {
                     Topic::Data,
                     Topic::Meeting,
                     Topic::Desk,
+                    Topic::Git,
                 ],
             }),
             self.limits.call,

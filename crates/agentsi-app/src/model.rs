@@ -184,6 +184,13 @@ pub struct DeskNotice(pub Notification);
 
 impl EventEmitter<DeskNotice> for CoreState {}
 
+/// A `git.*` event (`git.changed`, `git.progress`), for the git screens of this core. Each
+/// screen keeps the events of its own product.
+#[derive(Debug, Clone)]
+pub struct GitNotice(pub Notification);
+
+impl EventEmitter<GitNotice> for CoreState {}
+
 pub struct CoreState {
     /// The link of this core. A core of an SSH host gets a new link at each connection, so
     /// read it at each call.
@@ -507,6 +514,10 @@ pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp)
         );
     if decisions && let Some(product) = n.params.get("product").and_then(|p| p.as_str()) {
         read_desk(core, product, cx);
+    }
+    if n.method.starts_with("git.") {
+        core.update(cx, |_, cx| cx.emit(GitNotice(n.clone())));
+        return;
     }
     let desk = n.method.starts_with("desk.");
     let refresh = core.update(cx, |s, cx| {

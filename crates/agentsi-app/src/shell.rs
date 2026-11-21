@@ -46,6 +46,7 @@ use crate::model::{CoreEvent, CoreState, Cores, HostState, ProductRef, take_even
 use crate::nav::{Nav, ScreenRequest};
 use crate::pane::{QUITTING, TerminalPanel};
 use crate::prompt::{Choice, Prompt, PromptEvent};
+use crate::screens::git::{GitScreen, Tab as GitTab};
 use crate::screens::meeting;
 use crate::screens::memory::MemoryScreen;
 use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
@@ -402,6 +403,7 @@ impl Shell {
                 Topic::Meeting,
                 Topic::Voice,
                 Topic::Desk,
+                Topic::Git,
             ],
         });
         let products = link.call::<ProductList>(&Empty {});
@@ -812,6 +814,21 @@ impl Shell {
                 panel.update(cx, |p, cx| f(p, window, cx));
             }
         }
+    }
+
+    /// Shows the git screen of the active product and acts on it.
+    fn on_git(
+        &mut self,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        f: impl Fn(&mut GitScreen, &mut Window, &mut Context<GitScreen>),
+    ) {
+        self.show_active(ScreenSpec::git, window, cx);
+        self.on_active(ScreenSpec::git, window, cx, |p, window, cx| {
+            if let Some(git) = p.git() {
+                git.update(cx, |s, cx| f(s, window, cx));
+            }
+        });
     }
 
     fn open_screens(&self, cx: &App) -> Vec<Entity<ScreenPanel>> {
@@ -1479,6 +1496,24 @@ impl Render for Shell {
             }))
             .on_action(cx.listener(|this, _: &actions::OpenGit, window, cx| {
                 this.show_active(ScreenSpec::git, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::GitFetch, window, cx| {
+                this.on_git(window, cx, |s, _, cx| s.fetch(cx))
+            }))
+            .on_action(cx.listener(|this, _: &actions::GitPull, window, cx| {
+                this.on_git(window, cx, |s, _, cx| s.pull(cx))
+            }))
+            .on_action(cx.listener(|this, _: &actions::GitPush, window, cx| {
+                this.on_git(window, cx, |s, _, cx| s.ask_push(cx))
+            }))
+            .on_action(cx.listener(|this, _: &actions::GitSwitchBranch, window, cx| {
+                this.on_git(window, cx, |s, _, cx| s.set_tab(GitTab::Branches, cx))
+            }))
+            .on_action(cx.listener(|this, _: &actions::GitNewBranch, window, cx| {
+                this.on_git(window, cx, |s, window, cx| {
+                    s.set_tab(GitTab::Branches, cx);
+                    s.open_new_branch(None, window, cx);
+                })
             }))
             .on_action(cx.listener(|this, _: &actions::UpdateBrief, window, cx| {
                 this.show_active(ScreenSpec::setup, window, cx)
