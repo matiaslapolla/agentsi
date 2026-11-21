@@ -114,12 +114,47 @@ pub fn read(shell: &Path, timeout: Duration) -> Result<OsString, String> {
             Err(e) => break Err(format!("cannot read {}: {e}", shell.display())),
         }
     };
-    // The whole session: the shell can leave jobs behind. The leader is not reaped yet, so
-    // its id still names this group.
-    // SAFETY: kill takes plain values.
-    unsafe { libc::kill(-(child.id() as i32), libc::SIGKILL) };
+    // The leader is not reaped yet, so its id still names its group and its session.
+    kill_session(child.id() as libc::pid_t);
     let _ = child.wait();
     found
+}
+
+/// Kills the session `sid`: the shell's group, and the jobs that the shell put in groups of
+/// their own. Outside Linux, only the shell's group.
+fn kill_session(sid: libc::pid_t) {
+    // SAFETY: kill takes plain values.
+    unsafe { libc::kill(-sid, libc::SIGKILL) };
+    #[cfg(target_os = "linux")]
+    for _ in 0..3 {
+        let members = session_members(sid);
+        if members.is_empty() {
+            break;
+        }
+        for pid in members {
+            // SAFETY: kill takes plain values.
+            unsafe { libc::kill(pid, libc::SIGKILL) };
+        }
+    }
+}
+
+/// The live processes of the session `sid`, from `/proc/<pid>/stat`.
+#[cfg(target_os = "linux")]
+fn session_members(sid: libc::pid_t) -> Vec<libc::pid_t> {
+    let Ok(dir) = std::fs::read_dir("/proc") else {
+        return Vec::new();
+    };
+    dir.flatten()
+        .filter_map(|entry| {
+            let pid: libc::pid_t = entry.file_name().to_str()?.parse().ok()?;
+            let stat = std::fs::read_to_string(entry.path().join("stat")).ok()?;
+            // After the name in parentheses: state, ppid, pgrp, session.
+            let mut fields = stat.get(stat.rfind(')')? + 2..)?.split(' ');
+            let state = fields.next()?;
+            let session: libc::pid_t = fields.nth(2)?.parse().ok()?;
+            (session == sid && state != "Z" && state != "X").then_some(pid)
+        })
+        .collect()
 }
 
 /// The line between the markers. An interactive shell can print other lines around them.
@@ -186,6 +221,37 @@ mod tests {
             start.elapsed()
         );
         assert!(err.contains("gave no PATH in 5s"), "{err}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn a_job_in_its_own_group_ends_with_the_shell() {
+        let dir = tempfile::tempdir().unwrap();
+        let pid_file = dir.path().join("job");
+        let shell = dir.path().join("job-shell");
+        std::fs::write(
+            &shell,
+            format!(
+                "#!/bin/bash\nset -m\nsleep 100 &\necho $! > {}\neval \"$4\"\n",
+                pid_file.display()
+            ),
+        )
+        .unwrap();
+        std::fs::set_permissions(&shell, std::fs::Permissions::from_mode(0o755)).unwrap();
+        read(&shell, SHELL_TIMEOUT).unwrap();
+        let job: libc::pid_t = std::fs::read_to_string(&pid_file)
+            .unwrap()
+            .trim()
+            .parse()
+            .unwrap();
+        // The job's parent is gone, so init reaps it: it is gone or a zombie for a moment.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while std::fs::read_to_string(format!("/proc/{job}/stat"))
+            .is_ok_and(|s| s.contains("sleep") && !s.contains(") Z "))
+        {
+            assert!(Instant::now() < deadline, "the job {job} still runs");
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
 
     #[test]
