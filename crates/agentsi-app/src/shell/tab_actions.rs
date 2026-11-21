@@ -1,5 +1,5 @@
-//! What the shell does with tabs and tab groups: close a set of tabs behind one Confirm, and
-//! keep the groups.
+//! What the shell does with tabs and tab groups: close a set of tabs behind one Confirm, keep
+//! the groups, and pin a tab.
 //!
 //! Each action is a plain method that takes the tab or the group it acts on. A palette entry
 //! resolves the active tab and calls the method. The context menus of the tab bar call the same
@@ -9,7 +9,6 @@ use gpui_kit::component::dock::PanelId;
 use gpui_kit::*;
 
 use super::{Ask, Shell};
-use crate::layout::{self, TabGroupSave};
 use crate::prompt::{Choice, Prompt};
 use crate::tabs::{self, GroupId};
 
@@ -86,7 +85,7 @@ impl Shell {
                     .find(|s| same(s.entity_id()))
                     .map(TabEntity::Screen)
             })
-            .filter(|_| self.dock.read(cx).panel(id).is_some())
+            .filter(|_| self.space_of_panel(id, cx).is_some())
     }
 
     /// A program runs in the tab: closing it stops the program.
@@ -94,31 +93,60 @@ impl Shell {
         matches!(self.entity_of(id, cx), Some(TabEntity::Terminal(t)) if t.read(cx).running(cx))
     }
 
-    /// Closes the tabs. When a program runs in some of them, one Confirm comes first. A tab that
-    /// cannot close stays.
+    pub fn is_pinned(&self, panel: PanelId, cx: &App) -> bool {
+        self.tabs_of(panel, cx)
+            .is_some_and(|t| t.read(cx).is_pinned(panel))
+    }
+
+    /// Pins or unpins the tab. A pinned tab moves to the start of its bar and leaves its group.
+    pub fn pin_tab(
+        &mut self,
+        panel: PanelId,
+        pinned: bool,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        if let (Some(dock), Some(tabs)) = (self.dock_of(panel, cx), self.tabs_of(panel, cx)) {
+            tabs::set_pinned(&dock, &tabs, panel, pinned, window, cx);
+        }
+    }
+
+    /// Closes the tab unless it is pinned: the middle click of a sidebar row.
+    pub fn close_unpinned(&mut self, panel: PanelId, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.is_pinned(panel, cx) {
+            self.close_tabs(vec![panel], window, cx);
+        }
+    }
+
+    /// Closes the tabs. When a program runs in some of them, or one is pinned, one Confirm comes
+    /// first. A tab that cannot close stays.
     pub fn close_tabs(&mut self, tabs: Vec<PanelId>, window: &mut Window, cx: &mut Context<Self>) {
         let tabs: Vec<PanelId> = tabs
             .into_iter()
-            .filter(|p| self.dock.read(cx).panel(*p).is_some_and(|v| v.closable(cx)))
+            .filter(|p| {
+                self.dock_of(*p, cx)
+                    .is_some_and(|d| d.read(cx).panel(*p).is_some_and(|v| v.closable(cx)))
+            })
             .collect();
         if tabs.is_empty() {
             return;
         }
         let running = tabs.iter().filter(|p| self.tab_runs(**p, cx)).count();
-        if running == 0 {
+        let pinned = tabs.iter().filter(|p| self.is_pinned(**p, cx)).count();
+        if running == 0 && pinned == 0 {
             self.remove_tabs(&tabs, window, cx);
         } else {
-            self.ask(Ask::CloseTabs(tabs, running), window, cx);
+            self.ask(Ask::CloseTabs(tabs, running, pinned), window, cx);
         }
     }
 
     /// Closes the tabs now. A terminal tab kills its terminal.
     fn remove_tabs(&mut self, tabs: &[PanelId], window: &mut Window, cx: &mut Context<Self>) {
         for id in tabs {
-            let Some(tab) = self.entity_of(*id, cx) else {
+            let (Some(tab), Some(dock)) = (self.entity_of(*id, cx), self.dock_of(*id, cx)) else {
                 continue;
             };
-            self.dock.update(cx, |d, cx| match tab {
+            dock.update(cx, |d, cx| match tab {
                 TabEntity::Terminal(t) => d.remove_panel(t, window, cx),
                 TabEntity::Screen(s) => d.remove_panel(s, window, cx),
             });
@@ -126,18 +154,22 @@ impl Shell {
     }
 
     fn bar_of(&self, panel: PanelId, cx: &App) -> Option<tabs::Bar> {
-        tabs::bar_of(self.dock.read(cx), panel)
+        tabs::bar_of(self.dock_of(panel, cx)?.read(cx), panel)
     }
 
-    /// Closes each tab of the bar of `panel`, except `panel`.
+    /// Closes each tab of the bar of `panel`, except `panel` and the pinned tabs.
     pub fn close_others(&mut self, panel: PanelId, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(bar) = self.bar_of(panel, cx) {
-            let others = bar.panels.into_iter().filter(|p| *p != panel).collect();
+            let others = bar
+                .panels
+                .into_iter()
+                .filter(|p| *p != panel && !self.is_pinned(*p, cx))
+                .collect();
             self.close_tabs(others, window, cx);
         }
     }
 
-    /// Closes each tab of the bar of `panel` that sits after `panel`.
+    /// Closes each tab of the bar of `panel` that sits after `panel`, except the pinned tabs.
     pub fn close_to_the_right(
         &mut self,
         panel: PanelId,
@@ -150,6 +182,7 @@ impl Shell {
                 .into_iter()
                 .skip_while(|p| *p != panel)
                 .skip(1)
+                .filter(|p| !self.is_pinned(*p, cx))
                 .collect();
             self.close_tabs(after, window, cx);
         }
@@ -186,35 +219,16 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        tabs::add_to_group(&self.dock, &self.tabs, panel, id, window, cx);
+        if let (Some(dock), Some(tabs)) = (self.dock_of(panel, cx), self.tabs_of(panel, cx)) {
+            tabs::add_to_group(&dock, &tabs, panel, id, window, cx);
+        }
     }
 
     /// Takes the tab out of its group.
     pub fn leave_group(&mut self, panel: PanelId, window: &mut Window, cx: &mut Context<Self>) {
-        tabs::remove_from_group(&self.dock, &self.tabs, panel, window, cx);
-    }
-
-    /// Reads the groups of the layout file onto the panels that the dock loaded.
-    pub(super) fn restore_tab_groups(
-        &mut self,
-        saved: &[TabGroupSave],
-        window: &mut Window,
-        cx: &mut Context<Self>,
-    ) {
-        let dock = self.dock.read(cx);
-        let keys: Vec<(String, PanelId)> = tabs::bars(dock)
-            .into_iter()
-            .flat_map(|b| b.panels)
-            .filter_map(|p| Some((layout::panel_key(&dock.panel(p)?.dump(cx))?, p)))
-            .collect();
-        self.tabs.update(cx, |t, cx| {
-            t.restore(
-                saved,
-                |k| keys.iter().find(|(key, _)| key == k).map(|(_, p)| *p),
-                cx,
-            )
-        });
-        tabs::reconcile(&self.dock, &self.tabs, window, cx);
+        if let (Some(dock), Some(tabs)) = (self.dock_of(panel, cx), self.tabs_of(panel, cx)) {
+            tabs::remove_from_group(&dock, &tabs, panel, window, cx);
+        }
     }
 
     /// The prompt for an `Ask` about tabs, or `None` when it needs none.
@@ -226,6 +240,10 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> Option<Entity<Prompt>> {
         match what {
+            Ask::NewTabGroup(panel) if self.is_pinned(*panel, cx) => {
+                self.notice("A pinned tab joins no tab group. Unpin it first.", cx);
+                None
+            }
             Ask::NewTabGroup(_) => Some(cx.new(|cx| {
                 Prompt::text(
                     "Name for the new tab group",
@@ -236,10 +254,14 @@ impl Shell {
                     cx,
                 )
             })),
+            Ask::AddToTabGroup(panel) if self.is_pinned(*panel, cx) => {
+                self.notice("A pinned tab joins no tab group. Unpin it first.", cx);
+                None
+            }
             Ask::AddToTabGroup(panel) => {
                 let bar = self.bar_of(*panel, cx)?;
                 let choices: Vec<Choice> = self
-                    .tabs
+                    .tabs_of(*panel, cx)?
                     .read(cx)
                     .groups()
                     .iter()
@@ -294,14 +316,24 @@ impl Shell {
                 let colors = colors.to_vec();
                 Some(cx.new(|cx| Prompt::pick("Color for this tab group", colors, at, window, cx)))
             }
-            Ask::CloseTabs(tabs, running) => {
-                let title = format!(
-                    "Close {} tab{}? {} run{} a program, which stops.",
+            Ask::CloseTabs(tabs, running, pinned) => {
+                let mut title = format!(
+                    "Close {} tab{}?",
                     tabs.len(),
                     if tabs.len() == 1 { "" } else { "s" },
-                    running,
-                    if *running == 1 { "s" } else { "" },
                 );
+                if *pinned > 0 {
+                    title += &format!(
+                        " {pinned} {} pinned.",
+                        if *pinned == 1 { "is" } else { "are" }
+                    );
+                }
+                if *running > 0 {
+                    title += &format!(
+                        " {running} run{} a program, which stops.",
+                        if *running == 1 { "s" } else { "" }
+                    );
+                }
                 let choices = vec![
                     Choice::new("Close the tabs", CLOSE),
                     Choice::new("Keep them", KEEP),
@@ -323,7 +355,9 @@ impl Shell {
     ) -> bool {
         match what {
             Ask::NewTabGroup(panel) => {
-                self.tabs.update(cx, |t, cx| t.create(answer, *panel, cx));
+                if let Some(tabs) = self.tabs_of(*panel, cx) {
+                    tabs.update(cx, |t, cx| t.create(answer, *panel, cx));
+                }
             }
             Ask::AddToTabGroup(panel) => {
                 if let Ok(id) = answer.parse::<GroupId>() {
@@ -335,7 +369,7 @@ impl Shell {
                 let hue = agentsi_ui::tokens::label::Hue::from_key(answer);
                 self.tabs.update(cx, |t, cx| t.set_hue(*id, hue, cx));
             }
-            Ask::CloseTabs(tabs, _) => {
+            Ask::CloseTabs(tabs, ..) => {
                 if answer == CLOSE {
                     self.remove_tabs(tabs, window, cx);
                 }

@@ -36,8 +36,10 @@ impl Shell {
                 .iter()
                 .filter_map(WeakEntity::upgrade)
                 .any(|p| {
+                    let in_view = self.in_dock(p.entity_id(), cx);
                     let p = p.read(cx);
                     p.shown
+                        && in_view
                         && p.kind == kind
                         && p.host == *host
                         && (kind == ScreenKind::Settings

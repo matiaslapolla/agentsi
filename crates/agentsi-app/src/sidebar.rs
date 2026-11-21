@@ -1,8 +1,11 @@
 //! The sidebar: the products of each host as a tree. This device comes first, then each SSH
 //! host of `hosts.toml`. A product of a host that does not answer shows "device off".
 //!
-//! - A product row has an arrow. An open product shows its item rows: its panes, its running
-//!   meeting, its story sessions and its running reflection (`tree.rs`).
+//! - "Favorites" comes first: the targets that the owner saved (`favorites.rs`). It is folded
+//!   while it is empty. A favorite row drags onto another to take its place.
+//! - A product row has an arrow. An open product shows its item rows: its open tabs in the order
+//!   of its top bar, then its panes with no tab, its running meeting, its story sessions and its
+//!   running reflection (`tree.rs`). The tabs of no product show under "Home".
 //! - A product group is a header with a color square. A group collapses.
 //! - The list takes focus as one element. `Up` and `Down` move a cursor, `Right` opens a
 //!   product, `Left` closes it, and `Enter` selects the row. The rows have no focus handles.
@@ -26,6 +29,7 @@ use gpui_kit::*;
 
 use crate::actions::product_id;
 use crate::alerts::{AlertTarget, Alerts};
+use crate::favorites::{Favorites, FavoritesGlobal, Saved};
 use crate::hosts::{Hosts, HostsGlobal, RemoteHost};
 use crate::keys::{self, Keys};
 use crate::look::{self, Look, LookData, LookGlobal};
@@ -34,8 +38,10 @@ use crate::model::{CoreState, Cores, HostState, ProductRef};
 use crate::pane::{AttentionProbe, Marker};
 use crate::screens::minutes::cursor_after;
 use crate::shell::PaneRef;
-use crate::tree::{self, Item, ItemKey};
-use gpui_kit::component::IconName;
+use crate::tabs::SpaceId;
+use crate::tree::{self, Item, ItemKey, TabRow};
+use gpui_kit::component::dock::PanelId;
+use gpui_kit::component::{Icon, IconName};
 
 /// The icon of the desktop entry. `img` renders an SVG in its own colors.
 static APP_ICON: LazyLock<Arc<Image>> = LazyLock::new(|| {
@@ -48,11 +54,20 @@ static APP_ICON: LazyLock<Arc<Image>> = LazyLock::new(|| {
 /// The owner picked a product in the sidebar.
 pub struct SelectProduct(pub ProductRef);
 
-/// The owner picked an item row under a product.
+/// The owner picked an item row under a product. The product of a row under "Home" has an
+/// empty id.
 pub struct OpenItem {
     pub product: ProductRef,
     pub item: ItemKey,
+    /// The tab of the row, when it has one.
+    pub tab: Option<PanelId>,
 }
+
+/// The owner closed the tab of a row with the middle button.
+pub struct CloseTab(pub PanelId);
+
+/// The owner picked a favorite, by its place in the list.
+pub struct OpenFavorite(pub usize);
 
 /// The owner pressed "New product" at the end of a host group: the host, or `None` for this
 /// device. The shell opens the setup screen.
@@ -71,6 +86,30 @@ enum RowKey {
     Group(Option<String>, String),
     Product(ProductRef),
     Item(ProductRef, ItemKey),
+    /// The header of the favorites.
+    Favorites,
+    Favorite(usize),
+}
+
+/// The product of the rows under "Home".
+fn home() -> ProductRef {
+    ProductRef {
+        host: None,
+        id: String::new(),
+    }
+}
+
+/// A favorite that the owner drags onto another.
+#[derive(Clone)]
+struct DraggedFavorite {
+    at: usize,
+    label: SharedString,
+}
+
+impl Render for DraggedFavorite {
+    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
+        neutral_tag(self.label.clone())
+    }
 }
 
 /// Where each row of the last draw is.
@@ -94,6 +133,11 @@ pub struct Sidebar {
     cores: Cores,
     hosts: Option<Entity<Hosts>>,
     look: Option<Entity<Look>>,
+    favorites: Option<Entity<Favorites>>,
+    /// The owner folded the favorites. Not saved: an empty list is always folded.
+    favorites_folded: bool,
+    /// The open tabs of each space, from the shell.
+    tabs: BTreeMap<SpaceId, Vec<TabRow>>,
     /// The attention bench times the product marker too.
     probe: Option<AttentionProbe>,
     focus: FocusHandle,
@@ -115,11 +159,14 @@ impl EventEmitter<OpenItem> for Sidebar {}
 impl EventEmitter<TreeChanged> for Sidebar {}
 impl EventEmitter<ShowAlerts> for Sidebar {}
 impl EventEmitter<NewProduct> for Sidebar {}
+impl EventEmitter<CloseTab> for Sidebar {}
+impl EventEmitter<OpenFavorite> for Sidebar {}
 
 impl Sidebar {
     pub fn new(cores: Cores, probe: Option<AttentionProbe>, cx: &mut Context<Self>) -> Self {
         let hosts = cx.try_global::<HostsGlobal>().map(|h| h.0.clone());
         let look = cx.try_global::<LookGlobal>().map(|l| l.0.clone());
+        let favorites = FavoritesGlobal::get(cx);
         let mut observe: Vec<Subscription> = cores
             .all()
             .map(|c| cx.observe(c, |_, _, cx| cx.notify()))
@@ -136,6 +183,9 @@ impl Sidebar {
         if let Some(l) = &look {
             observe.push(cx.observe(l, |_, _, cx| cx.notify()));
         }
+        if let Some(f) = &favorites {
+            observe.push(cx.observe(f, |_, _, cx| cx.notify()));
+        }
         if let Some(center) = Alerts::try_get(cx) {
             observe.push(cx.observe(&center, |_, _, cx| cx.notify()));
         }
@@ -145,6 +195,9 @@ impl Sidebar {
             probe,
             hosts,
             look,
+            favorites,
+            favorites_folded: false,
+            tabs: BTreeMap::new(),
             focus: cx.focus_handle().tab_stop(true),
             cursor: None,
             stops: Vec::new(),
@@ -193,11 +246,42 @@ impl Sidebar {
             .unwrap_or_default()
     }
 
+    /// Takes the open tabs of each space from the shell.
+    pub fn set_tabs(&mut self, tabs: BTreeMap<SpaceId, Vec<TabRow>>, cx: &mut Context<Self>) {
+        if self.tabs != tabs {
+            self.tabs = tabs;
+            cx.notify();
+        }
+    }
+
+    fn space_tabs(&self, product: &ProductRef) -> &[TabRow] {
+        let space = if product.id.is_empty() {
+            SpaceId::Home
+        } else {
+            SpaceId::Product(product.clone())
+        };
+        self.tabs.get(&space).map_or(&[], Vec::as_slice)
+    }
+
     /// The object that the menu of `key` belongs to.
-    fn target_of(key: &RowKey) -> Target {
+    fn target_of(&self, key: &RowKey) -> Target {
         match key {
             RowKey::Group(host, name) => Target::Group(host.clone(), name.clone()),
             RowKey::Product(p) => Target::Product(p.clone()),
+            RowKey::Favorites | RowKey::Favorite(_) => Target::Favorite(match key {
+                RowKey::Favorite(at) => *at,
+                _ => 0,
+            }),
+            RowKey::Item(p, ItemKey::Screen(kind, arg)) => {
+                let tab = self
+                    .space_tabs(p)
+                    .iter()
+                    .find(|t| t.key == ItemKey::Screen(*kind, arg.clone()));
+                match tab {
+                    Some(t) => Target::Tab(t.panel),
+                    None => Target::Product(p.clone()),
+                }
+            }
             RowKey::Item(p, item) => match item {
                 ItemKey::Pane(id) => Target::Pane(PaneRef {
                     host: p.host.clone(),
@@ -206,6 +290,7 @@ impl Sidebar {
                 ItemKey::Meeting => Target::Meeting(p.clone()),
                 ItemKey::Story(id) => Target::Story(p.clone(), id.clone()),
                 ItemKey::Reflection => Target::Reflection(p.clone()),
+                ItemKey::Screen(..) => Target::Product(p.clone()),
             },
         }
     }
@@ -236,8 +321,11 @@ impl Sidebar {
         else {
             return false;
         };
+        if cursor == RowKey::Favorites {
+            return false;
+        }
         let at = Point::new(bounds.origin.x + space(4), bounds.bottom());
-        menus::request(cx, Self::target_of(&cursor), at);
+        menus::request(cx, self.target_of(&cursor), at);
         true
     }
 
@@ -251,7 +339,7 @@ impl Sidebar {
         cx.listener(move |this, e: &MouseDownEvent, window, cx| {
             this.cursor = Some(key.clone());
             window.focus(&this.focus, cx);
-            menus::request(cx, Self::target_of(&key), e.position);
+            menus::request(cx, this.target_of(&key), e.position);
             cx.notify();
         })
     }
@@ -334,8 +422,17 @@ impl Sidebar {
     fn activate(&mut self, key: RowKey, cx: &mut Context<Self>) {
         match key {
             RowKey::Product(p) => cx.emit(SelectProduct(p)),
-            RowKey::Item(product, item) => cx.emit(OpenItem { product, item }),
+            RowKey::Item(product, item) => {
+                let tab = self
+                    .space_tabs(&product)
+                    .iter()
+                    .find(|t| tree::stands_for(&item, &t.key))
+                    .map(|t| t.panel);
+                cx.emit(OpenItem { product, item, tab })
+            }
             RowKey::Group(host, name) => self.toggle_group(host.as_deref(), &name, cx),
+            RowKey::Favorites => self.toggle_favorites(cx),
+            RowKey::Favorite(at) => cx.emit(OpenFavorite(at)),
         }
     }
 
@@ -444,7 +541,18 @@ impl Sidebar {
             .iter()
             .map(|p| {
                 let meetings = feed.as_ref().map(|f| &f.read(cx).0);
-                tree::items(core.read(cx), meetings, &data, &p.id)
+                let items = tree::items(core.read(cx), meetings, &data, &p.id);
+                let space = SpaceId::Product(ProductRef {
+                    host: host.clone(),
+                    id: p.id.clone(),
+                });
+                let tabs = self.tabs.get(&space).map_or(&[][..], Vec::as_slice);
+                let elsewhere = |id: &str| {
+                    self.tabs.iter().any(|(s, rows)| {
+                        *s != space && rows.iter().any(|r| r.key == ItemKey::Pane(id.into()))
+                    })
+                };
+                tree::with_tabs(core.read(cx), &data, items, tabs, &elsewhere)
             })
             .collect();
         let product_work: Vec<(Option<WorkState>, u64)> = products
@@ -456,136 +564,115 @@ impl Sidebar {
         let numbers: Vec<usize> = arranged.flat();
         let scope = slot.map_or_else(String::new, |i| format!("host-{i}-"));
         let mut out = Vec::new();
-        let one = |this: &mut Self,
-                   i: usize,
-                   group: &str,
-                   cx: &mut Context<Self>|
-         -> Vec<AnyElement> {
-            let p = &products[i];
-            let list = &lists[i];
-            let product = ProductRef {
-                host: host.clone(),
-                id: p.id.clone(),
-            };
-            let style = data.product(host.as_deref(), &p.id);
-            let open = this.is_open(&product);
-            let n = first + numbers.iter().position(|x| *x == i).unwrap_or(i);
-            let running = tree::running(list);
-            let trailing: AnyElement = if off {
-                caption("device off").into_any_element()
-            } else {
-                let mark: Option<AnyElement> = if attention.contains(&p.id) {
-                    Some(
-                        div()
-                            .child(StateMark::new(WorkState::Blocked).compact())
-                            .children(
-                                (host.is_none())
-                                    .then(|| {
-                                        this.probe.as_ref().map(|pr| pr.element(Marker::Product))
-                                    })
-                                    .flatten(),
-                            )
-                            .into_any_element(),
-                    )
-                } else {
-                    None
+        let one =
+            |this: &mut Self, i: usize, group: &str, cx: &mut Context<Self>| -> Vec<AnyElement> {
+                let p = &products[i];
+                let list = &lists[i];
+                let product = ProductRef {
+                    host: host.clone(),
+                    id: p.id.clone(),
                 };
-                let chip = (!open && running > 0).then(|| {
+                let style = data.product(host.as_deref(), &p.id);
+                let open = this.is_open(&product);
+                let n = first + numbers.iter().position(|x| *x == i).unwrap_or(i);
+                let running = tree::running(list);
+                let trailing: AnyElement = if off {
+                    caption("device off").into_any_element()
+                } else {
+                    let mark: Option<AnyElement> = if attention.contains(&p.id) {
+                        Some(
+                            div()
+                                .child(StateMark::new(WorkState::Blocked).compact())
+                                .children(
+                                    (host.is_none())
+                                        .then(|| {
+                                            this.probe
+                                                .as_ref()
+                                                .map(|pr| pr.element(Marker::Product))
+                                        })
+                                        .flatten(),
+                                )
+                                .into_any_element(),
+                        )
+                    } else {
+                        None
+                    };
+                    let chip = (!open && running > 0).then(|| {
+                        div()
+                            .debug_selector({
+                                let id = format!("running-chip:{scope}{}", p.id);
+                                move || id
+                            })
+                            .child(running_chip(running))
+                    });
+                    let hint = (mark.is_none() && chip.is_none())
+                        .then(|| product_hint(n, cx))
+                        .flatten();
                     div()
-                        .debug_selector({
-                            let id = format!("running-chip:{scope}{}", p.id);
-                            move || id
-                        })
-                        .child(running_chip(running))
-                });
-                let hint = (mark.is_none() && chip.is_none())
-                    .then(|| product_hint(n, cx))
-                    .flatten();
-                div()
-                    .flex()
-                    .items_center()
-                    .gap(space(2))
-                    .children(chip)
-                    .children(mark)
-                    .children(hint)
-                    .into_any_element()
-            };
-            let id = format!("{scope}product-{}", p.id);
-            let key = RowKey::Product(product.clone());
-            let (click, toggle) = (product.clone(), product.clone());
-            let (click_key, toggle_key) = (key.clone(), key.clone());
-            let dragged = DraggedProduct {
-                product: product.clone(),
-                name: p.name.clone().into(),
-            };
-            let drop = this.on_drop(host.clone(), group.to_string(), cx);
-            let menu = this.on_menu(key.clone(), cx);
-            let mut row = ProductRow::new(ElementId::Name(id.clone().into()), p.name.clone())
-                .decorate(move |el| {
-                    drop(el.on_drag(dragged, |d, _, _, cx| cx.new(|_| d.clone())))
-                        .on_mouse_down(MouseButton::Right, menu)
-                })
-                .label(style.label.map(SharedString::from))
-                .hue(style.hue)
-                .open(open)
-                .state(
-                    product_work[i]
-                        .0
-                        .or_else(|| attention.contains(&p.id).then_some(WorkState::Blocked)),
-                )
-                .alert(product_work[i].1)
-                .selected(active.as_ref() == Some(&product))
-                .focused(focused && this.cursor.as_ref() == Some(&key))
-                .trailing(trailing)
-                .on_click(cx.listener(move |this, _, _, cx| {
-                    this.cursor = Some(click_key.clone());
-                    cx.emit(SelectProduct(click.clone()));
-                }))
-                .on_toggle(cx.listener(move |this, _, window, cx| {
-                    this.cursor = Some(toggle_key.clone());
-                    window.focus(&this.focus, cx);
-                    let now = this.is_open(&toggle);
-                    this.set_open(&toggle, !now, cx);
-                }));
-            if let Some(path) = &p.path {
-                row = row.meta(path.clone());
-            }
-            this.stops.push(key.clone());
-            let mut rows = vec![this.placed(key, row)];
-            if open {
-                for item in list {
-                    let key = RowKey::Item(product.clone(), item.key.clone());
-                    let click_key = key.clone();
-                    let (owner, which) = (product.clone(), item.key.clone());
-                    let is_focused =
-                        matches!(&item.key, ItemKey::Pane(t) if voice_focus.as_deref() == Some(t));
-                    let menu = this.on_menu(key.clone(), cx);
-                    let row = ItemRow::new(
-                        ElementId::Name(format!("{id}-{}", item.key.slug()).into()),
-                        item.title.clone(),
+                        .flex()
+                        .items_center()
+                        .gap(space(2))
+                        .children(chip)
+                        .children(mark)
+                        .children(hint)
+                        .into_any_element()
+                };
+                let id = format!("{scope}product-{}", p.id);
+                let key = RowKey::Product(product.clone());
+                let (click, toggle) = (product.clone(), product.clone());
+                let (click_key, toggle_key) = (key.clone(), key.clone());
+                let dragged = DraggedProduct {
+                    product: product.clone(),
+                    name: p.name.clone().into(),
+                };
+                let drop = this.on_drop(host.clone(), group.to_string(), cx);
+                let menu = this.on_menu(key.clone(), cx);
+                let mut row = ProductRow::new(ElementId::Name(id.clone().into()), p.name.clone())
+                    .decorate(move |el| {
+                        drop(el.on_drag(dragged, |d, _, _, cx| cx.new(|_| d.clone())))
+                            .on_mouse_down(MouseButton::Right, menu)
+                    })
+                    .label(style.label.map(SharedString::from))
+                    .hue(style.hue)
+                    .open(open)
+                    .state(
+                        product_work[i]
+                            .0
+                            .or_else(|| attention.contains(&p.id).then_some(WorkState::Blocked)),
                     )
-                    .decorate(move |el| el.on_mouse_down(MouseButton::Right, menu))
-                    .leading(StatusDot(item.status))
-                    .state(item.work)
-                    .alert(item.alert)
-                    .meta(item.meta.clone())
-                    .hue(item.hue)
-                    .tooltip(item.tooltip.clone().map(SharedString::from))
-                    .selected(is_focused)
+                    .alert(product_work[i].1)
+                    .selected(active.as_ref() == Some(&product))
                     .focused(focused && this.cursor.as_ref() == Some(&key))
+                    .trailing(trailing)
                     .on_click(cx.listener(move |this, _, _, cx| {
                         this.cursor = Some(click_key.clone());
-                        cx.emit(OpenItem {
-                            product: owner.clone(),
-                            item: which.clone(),
-                        });
+                        cx.emit(SelectProduct(click.clone()));
+                    }))
+                    .on_toggle(cx.listener(move |this, _, window, cx| {
+                        this.cursor = Some(toggle_key.clone());
+                        window.focus(&this.focus, cx);
+                        let now = this.is_open(&toggle);
+                        this.set_open(&toggle, !now, cx);
                     }));
-                    this.stops.push(key.clone());
-                    rows.push(this.placed(key, row));
+                if let Some(path) = &p.path {
+                    row = row.meta(path.clone());
                 }
-            }
-            rows
-        };
+                this.stops.push(key.clone());
+                let mut rows = vec![this.placed(key, row)];
+                if open {
+                    for item in list {
+                        rows.push(this.item_row(
+                            &id,
+                            &product,
+                            item,
+                            voice_focus.as_deref(),
+                            focused,
+                            cx,
+                        ));
+                    }
+                }
+                rows
+            };
         for &i in &arranged.top {
             out.extend(one(self, i, "", cx));
         }
@@ -632,6 +719,157 @@ impl Sidebar {
         out.extend(self.archived_rows(&host, &scope, off, cx));
         if !off {
             out.push(self.new_product_row(&host, &scope, cx));
+        }
+        out
+    }
+
+    /// One item row under `product`. `scope` makes its element id.
+    fn item_row(
+        &mut self,
+        scope: &str,
+        product: &ProductRef,
+        item: &Item,
+        voice_focus: Option<&str>,
+        focused: bool,
+        cx: &mut Context<Self>,
+    ) -> AnyElement {
+        let key = RowKey::Item(product.clone(), item.key.clone());
+        let click_key = key.clone();
+        let (owner, which, tab) = (product.clone(), item.key.clone(), item.tab);
+        let is_focused = matches!(&item.key, ItemKey::Pane(t) if voice_focus == Some(t));
+        let menu = self.on_menu(key.clone(), cx);
+        // The middle button closes the tab of the row, but not a pinned tab.
+        let close = tab.filter(|_| !item.pinned).map(|panel| {
+            cx.listener(move |_, _: &MouseDownEvent, _, cx| {
+                cx.stop_propagation();
+                cx.emit(CloseTab(panel));
+            })
+        });
+        let row = ItemRow::new(
+            ElementId::Name(format!("{scope}-{}", item.key.slug()).into()),
+            item.title.clone(),
+        )
+        .decorate(move |el| {
+            el.on_mouse_down(MouseButton::Right, menu)
+                .when_some(close, |el, close| {
+                    el.on_mouse_down(MouseButton::Middle, close)
+                })
+        })
+        .leading(StatusDot(item.status))
+        .state(item.work)
+        .alert(item.alert)
+        .meta(item.meta.clone())
+        .hue(item.hue)
+        .tooltip(item.tooltip.clone().map(SharedString::from))
+        .selected(is_focused)
+        .focused(focused && self.cursor.as_ref() == Some(&key))
+        .on_click(cx.listener(move |this, _, _, cx| {
+            this.cursor = Some(click_key.clone());
+            cx.emit(OpenItem {
+                product: owner.clone(),
+                item: which.clone(),
+                tab,
+            });
+        }));
+        self.stops.push(key.clone());
+        self.placed(key, row)
+    }
+
+    /// The tabs of no product, under "Home". Nothing shows while Home has no tab.
+    fn home_rows(&mut self, focused: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let tabs = self.tabs.get(&SpaceId::Home).cloned().unwrap_or_default();
+        if tabs.is_empty() {
+            return Vec::new();
+        }
+        let data = self.data(cx);
+        let items = tree::with_tabs(self.core.read(cx), &data, Vec::new(), &tabs, &|_| false);
+        let mut out = vec![
+            div()
+                .debug_selector(|| "home-header".into())
+                .pad_x(space(2))
+                .py(space(1))
+                .child(caption("Home"))
+                .into_any_element(),
+        ];
+        for item in &items {
+            out.push(self.item_row("home", &home(), item, None, focused, cx));
+        }
+        out
+    }
+
+    fn toggle_favorites(&mut self, cx: &mut Context<Self>) {
+        self.favorites_folded = !self.favorites_folded;
+        cx.notify();
+    }
+
+    /// The favorites: a header, then a row for each favorite unless the list is folded.
+    fn favorite_rows(&mut self, focused: bool, cx: &mut Context<Self>) -> Vec<AnyElement> {
+        let Some(list) = self.favorites.as_ref().map(|f| f.read(cx).list.clone()) else {
+            return Vec::new();
+        };
+        let folded = self.favorites_folded || list.is_empty();
+        let key = RowKey::Favorites;
+        let header = GroupHeader::new("favorites", "Favorites")
+            .collapsed(folded)
+            .count(list.len())
+            .focused(focused && self.cursor.as_ref() == Some(&key))
+            .on_click({
+                let key = key.clone();
+                cx.listener(move |this, _, _, cx| {
+                    this.cursor = Some(key.clone());
+                    this.toggle_favorites(cx);
+                })
+            });
+        self.stops.push(key.clone());
+        let mut out = vec![self.placed(key, header)];
+        if folded {
+            return out;
+        }
+        for (at, f) in list.iter().enumerate() {
+            let key = RowKey::Favorite(at);
+            let click_key = key.clone();
+            let menu = self.on_menu(key.clone(), cx);
+            let dragged = DraggedFavorite {
+                at,
+                label: f.label.clone().into(),
+            };
+            let drop = cx.listener(move |this, d: &DraggedFavorite, _, cx| {
+                if let Some(f) = &this.favorites {
+                    f.update(cx, |f, cx| f.move_to(d.at, at, cx));
+                }
+            });
+            let icon = match f.saved {
+                Saved::Screen(..) => IconName::LayoutDashboard,
+                Saved::Folder(_) => IconName::Folder,
+                Saved::Command { .. } => IconName::SquareTerminal,
+            };
+            let meta = match &f.product {
+                Some(p) => look::key(p.host.as_deref(), &p.id),
+                None => "Home".into(),
+            };
+            let row = ItemRow::new(
+                ElementId::Name(format!("favorite-{at}").into()),
+                f.label.clone(),
+            )
+            .decorate(move |el| {
+                el.on_mouse_down(MouseButton::Right, menu)
+                    .on_drag(dragged, |d, _, _, cx| cx.new(|_| d.clone()))
+                    .drag_over::<DraggedFavorite>(|style, _, _, _| style.bg(accent::subtle()))
+                    .on_drop(drop)
+            })
+            .leading(
+                Icon::new(icon)
+                    .size(control::icon_sm())
+                    .text_color(Hsla::from(text::secondary())),
+            )
+            .meta(meta)
+            .focused(focused && self.cursor.as_ref() == Some(&key))
+            .on_click(cx.listener(move |this, _, _, cx| {
+                this.cursor = Some(click_key.clone());
+                cx.emit(OpenFavorite(at));
+            }));
+            self.stops.push(key.clone());
+            out.push(self.placed(key, row));
         }
         out
     }
@@ -818,6 +1056,10 @@ impl Render for Sidebar {
             .map(|h| h.read(cx).hosts.clone())
             .unwrap_or_default();
         let look_note = self.look.as_ref().and_then(|l| l.read(cx).note.clone());
+        let favorites_note = self
+            .favorites
+            .as_ref()
+            .and_then(|f| f.read(cx).note.clone());
         let (products, host_state, error, notices) = {
             let core = self.core.read(cx);
             (
@@ -828,9 +1070,12 @@ impl Render for Sidebar {
                     .iter()
                     .cloned()
                     .chain(look_note)
+                    .chain(favorites_note)
                     .collect::<Vec<_>>(),
             )
         };
+        let favorite_rows = self.favorite_rows(focused, cx);
+        let home_rows = self.home_rows(focused, cx);
         let rows = self.product_rows(None, None, &products, false, 0, focused, cx);
         let local_header = host_header(&host_state, "This device");
         let local_header = self.host_drop("host-header-local".into(), None, local_header, cx);
@@ -909,6 +1154,8 @@ impl Render for Sidebar {
                     .overflow_y_scroll()
                     .gap(space(1))
                     .p(space(2))
+                    .children(favorite_rows)
+                    .children(home_rows)
                     .child(local_header)
                     .children(rows)
                     .when(empty, |el| {
@@ -1052,6 +1299,8 @@ mod tests {
             meta: String::new(),
             hue: None,
             running: false,
+            tab: None,
+            pinned: false,
         };
         let none = |_: &str| Name::default();
         let ids = |cx: &mut TestAppContext| {

@@ -173,6 +173,23 @@ gpui_kit::actions!(
         UngroupTabs,
         /// Closes each tab of the tab group of the active tab.
         CloseTabGroup,
+        /// Closes the active tab, behind the Confirm of the tabs.
+        CloseActiveTab,
+        /// Pins the active tab: it sits first in its bar with its icon only.
+        PinTab,
+        /// Unpins the active tab.
+        UnpinTab,
+        /// Saves the active tab as a favorite: its screen, or the command and the folder of
+        /// its terminal.
+        AddTabToFavorites,
+        /// Asks for a product and moves the active terminal tab to its space.
+        MoveTabToProduct,
+        /// Asks for a favorite and opens it.
+        OpenFavorite,
+        /// Asks for a favorite and a new label for it.
+        RenameFavorite,
+        /// Asks for a favorite and removes it, after one Confirm.
+        RemoveFavorite,
         /// Opens the context menu of the focused row of the sidebar, or of the focused pane.
         OpenContextMenu,
         /// Asks for the text of a new story of the active product.
@@ -790,6 +807,61 @@ pub const ENTRIES: &[Entry] = &[
         icon: IconName::Folder,
         keywords: &["tab", "group", "remove", "leave", "out"],
         action: || Box::new(RemoveTabFromGroup),
+    },
+    Entry {
+        label: "Close the active tab",
+        icon: IconName::Close,
+        keywords: &["close", "tab", "screen", "pane"],
+        action: || Box::new(CloseActiveTab),
+    },
+    Entry {
+        label: "Pin the active tab",
+        icon: IconName::Star,
+        keywords: &["pin", "tab", "keep", "first"],
+        action: || Box::new(PinTab),
+    },
+    Entry {
+        label: "Unpin the active tab",
+        icon: IconName::StarOff,
+        keywords: &["unpin", "pin", "tab"],
+        action: || Box::new(UnpinTab),
+    },
+    Entry {
+        label: "Add the active tab to the favorites",
+        icon: IconName::Star,
+        keywords: &[
+            "favorite",
+            "favourite",
+            "save",
+            "bookmark",
+            "tab",
+            "command",
+        ],
+        action: || Box::new(AddTabToFavorites),
+    },
+    Entry {
+        label: "Move the active tab to a product",
+        icon: IconName::ArrowRight,
+        keywords: &["move", "tab", "product", "space"],
+        action: || Box::new(MoveTabToProduct),
+    },
+    Entry {
+        label: "Open a favorite",
+        icon: IconName::Star,
+        keywords: &["favorite", "favourite", "open", "bookmark"],
+        action: || Box::new(OpenFavorite),
+    },
+    Entry {
+        label: "Rename a favorite",
+        icon: IconName::Replace,
+        keywords: &["favorite", "favourite", "rename", "label"],
+        action: || Box::new(RenameFavorite),
+    },
+    Entry {
+        label: "Remove a favorite",
+        icon: IconName::Delete,
+        keywords: &["favorite", "favourite", "remove", "delete"],
+        action: || Box::new(RemoveFavorite),
     },
     Entry {
         label: "Rename the tab group of the active tab",

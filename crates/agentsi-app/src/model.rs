@@ -42,6 +42,8 @@ pub struct Term {
     pub voice: bool,
     /// The folder where the program started.
     pub cwd: String,
+    /// The program and its arguments.
+    pub argv: Vec<String>,
 }
 
 impl Term {
@@ -57,6 +59,7 @@ impl Term {
             code: t.code,
             voice: false,
             cwd: t.cwd,
+            argv: t.argv,
         }
     }
 
@@ -156,7 +159,7 @@ impl HostState {
 pub const DEVICE_OFF: &str = "device off";
 
 /// One product of one host. A local product and a product of a host can have the same id.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ProductRef {
     /// The SSH host, or `None` for this device.
     pub host: Option<String>,
