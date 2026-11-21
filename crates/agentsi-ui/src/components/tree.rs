@@ -266,6 +266,7 @@ impl RenderOnce for ProductRow {
                     .when_some(self.meta, |el, m| {
                         el.child(
                             div()
+                                .debug_selector(|| format!("{selector}:meta"))
                                 .text_size(size::xs())
                                 .text_color(text::tertiary().hsla())
                                 .truncate()

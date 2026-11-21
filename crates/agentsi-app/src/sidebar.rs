@@ -9,6 +9,8 @@
 //! - A product group is a header with a color square. A group collapses.
 //! - The list takes focus as one element. `Up` and `Down` move a cursor, `Right` opens a
 //!   product, `Left` closes it, and `Enter` selects the row. The rows have no focus handles.
+//! - A product row shows the git summary of its product as meta text (`git_marks.rs`), or its
+//!   folder outside a repo.
 //! - The open and closed state is `layout.json` data: the sidebar keeps it and the shell saves it.
 
 use std::cell::RefCell;
@@ -30,6 +32,7 @@ use gpui_kit::*;
 use crate::actions::product_id;
 use crate::alerts::{AlertTarget, Alerts};
 use crate::favorites::{Favorites, FavoritesGlobal, Saved};
+use crate::git_marks::{MarkChanged, Source};
 use crate::hosts::{Hosts, HostsGlobal, RemoteHost};
 use crate::keys::{self, Keys};
 use crate::look::{self, Look, LookData, LookGlobal};
@@ -175,6 +178,13 @@ impl Sidebar {
         for c in cores.all() {
             if let Some(feed) = c.read(cx).meetings.clone() {
                 observe.push(cx.observe(&feed, |_, _, cx| cx.notify()));
+            }
+            if let Some(git) = c.read(cx).git.clone() {
+                observe.push(cx.subscribe(&git, |_, _, e: &MarkChanged, cx| {
+                    if matches!(e.0, Source::Product(_)) {
+                        cx.notify();
+                    }
+                }));
             }
         }
         if let Some(h) = &hosts {
@@ -654,8 +664,10 @@ impl Sidebar {
                         let now = this.is_open(&toggle);
                         this.set_open(&toggle, !now, cx);
                     }));
-                if let Some(path) = &p.path {
-                    row = row.meta(path.clone());
+                let git = crate::git_marks::of_product(core.read(cx), &p.id, cx)
+                    .map(crate::git_marks::meta);
+                if let Some(meta) = git.or_else(|| p.path.clone()) {
+                    row = row.meta(meta);
                 }
                 this.stops.push(key.clone());
                 let mut rows = vec![this.placed(key, row)];
@@ -1475,6 +1487,7 @@ mod tests {
             core: Entity<CoreState>,
             look: Entity<Look>,
             sidebar: Entity<Sidebar>,
+            marks: Entity<crate::git_marks::GitMarks>,
             told: Rc<RefCell<Vec<Told>>>,
             file: std::path::PathBuf,
             _end: UnixStream,
@@ -1520,6 +1533,7 @@ mod tests {
                 );
                 s.set_reflecting("a", true);
             });
+            let marks = cx.update(|cx| crate::git_marks::GitMarks::install(&core, cx));
             let c = core.clone();
             let (sidebar, cx) =
                 cx.add_window_view(move |_, cx| Sidebar::new(Cores::new(c), None, cx));
@@ -1556,6 +1570,7 @@ mod tests {
                     core,
                     look,
                     sidebar,
+                    marks,
                     told,
                     file,
                     _end: core_end,
@@ -1730,6 +1745,40 @@ mod tests {
             assert_eq!(data.product(None, "a").label.as_deref(), Some("api"));
             assert_eq!(data.product(None, "a").hue, Some(Hue::Teal));
             assert_eq!(data.pane(None, "t1-a").label.as_deref(), Some("build"));
+        }
+
+        #[gpui::test]
+        fn a_git_summary_of_a_product_shows_on_its_row_and_a_folder_one_does_not_redraw(
+            cx: &mut TestAppContext,
+        ) {
+            use crate::git_marks::Source;
+            use agentsi_proto::git_api::GitSummaryInfo;
+            let (t, cx) = tree(cx, "git");
+            let (sidebar, marks) = (t.sidebar.clone(), t.marks.clone());
+            assert!(at(cx, "tree-row:product-a:meta").is_none());
+            let drawn = Rc::new(std::cell::Cell::new(0));
+            let d = drawn.clone();
+            cx.update(|_, cx| {
+                cx.observe(&sidebar, move |_, _| d.set(d.get() + 1))
+                    .detach()
+            });
+            let dirty = GitSummaryInfo {
+                repo: "/w".into(),
+                branch: Some("main".into()),
+                changed: 2,
+                ..Default::default()
+            };
+            marks.update(cx, |m, cx| {
+                m.loaded(Source::Folder("/".into()), Ok(Some(dirty.clone())), cx)
+            });
+            assert_eq!(drawn.get(), 0);
+            marks.update(cx, |m, cx| {
+                m.loaded(Source::Product("a".into()), Ok(Some(dirty)), cx)
+            });
+            assert_eq!(drawn.get(), 1);
+            redraw(cx);
+            assert!(at(cx, "tree-row:product-a:meta").is_some());
+            assert!(at(cx, "tree-row:product-b:meta").is_none());
         }
 
         fn center(cx: &mut VisualTestContext, name: &str) -> Point<Pixels> {
