@@ -183,7 +183,8 @@ fn branches_lists_the_current_branch_first_the_remote_ones_and_the_worktrees() {
     assert_eq!((r.local[0].ahead, r.local[0].behind), (Some(1), Some(0)));
     assert_eq!(r.local[0].subject, "ahead");
     assert_eq!(r.local[1].upstream, None);
-    assert_eq!(r.local[2].upstream.as_deref(), Some("origin/main"));
+    // A branch from a remote branch tracks nothing, so a push cannot send it there.
+    assert_eq!(r.local[2].upstream, None);
     let remote: Vec<_> = r.remote.iter().map(|b| b.name.as_str()).collect();
     assert_eq!(remote, ["origin/main"]);
     assert_eq!(r.worktrees.len(), 2);
@@ -233,6 +234,49 @@ fn a_switch_to_a_remote_branch_makes_a_local_branch_that_tracks_it() {
         git(&n.a, &["rev-parse", "--abbrev-ref", "topic@{upstream}"]),
         "origin/topic"
     );
+}
+
+#[test]
+fn a_switch_to_a_remote_branch_whose_local_branch_exists_switches_to_the_local_one() {
+    let n = net();
+    git(&n.a, &["switch", "-q", "-c", "other"]);
+    let r = gitpanel::switch(&n.a, "origin/main").unwrap();
+    assert_eq!(r.outcome, GitOutcome::Done, "{}", r.output);
+    assert_eq!(git(&n.a, &["branch", "--show-current"]), "main");
+}
+
+#[test]
+fn a_push_to_an_upstream_of_another_name_and_a_push_after_the_head_moved_are_refused() {
+    let n = net();
+    git(
+        &n.a,
+        &["switch", "-q", "-c", "feature", "--track", "origin/main"],
+    );
+    write(&n.a, "f.txt", "f\n");
+    commit_all(&n.a, "feature");
+    assert!(matches!(gitpanel::outgoing(&n.a), Err(Error::Invalid(_))));
+    assert!(matches!(
+        gitpanel::push(&n.a, None, &mut quiet),
+        Err(Error::Invalid(_))
+    ));
+    let main = git(&n.b, &["rev-parse", "HEAD"]);
+    assert_eq!(git(&n.a, &["ls-remote", "origin", "main"])[..40], main);
+
+    git(&n.a, &["switch", "-q", "main"]);
+    write(&n.a, "a.txt", "two\n");
+    commit_all(&n.a, "one out");
+    let o = gitpanel::outgoing(&n.a).unwrap();
+    assert_eq!(o.head, head(&n.a));
+    write(&n.a, "a.txt", "three\n");
+    commit_all(&n.a, "not confirmed");
+    assert!(matches!(
+        gitpanel::push(&n.a, Some(("main", &o.head)), &mut quiet),
+        Err(Error::Invalid(_))
+    ));
+    assert_eq!(git(&n.a, &["ls-remote", "origin", "main"])[..40], main);
+    let now = head(&n.a);
+    let r = gitpanel::push(&n.a, Some(("main", &now)), &mut quiet).unwrap();
+    assert_eq!(r.outcome, GitOutcome::Done, "{}", r.output);
 }
 
 #[test]
@@ -298,7 +342,7 @@ fn push_lists_the_outgoing_commits_and_sets_the_upstream_of_a_new_branch() {
     assert_eq!(subjects, ["two out", "one out"]);
 
     let mut lines = Vec::new();
-    let r = gitpanel::push(&n.a, &mut |l: &str| lines.push(l.to_string())).unwrap();
+    let r = gitpanel::push(&n.a, None, &mut |l: &str| lines.push(l.to_string())).unwrap();
     assert_eq!(r.outcome, GitOutcome::Done, "{}", r.output);
     assert!(!lines.is_empty(), "the push sent no progress line");
     assert_eq!(
@@ -313,7 +357,7 @@ fn push_lists_the_outgoing_commits_and_sets_the_upstream_of_a_new_branch() {
     let o = gitpanel::outgoing(&n.a).unwrap();
     assert!(o.set_upstream);
     assert_eq!(o.count, 1);
-    let r = gitpanel::push(&n.a, &mut quiet).unwrap();
+    let r = gitpanel::push(&n.a, None, &mut quiet).unwrap();
     assert_eq!(r.outcome, GitOutcome::Done, "{}", r.output);
     assert_eq!(
         git(
@@ -332,7 +376,7 @@ fn a_push_that_the_remote_refuses_fails_and_does_not_force() {
     git(&n.b, &["push", "-q"]);
     write(&n.a, "a.txt", "mine\n");
     commit_all(&n.a, "from a");
-    let r = gitpanel::push(&n.a, &mut quiet).unwrap();
+    let r = gitpanel::push(&n.a, None, &mut quiet).unwrap();
     assert_eq!(r.outcome, GitOutcome::Failed);
     assert!(r.output.contains("rejected"), "{}", r.output);
     assert_eq!(
@@ -342,7 +386,7 @@ fn a_push_that_the_remote_refuses_fails_and_does_not_force() {
 
     git(&n.a, &["switch", "-q", "--detach"]);
     assert!(matches!(
-        gitpanel::push(&n.a, &mut quiet),
+        gitpanel::push(&n.a, None, &mut quiet),
         Err(Error::Invalid(_))
     ));
 }

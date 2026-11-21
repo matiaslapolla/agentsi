@@ -2343,6 +2343,10 @@
             "minimum": 0,
             "type": "integer"
           },
+          "head": {
+            "description": "The full id of the head, for `git.push` `head`.",
+            "type": "string"
+          },
           "remote": {
             "type": "string"
           },
@@ -2357,6 +2361,7 @@
         },
         "required": [
           "branch",
+          "head",
           "remote",
           "remote_branch",
           "set_upstream",
@@ -13913,7 +13918,7 @@
       }
     },
     {
-      "description": "Pushes the branch to its upstream, or with --set-upstream to origin when it has none, with a 120 s limit. It never forces. It sends git.progress lines while it runs, and data.changed with kind git after.",
+      "description": "Pushes the branch to its upstream, or with --set-upstream to origin when it has none, with a 120 s limit. It never forces. With branch and head, it pushes only while they are the ones of the confirm. It sends git.progress lines while it runs, and data.changed with kind git after.",
       "errors": [
         {
           "code": -32602,
@@ -13947,6 +13952,30 @@
       "name": "git.push",
       "paramStructure": "by-name",
       "params": [
+        {
+          "description": "The branch of the confirm. The push is refused when the branch changed.",
+          "name": "branch",
+          "required": false,
+          "schema": {
+            "description": "The branch of the confirm. The push is refused when the branch changed.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "The head of the confirm, from `git.outgoing`. The push is refused when it moved.",
+          "name": "head",
+          "required": false,
+          "schema": {
+            "description": "The head of the confirm, from `git.outgoing`. The push is refused when it moved.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
         {
           "name": "product",
           "required": true,

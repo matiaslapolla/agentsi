@@ -429,6 +429,8 @@ impl Method for GitSwitch {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct GitOutgoingResult {
     pub branch: String,
+    /// The full id of the head, for `git.push` `head`.
+    pub head: String,
     pub remote: String,
     /// The branch on the remote that gets the commits.
     pub remote_branch: String,
@@ -481,15 +483,29 @@ impl Method for GitPull {
     type Result = GitSyncResult;
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct GitPushParams {
+    pub product: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// The branch of the confirm. The push is refused when the branch changed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub branch: Option<String>,
+    /// The head of the confirm, from `git.outgoing`. The push is refused when it moved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head: Option<String>,
+}
+
 pub struct GitPush;
 
 impl Method for GitPush {
     const NAME: &'static str = "git.push";
     const DESCRIPTION: &'static str = "Pushes the branch to its upstream, or with \
-        --set-upstream to origin when it has none, with a 120 s limit. It never forces. It \
+        --set-upstream to origin when it has none, with a 120 s limit. It never forces. With \
+        branch and head, it pushes only while they are the ones of the confirm. It \
         sends git.progress lines while it runs, and data.changed with kind git after.";
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
-    type Params = GitRepoParams;
+    type Params = GitPushParams;
     type Result = GitSyncResult;
 }
 
