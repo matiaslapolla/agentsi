@@ -207,7 +207,7 @@ fn the_store_sets_wal_foreign_keys_and_the_migration_number() {
             ))
         })
         .unwrap();
-    assert_eq!((mode.as_str(), version, fk), ("wal", 3, 1));
+    assert_eq!((mode.as_str(), version, fk), ("wal", 4, 1));
     drop(store);
     // A second open applies nothing and keeps the rows.
     let again = Store::open(&dir.path().join("agentsi.db")).unwrap();
@@ -215,7 +215,7 @@ fn the_store_sets_wal_foreign_keys_and_the_migration_number() {
         again
             .read(|c| Ok(c.pragma_query_value(None, "user_version", |r| r.get::<_, i64>(0))?))
             .unwrap(),
-        3
+        4
     );
 }
 
@@ -242,7 +242,7 @@ fn a_database_of_the_first_migration_opens_with_the_later_migrations() {
             ))
         })
         .unwrap();
-    assert_eq!((version, tickets, desk, products), (3, 0, 0, 1));
+    assert_eq!((version, tickets, desk, products), (4, 0, 0, 1));
 }
 
 #[test]

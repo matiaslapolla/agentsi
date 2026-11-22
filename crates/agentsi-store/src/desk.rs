@@ -44,6 +44,37 @@ pub fn set_session(c: &Connection, product: &str, session: &str, at: &str) -> Re
     Ok(())
 }
 
+/// The stored model and effort of the desk session of a product. Null: the role default.
+pub fn choice(c: &Connection, product: &str) -> Result<(Option<String>, Option<String>)> {
+    Ok(c.query_row(
+        "select desk_model, desk_effort from desk_sessions where product = ?1",
+        [product],
+        |r| Ok((r.get(0)?, r.get(1)?)),
+    )
+    .optional()?
+    .unwrap_or((None, None)))
+}
+
+/// Stores the model and the effort of a product. A product with no desk session gets the
+/// session `fresh`, so the choice has a row. A reset keeps the choice.
+pub fn set_choice(
+    c: &Connection,
+    product: &str,
+    model: Option<&str>,
+    effort: Option<&str>,
+    fresh: &str,
+    at: &str,
+) -> Result<()> {
+    c.execute(
+        "insert into desk_sessions (product, session, created_at, desk_model, desk_effort)
+         values (?1, ?2, ?3, ?4, ?5)
+         on conflict (product) do update
+         set desk_model = excluded.desk_model, desk_effort = excluded.desk_effort",
+        params![product, fresh, at, model, effort],
+    )?;
+    Ok(())
+}
+
 /// Stores an item after the last one, and gives its `seq`. A note starts unsent.
 pub fn add_item(c: &Connection, product: &str, kind: &str, body: &str, at: &str) -> Result<i64> {
     let seq: i64 = c.query_row(
@@ -174,6 +205,35 @@ mod tests {
             Ok(())
         })
         .unwrap();
+    }
+
+    #[test]
+    fn a_choice_is_for_each_product_and_a_reset_keeps_it() {
+        let (dir, s) = store();
+        s.write(|tx| {
+            assert_eq!(choice(tx, "alpha")?, (None, None));
+            set_choice(tx, "alpha", Some("sonnet"), None, "u1", "t0")?;
+            set_choice(tx, "beta", None, Some("high"), "u2", "t0")?;
+            assert_eq!(choice(tx, "alpha")?, (Some("sonnet".into()), None));
+            assert_eq!(choice(tx, "beta")?, (None, Some("high".into())));
+            assert_eq!(session(tx, "alpha")?.as_deref(), Some("u1"));
+            reset(tx, "alpha", "u3", "t1")?;
+            assert_eq!(choice(tx, "alpha")?, (Some("sonnet".into()), None));
+            assert_eq!(session(tx, "alpha")?.as_deref(), Some("u3"));
+            set_choice(tx, "alpha", None, None, "ignored", "t2")?;
+            assert_eq!(choice(tx, "alpha")?, (None, None));
+            assert_eq!(session(tx, "alpha")?.as_deref(), Some("u3"));
+            Ok(())
+        })
+        .unwrap();
+        drop(s);
+        let again = Store::open(&dir.path().join("agentsi.db")).unwrap();
+        again
+            .read(|c| {
+                assert_eq!(choice(c, "beta")?, (None, Some("high".into())));
+                Ok(())
+            })
+            .unwrap();
     }
 
     #[test]
