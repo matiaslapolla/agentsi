@@ -602,6 +602,30 @@ fn check_choice(what: &str, value: Option<&str>, allowed: &[&str]) -> Result<(),
     }
 }
 
+/// Ends the process of a slot and sets `Stopped`, in the critical section of the caller, so a
+/// `desk.send` that comes after it starts a new process and its state is never overwritten.
+/// Gives the commands to stop and whether the state changed.
+fn end_slot(core: &Core, slot: &mut Slot) -> Option<(mpsc::Sender<Cmd>, bool)> {
+    let commands = slot.commands.take()?;
+    slot.generation = core.desks.next_generation();
+    let changed = slot.state != DeskState::Stopped || slot.message.is_some();
+    slot.state = DeskState::Stopped;
+    slot.message = None;
+    Some((commands, changed))
+}
+
+/// Sends Stop to an ended process, after the slot lock, and publishes `Stopped`.
+fn finish_end(core: &Core, product: &str, (commands, changed): (mpsc::Sender<Cmd>, bool)) {
+    let _ = commands.send(Cmd::Stop);
+    if changed {
+        core.publish::<DeskStateEvent>(&DeskStateParams {
+            product: product.to_string(),
+            state: DeskState::Stopped,
+            message: None,
+        });
+    }
+}
+
 /// `desk.configure`: stores the model and the effort of a product. A reply that runs keeps
 /// its process. An idle process ends, so the next message starts one with the new values.
 pub fn configure(
@@ -628,43 +652,27 @@ pub fn configure(
             Ok(!same)
         })
         .map_err(rpc_store)?;
-    // An idle process ends, in the same critical section that checks it, so a `desk.send`
+    // An idle process ends in the same critical section that checks it, so a `desk.send`
     // never finds it half ended and a reply that runs never ends.
-    let ended = {
-        let mut slots = lock(&core.desks.slots);
-        slots
-            .get_mut(product)
-            .filter(|s| changed && s.state == DeskState::Idle && !s.sending && s.commands.is_some())
-            .and_then(|s| {
-                s.generation = core.desks.next_generation();
-                s.commands.take()
-            })
-    };
-    if let Some(commands) = ended {
-        let _ = commands.send(Cmd::Stop);
-        set_state(core, product, None, DeskState::Stopped, None);
+    let ended = lock(&core.desks.slots)
+        .get_mut(product)
+        .filter(|s| changed && s.state == DeskState::Idle && !s.sending)
+        .and_then(|s| end_slot(core, s));
+    if let Some(ended) = ended {
+        finish_end(core, product, ended);
     }
     settings(core, product)
 }
 
 /// `desk.stop`: stops the process of a product. False when none ran.
 pub fn stop(core: &Core, product: &str) -> bool {
-    let commands = {
-        let mut slots = lock(&core.desks.slots);
-        let Some(slot) = slots.get_mut(product) else {
-            return false;
-        };
-        let commands = slot.commands.take();
-        if commands.is_some() {
-            slot.generation = core.desks.next_generation();
-        }
-        commands
-    };
-    let Some(commands) = commands else {
+    let ended = lock(&core.desks.slots)
+        .get_mut(product)
+        .and_then(|s| end_slot(core, s));
+    let Some(ended) = ended else {
         return false;
     };
-    let _ = commands.send(Cmd::Stop);
-    set_state(core, product, None, DeskState::Stopped, None);
+    finish_end(core, product, ended);
     true
 }
 
