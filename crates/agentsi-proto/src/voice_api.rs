@@ -243,6 +243,17 @@ impl KeepTime {
     }
 }
 
+/// The `VmRSS` value of a `/proc/<pid>/status` text, in KB: the resident memory of a process.
+pub fn rss_kb(status: &str) -> Option<u64> {
+    status
+        .lines()
+        .find_map(|l| l.strip_prefix("VmRSS:"))?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()
+}
+
 pub struct ModelsKeep;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -349,6 +360,13 @@ impl Method for FocusReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_status_file_gives_the_resident_memory() {
+        let status = "Name:\tagentsi-pill\nVmPeak:\t 9000 kB\nVmRSS:\t  143360 kB\nThreads:\t9\n";
+        assert_eq!(rss_kb(status), Some(143_360));
+        assert_eq!(rss_kb("Name:\tx\n"), None);
+    }
 
     #[test]
     fn the_bridge_reads_an_event_in_any_case() {

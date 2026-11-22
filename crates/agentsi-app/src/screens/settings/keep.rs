@@ -49,17 +49,6 @@ pub fn label(keep: KeepTime) -> &'static str {
     }
 }
 
-/// The `VmRSS` value of a `/proc/<pid>/status` text, in KB.
-pub fn rss_kb(status: &str) -> Option<u64> {
-    status
-        .lines()
-        .find_map(|l| l.strip_prefix("VmRSS:"))?
-        .split_whitespace()
-        .next()?
-        .parse()
-        .ok()
-}
-
 /// The resident memory of the first `agentsi-pill` process of this user, in KB.
 fn pill_kb() -> Option<u64> {
     use std::os::unix::fs::MetadataExt as _;
@@ -78,7 +67,7 @@ fn pill_kb() -> Option<u64> {
         if comm.trim_end() != "agentsi-pill" {
             return None;
         }
-        rss_kb(&std::fs::read_to_string(dir.join("status")).ok()?)
+        agentsi_proto::voice_api::rss_kb(&std::fs::read_to_string(dir.join("status")).ok()?)
     })
 }
 
@@ -218,7 +207,7 @@ impl SettingsScreen {
 
 #[cfg(test)]
 mod tests {
-    use super::{KeepTime, label, memory_line, rss_kb};
+    use super::{KeepTime, label, memory_line};
     use crate::screens::parts::Load;
     use crate::screens::settings::Section;
     use crate::screens::settings::tests::support::setup;
@@ -281,10 +270,7 @@ mod tests {
     }
 
     #[test]
-    fn the_status_file_gives_the_resident_memory() {
-        let status = "Name:\tagentsi-pill\nVmPeak:\t 9000 kB\nVmRSS:\t  143360 kB\nThreads:\t9\n";
-        assert_eq!(rss_kb(status), Some(143_360));
-        assert_eq!(rss_kb("Name:\tx\n"), None);
+    fn the_memory_line_gives_whole_mb() {
         assert_eq!(
             memory_line(Some(143_360)),
             "The pill uses 140 MB of memory now."

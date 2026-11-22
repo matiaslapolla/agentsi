@@ -9,13 +9,8 @@ use agentsi_voice::{stt, tts, vad};
 /// `VmRSS` of `/proc/self/status`, in MB.
 fn rss_mb() -> f64 {
     let status = std::fs::read_to_string("/proc/self/status").expect("Linux has /proc");
-    let kb: f64 = status
-        .lines()
-        .find_map(|l| l.strip_prefix("VmRSS:"))
-        .and_then(|v| v.split_whitespace().next())
-        .and_then(|v| v.parse().ok())
-        .expect("a VmRSS line");
-    kb / 1024.0
+    let kb = agentsi_proto::voice_api::rss_kb(&status).expect("a VmRSS line");
+    kb as f64 / 1024.0
 }
 
 fn step(what: &str, before: &mut f64) {
