@@ -277,7 +277,7 @@ pub(crate) fn store_item(core: &Core, product: &str, item: DeskItem) -> Result<i
     Ok(seq)
 }
 
-/// Stores a desk note when the product has a desk session: one line about a write of
+/// Stores a desk note when the product has a desk conversation: one line about a write of
 /// product data. The next owner message carries it. A failure is only logged, so a note
 /// never fails the write of the owner.
 pub fn note(core: &Core, product: &str, text: &str) {
@@ -474,7 +474,7 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
     let id = product.to_string();
     let (model, effort) = plan
         .store
-        .read(move |c| desk::choice(c, &id))
+        .read(move |c| desk::desk_model_effort(c, &id))
         .map_err(rpc_store)?;
     let wanted = (
         model.unwrap_or_else(|| plan.role.0.clone()),
@@ -591,7 +591,7 @@ fn record_owner(core: &Core, product: &str, text: &str) -> Result<Recorded, RpcE
     })
 }
 
-/// The stored choice of a product with the defaults of its `pm` role.
+/// The stored desk model and desk effort of a product, with its role default.
 pub fn settings(core: &Core, product: &str) -> Result<DeskChoice, RpcError> {
     registry()?
         .product(product)
@@ -599,7 +599,7 @@ pub fn settings(core: &Core, product: &str) -> Result<DeskChoice, RpcError> {
     let store = open_store(core)?;
     let id = product.to_string();
     let (model, effort) = store
-        .read(move |c| desk::choice(c, &id))
+        .read(move |c| desk::desk_model_effort(c, &id))
         .map_err(rpc_store)?;
     let role = pm_role(&store, product)?;
     Ok(DeskChoice {
@@ -610,7 +610,7 @@ pub fn settings(core: &Core, product: &str) -> Result<DeskChoice, RpcError> {
     })
 }
 
-fn check_choice(what: &str, value: Option<&str>, allowed: &[&str]) -> Result<(), RpcError> {
+fn check_value(what: &str, value: Option<&str>, allowed: &[&str]) -> Result<(), RpcError> {
     match value {
         Some(v) if !allowed.contains(&v) => Err(RpcError::invalid_params(format!(
             "Unknown {what} \"{v}\". Use one of: {}.",
@@ -644,8 +644,8 @@ fn finish_end(core: &Core, product: &str, (commands, changed): (mpsc::Sender<Cmd
     }
 }
 
-/// `desk.configure`: stores the model and the effort of a product. A reply that runs keeps
-/// its process. An idle process ends, so the next message starts one with the new values.
+/// `desk.configure`: stores the desk model and the desk effort of a product. A reply that runs
+/// keeps its process. An idle process ends, so the next message starts one with the new values.
 pub fn configure(
     core: &Core,
     product: &str,
@@ -656,8 +656,8 @@ pub fn configure(
         .product(product)
         .map_err(|_| unknown_product(product))?;
     let models: Vec<&str> = DESK_MODELS.iter().map(|(id, _)| *id).collect();
-    check_choice("model", model.as_deref(), &models)?;
-    check_choice("effort", effort.as_deref(), &DESK_EFFORTS)?;
+    check_value("model", model.as_deref(), &models)?;
+    check_value("effort", effort.as_deref(), &DESK_EFFORTS)?;
     let store = open_store(core)?;
     let role = pm_role(&store, product)?;
     let fresh =
@@ -666,8 +666,8 @@ pub fn configure(
     let (m, e) = (model.clone(), effort.clone());
     let changed = store
         .write(move |tx| {
-            let same = desk::choice(tx, &p)? == (m.clone(), e.clone());
-            desk::set_choice(tx, &p, m.as_deref(), e.as_deref(), &fresh, &at)?;
+            let same = desk::desk_model_effort(tx, &p)? == (m.clone(), e.clone());
+            desk::set_desk_model_effort(tx, &p, m.as_deref(), e.as_deref(), &fresh, &at)?;
             Ok(!same)
         })
         .map_err(rpc_store)?;

@@ -382,7 +382,7 @@ pub struct DeskChoice {
 impl Method for DeskSettings {
     const NAME: &'static str = "desk.settings";
     const DESCRIPTION: &'static str = "Gives the model and the effort of the desk session of a \
-        product: the stored choice and the defaults of the `pm` role.";
+        product: the stored desk model and desk effort, and the role default.";
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound];
     type Params = DeskProductParams;
     type Result = DeskChoice;
@@ -393,10 +393,10 @@ pub struct DeskConfigure;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct DeskConfigureParams {
     pub product: String,
-    /// An id of `DESK_MODELS`. Null or absent clears the choice to the role default.
+    /// An id of `DESK_MODELS`. Null or absent clears the desk model to the role default.
     #[serde(default)]
     pub model: Option<String>,
-    /// An id of `DESK_EFFORTS`. Null or absent clears the choice to the role default.
+    /// An id of `DESK_EFFORTS`. Null or absent clears the desk effort to the role default.
     #[serde(default)]
     pub effort: Option<String>,
 }

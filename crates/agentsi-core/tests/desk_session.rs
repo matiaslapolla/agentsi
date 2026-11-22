@@ -805,7 +805,7 @@ fn a_model_pick_shows_in_the_settings_and_makes_the_next_process_run_it_with_the
     );
     assert_eq!(history(&mut c)["state"], "idle");
 
-    // A null clears the choice back to the role default.
+    // A null clears the desk model and the desk effort back to the role default.
     let s = c.ok(
         "desk.configure",
         json!({"product": "alpha", "model": null, "effort": null}),
@@ -855,7 +855,7 @@ fn a_pick_while_a_reply_runs_keeps_the_reply_and_the_next_message_uses_the_new_m
 }
 
 #[test]
-fn a_value_outside_the_lists_is_refused_and_the_choice_stays() {
+fn a_value_outside_the_lists_is_refused_and_the_desk_model_stays() {
     let dir = TempDir::new();
     let w = setup(&dir, READY);
     let core = start(&dir, &w, &[]);
@@ -892,7 +892,7 @@ fn a_value_outside_the_lists_is_refused_and_the_choice_stays() {
 }
 
 #[test]
-fn the_choice_stays_after_a_core_restart_and_starts_the_first_process() {
+fn the_desk_model_stays_after_a_core_restart_and_starts_the_first_process() {
     let dir = TempDir::new();
     let w = setup(&dir, READY);
     {
@@ -923,7 +923,7 @@ fn the_choice_stays_after_a_core_restart_and_starts_the_first_process() {
         Some("max"),
         "{args}"
     );
-    // A reset keeps the choice.
+    // A reset keeps the desk model.
     c.ok("desk.reset", json!({"product": "alpha"}));
     assert_eq!(
         c.ok("desk.settings", json!({"product": "alpha"}))["model"],

@@ -8700,7 +8700,7 @@
       }
     },
     {
-      "description": "Gives the model and the effort of the desk session of a product: the stored choice and the defaults of the `pm` role.",
+      "description": "Gives the model and the effort of the desk session of a product: the stored desk model and desk effort, and the role default.",
       "errors": [
         {
           "code": -32602,
@@ -8771,12 +8771,12 @@
       "paramStructure": "by-name",
       "params": [
         {
-          "description": "An id of `DESK_EFFORTS`. Null or absent clears the choice to the role default.",
+          "description": "An id of `DESK_EFFORTS`. Null or absent clears the desk effort to the role default.",
           "name": "effort",
           "required": false,
           "schema": {
             "default": null,
-            "description": "An id of `DESK_EFFORTS`. Null or absent clears the choice to the role default.",
+            "description": "An id of `DESK_EFFORTS`. Null or absent clears the desk effort to the role default.",
             "type": [
               "string",
               "null"
@@ -8784,12 +8784,12 @@
           }
         },
         {
-          "description": "An id of `DESK_MODELS`. Null or absent clears the choice to the role default.",
+          "description": "An id of `DESK_MODELS`. Null or absent clears the desk model to the role default.",
           "name": "model",
           "required": false,
           "schema": {
             "default": null,
-            "description": "An id of `DESK_MODELS`. Null or absent clears the choice to the role default.",
+            "description": "An id of `DESK_MODELS`. Null or absent clears the desk model to the role default.",
             "type": [
               "string",
               "null"
