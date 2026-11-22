@@ -931,3 +931,27 @@ fn the_choice_stays_after_a_core_restart_and_starts_the_first_process() {
     );
 }
 
+#[test]
+fn a_desk_model_alone_starts_no_desk_notes() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "sonnet"}),
+    );
+    c.ok(
+        "decision.add",
+        json!({"product": "alpha", "text": "Pick a name", "why": "w"}),
+    );
+    c.ok(
+        "decision.decide",
+        json!({"decision": 1, "status": "approved"}),
+    );
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    reply_ends(&mut c);
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+    let stdin = read(&w.bin.join("stdin"));
+    assert!(!stdin.contains("Desk notes"), "{stdin}");
+}

@@ -291,7 +291,8 @@ pub fn note(core: &Core, product: &str, text: &str) {
     let at = crate::clock::iso_now();
     let (p, stamp) = (product.to_string(), at.clone());
     let stored = store.write(move |tx| {
-        if desk::session(tx, &p)?.is_none() {
+        // A desk model alone makes the session row, and starts no backlog of notes.
+        if desk::session(tx, &p)?.is_none() || !desk::has_kind(tx, &p, "owner")? {
             return Ok(None);
         }
         desk::add_item(tx, &p, "note", &body, &stamp).map(Some)
