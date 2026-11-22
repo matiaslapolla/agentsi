@@ -19,8 +19,10 @@
 //! any other text goes to the core, which submits it to the target pane.
 //!
 //! The speech model and the voice detector load at the first start of a recording, after the
-//! microphone opened. The microphone records while they load, so no audio is lost: only the
-//! text waits. They drop together when the keep time passes with no recording.
+//! microphone opened. The load runs on its own thread, and the thread of the microphone goes on
+//! with its jobs: the microphone records while the models load, and a release or a cancel closes
+//! it at once. So no audio before the release is lost, and none after it is heard: only the text
+//! waits. They drop together when the keep time passes with no recording.
 //!
 //! The microphone, the model and the core are traits, so a test feeds a WAV file through
 //! the same path with no microphone.
@@ -104,10 +106,17 @@ enum Kind {
 }
 
 enum Job {
-    Start { ticket: u64, kind: Kind },
+    Start {
+        ticket: u64,
+        kind: Kind,
+    },
     Finish(u64),
     Cancel,
     Keep(KeepTime),
+    /// A load of the speech model ended.
+    Loaded(Opened),
+    /// The dictator is gone.
+    Quit,
 }
 
 /// The dictation of the pill. The window thread calls [`Dictator::effect`].
@@ -155,18 +164,22 @@ impl Dictator {
         stats: bool,
     ) -> Dictator {
         let (tx, rx) = mpsc::channel();
+        let me = tx.clone();
         std::thread::Builder::new()
             .name("dictation".into())
             .spawn(move || {
                 Worker {
                     jobs: rx,
+                    me,
                     events,
                     poll,
                     open_mic,
                     mic: None,
                     recording: false,
                     open_recognizer: Arc::new(Mutex::new(open_recognizer)),
-                    preload: None,
+                    loading: None,
+                    shown: false,
+                    waiting: None,
                     open_detector,
                     delivery,
                     cutter: None,
@@ -214,6 +227,30 @@ impl Dictator {
     }
 }
 
+impl Drop for Dictator {
+    /// The thread holds a sender of its own jobs for the loads, so it learns the end here.
+    fn drop(&mut self) {
+        self.send(Job::Quit);
+    }
+}
+
+/// Why a load of the speech model runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Load {
+    /// The keep time "Load at start", with no recording.
+    Preload,
+    /// A recording waits for it.
+    Press,
+}
+
+/// A recording that started before the speech model was ready. Its text waits for the model.
+struct Waiting {
+    ticket: u64,
+    kind: Kind,
+    /// What the microphone heard up to the release, once the owner released.
+    clip: Option<Clip>,
+}
+
 /// Toggle dictation in progress.
 struct Live {
     ticket: u64,
@@ -232,16 +269,21 @@ type DetectorCutter = Cutter<Box<dyn Classifier + Send>>;
 
 struct Worker {
     jobs: mpsc::Receiver<Job>,
+    /// For the thread of a load, which sends its result as [`Job::Loaded`].
+    me: mpsc::Sender<Job>,
     events: LinkSender,
     poll: Duration,
     open_mic: OpenMic,
     mic: Option<Box<dyn Mic>>,
     /// The microphone records for a dictation or a turn, so the models are in use.
     recording: bool,
-    /// Shared with the thread of a preload.
+    /// Shared with the thread of a load.
     open_recognizer: Arc<Mutex<OpenRecognizer>>,
-    /// A load that runs on its own thread, so a key press during it opens the microphone at once.
-    preload: Option<mpsc::Receiver<Opened>>,
+    /// The load that runs on its own thread. At most one runs.
+    loading: Option<Load>,
+    /// The pill got `Input::Loading(true)` for the load that runs.
+    shown: bool,
+    waiting: Option<Waiting>,
     open_detector: OpenDetector,
     delivery: Box<dyn Delivery>,
     /// The cutter, with the loaded voice detector. `None` when the detector is missing or
@@ -287,50 +329,83 @@ impl Worker {
         self.keeper.used(now);
     }
 
-    /// Loads the speech model and then the voice detector, when they are not loaded. The
-    /// detector is optional: hold dictation does not use it.
-    fn load<'a>(
-        &mut self,
-        recognizer: &'a mut Loaded,
-    ) -> Result<&'a mut Box<dyn Recognizer>, String> {
-        if recognizer.is_none() {
-            let (result, took) = match self.preload.take() {
-                Some(rx) => rx.recv().unwrap_or_else(|_| {
-                    (Err("The speech model load stopped".into()), Duration::ZERO)
-                }),
-                None => open_now(&self.open_recognizer),
-            };
-            match result {
-                Ok(r) => {
-                    eprintln!("agentsi-pill: speech in ready in {took:?}");
-                    *recognizer = Some(r);
-                    self.used();
-                }
-                Err(e) => {
-                    eprintln!("agentsi-pill: speech in cannot start: {e}");
-                    return Err(e);
-                }
-            }
-            self.load_detector();
-        }
-        Ok(recognizer.as_mut().expect("set above"))
-    }
-
-    /// Starts a load of the speech model on its own thread. [`Worker::load`] takes its result.
-    fn preload(&mut self, recognizer: &Loaded) {
-        if recognizer.is_some() || self.preload.is_some() {
+    /// Starts a load of the speech model on its own thread, when it is not loaded and no load
+    /// runs. The worker never waits for it: the result comes back as [`Job::Loaded`].
+    fn load(&mut self, recognizer: &Loaded, why: Load) {
+        if recognizer.is_some() || self.loading.is_some() {
             return;
         }
-        let (tx, rx) = mpsc::channel();
+        self.loading = Some(why);
+        let tx = self.me.clone();
         let open = self.open_recognizer.clone();
         let spawned = std::thread::Builder::new()
             .name("speech-in-load".into())
             .spawn(move || {
-                let _ = tx.send(open_now(&open));
+                let _ = tx.send(Job::Loaded(open_now(&open)));
             });
-        if spawned.is_ok() {
-            self.preload = Some(rx);
+        if let Err(e) = spawned {
+            let _ = self.me.send(Job::Loaded((
+                Err(format!("The speech model load cannot start: {e}")),
+                Duration::ZERO,
+            )));
         }
+    }
+
+    /// A load ended. A recording that waits for it goes on, or fails with it. A preload that
+    /// failed may have run before a download, so a recording that waits for it tries once more.
+    fn loaded(&mut self, opened: Opened, recognizer: &mut Loaded) {
+        let why = self.loading.take();
+        let (result, took) = opened;
+        match result {
+            Ok(r) => {
+                eprintln!("agentsi-pill: speech in ready in {took:?}");
+                *recognizer = Some(r);
+                self.used();
+                self.load_detector();
+            }
+            Err(e) => {
+                eprintln!("agentsi-pill: speech in cannot start: {e}");
+                if why == Some(Load::Preload) && self.waiting.is_some() {
+                    self.load(recognizer, Load::Press);
+                    return;
+                }
+                if let Some(waiting) = self.waiting.take() {
+                    self.abort();
+                    self.ended(waiting.ticket, Err(e));
+                }
+            }
+        }
+        if std::mem::take(&mut self.shown) {
+            self.send(Input::Loading(false));
+        }
+        let (Some(waiting), Some(r)) = (self.waiting.take(), recognizer.as_mut()) else {
+            return;
+        };
+        let Waiting { ticket, kind, clip } = waiting;
+        if let Err(e) = self.begin(ticket, kind) {
+            eprintln!("agentsi-pill: cannot record: {e}");
+            self.abort();
+            self.ended(ticket, Err(e));
+            return;
+        }
+        // Without a release yet, the recording goes on with the model.
+        let Some(clip) = clip else {
+            return;
+        };
+        let result = if kind == Kind::Hold {
+            self.finish(r.as_mut(), Some(clip))
+        } else {
+            self.finish_toggle(r.as_mut(), Some(clip))
+        };
+        self.used();
+        self.report(ticket, result);
+    }
+
+    fn report(&self, ticket: u64, result: Result<(), String>) {
+        if let Err(e) = &result {
+            eprintln!("agentsi-pill: dictation failed: {e}");
+        }
+        self.ended(ticket, result);
     }
 
     fn load_detector(&mut self) {
@@ -384,7 +459,7 @@ impl Worker {
     fn run(mut self) {
         let mut recognizer: Loaded = None;
         if self.keeper.keep().loads_at_start() {
-            self.preload(&recognizer);
+            self.load(&recognizer, Load::Preload);
         }
         loop {
             let Ok(job) = self.next_job(&mut recognizer) else {
@@ -400,7 +475,7 @@ impl Worker {
                 continue;
             };
             match job {
-                Job::Start { ticket, kind } => match self.start(ticket, kind, &mut recognizer) {
+                Job::Start { ticket, kind } => match self.start(ticket, kind, &recognizer) {
                     Ok(()) => self.used(),
                     Err(e) => {
                         eprintln!("agentsi-pill: cannot record: {e}");
@@ -415,42 +490,55 @@ impl Worker {
                 }
                 Job::Keep(keep) => {
                     self.keeper.set(keep);
+                    // A load that runs marks its use when it ends, so its drop time counts.
                     if keep.loads_at_start() {
-                        self.preload(&recognizer);
-                    } else if self.preload.is_some() {
-                        // A timed keep needs the loaded model, so that its drop time counts.
-                        let _ = self.load(&mut recognizer);
+                        self.load(&recognizer, Load::Preload);
                     }
                 }
+                Job::Loaded(opened) => self.loaded(opened, &mut recognizer),
+                Job::Quit => return,
                 Job::Finish(ticket) => {
+                    if let Some(waiting) = self.waiting.as_mut() {
+                        if waiting.ticket != ticket || waiting.clip.is_some() {
+                            continue;
+                        }
+                        // The microphone closes at the release. The text waits for the model.
+                        let clip = match self.mic.as_mut() {
+                            Some(mic) => mic.finish(),
+                            None => Err("The microphone is not open".into()),
+                        };
+                        self.recording = false;
+                        match clip {
+                            Ok(clip) => waiting.clip = Some(clip),
+                            Err(e) => {
+                                self.waiting = None;
+                                self.report(ticket, Err(e));
+                            }
+                        }
+                        continue;
+                    }
                     // Without a model or a recording, the start failed already.
                     let (Some(r), true) = (recognizer.as_mut(), self.recording) else {
                         continue;
                     };
                     let running = self.live.as_ref().map(|l| l.ticket);
                     let result = match running {
-                        Some(live) if live == ticket => self.finish_toggle(r.as_mut()),
+                        Some(live) if live == ticket => self.finish_toggle(r.as_mut(), None),
                         // The stop of an old dictation: the one that runs goes on.
                         Some(_) => continue,
-                        None => self.finish(r.as_mut()),
+                        None => self.finish(r.as_mut(), None),
                     };
                     self.recording = false;
                     self.used();
-                    match result {
-                        Ok(()) => self.ended(ticket, Ok(())),
-                        Err(e) => {
-                            eprintln!("agentsi-pill: dictation failed: {e}");
-                            self.ended(ticket, Err(e));
-                        }
-                    }
+                    self.report(ticket, result);
                 }
             }
         }
     }
 
-    /// Opens the microphone, then loads the models while it records. A model that cannot load
-    /// closes the microphone again.
-    fn start(&mut self, ticket: u64, kind: Kind, recognizer: &mut Loaded) -> Result<(), String> {
+    /// Opens the microphone. Without the models, it starts their load and records while it
+    /// runs.
+    fn start(&mut self, ticket: u64, kind: Kind, recognizer: &Loaded) -> Result<(), String> {
         if self.mic.is_none() {
             self.mic = Some((self.open_mic)()?);
         }
@@ -458,22 +546,33 @@ impl Worker {
         mic.start().inspect_err(|_| self.mic = None)?;
         self.recording = true;
         self.live = None;
-        let fresh = recognizer.is_none();
-        if let Err(e) = self.load(recognizer) {
-            self.abort();
-            return Err(e);
-        }
-        if kind == Kind::Hold {
+        self.waiting = None;
+        if recognizer.is_none() {
+            self.waiting = Some(Waiting {
+                ticket,
+                kind,
+                clip: None,
+            });
+            self.load(recognizer, Load::Press);
+            if !self.shown {
+                self.shown = true;
+                self.send(Input::Loading(true));
+            }
             return Ok(());
         }
         // A detector that was missing at an earlier load may be downloaded now.
-        if self.cutter.is_none() && !fresh {
+        if kind != Kind::Hold && self.cutter.is_none() {
             self.load_detector();
         }
-        let Some(cutter) = self.cutter.as_mut() else {
-            self.abort();
-            return Err(NO_DETECTOR.into());
-        };
+        self.begin(ticket, kind).inspect_err(|_| self.abort())
+    }
+
+    /// The models are ready: toggle dictation and a turn get the cutter.
+    fn begin(&mut self, ticket: u64, kind: Kind) -> Result<(), String> {
+        if kind == Kind::Hold {
+            return Ok(());
+        }
+        let cutter = self.cutter.as_mut().ok_or(NO_DETECTOR)?;
         cutter.reset();
         if kind == Kind::Turn {
             cutter.set_pause(TURN_PAUSE);
@@ -502,7 +601,7 @@ impl Worker {
         if kind == Kind::Turn {
             return self.tick_turn(recognizer, ticket);
         }
-        let result = self.pump(recognizer, false);
+        let result = self.pump(recognizer, false, None);
         if let Err(e) = result {
             eprintln!("agentsi-pill: dictation failed: {e}");
             self.abort();
@@ -518,7 +617,7 @@ impl Worker {
 
     /// One poll of conversation mode. The first piece that closes is the turn.
     fn tick_turn(&mut self, recognizer: &mut dyn Recognizer, ticket: u64) {
-        let pieces = match self.collect(false) {
+        let pieces = match self.collect(false, None) {
             Ok(pieces) => pieces,
             Err(e) => {
                 eprintln!("agentsi-pill: conversation failed: {e}");
@@ -574,6 +673,7 @@ impl Worker {
     /// Ends the recording and drops what the microphone heard.
     fn abort(&mut self) {
         self.live = None;
+        self.waiting = None;
         self.recording = false;
         if let Some(cutter) = self.cutter.as_mut() {
             cutter.reset();
@@ -584,18 +684,28 @@ impl Worker {
     }
 
     /// Takes the audio that came in since the last call, or with `last` the rest of it, and
-    /// sends the pieces that it closes.
-    fn pump(&mut self, recognizer: &mut dyn Recognizer, last: bool) -> Result<(), String> {
-        for piece in self.collect(last)? {
+    /// sends the pieces that it closes. `heard` is the rest when the microphone closed already.
+    fn pump(
+        &mut self,
+        recognizer: &mut dyn Recognizer,
+        last: bool,
+        heard: Option<Clip>,
+    ) -> Result<(), String> {
+        for piece in self.collect(last, heard)? {
             self.send_piece(recognizer, &piece)?;
         }
         Ok(())
     }
 
     /// The pieces that the audio so far closes. With `last`, the rest of it closes the open one.
-    fn collect(&mut self, last: bool) -> Result<Vec<Vec<f32>>, String> {
-        let mic = self.mic.as_mut().ok_or("The microphone is not open")?;
-        let clip = if last { mic.finish()? } else { mic.take()? };
+    fn collect(&mut self, last: bool, heard: Option<Clip>) -> Result<Vec<Vec<f32>>, String> {
+        let clip = match heard {
+            Some(clip) => clip,
+            None => {
+                let mic = self.mic.as_mut().ok_or("The microphone is not open")?;
+                if last { mic.finish()? } else { mic.take()? }
+            }
+        };
         let live = self
             .live
             .as_mut()
@@ -614,8 +724,12 @@ impl Worker {
 
     /// The end of toggle dictation: the rest of the audio, then the last piece. It fails when
     /// the whole dictation gave no text.
-    fn finish_toggle(&mut self, recognizer: &mut dyn Recognizer) -> Result<(), String> {
-        let result = self.pump(recognizer, true);
+    fn finish_toggle(
+        &mut self,
+        recognizer: &mut dyn Recognizer,
+        heard: Option<Clip>,
+    ) -> Result<(), String> {
+        let result = self.pump(recognizer, true, heard);
         let pieces = self.live.take().map_or(0, |l| l.pieces);
         if let Some(cutter) = self.cutter.as_mut() {
             cutter.reset();
@@ -659,11 +773,22 @@ impl Worker {
         self.delivery.copy(live.clipboard.trim_start())
     }
 
-    /// Capture is done: the clip goes through the model and the core.
-    fn finish(&mut self, recognizer: &mut dyn Recognizer) -> Result<(), String> {
+    /// Capture is done: the clip goes through the model and the core. `heard` is the clip when
+    /// the microphone closed already.
+    fn finish(
+        &mut self,
+        recognizer: &mut dyn Recognizer,
+        heard: Option<Clip>,
+    ) -> Result<(), String> {
         let released = Instant::now();
-        let mic = self.mic.as_mut().ok_or("The microphone is not open")?;
-        let clip = mic.finish()?;
+        let clip = match heard {
+            Some(clip) => clip,
+            None => self
+                .mic
+                .as_mut()
+                .ok_or("The microphone is not open")?
+                .finish()?,
+        };
         let captured = released.elapsed();
         let samples = clip.at_model_rate();
         let resampled = released.elapsed();
@@ -1029,12 +1154,24 @@ mod tests {
         let deadline = Instant::now() + Duration::from_secs(10);
         loop {
             match rx.try_recv() {
+                Ok(LinkEvent::Input(Input::Loading(_))) => {}
                 Ok(LinkEvent::Input(input)) => return input,
                 Ok(other) => panic!("unexpected {other:?}"),
                 Err(_) => {
                     assert!(Instant::now() < deadline, "no event within 10 seconds");
                     std::thread::sleep(Duration::from_millis(5));
                 }
+            }
+        }
+    }
+
+    /// No event came, but the news of a load.
+    fn no_event(rx: &mut futures::channel::mpsc::UnboundedReceiver<LinkEvent>) -> bool {
+        loop {
+            match rx.try_recv() {
+                Ok(LinkEvent::Input(Input::Loading(_))) => {}
+                Ok(_) => return false,
+                Err(_) => return true,
             }
         }
     }
@@ -1224,6 +1361,16 @@ mod tests {
             })
         }
 
+        /// A recognizer whose open takes `load`.
+        fn slow(&self, load: Duration) -> OpenRecognizer {
+            let me = self.clone();
+            Box::new(move || {
+                me.opens.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                std::thread::sleep(load);
+                Ok(Box::new(Counted(me.clone())) as Box<dyn Recognizer>)
+            })
+        }
+
         fn detector(&self) -> OpenDetector {
             let me = self.clone();
             Box::new(move || Ok(Box::new(CountedLoud(me.clone())) as Box<dyn Classifier + Send>))
@@ -1331,7 +1478,7 @@ mod tests {
         // The release that follows reports nothing more.
         dictator.effect(&Effect::FinishRecording { ticket: 1 });
         std::thread::sleep(Duration::from_millis(50));
-        assert!(rx.try_recv().is_err());
+        assert!(no_event(&mut rx));
     }
 
     #[test]
@@ -1347,7 +1494,7 @@ mod tests {
         p.mic.speak(&speech(1.5));
         p.dictator.effect(&Effect::FinishRecording { ticket: 1 });
         std::thread::sleep(Duration::from_millis(50));
-        assert!(p.rx.try_recv().is_err(), "the text waits for the model");
+        assert!(no_event(&mut p.rx), "the text waits for the model");
         release.send(()).unwrap();
         assert_eq!(next(&mut p.rx), done(1));
         assert_eq!(
@@ -1501,6 +1648,192 @@ mod tests {
         assert_eq!(next(&mut p.rx), done(1));
         assert_eq!(*p.models.lengths.lock().unwrap(), [24_000]);
         assert_eq!(p.models.opens(), 1);
+    }
+
+    fn slow_pill(load: Duration) -> Pill {
+        let (tx, rx) = unbounded();
+        let mic = LiveMic::default();
+        let models = Models::default();
+        let log = Arc::new(Mutex::new(Log::default()));
+        let dictator = Dictator::start(
+            mic.open(),
+            models.slow(load),
+            models.detector(),
+            Box::new(Sink {
+                log: log.clone(),
+                terminal: Some("t1".into()),
+            }),
+            tx,
+            Policy::new(KeepTime::FiveMinutes),
+            false,
+        );
+        Pill {
+            dictator,
+            rx,
+            mic,
+            models,
+            log,
+        }
+    }
+
+    #[test]
+    fn a_release_during_a_slow_load_closes_the_microphone_and_keeps_only_the_audio_before_it() {
+        let mut p = slow_pill(Duration::from_secs(3));
+        p.dictator.effect(&hold(1));
+        wait_for("the microphone", || p.mic.is_recording());
+        p.mic.speak(&speech(0.5));
+        let released = Instant::now();
+        p.dictator.effect(&Effect::FinishRecording { ticket: 1 });
+        wait_for("the release", || !p.mic.is_recording());
+        assert!(
+            released.elapsed() < Duration::from_secs(1),
+            "closed at once"
+        );
+        // Sound after the release must not reach the text.
+        p.mic.heard.lock().unwrap().extend(speech(1.0));
+        assert_eq!(next(&mut p.rx), done(1));
+        assert_eq!(*p.models.lengths.lock().unwrap(), [8_000]);
+        assert_eq!(p.log.lock().unwrap().delivered, ["p1"]);
+    }
+
+    #[test]
+    fn a_cancel_during_a_slow_load_closes_the_microphone_at_once_and_reports_nothing() {
+        let mut p = slow_pill(Duration::from_secs(3));
+        p.dictator.effect(&hold(1));
+        wait_for("the microphone", || p.mic.is_recording());
+        p.mic.speak(&speech(0.5));
+        let cancelled = Instant::now();
+        p.dictator.effect(&Effect::CancelRecording);
+        wait_for("the cancel", || !p.mic.is_recording());
+        assert!(
+            cancelled.elapsed() < Duration::from_secs(1),
+            "closed at once"
+        );
+        assert_eq!(p.mic.cancels.load(std::sync::atomic::Ordering::SeqCst), 1);
+        // The load ends with no text: the next press uses the loaded model.
+        wait_for("the load", || p.models.opens() == 1);
+        std::thread::sleep(Duration::from_millis(3_200));
+        assert!(no_event(&mut p.rx));
+        assert!(p.models.lengths.lock().unwrap().is_empty());
+        p.dictator.effect(&hold(2));
+        wait_for("the microphone", || p.mic.is_recording());
+        p.mic.speak(&speech(0.5));
+        p.dictator.effect(&Effect::FinishRecording { ticket: 2 });
+        assert_eq!(next(&mut p.rx), done(2));
+        assert_eq!(p.models.opens(), 1);
+    }
+
+    #[test]
+    fn a_timed_keep_during_a_load_at_start_does_not_hold_back_a_press() {
+        let (release, gate) = mpsc::channel::<()>();
+        let mut p = pill(Policy::new(KeepTime::Start), Some(gate));
+        wait_for("the load at start", || p.models.opens() == 1);
+        p.dictator.set_keep(KeepTime::OneMinute);
+        p.dictator.effect(&hold(1));
+        // The load still waits at the gate, and the microphone records already.
+        wait_for("the microphone", || p.mic.is_recording());
+        p.mic.speak(&speech(1.0));
+        p.dictator.effect(&Effect::FinishRecording { ticket: 1 });
+        wait_for("the release", || !p.mic.is_recording());
+        release.send(()).unwrap();
+        assert_eq!(next(&mut p.rx), done(1));
+        assert_eq!(*p.models.lengths.lock().unwrap(), [16_000]);
+        assert_eq!(p.models.opens(), 1);
+    }
+
+    #[test]
+    fn a_load_at_start_that_failed_before_a_download_does_not_fail_the_next_press() {
+        // The first open fails, as with no model on disk. A second open finds it.
+        let fails = |gate: Option<mpsc::Receiver<()>>| -> (OpenRecognizer, Arc<Mutex<u32>>) {
+            let opens = Arc::new(Mutex::new(0));
+            let n = opens.clone();
+            let gate = gate.map(Mutex::new);
+            let open: OpenRecognizer = Box::new(move || {
+                let first = {
+                    let mut n = n.lock().unwrap();
+                    *n += 1;
+                    *n == 1
+                };
+                if first {
+                    if let Some(gate) = &gate {
+                        gate.lock().unwrap().recv().unwrap();
+                    }
+                    return Err(NOT_DOWNLOADED.into());
+                }
+                Ok(Box::new(Words("Hello.")) as Box<dyn Recognizer>)
+            });
+            (open, opens)
+        };
+        let start = |open: OpenRecognizer| {
+            let (tx, rx) = unbounded();
+            let mic = LiveMic::default();
+            let dictator = Dictator::start(
+                mic.open(),
+                open,
+                no_detector(),
+                Box::new(Sink {
+                    log: Arc::default(),
+                    terminal: Some("t1".into()),
+                }),
+                tx,
+                Policy::new(KeepTime::Start),
+                false,
+            );
+            (dictator, rx, mic)
+        };
+        // The failed load ended before the press.
+        let (open, opens) = fails(None);
+        let (dictator, mut rx, mic) = start(open);
+        wait_for("the load at start", || *opens.lock().unwrap() == 1);
+        std::thread::sleep(Duration::from_millis(50));
+        dictator.effect(&hold(1));
+        wait_for("the microphone", || mic.is_recording());
+        mic.speak(&speech(0.5));
+        dictator.effect(&Effect::FinishRecording { ticket: 1 });
+        assert_eq!(next(&mut rx), done(1));
+        assert_eq!(*opens.lock().unwrap(), 2);
+        // The failed load ends while the press waits for it: it opens once more.
+        let (release, gate) = mpsc::channel::<()>();
+        let (open, opens) = fails(Some(gate));
+        let (dictator, mut rx, mic) = start(open);
+        wait_for("the load at start", || *opens.lock().unwrap() == 1);
+        dictator.effect(&hold(1));
+        wait_for("the microphone", || mic.is_recording());
+        mic.speak(&speech(0.5));
+        dictator.effect(&Effect::FinishRecording { ticket: 1 });
+        release.send(()).unwrap();
+        assert_eq!(next(&mut rx), done(1));
+        assert_eq!(*opens.lock().unwrap(), 2);
+    }
+
+    #[test]
+    fn a_press_that_waits_for_the_model_tells_the_pill_of_the_load() {
+        let (release, gate) = mpsc::channel::<()>();
+        let mut p = pill(Policy::new(KeepTime::FiveMinutes), Some(gate));
+        p.dictator.effect(&hold(1));
+        wait_for("the microphone", || p.mic.is_recording());
+        let event = |rx: &mut futures::channel::mpsc::UnboundedReceiver<LinkEvent>| {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            loop {
+                if let Ok(LinkEvent::Input(input)) = rx.try_recv() {
+                    return input;
+                }
+                assert!(Instant::now() < deadline, "no event");
+                std::thread::sleep(Duration::from_millis(5));
+            }
+        };
+        assert_eq!(event(&mut p.rx), Input::Loading(true));
+        p.mic.speak(&speech(0.5));
+        p.dictator.effect(&Effect::FinishRecording { ticket: 1 });
+        release.send(()).unwrap();
+        assert_eq!(event(&mut p.rx), Input::Loading(false));
+        assert_eq!(event(&mut p.rx), done(1));
+        // With the model loaded, a press says nothing of a load.
+        p.dictator.effect(&hold(2));
+        wait_for("the microphone", || p.mic.is_recording());
+        p.mic.speak(&speech(0.5));
+        p.dictator.effect(&Effect::FinishRecording { ticket: 2 });
+        assert_eq!(event(&mut p.rx), done(2));
     }
 
     #[test]
@@ -1759,7 +2092,7 @@ mod tests {
         let lengths = lengths.lock().unwrap().clone();
         assert!(lengths.iter().all(|l| *l <= 30 * 16_000), "{lengths:?}");
         // No stop yet: the dictation has no limit. The stop ends it with no more text.
-        assert!(rx.try_recv().is_err());
+        assert!(no_event(&mut rx));
         dictator.effect(&Effect::FinishRecording { ticket: 1 });
         assert_eq!(next(&mut rx), done(1));
         assert_eq!(log.lock().unwrap().delivered.len(), count);
@@ -1803,7 +2136,7 @@ mod tests {
         // The cancel that follows ends the session, and no second report comes.
         dictator.effect(&Effect::CancelRecording);
         std::thread::sleep(Duration::from_millis(100));
-        assert!(rx.try_recv().is_err());
+        assert!(no_event(&mut rx));
     }
 
     #[test]
@@ -1906,7 +2239,7 @@ mod tests {
         std::thread::sleep(Duration::from_millis(150));
         assert_eq!(given.load(std::sync::atomic::Ordering::SeqCst), after);
         assert!(after < total, "{after} of {total}");
-        assert!(rx.try_recv().is_err());
+        assert!(no_event(&mut rx));
         // The pill listens again: a new start opens the microphone for the next turn.
         dictator.effect(&Effect::Listen { ticket: 5 });
         assert_eq!(next(&mut rx), heard(5));
@@ -2020,6 +2353,6 @@ mod tests {
         assert_eq!(next(&mut rx), Input::Quiet { ticket: 7 });
         dictator.effect(&Effect::CancelRecording);
         std::thread::sleep(Duration::from_millis(100));
-        assert!(rx.try_recv().is_err());
+        assert!(no_event(&mut rx));
     }
 }
