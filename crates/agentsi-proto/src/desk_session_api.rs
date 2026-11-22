@@ -359,7 +359,8 @@ pub const DESK_MODELS: [(&str, &str); 4] = [
     ("haiku", "Haiku"),
 ];
 
-/// The levels of `claude --effort`, in the order of the desk select.
+/// The levels of `claude --effort`, in the order of the desk select. A role file and a
+/// reflection proposal take the same levels.
 pub const DESK_EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
 
 pub struct DeskSettings;
@@ -585,6 +586,16 @@ impl Event for DeskItemEvent {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn the_description_of_desk_configure_names_the_lists() {
+        let models: Vec<&str> = DESK_MODELS.iter().map(|(id, _)| *id).collect();
+        let lists = format!("({}; {})", models.join(", "), DESK_EFFORTS.join(", "));
+        assert!(
+            DeskConfigure::DESCRIPTION.contains(&lists),
+            "{lists} is not in the description"
+        );
+    }
 
     #[test]
     fn each_view_gives_a_show_tool_with_a_description_and_no_kind() {

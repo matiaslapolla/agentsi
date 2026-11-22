@@ -14,6 +14,7 @@ use crate::screens::desk::DeskScreen;
 use crate::screens::minute::MinuteScreen;
 use crate::screens::parts::Live;
 use crate::screens::settings::Section;
+use agentsi_proto::desk_session_api::{DESK_EFFORTS, DESK_MODELS};
 
 gpui_kit::actions!(
     agentsi,
@@ -491,6 +492,38 @@ pub struct Entry {
     pub keywords: &'static [&'static str],
     pub action: MakeAction,
 }
+
+/// The keywords of "Desk: Choose model…": the words, then each id of `DESK_MODELS`.
+const DESK_MODEL_KEYWORDS: [&str; 4 + DESK_MODELS.len()] = {
+    let mut k = [""; 4 + DESK_MODELS.len()];
+    let words = ["desk", "model", "claude", "conversation"];
+    let mut i = 0;
+    while i < k.len() {
+        k[i] = if i < words.len() {
+            words[i]
+        } else {
+            DESK_MODELS[i - words.len()].0
+        };
+        i += 1;
+    }
+    k
+};
+
+/// The keywords of "Desk: Choose effort…": the words, then each level of `DESK_EFFORTS`.
+const DESK_EFFORT_KEYWORDS: [&str; 5 + DESK_EFFORTS.len()] = {
+    let mut k = [""; 5 + DESK_EFFORTS.len()];
+    let words = ["desk", "effort", "claude", "thinking", "conversation"];
+    let mut i = 0;
+    while i < k.len() {
+        k[i] = if i < words.len() {
+            words[i]
+        } else {
+            DESK_EFFORTS[i - words.len()]
+        };
+        i += 1;
+    }
+    k
+};
 
 pub const ENTRIES: &[Entry] = &[
     Entry {
@@ -1269,22 +1302,13 @@ pub const ENTRIES: &[Entry] = &[
     Entry {
         label: "Desk: Choose model…",
         icon: IconName::Bot,
-        keywords: &[
-            "desk",
-            "model",
-            "claude",
-            "fable",
-            "opus",
-            "sonnet",
-            "haiku",
-            "conversation",
-        ],
+        keywords: &DESK_MODEL_KEYWORDS,
         action: || Box::new(DeskChooseModel),
     },
     Entry {
         label: "Desk: Choose effort…",
         icon: IconName::Bot,
-        keywords: &["desk", "effort", "claude", "thinking", "conversation"],
+        keywords: &DESK_EFFORT_KEYWORDS,
         action: || Box::new(DeskChooseEffort),
     },
     Entry {
