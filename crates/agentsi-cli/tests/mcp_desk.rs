@@ -85,7 +85,7 @@ fn work() -> Work {
     agentsi_store::db::migrate(&mut conn).unwrap();
     conn.execute_batch(&format!(
         "insert into decisions (id, product, text, why, status, kind) values (1, 'alpha', 'Ship it', 'w', 'pending', 'product');
-         insert into desk_sessions values ('alpha', '{SESSION}', '2026-11-09T10:00:00.000Z');"
+         insert into desk_sessions (product, session, created_at) values ('alpha', '{SESSION}', '2026-11-09T10:00:00.000Z');"
     ))
     .unwrap();
     Work {

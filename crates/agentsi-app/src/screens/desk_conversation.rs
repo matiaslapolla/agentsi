@@ -13,9 +13,10 @@ use std::collections::HashMap;
 
 use agentsi_proto::Event as _;
 use agentsi_proto::desk_session_api::{
-    DeskAuth, DeskAuthParams, DeskAuthResult, DeskDelta, DeskEntry, DeskHistory, DeskHistoryParams,
-    DeskHistoryResult, DeskItem, DeskItemEvent, DeskProductParams, DeskReset, DeskResetResult,
-    DeskSend, DeskSendParams, DeskState, DeskStateEvent, DeskStop, View,
+    DeskAuth, DeskAuthParams, DeskAuthResult, DeskChoice, DeskConfigure, DeskConfigureParams,
+    DeskDelta, DeskEntry, DeskHistory, DeskHistoryParams, DeskHistoryResult, DeskItem,
+    DeskItemEvent, DeskProductParams, DeskReset, DeskResetResult, DeskSend, DeskSendParams,
+    DeskSettings, DeskState, DeskStateEvent, DeskStop, View,
 };
 use agentsi_proto::events::{DataChanged, Lagged};
 use agentsi_proto::marks_api::{
@@ -41,6 +42,8 @@ use crate::model::{CoreEvent, CoreState, DeskNotice};
 #[path = "desk_views.rs"]
 mod desk_views;
 use desk_views as views;
+
+use super::desk_model::{self as model, Field, Selects};
 
 /// The text of the first suggestion in an empty conversation.
 const ASK_PENDING: &str = "What waits for me?";
@@ -111,6 +114,20 @@ pub struct DeskConversation {
     /// `desk.send` waits for the core.
     sending: bool,
     flash: Option<Flash>,
+    /// The desk model, the desk effort and the role default, as the core stores them, with the
+    /// last pick applied.
+    desk_settings: Option<DeskChoice>,
+    selects: Option<Selects>,
+    /// The next draw shows `desk_settings` in the selects.
+    selects_stale: bool,
+    /// One line under the selects: the core refused a pick, or it did not answer.
+    settings_error: Option<String>,
+    /// A pick came while a reply runs: the note says which model the next message uses.
+    picked_while_working: bool,
+    /// A `desk.configure` waits for the core. The core runs two calls at once, so the next
+    /// pair waits in `queued`, and the store ends with the last pick.
+    configuring: bool,
+    queued: Option<(Option<String>, Option<String>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -146,6 +163,13 @@ impl DeskConversation {
             busy: false,
             sending: false,
             flash: None,
+            desk_settings: None,
+            selects: None,
+            selects_stale: false,
+            settings_error: None,
+            picked_while_working: false,
+            configuring: false,
+            queued: None,
             _subs: vec![notices, up],
         };
         me.reload(cx);
@@ -183,6 +207,135 @@ impl DeskConversation {
             let _ = this.update(cx, |this, cx| this.history_done(result, cx));
         })
         .detach();
+        self.read_settings(cx);
+    }
+
+    fn read_settings(&mut self, cx: &mut Context<Self>) {
+        let call = self
+            .core
+            .read(cx)
+            .link
+            .call::<DeskSettings>(&DeskProductParams {
+                product: self.product.clone(),
+            });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.settings_done(result, cx));
+        })
+        .detach();
+    }
+
+    pub(crate) fn settings_done(
+        &mut self,
+        result: Result<DeskChoice, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        match result {
+            // A pick that waits for the core is newer than the settings.
+            Ok(_) if self.configuring => {}
+            Ok(settings) => {
+                self.desk_settings = Some(settings);
+                self.settings_error = None;
+                self.selects_stale = true;
+            }
+            Err(e) => {
+                self.settings_error = Some(format!(
+                    "The desk model and the desk effort did not load: {e}"
+                ))
+            }
+        }
+        cx.notify();
+    }
+
+    /// A pick of a select: the core stores it, and the select shows what the core answers.
+    pub(crate) fn pick(&mut self, field: Field, value: String, cx: &mut Context<Self>) {
+        let value = (!value.is_empty()).then_some(value);
+        // `desk.configure` replaces both fields, so a pick needs the stored pair.
+        let Some(settings) = self.desk_settings.as_mut() else {
+            self.settings_error = Some(
+                "The desk model and the desk effort are loading. Pick again in a moment.".into(),
+            );
+            self.selects_stale = true;
+            self.read_settings(cx);
+            cx.notify();
+            return;
+        };
+        match field {
+            Field::Model => settings.model = value,
+            Field::Effort => settings.effort = value,
+        }
+        // The pair stays in `desk_settings` until the core answers, so a second pick keeps the
+        // first.
+        let pair = (settings.model.clone(), settings.effort.clone());
+        if self.configuring {
+            self.queued = Some(pair);
+        } else {
+            self.configure(pair.0, pair.1, cx);
+        }
+    }
+
+    /// `desk.configure`. A pick while a reply runs does not wait: the reply keeps its process.
+    pub fn configure(
+        &mut self,
+        model: Option<String>,
+        effort: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        self.configuring = true;
+        let call = self
+            .core
+            .read(cx)
+            .link
+            .call::<DeskConfigure>(&DeskConfigureParams {
+                product: self.product.clone(),
+                model,
+                effort,
+            });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.configure_done(result, cx));
+        })
+        .detach();
+    }
+
+    pub(crate) fn configure_done(
+        &mut self,
+        result: Result<DeskChoice, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        self.configuring = false;
+        let queued = self.queued.take();
+        match result {
+            Ok(settings) => {
+                self.settings_error = None;
+                self.picked_while_working |=
+                    matches!(self.state, DeskState::Working | DeskState::Starting);
+                if queued.is_none() {
+                    self.desk_settings = Some(settings);
+                }
+            }
+            Err(e) => {
+                self.settings_error = Some(e.to_string());
+                // The pair of a refused pick is not stored: read what the core holds.
+                if queued.is_none() {
+                    self.read_settings(cx);
+                }
+            }
+        }
+        if let Some((model, effort)) = queued {
+            self.configure(model, effort, cx);
+        }
+        self.selects_stale = true;
+        cx.notify();
+    }
+
+    /// The entries of the model or the effort step of the palette, and the value that is picked.
+    pub fn options(&self, field: Field) -> (Vec<model::Pick>, String) {
+        let c = self.desk_settings.as_ref();
+        match field {
+            Field::Model => (model::model_options(c), model::model_value(c)),
+            Field::Effort => (model::effort_options(c), model::effort_value(c)),
+        }
     }
 
     pub(crate) fn history_done(
@@ -324,6 +477,9 @@ impl DeskConversation {
     }
 
     fn set_state(&mut self, state: DeskState, message: Option<String>, cx: &mut Context<Self>) {
+        if !matches!(state, DeskState::Working | DeskState::Starting) {
+            self.picked_while_working = false;
+        }
         self.state = state;
         self.message = message;
         cx.notify();
@@ -643,6 +799,27 @@ impl DeskConversation {
         cx.notify();
     }
 
+    /// Makes the selects at the first draw, and shows the desk settings after a change of them.
+    fn ensure_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match &self.selects {
+            None => {
+                let selects = Selects::new(
+                    self.desk_settings.as_ref(),
+                    window,
+                    cx,
+                    |this: &mut Self, field, value, cx| this.pick(field, value, cx),
+                );
+                self.selects = Some(selects);
+                self.selects_stale = false;
+            }
+            Some(selects) if self.selects_stale => {
+                selects.show(self.desk_settings.as_ref(), window, cx);
+                self.selects_stale = false;
+            }
+            Some(_) => {}
+        }
+    }
+
     fn ensure_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.input.is_none() {
             let input = cx.new(|cx| InputState::new(window, cx).placeholder("Ask the front desk"));
@@ -926,8 +1103,9 @@ impl DeskConversation {
 impl Render for DeskConversation {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_input(window, cx);
+        self.ensure_selects(window, cx);
         let working = matches!(self.state, DeskState::Working | DeskState::Starting);
-        let header = div()
+        let title_row = div()
             .flex()
             .items_center()
             .justify_between()
@@ -969,6 +1147,24 @@ impl Render for DeskConversation {
                             .on_click(cx.listener(|this, _, _, cx| this.ask_reset(cx))),
                     ),
             );
+        let next_note = self
+            .desk_settings
+            .as_ref()
+            .filter(|_| working && self.picked_while_working)
+            .map(model::next_message_note);
+        let header = div()
+            .flex()
+            .flex_col()
+            .gap(space(2))
+            .child(title_row)
+            .children(self.selects.as_ref().map(Selects::row))
+            .children(self.settings_error.clone().map(failed_text))
+            .children(next_note.map(|n| {
+                div()
+                    .text_size(size::sm())
+                    .text_color(text::tertiary())
+                    .child(n)
+            }));
 
         let weak = cx.weak_entity();
         let body = match &self.history {
@@ -1129,9 +1325,9 @@ mod tests {
     // No `use super::*`: it would bring the glob of `gpui_kit` and its `test` macro, and
     // the `#[test]` that `#[gpui::test]` writes would expand again and again.
     use super::{
-        CallError, DecideResult, DecisionInfo, DeskAuthResult, DeskConversation, DeskDelta,
-        DeskHistoryResult, DeskItem, DeskItemEvent, DeskResetResult, DeskState, DeskStateEvent,
-        Flash, Notification, Row, Verdict,
+        CallError, DecideResult, DecisionInfo, DeskAuthResult, DeskChoice, DeskConversation,
+        DeskDelta, DeskHistoryResult, DeskItem, DeskItemEvent, DeskResetResult, DeskState,
+        DeskStateEvent, Flash, Notification, Row, Verdict,
     };
     use crate::link::Link;
     use crate::model::CoreState;
@@ -1174,9 +1370,11 @@ mod tests {
         cx.update(|window, cx| window.draw(cx).clear(cx));
     }
 
+    /// The requests that the core received, without the read of the model settings.
     pub(super) fn methods_sent(other: &mut UnixStream) -> Vec<(String, Value)> {
         received(other)
             .into_iter()
+            .filter(|r| r["method"] != "desk.settings")
             .map(|r| {
                 (
                     r["method"].as_str().unwrap_or_default().to_string(),
@@ -1694,6 +1892,231 @@ mod tests {
                 .all(|(m, _)| m != "decision.decide" && m != "archive.archive"),
             "a letter in the input must not act on a decision"
         );
+    }
+
+    fn choice(model: Option<&str>, effort: Option<&str>) -> DeskChoice {
+        DeskChoice {
+            model: model.map(String::from),
+            effort: effort.map(String::from),
+            role_model: "claude-opus-5-5".into(),
+            role_effort: None,
+        }
+    }
+
+    fn labels(options: Vec<super::model::Pick>) -> Vec<String> {
+        options.into_iter().map(|o| o.label).collect()
+    }
+
+    #[gpui::test]
+    fn the_selects_list_the_role_default_and_each_alias_and_level(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        draw(cx);
+        let asked: Vec<String> = received(&mut other)
+            .iter()
+            .map(|r| r["method"].as_str().unwrap_or_default().to_string())
+            .collect();
+        assert_eq!(asked, ["desk.history", "desk.settings"]);
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert_eq!(
+                labels(c.options(Field::Model).0),
+                [
+                    "Role default (claude-opus-5-5)",
+                    "Fable",
+                    "Opus",
+                    "Sonnet",
+                    "Haiku"
+                ]
+            );
+            assert_eq!(
+                labels(c.options(Field::Effort).0),
+                [
+                    "Role default (none)",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                ]
+            );
+            assert_eq!(c.options(Field::Model).1, "");
+        });
+    }
+
+    #[gpui::test]
+    fn a_pick_sends_desk_configure_with_the_other_field_kept_and_the_core_answer_shows(
+        cx: &mut TestAppContext,
+    ) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| {
+            c.settings_done(Ok(choice(Some("opus"), Some("high"))), cx)
+        });
+        draw(cx);
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| c.pick(Field::Model, "sonnet".into(), cx));
+        let sent = methods_sent(&mut other);
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].0, "desk.configure");
+        assert_eq!(
+            sent[0].1,
+            json!({"product": "demo", "model": "sonnet", "effort": "high"})
+        );
+        conv.update(cx, |c, cx| {
+            c.configure_done(Ok(choice(Some("sonnet"), Some("high"))), cx)
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.options(Field::Model).1, "sonnet");
+            assert!(c.settings_error.is_none());
+        });
+
+        // The role default clears the field.
+        conv.update(cx, |c, cx| c.pick(Field::Effort, String::new(), cx));
+        assert_eq!(
+            methods_sent(&mut other)[0].1,
+            json!({"product": "demo", "model": "sonnet", "effort": null})
+        );
+    }
+
+    #[gpui::test]
+    fn a_refused_pick_shows_one_line_and_the_stored_value(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, _other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| {
+            c.settings_done(Ok(choice(Some("opus"), None)), cx);
+            c.configure_done(Err(CallError::Link("Unknown model \"x\".".into())), cx);
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert!(
+                c.settings_error
+                    .as_deref()
+                    .unwrap()
+                    .contains("Unknown model")
+            );
+            assert_eq!(c.options(Field::Model).1, "opus");
+        });
+    }
+
+    #[gpui::test]
+    fn a_pick_before_the_settings_load_reads_them_again(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| {
+            c.settings_done(Err(CallError::Link("gone".into())), cx)
+        });
+        received(&mut other);
+        conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
+        let asked: Vec<Value> = received(&mut other)
+            .into_iter()
+            .map(|r| r["method"].clone())
+            .collect();
+        assert_eq!(asked, [json!("desk.settings")], "no pair to send yet");
+        conv.read_with(cx, |c, _| {
+            assert!(c.settings_error.as_deref().unwrap().contains("loading"))
+        });
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        conv.read_with(cx, |c, _| assert!(c.settings_error.is_none()));
+        conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
+        assert_eq!(
+            methods_sent(&mut other)[0].1,
+            json!({"product": "demo", "model": "opus", "effort": null})
+        );
+    }
+
+    #[gpui::test]
+    fn two_quick_picks_send_one_after_the_other_and_the_last_pair_stays(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| {
+            c.pick(Field::Model, "sonnet".into(), cx);
+            c.pick(Field::Effort, "max".into(), cx);
+            c.pick(Field::Model, "haiku".into(), cx);
+        });
+        let sent = methods_sent(&mut other);
+        assert_eq!(sent.len(), 1, "the next pick waits for the answer");
+        assert_eq!(
+            sent[0].1,
+            json!({"product": "demo", "model": "sonnet", "effort": null})
+        );
+        // The answer of the first call does not undo the picks that wait.
+        conv.update(cx, |c, cx| {
+            c.configure_done(Ok(choice(Some("sonnet"), None)), cx)
+        });
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.options(Field::Model).1, "haiku");
+            assert_eq!(c.options(Field::Effort).1, "max");
+        });
+        let sent = methods_sent(&mut other);
+        assert_eq!(sent.len(), 1);
+        assert_eq!(
+            sent[0].1,
+            json!({"product": "demo", "model": "haiku", "effort": "max"})
+        );
+        conv.update(cx, |c, cx| {
+            c.configure_done(Ok(choice(Some("haiku"), Some("max"))), cx)
+        });
+        draw(cx);
+        assert!(methods_sent(&mut other).is_empty());
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.options(Field::Model).1, "haiku");
+            assert_eq!(c.options(Field::Effort).1, "max");
+            assert!(!c.configuring);
+        });
+    }
+
+    #[gpui::test]
+    fn a_pick_while_a_reply_runs_shows_the_note_until_the_reply_ends(cx: &mut TestAppContext) {
+        let (conv, _other, cx) = setup(cx);
+        conv.update(cx, |c, cx| {
+            c.history_done(Ok(history("working", None, json!([]))), cx);
+            c.settings_done(Ok(choice(None, None)), cx);
+            c.configure_done(Ok(choice(Some("sonnet"), None)), cx);
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert!(c.picked_while_working);
+            let c = c.desk_settings.as_ref().unwrap();
+            assert_eq!(
+                super::model::next_message_note(c),
+                "The next message uses Sonnet."
+            );
+        });
+        conv.update(cx, |c, cx| {
+            c.take(
+                &note::<DeskStateEvent>(&DeskStateParams {
+                    product: "demo".into(),
+                    state: DeskState::Idle,
+                    message: None,
+                }),
+                cx,
+            )
+        });
+        conv.read_with(cx, |c, _| assert!(!c.picked_while_working));
+    }
+
+    #[gpui::test]
+    fn the_selects_update_once_after_a_change_and_an_idle_draw_changes_nothing(
+        cx: &mut TestAppContext,
+    ) {
+        let (conv, _other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        draw(cx);
+        conv.read_with(cx, |c, _| assert!(!c.selects_stale && c.selects.is_some()));
+        // A draw with nothing new sets nothing stale, so it asks for no new frame.
+        draw(cx);
+        conv.read_with(cx, |c, _| assert!(!c.selects_stale));
     }
 
     fn conv_ready(cx: &mut VisualTestContext, conv: &Entity<DeskConversation>) {

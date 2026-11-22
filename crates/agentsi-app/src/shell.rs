@@ -149,6 +149,10 @@ pub enum Ask {
     SwitchBranch(ProductRef),
     /// The one Confirm before the core of this device restarts.
     RestartCore,
+    /// The model of the desk conversation on screen.
+    DeskModel,
+    /// The effort of the desk conversation on screen.
+    DeskEffort,
 }
 
 pub(crate) struct Asking {
@@ -1690,6 +1694,16 @@ impl Render for Shell {
             .on_action(
                 cx.listener(|this, _: &actions::GitSwitchBranch, window, cx| {
                     this.ask_branch(window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::DeskChooseModel, window, cx| {
+                    this.ask_desk_pick(Ask::DeskModel, window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::DeskChooseEffort, window, cx| {
+                    this.ask_desk_pick(Ask::DeskEffort, window, cx)
                 }),
             )
             .on_action(cx.listener(|this, _: &actions::GoToTab, window, cx| {

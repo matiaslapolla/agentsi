@@ -1410,6 +1410,40 @@
         ],
         "type": "object"
       },
+      "DeskChoice": {
+        "description": "The model and the effort of the desk session of a product. Spec:\n`docs/specs/agentsi-desktop-desk-model.md`.",
+        "properties": {
+          "effort": {
+            "description": "The stored effort (an id of `DESK_EFFORTS`), or null for the role default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "model": {
+            "description": "The stored model (an id of `DESK_MODELS`), or null for the role default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_effort": {
+            "description": "The effort of the `pm` role, or null when the role sets none.",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "role_model": {
+            "description": "The model of the `pm` role of the product: the role default.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "role_model"
+        ],
+        "type": "object"
+      },
       "DeskEntry": {
         "description": "One item with its place in the desk conversation.",
         "properties": {
@@ -8662,6 +8696,118 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/DeskResetResult"
+        }
+      }
+    },
+    {
+      "description": "Gives the model and the effort of the desk session of a product: the stored desk model and desk effort, and the role default.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        }
+      ],
+      "name": "desk.settings",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskChoice"
+        }
+      }
+    },
+    {
+      "description": "Stores the model and the effort of the desk session of a product, and gives the new settings. A value that is not in the lists (fable, opus, sonnet, haiku; low, medium, high, xhigh, max) is `invalid`, and nothing changes. A reply that runs keeps its process. The next owner message starts the process with the new values and resumes the session.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        }
+      ],
+      "name": "desk.configure",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "An id of `DESK_EFFORTS`. Null or absent clears the desk effort to the role default.",
+          "name": "effort",
+          "required": false,
+          "schema": {
+            "default": null,
+            "description": "An id of `DESK_EFFORTS`. Null or absent clears the desk effort to the role default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "description": "An id of `DESK_MODELS`. Null or absent clears the desk model to the role default.",
+          "name": "model",
+          "required": false,
+          "schema": {
+            "default": null,
+            "description": "An id of `DESK_MODELS`. Null or absent clears the desk model to the role default.",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/DeskChoice"
         }
       }
     },

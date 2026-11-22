@@ -14,6 +14,7 @@ pub const MIGRATIONS: &[(u32, &str)] = &[
     (1, include_str!("../sql/0001_init.sql")),
     (2, include_str!("../sql/0002_tickets.sql")),
     (3, include_str!("../sql/0003_desk.sql")),
+    (4, include_str!("../sql/0004_desk_model.sql")),
 ];
 
 pub const DB_FILE: &str = "agentsi.db";

@@ -419,3 +419,95 @@ fn each_old_entry_is_found_by_its_old_keywords_in_the_real_palette(cx: &mut Test
         }
     });
 }
+
+#[gpui::test]
+fn the_desk_entries_are_found_and_with_no_front_desk_open_they_say_so(cx: &mut TestAppContext) {
+    let dir = folder("palette-desk-none");
+    let (f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    type_in(&f, cx, "desk: choose");
+    assert_eq!(
+        labels(&f, cx),
+        ["Desk: Choose model…", "Desk: Choose effort…"]
+    );
+    keys(cx, "enter");
+    assert_eq!(asking(&f, cx), None);
+    let notices = f.core.read_with(cx, |c, _| c.notices.clone());
+    assert_eq!(notices, ["Open the front desk first."]);
+}
+
+#[gpui::test]
+fn the_desk_model_and_effort_entries_open_a_second_step_with_the_lists_of_the_selects(
+    cx: &mut TestAppContext,
+) {
+    use crate::screens::desk::DeskScreen;
+    use agentsi_proto::desk_session_api::DeskChoice;
+    use gpui_kit::AppContext as _;
+
+    let dir = folder("palette-desk-pick");
+    let (mut f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    let core = f.core.clone();
+    let desk = cx.new(|cx| DeskScreen::new("a".into(), core, cx));
+    let conversation = desk.read_with(cx, |d, _| d.conversation().clone());
+    conversation.update(cx, |c, cx| {
+        c.settings_done(
+            Ok(DeskChoice {
+                model: Some("sonnet".into()),
+                effort: None,
+                role_model: "claude-opus-5-5".into(),
+                role_effort: Some("high".into()),
+            }),
+            cx,
+        )
+    });
+
+    type_in(&f, cx, "desk: choose model");
+    keys(cx, "enter");
+    assert_eq!(asking(&f, cx), Some(Ask::DeskModel));
+    let prompt = f
+        .shell
+        .read_with(cx, |s, _| s.asking.as_ref().unwrap().prompt.clone());
+    assert_eq!(
+        prompt.read_with(cx, |p, _| p.labels()),
+        [
+            "Role default (claude-opus-5-5)",
+            "Fable",
+            "Opus",
+            "Sonnet",
+            "Haiku"
+        ]
+    );
+    keys(cx, "escape");
+    assert_eq!(palette_query(&f, cx).as_deref(), Some("desk: choose model"));
+
+    // An answer stores the pick and keeps the other field.
+    keys(cx, "enter");
+    let _ = received(&mut f.core_end);
+    f.shell.update_in(cx, |s, window, cx| {
+        s.asked(PromptEvent::Answer("haiku".into()), window, cx)
+    });
+    redraw(cx);
+    let sent = received(&mut f.core_end);
+    let configure = sent.iter().find(|r| r["method"] == "desk.configure");
+    assert_eq!(
+        configure.map(|r| r["params"].clone()),
+        Some(json!({"product": "a", "model": "haiku", "effort": null}))
+    );
+
+    type_in(&f, cx, "desk: choose effort");
+    keys(cx, "enter");
+    assert_eq!(asking(&f, cx), Some(Ask::DeskEffort));
+    let prompt = f
+        .shell
+        .read_with(cx, |s, _| s.asking.as_ref().unwrap().prompt.clone());
+    assert_eq!(
+        prompt.read_with(cx, |p, _| p.labels()),
+        [
+            "Role default (high)",
+            "low",
+            "medium",
+            "high",
+            "xhigh",
+            "max"
+        ]
+    );
+}

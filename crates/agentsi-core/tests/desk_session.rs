@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 /// A fake `claude`. `auth status` prints `$dir/auth`. Else it counts its starts, keeps its
 /// arguments and answers each stdin line. A line with `hang` never ends its reply, and a line
-/// with `crash` stops the program.
+/// with `slow` ends it after two seconds, and a line with `crash` stops the program.
 const FAKE: &str = r#"#!/bin/sh
 dir="$(dirname "$0")"
 if [ "$1" = auth ]; then cat "$dir/auth"; exit 0; fi
@@ -24,6 +24,7 @@ while IFS= read -r line; do
   printf '%s\n' "$line" >> "$dir/stdin"
   case "$line" in
     *hang*) sleep 60;;
+    *slow*) sleep 2;;
     *crash*) echo 'it broke' >&2; exit 3;;
   esac
   echo '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}}'
@@ -112,6 +113,17 @@ fn items_until(c: &mut Framed, kind: &str) -> Vec<String> {
     }
 }
 
+/// Reads `desk.item` events until the end of a reply, then waits for `idle`: the actor
+/// publishes the end before it sets the state, so a call right after the end can find the
+/// process still working.
+fn reply_ends(c: &mut Framed) -> Vec<String> {
+    let seen = items_until(c, "end");
+    wait_until("the desk is idle after the end", || {
+        history(c)["state"] == "idle"
+    });
+    seen
+}
+
 fn read(path: &Path) -> String {
     std::fs::read_to_string(path).unwrap_or_default()
 }
@@ -142,13 +154,13 @@ fn a_second_owner_message_goes_to_the_same_claude_process() {
         json!({"product": "alpha", "text": "What waits for me?"}),
     );
     assert_eq!(r, json!({"seq": 1}));
-    assert_eq!(items_until(&mut c, "end"), ["owner", "reply", "end"]);
+    assert_eq!(reply_ends(&mut c), ["owner", "reply", "end"]);
     let r = c.ok(
         "desk.send",
         json!({"product": "alpha", "text": "And then?"}),
     );
     assert_eq!(r, json!({"seq": 4}));
-    assert_eq!(items_until(&mut c, "end"), ["owner", "reply", "end"]);
+    assert_eq!(reply_ends(&mut c), ["owner", "reply", "end"]);
 
     assert_eq!(read(&w.bin.join("starts")).trim(), "1");
     assert_eq!(read(&w.bin.join("pids")).lines().count(), 1);
@@ -209,7 +221,7 @@ fn the_system_prompt_of_the_process_holds_the_objectives_of_the_brief() {
         "desk.send",
         json!({"product": "alpha", "text": "Which objectives?"}),
     );
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let args = read(&w.bin.join("args-1"));
     assert!(
         args.contains(
@@ -227,7 +239,7 @@ fn after_a_core_restart_the_process_resumes_the_same_session() {
         let core = start(&dir, &w, &[]);
         let mut c = connect(&core);
         c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-        items_until(&mut c, "end");
+        reply_ends(&mut c);
         history(&mut c)["session"].as_str().unwrap().to_string()
     };
     wait_until("the first process stops with its core", || {
@@ -240,7 +252,7 @@ fn after_a_core_restart_the_process_resumes_the_same_session() {
     let mut c = connect(&core);
     assert_eq!(history(&mut c)["session"], session.as_str());
     c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let args = read(&w.bin.join("args-2"));
     assert!(args.contains(&format!("--resume\n{session}\n")), "{args}");
     assert!(!args.contains("--session-id"));
@@ -258,7 +270,7 @@ fn an_owner_decision_reaches_the_next_owner_message_as_a_desk_note() {
         json!({"product": "alpha", "text": "Pick a name", "why": "w"}),
     );
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
 
     c.ok(
         "decision.decide",
@@ -270,7 +282,7 @@ fn an_owner_decision_reaches_the_next_owner_message_as_a_desk_note() {
         json!({"kind": "note", "text": "The owner approved decision 1."})
     );
     c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let stdin = read(&w.bin.join("stdin"));
     let last: Value = serde_json::from_str(stdin.lines().last().unwrap()).unwrap();
     assert_eq!(
@@ -326,7 +338,7 @@ fn a_crash_gives_a_failed_state_and_the_next_message_starts_a_new_process() {
         "no restart by itself"
     );
     c.ok("desk.send", json!({"product": "alpha", "text": "hello"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     assert_eq!(read(&w.bin.join("starts")).trim(), "2");
 }
 
@@ -353,7 +365,7 @@ fn a_signed_out_login_shows_its_message_and_starts_no_process() {
         "ready"
     );
     c.ok("desk.send", json!({"product": "alpha", "text": "hi"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
 }
 
 #[test]
@@ -369,7 +381,7 @@ fn a_view_names_decisions_of_the_product_and_decision_get_reads_them() {
     assert_eq!(kind(&r), "not_found", "{r}");
 
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let session = history(&mut c)["session"].as_str().unwrap().to_string();
     let r = c.call(
         "desk.show",
@@ -425,7 +437,7 @@ fn object_views_name_objects_of_the_product_and_accept_on_a_priority_writes_no_o
     let core = start(&dir, &w, &[]);
     let mut c = connect(&core);
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let session = history(&mut c)["session"].as_str().unwrap().to_string();
     let show = |c: &mut Framed, view: Value| {
         c.call("desk.show", json!({"session": session, "view": view}))
@@ -483,7 +495,7 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
     let core = start(&dir, &w, &[]);
     let mut c = connect(&core);
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let session = history(&mut c)["session"].as_str().unwrap().to_string();
     let show = |c: &mut Framed, view: Value| {
         c.call("desk.show", json!({"session": session, "view": view}))
@@ -593,7 +605,7 @@ fn generic_views_keep_their_limits_a_check_becomes_a_desk_note_and_a_page_gives_
 
     // The next owner message carries the note of the check.
     c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let stdin = read(&w.bin.join("stdin"));
     let last: Value = serde_json::from_str(stdin.lines().last().unwrap()).unwrap();
     assert_eq!(
@@ -615,7 +627,7 @@ fn a_tickets_view_names_tickets_of_the_product() {
     );
     let id = t["ticket"]["id"].as_str().unwrap().to_string();
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let session = history(&mut c)["session"].as_str().unwrap().to_string();
     let show = |c: &mut Framed, ids: Value| {
         c.call(
@@ -647,7 +659,7 @@ fn a_reset_starts_a_new_conversation_with_a_new_session() {
     let core = start(&dir, &w, &[]);
     let mut c = connect(&core);
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let old = history(&mut c)["session"].as_str().unwrap().to_string();
     let r = c.ok("desk.reset", json!({"product": "alpha"}));
     let new = r["session"].as_str().unwrap().to_string();
@@ -659,7 +671,7 @@ fn a_reset_starts_a_new_conversation_with_a_new_session() {
     );
     assert_eq!(h["state"], "stopped");
     c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let args = read(&w.bin.join("args-2"));
     assert!(args.contains(&format!("--session-id\n{new}\n")), "{args}");
     let r = c.call("desk.send", json!({"product": "nope", "text": "x"}));
@@ -673,7 +685,7 @@ fn a_product_clear_stops_its_desk_process_before_it_deletes_the_rows() {
     let core = start(&dir, &w, &[]);
     let mut c = connect(&core);
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let pid: i32 = read(&w.bin.join("pids")).trim().parse().unwrap();
 
     let items = json!([{"item": "product", "product": "alpha"}]);
@@ -703,7 +715,7 @@ fn a_desk_note_stays_unsent_when_the_process_does_not_start() {
     let core = start(&dir, &w, &[]);
     let mut c = connect(&core);
     c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     c.ok("desk.stop", json!({"product": "alpha"}));
     c.ok(
         "decision.decide",
@@ -719,11 +731,227 @@ fn a_desk_note_stays_unsent_when_the_process_does_not_start() {
 
     std::fs::write(&fake, FAKE).unwrap();
     c.ok("desk.send", json!({"product": "alpha", "text": "three"}));
-    items_until(&mut c, "end");
+    reply_ends(&mut c);
     let stdin = read(&w.bin.join("stdin"));
     let last: Value = serde_json::from_str(stdin.lines().last().unwrap()).unwrap();
     assert_eq!(
         last["message"]["content"],
         "Desk notes:\n- The owner approved decision 1.\n\nthree"
     );
+}
+
+/// The value after `flag` in the keep file of the arguments of a start, or `None`.
+fn arg_after(args: &str, flag: &str) -> Option<String> {
+    let lines: Vec<&str> = args.lines().collect();
+    lines
+        .iter()
+        .position(|l| *l == flag)
+        .map(|i| lines[i + 1].to_string())
+}
+
+#[test]
+fn a_model_pick_shows_in_the_settings_and_makes_the_next_process_run_it_with_the_same_session() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    let s = c.ok("desk.settings", json!({"product": "alpha"}));
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (Value::Null, Value::Null)
+    );
+    let role_model = s["role_model"].as_str().unwrap().to_string();
+
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    reply_ends(&mut c);
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let first = read(&w.bin.join("args-1"));
+    assert_eq!(arg_after(&first, "--model"), Some(role_model.clone()));
+
+    // An idle process ends at once, and the next message resumes the session.
+    let s = c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "sonnet", "effort": "high"}),
+    );
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (json!("sonnet"), json!("high"))
+    );
+    assert_eq!(s["role_model"], role_model.as_str());
+    wait_until("the idle process ends", || {
+        history(&mut c)["state"] == "stopped"
+    });
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    reply_ends(&mut c);
+    let second = read(&w.bin.join("args-2"));
+    assert_eq!(
+        arg_after(&second, "--model").as_deref(),
+        Some("sonnet"),
+        "{second}"
+    );
+    assert_eq!(
+        arg_after(&second, "--effort").as_deref(),
+        Some("high"),
+        "{second}"
+    );
+    assert_eq!(arg_after(&second, "--resume"), Some(session.clone()));
+    assert!(!second.contains("--session-id"));
+
+    // The same pick again keeps the warm process.
+    assert_eq!(history(&mut c)["state"], "idle");
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "sonnet", "effort": "high"}),
+    );
+    assert_eq!(history(&mut c)["state"], "idle");
+
+    // A null clears the desk model and the desk effort back to the role default.
+    let s = c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": null, "effort": null}),
+    );
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (Value::Null, Value::Null)
+    );
+    c.ok("desk.send", json!({"product": "alpha", "text": "three"}));
+    reply_ends(&mut c);
+    let third = read(&w.bin.join("args-3"));
+    assert_eq!(arg_after(&third, "--model"), Some(role_model));
+    assert_eq!(arg_after(&third, "--resume"), Some(session));
+}
+
+#[test]
+fn a_pick_while_a_reply_runs_keeps_the_reply_and_the_next_message_uses_the_new_model() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "slow one"}));
+    let running =
+        |c: &mut Framed| ["starting", "working"].contains(&history(c)["state"].as_str().unwrap());
+    assert!(running(&mut c));
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "haiku"}),
+    );
+    assert!(running(&mut c));
+    // The reply ends in its own process.
+    assert_eq!(reply_ends(&mut c), ["owner", "reply", "end"]);
+    assert_eq!(read(&w.bin.join("starts")).trim(), "1");
+
+    // The process still runs the old model, so the next message replaces it.
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    reply_ends(&mut c);
+    assert_eq!(read(&w.bin.join("starts")).trim(), "2");
+    let second = read(&w.bin.join("args-2"));
+    assert_eq!(
+        arg_after(&second, "--model").as_deref(),
+        Some("haiku"),
+        "{second}"
+    );
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    assert_eq!(arg_after(&second, "--resume"), Some(session));
+}
+
+#[test]
+fn a_value_outside_the_lists_is_refused_and_the_desk_model_stays() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "opus", "effort": "low"}),
+    );
+    for bad in [
+        json!({"product": "alpha", "model": "gpt-5", "effort": "high"}),
+        json!({"product": "alpha", "model": "sonnet", "effort": "extreme"}),
+        json!({"product": "alpha", "model": "claude-opus-5-5"}),
+    ] {
+        let r = c.call("desk.configure", bad);
+        assert_eq!(kind(&r), "invalid", "{r}");
+        assert!(
+            r["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("Use one of"),
+            "{r}"
+        );
+    }
+    let r = c.call(
+        "desk.configure",
+        json!({"product": "nope", "model": "opus"}),
+    );
+    assert_eq!(kind(&r), "not_found", "{r}");
+    let s = c.ok("desk.settings", json!({"product": "alpha"}));
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (json!("opus"), json!("low"))
+    );
+}
+
+#[test]
+fn the_desk_model_stays_after_a_core_restart_and_starts_the_first_process() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    {
+        let core = start(&dir, &w, &[]);
+        let mut c = connect(&core);
+        c.ok(
+            "desk.configure",
+            json!({"product": "alpha", "model": "sonnet", "effort": "max"}),
+        );
+    }
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    let s = c.ok("desk.settings", json!({"product": "alpha"}));
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (json!("sonnet"), json!("max"))
+    );
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    reply_ends(&mut c);
+    let args = read(&w.bin.join("args-1"));
+    assert_eq!(
+        arg_after(&args, "--model").as_deref(),
+        Some("sonnet"),
+        "{args}"
+    );
+    assert_eq!(
+        arg_after(&args, "--effort").as_deref(),
+        Some("max"),
+        "{args}"
+    );
+    // A reset keeps the desk model.
+    c.ok("desk.reset", json!({"product": "alpha"}));
+    assert_eq!(
+        c.ok("desk.settings", json!({"product": "alpha"}))["model"],
+        "sonnet"
+    );
+}
+
+#[test]
+fn a_desk_model_alone_starts_no_desk_notes() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "sonnet"}),
+    );
+    c.ok(
+        "decision.add",
+        json!({"product": "alpha", "text": "Pick a name", "why": "w"}),
+    );
+    c.ok(
+        "decision.decide",
+        json!({"decision": 1, "status": "approved"}),
+    );
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    reply_ends(&mut c);
+    assert_eq!(kinds(&history(&mut c)), ["owner", "reply", "end"]);
+    let stdin = read(&w.bin.join("stdin"));
+    assert!(!stdin.contains("Desk notes"), "{stdin}");
 }
