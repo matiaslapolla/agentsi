@@ -51,6 +51,13 @@ pub struct Layout {
     /// sections has none, so no version bump.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settings_section: Option<String>,
+    /// The mode of the sidebar: `files` for the file tree. Absent: the products. A file from
+    /// before the file tree has none, so no version bump.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sidebar_mode: Option<String>,
+    /// The file tree hides the entries that git ignores.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hide_ignored: bool,
     /// The one dock of a file of version 1 or 2. Version 3 writes none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dock: Option<DockAreaState>,
@@ -530,6 +537,8 @@ mod tests {
                 (HOME.to_string(), space(tabs(0, vec![term("t9-a")]), vec![])),
             ]),
             settings_section: Some("terminal".into()),
+            sidebar_mode: Some("files".into()),
+            hide_ignored: true,
             dock: None,
             tab_groups: vec![],
         };

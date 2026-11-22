@@ -13,6 +13,7 @@ pub mod desk_api;
 pub mod desk_session_api;
 pub mod doctor;
 pub mod events;
+pub mod files_api;
 pub mod frame;
 pub mod git_api;
 pub mod hosts_api;

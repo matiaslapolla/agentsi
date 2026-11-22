@@ -14,6 +14,7 @@ mod bench;
 mod chime;
 mod dictation_bind;
 mod favorites;
+mod files;
 mod format;
 mod git_marks;
 mod guide;

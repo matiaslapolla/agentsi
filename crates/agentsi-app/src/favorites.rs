@@ -44,7 +44,7 @@ pub fn path() -> Option<PathBuf> {
 pub enum Saved {
     /// A screen of the product: its kind and its argument.
     Screen(ScreenKind, Option<String>),
-    /// A folder. Until the file explorer ships, it opens a shell in the folder.
+    /// A folder. It opens a shell in the folder.
     Folder(String),
     /// A terminal command and the folder it runs in.
     Command { argv: Vec<String>, folder: String },

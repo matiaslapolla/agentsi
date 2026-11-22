@@ -487,3 +487,62 @@ fn move_to_product_takes_a_terminal_tab_to_another_space_and_keeps_the_terminal(
     assert!(at(cx, "tree-row:product-b-pane-t2-a").is_some());
     assert!(at(cx, "tree-row:product-a-pane-t2-a").is_none());
 }
+
+#[gpui::test]
+fn the_file_tree_opens_a_terminal_in_a_folder_saves_a_favorite_and_trashes_after_a_confirm(
+    cx: &mut TestAppContext,
+) {
+    let dir = folder("spaces-files");
+    let fav_file = dir.join(favorites::FILE_NAME);
+    let list = cx.update(|cx| favorites::install(cx, Some(fav_file.clone())));
+    let (mut f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    f.core.update(cx, |s, cx| {
+        let a = agentsi_proto::desk_api::ProductInfo {
+            id: "a".into(),
+            name: "a".into(),
+            path: Some("/work/a".into()),
+            archived: false,
+        };
+        let b = s.product("b").cloned().unwrap();
+        s.set_products(vec![a, b], cx);
+    });
+    select(&f, cx, "a");
+    cx.dispatch_action(crate::actions::ShowFiles);
+    redraw(cx);
+    let mode = f.shell.read_with(cx, |s, cx| s.sidebar.read(cx).mode);
+    assert_eq!(mode, crate::sidebar::SidebarMode::Files);
+    let _ = sent(&mut f);
+    let docs = Target::File(crate::files::FileRef {
+        product: product("a"),
+        path: "docs".into(),
+        folder: true,
+    });
+    run(&f, cx, docs.clone(), Cmd::TerminalHere);
+    let s = sent(&mut f);
+    let create = s
+        .iter()
+        .find(|r| r["method"] == "terminal.create")
+        .expect("a terminal is created");
+    assert_eq!(create["params"]["cwd"], "/work/a/docs");
+    assert_eq!(create["params"]["product"], "a");
+
+    run(&f, cx, docs.clone(), Cmd::AddToFavorites);
+    let saved = list.read_with(cx, |l, _| l.list.last().cloned().unwrap());
+    assert_eq!(saved.saved, Saved::Folder("/work/a/docs".into()));
+    assert_eq!(saved.product, Some(product("a")));
+    assert_eq!(saved.label, "docs");
+
+    run(&f, cx, docs.clone(), Cmd::MoveToTrash);
+    assert_eq!(asking(&f, cx), Some(Ask::Confirm(docs, Cmd::MoveToTrash)));
+    assert!(!sent(&mut f).iter().any(|r| r["method"] == "files.trash"));
+    click(cx, "prompt-choice:yes");
+    let s = sent(&mut f);
+    let trash = s
+        .iter()
+        .find(|r| r["method"] == "files.trash")
+        .expect("the folder goes to the trash");
+    assert_eq!(
+        trash["params"],
+        serde_json::json!({"product": "a", "path": "docs"})
+    );
+}

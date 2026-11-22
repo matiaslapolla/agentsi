@@ -35,6 +35,7 @@ use gpui_kit::*;
 use crate::actions::{self, ENTRIES};
 use crate::alerts::{AlertTarget, Alerts, Raised};
 use crate::bench::{BenchHandle, BenchPlan};
+use crate::files::RunFile;
 use crate::hosts::HostsGlobal;
 use crate::keys;
 use crate::layout::{self, Layout, SCREEN_PANEL, TERMINAL_PANEL};
@@ -52,7 +53,8 @@ use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
 use crate::screens::settings::{ModelFeed, ModelFeedGlobal, OpenedSection, Section};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec, screen_of};
 use crate::sidebar::{
-    CloseTab, NewProduct, OpenFavorite, OpenItem, SelectProduct, ShowAlerts, Sidebar, TreeChanged,
+    CloseTab, NewProduct, OpenFavorite, OpenItem, SelectProduct, ShowAlerts, Sidebar, SidebarMode,
+    TreeChanged,
 };
 use crate::tabs::{GroupId, SpaceId, TabGroups};
 use crate::tree::ItemKey;
@@ -221,7 +223,7 @@ impl Shell {
         let (dock, tabs) = (home.dock.clone(), home.tabs.clone());
         let probe = plan.as_ref().and_then(|p| p.probe.clone());
         let core = cores.local.clone();
-        let sidebar = cx.new(|cx| Sidebar::new(cores.clone(), probe, cx));
+        let sidebar = cx.new(|cx| Sidebar::new(cores.clone(), probe, window, cx));
         let mut subscriptions = vec![
             cx.subscribe_in(
                 &sidebar,
@@ -250,6 +252,9 @@ impl Shell {
             }),
             cx.subscribe(&sidebar, |this, _, _: &TreeChanged, cx| {
                 this.schedule_save(cx)
+            }),
+            cx.subscribe_in(&sidebar, window, |this, _, e: &RunFile, window, cx| {
+                this.run_menu(e.0.clone(), e.1, window, cx)
             }),
             cx.observe(&core, |_, _, cx| cx.notify()),
         ];
@@ -490,6 +495,7 @@ impl Shell {
                 Topic::Voice,
                 Topic::Desk,
                 Topic::Git,
+                Topic::Files,
             ],
         });
         let products = link.call::<ProductList>(&Empty {});
@@ -560,7 +566,13 @@ impl Shell {
                 };
                 self.prune_look(&known, cx);
                 let tree = std::mem::take(&mut saved.tree);
-                self.sidebar.update(cx, |s, cx| s.set_open_state(tree, cx));
+                let mode = SidebarMode::from_key(saved.sidebar_mode.as_deref());
+                let hide = saved.hide_ignored;
+                self.sidebar.update(cx, |s, cx| {
+                    s.set_open_state(tree, cx);
+                    s.files.update(cx, |f, _| f.show_ignored = !hide);
+                    s.set_mode(mode, cx);
+                });
                 // Before the dock loads, so a saved settings screen opens at the section.
                 if let Some(s) = saved.settings_section.as_deref().and_then(Section::from_id) {
                     cx.set_global(OpenedSection(s));
@@ -656,6 +668,7 @@ impl Shell {
             Some(p) => (p.host, Some(p.id)),
             None => (None, None),
         };
+        let sidebar = self.sidebar.read(cx);
         let layout = Layout {
             version: layout::VERSION,
             active_product,
@@ -666,6 +679,8 @@ impl Shell {
             settings_section: cx
                 .try_global::<OpenedSection>()
                 .map(|s| s.0.id().to_string()),
+            sidebar_mode: sidebar.mode.key().map(str::to_string),
+            hide_ignored: !sidebar.files.read(cx).show_ignored,
             dock: None,
             tab_groups: Vec::new(),
         };
@@ -1647,6 +1662,9 @@ impl Render for Shell {
             }))
             .on_action(cx.listener(|this, _: &actions::OpenMinutes, window, cx| {
                 this.show_active(ScreenSpec::minutes, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::ShowFiles, window, cx| {
+                this.sidebar.update(cx, |s, cx| s.show_files(window, cx))
             }))
             .on_action(cx.listener(|this, _: &actions::OpenRoles, window, cx| {
                 this.show_active(ScreenSpec::roles, window, cx)

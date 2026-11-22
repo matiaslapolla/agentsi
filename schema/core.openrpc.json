@@ -1907,6 +1907,113 @@
         ],
         "type": "object"
       },
+      "FileEntry": {
+        "properties": {
+          "git": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FileGit"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Null for a file with no change, and outside a git repo."
+          },
+          "kind": {
+            "$ref": "#/components/schemas/FileKind"
+          },
+          "modified": {
+            "default": null,
+            "description": "Seconds since the Unix epoch. Null when the system does not give it.",
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "size": {
+            "description": "Bytes. 0 for a folder.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "kind",
+          "size"
+        ],
+        "type": "object"
+      },
+      "FileGit": {
+        "description": "The git state of an entry. A folder takes the state of the files in it: `changed` wins\nover `new`.",
+        "oneOf": [
+          {
+            "const": "changed",
+            "description": "A tracked file with a staged or unstaged change.",
+            "type": "string"
+          },
+          {
+            "const": "new",
+            "description": "A file that git does not track yet, or that is only in the index.",
+            "type": "string"
+          },
+          {
+            "const": "ignored",
+            "description": "A file that `.gitignore`, `.git/info/exclude` or the global excludes file ignores.",
+            "type": "string"
+          }
+        ]
+      },
+      "FileKind": {
+        "oneOf": [
+          {
+            "enum": [
+              "folder",
+              "file"
+            ],
+            "type": "string"
+          },
+          {
+            "const": "link",
+            "description": "A symbolic link. The tree does not open it as a folder.",
+            "type": "string"
+          }
+        ]
+      },
+      "FilesDone": {
+        "type": "object"
+      },
+      "FilesListResult": {
+        "properties": {
+          "entries": {
+            "description": "The folders first, then the files, each by name. No `.git` entry.",
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "type": "array"
+          },
+          "path": {
+            "description": "The path of the request.",
+            "type": "string"
+          },
+          "truncated": {
+            "description": "True when the folder has more than 5000 entries and the list stops there.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "path",
+          "entries",
+          "truncated"
+        ],
+        "type": "object"
+      },
       "GeneralDeleteResult": {
         "properties": {
           "commit": {
@@ -4046,6 +4153,13 @@
           "models"
         ],
         "type": "object"
+      },
+      "NewKind": {
+        "enum": [
+          "file",
+          "folder"
+        ],
+        "type": "string"
       },
       "Objective": {
         "description": "One objective of the brief of a product.",
@@ -6729,7 +6843,8 @@
           "dictation",
           "models",
           "desk",
-          "git"
+          "git",
+          "files"
         ],
         "type": "string"
       },
@@ -14124,6 +14239,272 @@
       }
     },
     {
+      "description": "Gives the entries of one folder of the product: name, kind, size, modified time and git state, at most 5000. It leaves out .git and marks the entries that git ignores. While a client subscribes to the files topic, the core watches the folder, unless git ignores it, and sends files.changed.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "files.list",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "From the folder of the product. Empty for the folder itself.",
+          "name": "path",
+          "required": false,
+          "schema": {
+            "default": "",
+            "description": "From the folder of the product. Empty for the folder itself.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FilesListResult"
+        }
+      }
+    },
+    {
+      "description": "Makes an empty file or a folder in the product. A path that exists gives conflict.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "conflict"
+          },
+          "message": "conflict"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "files.create",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "kind",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/NewKind"
+          }
+        },
+        {
+          "description": "The new path. The core makes each missing folder on the way, as `mkdir -p` does.",
+          "name": "path",
+          "required": true,
+          "schema": {
+            "description": "The new path. The core makes each missing folder on the way, as `mkdir -p` does.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FilesDone"
+        }
+      }
+    },
+    {
+      "description": "Renames or moves a file or a folder inside the product. A link moves as a link. A target that exists gives conflict.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "conflict"
+          },
+          "message": "conflict"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "files.rename",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "name": "from",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "The new path. Its folder must exist, and the path must not.",
+          "name": "to",
+          "required": true,
+          "schema": {
+            "description": "The new path. Its folder must exist, and the path must not.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FilesDone"
+        }
+      }
+    },
+    {
+      "description": "Moves a file or a folder of the product to the system trash. A link goes to the trash, not its target. Nothing is deleted for good: a trash that fails gives unavailable and the file stays.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "files.trash",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "From the folder of the product. Empty for the folder itself.",
+          "name": "path",
+          "required": false,
+          "schema": {
+            "default": "",
+            "description": "From the folder of the product. Empty for the folder itself.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FilesDone"
+        }
+      }
+    },
+    {
       "description": "Lists the tickets of a product: by state, then the newest write, then the highest id. It never writes.",
       "errors": [
         {
@@ -15455,6 +15836,28 @@
           "required": true,
           "schema": {
             "description": "`fetch`, `pull` or `push`.",
+            "type": "string"
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        }
+      ]
+    },
+    {
+      "description": "An entry of a folder that files.list read was made, changed, renamed or removed. The core sends at most one for a folder in 150 ms, and none for a folder that git ignores.",
+      "name": "files.changed",
+      "params": [
+        {
+          "description": "The folder whose entries changed, from the folder of the product. Empty for the folder\nitself.",
+          "name": "path",
+          "required": true,
+          "schema": {
+            "description": "The folder whose entries changed, from the folder of the product. Empty for the folder\nitself.",
             "type": "string"
           }
         },

@@ -120,6 +120,7 @@ pub fn catalog() -> Catalog {
     crate::clear_api::register(&mut c);
     crate::reflect_api::register(&mut c);
     crate::git_api::register(&mut c);
+    crate::files_api::register(&mut c);
     crate::ticket_api::register(&mut c);
     crate::registry_api::register(&mut c);
     crate::setup_api::register(&mut c);

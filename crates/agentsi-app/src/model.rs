@@ -195,6 +195,12 @@ pub struct GitNotice(pub Notification);
 
 impl EventEmitter<GitNotice> for CoreState {}
 
+/// A `files.changed` or `lagged` notification, for the file tree of the sidebar.
+#[derive(Debug, Clone)]
+pub struct FilesNotice(pub Notification);
+
+impl EventEmitter<FilesNotice> for CoreState {}
+
 pub struct CoreState {
     /// The link of this core. A core of an SSH host gets a new link at each connection, so
     /// read it at each call.
@@ -521,6 +527,12 @@ pub fn take_event(core: &Entity<CoreState>, n: &Notification, cx: &mut AsyncApp)
         );
     if decisions && let Some(product) = n.params.get("product").and_then(|p| p.as_str()) {
         read_desk(core, product, cx);
+    }
+    if n.method.starts_with("files.") || n.method == Lagged::NAME {
+        core.update(cx, |_, cx| cx.emit(FilesNotice(n.clone())));
+        if n.method != Lagged::NAME {
+            return;
+        }
     }
     if n.method.starts_with("git.") {
         core.update(cx, |_, cx| cx.emit(GitNotice(n.clone())));
