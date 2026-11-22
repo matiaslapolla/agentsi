@@ -6,7 +6,9 @@
 //! - [`stt`]: Parakeet TDT on ONNX Runtime, from 16 kHz samples to text.
 //! - [`vad`]: Silero VAD on ONNX Runtime, and the cutter that splits speech at the pauses.
 //! - [`vocabulary`]: the owner's list of terms that the transcript is corrected with.
+//! - [`keep`]: the keep time of the voice models in `pill.toml`.
 
+pub mod keep;
 #[cfg(any(feature = "tts", feature = "stt"))]
 mod runtime;
 #[cfg(feature = "stt")]

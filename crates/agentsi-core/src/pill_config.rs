@@ -1,7 +1,8 @@
 //! The keep time of the voice models in `<config>/agentsi/pill.toml`, as `[models] keep`.
 //!
 //! The pill reads the file at its start, and the core sends it each change with
-//! `voice.models`. The core edits only that key, so the other keys and the comments stay.
+//! `voice.models`. The core edits only that key, so the other keys and the comments stay. Both
+//! read the key with [`agentsi_voice::keep::keep_in`], so they agree on it.
 
 use agentsi_proto::voice_api::KeepTime;
 use std::path::{Path, PathBuf};
@@ -15,16 +16,9 @@ pub fn path() -> Option<PathBuf> {
 /// The keep time of the file. A missing file, a file that does not parse, or a bad value
 /// gives the default, as the pill does.
 pub fn read_keep(path: &Path) -> KeepTime {
-    std::fs::read_to_string(path)
-        .ok()
-        .and_then(|text| text.parse::<DocumentMut>().ok())
-        .and_then(|doc| {
-            doc.get("models")?
-                .get("keep")?
-                .as_str()
-                .and_then(KeepTime::from_key)
-        })
-        .unwrap_or_default()
+    std::fs::read_to_string(path).map_or(KeepTime::default(), |text| {
+        agentsi_voice::keep::keep_in(&text).0
+    })
 }
 
 /// Sets `[models] keep` and keeps the rest of the file.

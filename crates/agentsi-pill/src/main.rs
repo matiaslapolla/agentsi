@@ -125,7 +125,7 @@ fn run(args: Args) -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let (keep, bad_keep) = config.keep();
+    let (keep, bad_keep) = agentsi_pill::config::keep_file();
     if let Some(line) = bad_keep {
         eprintln!("agentsi-pill: {line}");
     }
