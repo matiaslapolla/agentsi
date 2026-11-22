@@ -5,7 +5,7 @@
 //! names. The empty path is the folder itself. The core refuses a path that leaves the folder
 //! after it resolves the links, and a path in a `.git` folder. No method deletes for good:
 //! `files.trash` moves to the system trash. A folder that `files.list` read is watched, and a
-//! change in it sends `files.changed`.
+//! change in it sends `files.changed`. `files.find` finds files by name for the palette.
 
 use crate::method::{Catalog, Method};
 use crate::rpc::ErrorKind;
@@ -16,7 +16,8 @@ pub fn register(c: &mut Catalog) {
     c.method::<FilesList>()
         .method::<FilesCreate>()
         .method::<FilesRename>()
-        .method::<FilesTrash>();
+        .method::<FilesTrash>()
+        .method::<FilesFind>();
 }
 
 /// The most entries that `files.list` gives for one folder.
@@ -157,4 +158,38 @@ impl Method for FilesTrash {
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
     type Params = FilesPathParams;
     type Result = FilesDone;
+}
+
+/// The most matches that `files.find` gives.
+pub const FIND_MAX: usize = 200;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FilesFindParams {
+    pub product: String,
+    /// A part of the name, with no regard to case. A query with a `/` matches the path.
+    pub query: String,
+    /// The most matches to give, at most 200. 50 when it is missing.
+    #[serde(default)]
+    pub limit: Option<usize>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct FilesFindResult {
+    /// The paths of the files, from the folder of the product. The exact names come first,
+    /// then the names that start with the query, then the others, each by length and name.
+    pub paths: Vec<String>,
+    /// True when the walk stopped early: more files may match.
+    pub truncated: bool,
+}
+
+pub struct FilesFind;
+
+impl Method for FilesFind {
+    const NAME: &'static str = "files.find";
+    const DESCRIPTION: &'static str = "Finds the files of the product whose name holds the \
+        query: tracked and new files, never one that git ignores and never one in .git. It \
+        follows no link and stops after 100000 entries.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound, ErrorKind::Unavailable];
+    type Params = FilesFindParams;
+    type Result = FilesFindResult;
 }

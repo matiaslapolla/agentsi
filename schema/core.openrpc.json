@@ -1989,6 +1989,26 @@
       "FilesDone": {
         "type": "object"
       },
+      "FilesFindResult": {
+        "properties": {
+          "paths": {
+            "description": "The paths of the files, from the folder of the product. The exact names come first,\nthen the names that start with the query, then the others, each by length and name.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "description": "True when the walk stopped early: more files may match.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "paths",
+          "truncated"
+        ],
+        "type": "object"
+      },
       "FilesListResult": {
         "properties": {
           "entries": {
@@ -14501,6 +14521,80 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/FilesDone"
+        }
+      }
+    },
+    {
+      "description": "Finds the files of the product whose name holds the query: tracked and new files, never one that git ignores and never one in .git. It follows no link and stops after 100000 entries.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "not_found"
+          },
+          "message": "not_found"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "files.find",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The most matches to give, at most 200. 50 when it is missing.",
+          "name": "limit",
+          "required": false,
+          "schema": {
+            "default": null,
+            "description": "The most matches to give, at most 200. 50 when it is missing.",
+            "format": "uint",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "required": true,
+          "schema": {
+            "type": "string"
+          }
+        },
+        {
+          "description": "A part of the name, with no regard to case. A query with a `/` matches the path.",
+          "name": "query",
+          "required": true,
+          "schema": {
+            "description": "A part of the name, with no regard to case. A query with a `/` matches the path.",
+            "type": "string"
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/FilesFindResult"
         }
       }
     },

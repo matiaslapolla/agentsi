@@ -8,13 +8,17 @@
 
 use crate::registry::Product;
 use crate::story::git::git_limited;
-use agentsi_proto::files_api::{FileEntry, FileGit, FileKind, FilesListResult, LIST_MAX, NewKind};
+use agentsi_proto::files_api::{
+    FIND_MAX, FileEntry, FileGit, FileKind, FilesFindResult, FilesListResult, LIST_MAX, NewKind,
+};
 use ignore::WalkBuilder;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
 const GIT_LIMIT: Duration = Duration::from_secs(10);
+/// The most entries that one `find` reads, so a huge folder cannot hold a core thread.
+const FIND_WALK_MAX: usize = 100_000;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum Error {
@@ -282,6 +286,62 @@ impl Root {
 }
 
 /// A rename that fails with `AlreadyExists` when `dst` exists, also when it came after the check.
+impl Root {
+    /// The files whose name holds `query`, with no regard to case, best first. A query with a
+    /// `/` matches the path. The walk skips what git ignores and `.git`, and follows no link.
+    pub fn find(&self, query: &str, limit: usize) -> FilesFindResult {
+        let query = query.trim().to_lowercase();
+        let limit = limit.clamp(1, FIND_MAX);
+        let mut found: Vec<(u8, String)> = Vec::new();
+        let mut truncated = false;
+        if query.is_empty() {
+            return FilesFindResult {
+                paths: Vec::new(),
+                truncated,
+            };
+        }
+        let by_path = query.contains('/');
+        let tail = format!("/{query}");
+        let walk = walker(&self.dir)
+            .filter_entry(|e| e.depth() == 0 || !e.file_name().eq_ignore_ascii_case(".git"))
+            .build()
+            .filter_map(std::result::Result::ok)
+            .filter(|e| e.depth() > 0);
+        for (n, e) in walk.enumerate() {
+            if n == FIND_WALK_MAX {
+                truncated = true;
+                break;
+            }
+            if !e.file_type().is_some_and(|t| t.is_file()) {
+                continue;
+            }
+            let Some(rel) = self.relative(e.path()) else {
+                continue;
+            };
+            let name = e.file_name().to_string_lossy().to_lowercase();
+            let lower = rel.to_lowercase();
+            let hay = if by_path { &lower } else { &name };
+            let rank = if name == query || (by_path && (lower == query || lower.ends_with(&tail))) {
+                0
+            } else if hay.starts_with(&query) {
+                1
+            } else if hay.contains(&query) {
+                2
+            } else {
+                continue;
+            };
+            found.push((rank, rel));
+        }
+        found.sort_by(|a, b| (a.0, a.1.len(), &a.1).cmp(&(b.0, b.1.len(), &b.1)));
+        truncated |= found.len() > limit;
+        found.truncate(limit);
+        FilesFindResult {
+            paths: found.into_iter().map(|(_, p)| p).collect(),
+            truncated,
+        }
+    }
+}
+
 fn rename_no_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
@@ -655,5 +715,40 @@ mod tests {
         assert_eq!(root.relative(&dir.join("src/a")), Some("src/a".into()));
         assert_eq!(root.relative(dir), Some(String::new()));
         assert_eq!(root.relative(Path::new("/elsewhere")), None);
+    }
+
+    #[test]
+    fn find_ranks_by_name_skips_ignored_folders_git_and_links_and_keeps_to_the_cap() {
+        let (_b, root, outside) = product();
+        let dir = root.dir().to_path_buf();
+        std::fs::write(dir.join("src/main.rs"), "m").unwrap();
+        std::fs::create_dir_all(dir.join("app/src")).unwrap();
+        std::fs::write(dir.join("app/src/main.rs"), "m").unwrap();
+        std::fs::write(dir.join("app/main.rsx"), "m").unwrap();
+        std::fs::write(dir.join("my_main.rs"), "m").unwrap();
+        std::fs::write(dir.join("target/debug/main.rs"), "m").unwrap();
+        std::fs::write(outside.join("main.rs"), "m").unwrap();
+        std::fs::write(dir.join(".git/main.rs"), "m").unwrap();
+
+        let found = root.find("Main.RS", 50);
+        assert_eq!(
+            found.paths,
+            [
+                "src/main.rs",
+                "app/src/main.rs",
+                "app/main.rsx",
+                "my_main.rs"
+            ]
+        );
+        assert!(!found.truncated);
+
+        let capped = root.find("main", 2);
+        assert_eq!(capped.paths, ["src/main.rs", "app/main.rsx"]);
+        assert!(capped.truncated);
+
+        assert_eq!(root.find("app/src/main", 50).paths, ["app/src/main.rs"]);
+        assert_eq!(root.find("run.log", 50).paths, Vec::<String>::new());
+        assert_eq!(root.find("  ", 50).paths, Vec::<String>::new());
+        assert_eq!(root.find("deep/a.txt", 50).paths, ["fresh/deep/a.txt"]);
     }
 }

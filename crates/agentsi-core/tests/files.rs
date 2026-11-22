@@ -240,3 +240,35 @@ fn a_new_file_in_a_listed_folder_sends_files_changed_within_1_s_and_an_ignored_o
         json!({"product": "alpha", "path": "src"})
     );
 }
+
+#[test]
+fn find_gives_the_files_by_name_within_the_cap_and_never_one_that_is_ignored_or_outside() {
+    let dir = TempDir::new();
+    let s = start(&dir);
+    let mut c = Framed::connect(&s.core.socket.path);
+    std::fs::create_dir_all(s.alpha.join("src/deep")).unwrap();
+    for (n, f) in ["src/main.rs", "src/deep/main.rs", "main.rs.bak"]
+        .iter()
+        .enumerate()
+    {
+        std::fs::write(s.alpha.join(f), n.to_string()).unwrap();
+    }
+    std::fs::write(s.alpha.join("target/main.rs"), "t").unwrap();
+    std::fs::write(s.base.join("outside/main.rs"), "o").unwrap();
+
+    let found = c.ok(
+        "files.find",
+        json!({"product": "alpha", "query": "main.rs"}),
+    );
+    assert_eq!(
+        found,
+        json!({"paths": ["src/main.rs", "src/deep/main.rs", "main.rs.bak"], "truncated": false})
+    );
+    let capped = c.ok(
+        "files.find",
+        json!({"product": "alpha", "query": "main", "limit": 1}),
+    );
+    assert_eq!(capped, json!({"paths": ["main.rs.bak"], "truncated": true}));
+    let r = c.call("files.find", json!({"product": "nope", "query": "main"}));
+    assert_eq!(kind(&r), "not_found", "{r}");
+}
