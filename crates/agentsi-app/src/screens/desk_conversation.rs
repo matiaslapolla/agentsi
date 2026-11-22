@@ -124,6 +124,10 @@ pub struct DeskConversation {
     settings_error: Option<String>,
     /// A pick came while a reply runs: the note says which model the next message uses.
     picked_while_working: bool,
+    /// A `desk.configure` waits for the core. The core runs two calls at once, so the next
+    /// pair waits in `queued`, and the store ends with the last pick.
+    configuring: bool,
+    queued: Option<(Option<String>, Option<String>)>,
     _subs: Vec<Subscription>,
 }
 
@@ -164,6 +168,8 @@ impl DeskConversation {
             selects_stale: false,
             settings_error: None,
             picked_while_working: false,
+            configuring: false,
+            queued: None,
             _subs: vec![notices, up],
         };
         me.reload(cx);
@@ -225,6 +231,8 @@ impl DeskConversation {
         cx: &mut Context<Self>,
     ) {
         match result {
+            // A pick that waits for the core is newer than the settings.
+            Ok(_) if self.configuring => {}
             Ok(settings) => {
                 self.desk_settings = Some(settings);
                 self.settings_error = None;
@@ -258,8 +266,12 @@ impl DeskConversation {
         }
         // The pair stays in `desk_settings` until the core answers, so a second pick keeps the
         // first.
-        let (model, effort) = (settings.model.clone(), settings.effort.clone());
-        self.configure(model, effort, cx);
+        let pair = (settings.model.clone(), settings.effort.clone());
+        if self.configuring {
+            self.queued = Some(pair);
+        } else {
+            self.configure(pair.0, pair.1, cx);
+        }
     }
 
     /// `desk.configure`. A pick while a reply runs does not wait: the reply keeps its process.
@@ -269,6 +281,7 @@ impl DeskConversation {
         effort: Option<String>,
         cx: &mut Context<Self>,
     ) {
+        self.configuring = true;
         let call = self
             .core
             .read(cx)
@@ -290,18 +303,27 @@ impl DeskConversation {
         result: Result<DeskChoice, CallError>,
         cx: &mut Context<Self>,
     ) {
+        self.configuring = false;
+        let queued = self.queued.take();
         match result {
             Ok(settings) => {
                 self.settings_error = None;
                 self.picked_while_working |=
                     matches!(self.state, DeskState::Working | DeskState::Starting);
-                self.desk_settings = Some(settings);
+                if queued.is_none() {
+                    self.desk_settings = Some(settings);
+                }
             }
             Err(e) => {
                 self.settings_error = Some(e.to_string());
                 // The pair of a refused pick is not stored: read what the core holds.
-                self.read_settings(cx);
+                if queued.is_none() {
+                    self.read_settings(cx);
+                }
             }
+        }
+        if let Some((model, effort)) = queued {
+            self.configure(model, effort, cx);
         }
         self.selects_stale = true;
         cx.notify();
@@ -2007,6 +2029,50 @@ mod tests {
             methods_sent(&mut other)[0].1,
             json!({"product": "demo", "model": "opus", "effort": null})
         );
+    }
+
+    #[gpui::test]
+    fn two_quick_picks_send_one_after_the_other_and_the_last_pair_stays(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| {
+            c.pick(Field::Model, "sonnet".into(), cx);
+            c.pick(Field::Effort, "max".into(), cx);
+            c.pick(Field::Model, "haiku".into(), cx);
+        });
+        let sent = methods_sent(&mut other);
+        assert_eq!(sent.len(), 1, "the next pick waits for the answer");
+        assert_eq!(
+            sent[0].1,
+            json!({"product": "demo", "model": "sonnet", "effort": null})
+        );
+        // The answer of the first call does not undo the picks that wait.
+        conv.update(cx, |c, cx| {
+            c.configure_done(Ok(choice(Some("sonnet"), None)), cx)
+        });
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.options(Field::Model).1, "haiku");
+            assert_eq!(c.options(Field::Effort).1, "max");
+        });
+        let sent = methods_sent(&mut other);
+        assert_eq!(sent.len(), 1);
+        assert_eq!(
+            sent[0].1,
+            json!({"product": "demo", "model": "haiku", "effort": "max"})
+        );
+        conv.update(cx, |c, cx| {
+            c.configure_done(Ok(choice(Some("haiku"), Some("max"))), cx)
+        });
+        draw(cx);
+        assert!(methods_sent(&mut other).is_empty());
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.options(Field::Model).1, "haiku");
+            assert_eq!(c.options(Field::Effort).1, "max");
+            assert!(!c.configuring);
+        });
     }
 
     #[gpui::test]
