@@ -310,6 +310,14 @@ fn a_header_drag_moves_a_pane_to_the_other_column_and_inside_its_column_and_esca
     let from = bounds(cx, "pane-header:files").center();
     drag_to(cx, from, edge, false);
     assert!(at(cx, &drop_selector(right_end)).is_some());
+    cx.simulate_mouse_down(edge, MouseButton::Right, Modifiers::none());
+    cx.simulate_mouse_up(edge, MouseButton::Right, Modifiers::none());
+    redraw(cx);
+    assert!(
+        at(cx, &drop_selector(right_end)).is_some(),
+        "another button does not end the drag"
+    );
+    assert_eq!(panes(&f, cx), before);
     cx.simulate_keystrokes("escape");
     redraw(cx);
     assert!(at(cx, &drop_selector(right_end)).is_none());

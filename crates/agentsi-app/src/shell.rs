@@ -183,6 +183,8 @@ pub struct Shell {
     panes: Panes,
     /// The resize or the move of a pane that the pointer does now.
     gesture: Option<pane_actions::Gesture>,
+    /// Ends a pane move on Escape, while one runs.
+    escape: Option<Subscription>,
     /// The content of the Alerts pane.
     alert_log: Entity<alert_actions::AlertLog>,
     /// The context menu that is open.
@@ -348,6 +350,7 @@ impl Shell {
             asking: None,
             panes: Panes::default(),
             gesture: None,
+            escape: None,
             alert_log,
             menu: None,
             menu_link: None,
@@ -2022,7 +2025,7 @@ impl Shell {
                         .gap(space(2))
                         .text_color(text::secondary())
                         .child(format!(
-                            "Pick a product in the sidebar, or press {terminal_key} for a terminal."
+                            "Pick a product in the Products pane, or press {terminal_key} for a terminal."
                         ))
                         .child(
                             div()

@@ -4,6 +4,7 @@
 use std::time::Instant;
 
 use agentsi_ui::components::{Button, StateMark, state_icon};
+use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{line, size, space, text};
 use gpui_kit::component::notification::{Notification, NotificationDelivery};
 use gpui_kit::component::{Icon, WindowExt as _};
@@ -223,7 +224,7 @@ impl Render for AlertLog {
             .flex_col()
             .size_full()
             .overflow_y_scroll()
-            .px(space(3))
+            .pad_x(space(3))
             .when(rows.is_empty(), |el| {
                 el.child(
                     div()

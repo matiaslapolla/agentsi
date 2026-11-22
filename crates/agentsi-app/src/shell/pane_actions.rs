@@ -5,6 +5,7 @@
 //! the drag. The content of each pane is a cached view, so a change in one pane does not draw
 //! the others.
 
+use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{accent, control, line, radius, size, space, surface, text, weight};
 use gpui_kit::base::InteractiveElementExt as _;
 use gpui_kit::component::resizable::{HandleEdge, resize_handle};
@@ -55,7 +56,7 @@ impl Render for SplitEdge {
 impl Render for DraggedPane {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div()
-            .px(space(3))
+            .pad_x(space(3))
             .py(space(1))
             .rounded(radius::md())
             .border_1()
@@ -186,6 +187,13 @@ impl Shell {
 
     fn start_move(&mut self, pane: PaneKind, cx: &mut Context<Self>) {
         self.gesture = Some(Gesture::Move { pane, to: None });
+        // Before the key bindings: an input or a menu with the focus would keep Escape.
+        let shell = cx.weak_entity();
+        self.escape = Some(cx.intercept_keystrokes(move |e, window, cx| {
+            if e.keystroke.key == "escape" {
+                let _ = shell.update(cx, |s, cx| s.cancel_move(window, cx));
+            }
+        }));
         cx.notify();
     }
 
@@ -226,6 +234,7 @@ impl Shell {
 
     /// The pointer went up: a resize saves, and a move drops its pane.
     fn end_gesture(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.escape = None;
         match self.gesture.take() {
             None => {}
             Some(Gesture::Resize) => self.schedule_save(cx),
@@ -246,6 +255,7 @@ impl Shell {
             return false;
         }
         self.gesture = None;
+        self.escape = None;
         cx.stop_active_drag(window);
         cx.notify();
         true
@@ -266,16 +276,15 @@ impl Shell {
             this.drag_pane(pane, e.event.position, e.bounds, cx)
         }))
         // One of the two runs for each release: the root is under the pointer or it is not.
-        .capture_any_mouse_up(cx.listener(|this, _, window, cx| this.end_gesture(window, cx)))
+        .capture_any_mouse_up(cx.listener(|this, e: &MouseUpEvent, window, cx| {
+            if e.button == MouseButton::Left {
+                this.end_gesture(window, cx)
+            }
+        }))
         .on_mouse_up_out(
             MouseButton::Left,
             cx.listener(|this, _, window, cx| this.end_gesture(window, cx)),
         )
-        .capture_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
-            if e.keystroke.key == "escape" && this.cancel_move(window, cx) {
-                cx.stop_propagation();
-            }
-        }))
     }
 
     pub(super) fn pane_bar(&self, cx: &mut Context<Self>) -> Div {
@@ -408,7 +417,7 @@ impl Shell {
             .flex_none()
             .items_center()
             .h(control::height_sm())
-            .px(space(3))
+            .pad_x(space(3))
             .border_b_1()
             .border_color(line::border())
             .text_size(size::xs())
