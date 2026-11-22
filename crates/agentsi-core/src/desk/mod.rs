@@ -329,10 +329,14 @@ fn socket(core: &Core) -> String {
         .into_owned()
 }
 
-/// What a start of the process needs, apart from the session.
+/// What a start of the process needs, apart from the session, the desk model and the desk
+/// effort.
 struct Plan {
     call: DeskCall,
     cwd: PathBuf,
+    store: Arc<Store>,
+    /// The role default: the model and the effort of the `pm` role.
+    role: (String, Option<String>),
 }
 
 /// The `pm` role of the product, as the desk session and the settings read it.
@@ -355,8 +359,7 @@ fn pm_role(store: &Store, product: &str) -> Result<RoleDef, RpcError> {
     .map_err(RpcError::internal)
 }
 
-/// The `pm` agent of the product, with its model, effort and persona, and the folder. The
-/// model and the effort come from the choice of the owner, else from the role.
+/// The `pm` agent of the product, with its persona and its role default, and the folder.
 fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     let registry = registry()?;
     let p = registry
@@ -372,8 +375,8 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     })?;
     let store = open_store(core)?;
     let id = p.id.clone();
-    let (brief, (model, effort)) = store
-        .read(move |c| Ok((agentsi_store::read::brief(c, &id)?, desk::choice(c, &id)?)))
+    let brief = store
+        .read(move |c| agentsi_store::read::brief(c, &id))
         .map_err(rpc_store)?;
     let def = pm_role(&store, product)?;
     let cwd_text = cwd.to_string_lossy().into_owned();
@@ -389,8 +392,8 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     );
     Ok(Plan {
         call: DeskCall {
-            model: model.unwrap_or(def.model),
-            effort: effort.or(def.effort),
+            model: def.model.clone(),
+            effort: def.effort.clone(),
             system,
             agentsi: agentsi_program(),
             socket: socket(core),
@@ -398,6 +401,8 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
             resume: false,
         },
         cwd,
+        store,
+        role: (def.model, def.effort),
     })
 }
 
@@ -462,9 +467,20 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
         text: owner_text(&texts, text),
         notes: seqs,
     };
+    // The desk model and the desk effort are read under the slot lock that decides the launch,
+    // so a `desk.configure` that stored them before is always seen, and one that stores them
+    // after finds the process of this message.
+    let id = product.to_string();
+    let (model, effort) = plan
+        .store
+        .read(move |c| desk::choice(c, &id))
+        .map_err(rpc_store)?;
+    let wanted = (
+        model.unwrap_or_else(|| plan.role.0.clone()),
+        effort.or_else(|| plan.role.1.clone()),
+    );
     // A process that runs another model or effort ends, so the message starts one with the
-    // choice of the owner. The session resumes, so the conversation stays whole.
-    let wanted = (plan.call.model.clone(), plan.call.effort.clone());
+    // new values. The session resumes, so the conversation stays whole.
     if slot.launched.as_ref().is_some_and(|l| *l != wanted)
         && let Some(old) = slot.commands.take()
     {
@@ -492,10 +508,11 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
     let (commands, inbox) = mpsc::channel();
     slot.generation = generation;
     slot.commands = Some(commands);
-    slot.launched = Some(wanted);
+    slot.launched = Some(wanted.clone());
     drop(slots);
     set_state(core, product, None, DeskState::Starting, None);
     let mut call = plan.call;
+    (call.model, call.effort) = wanted;
     call.session = session;
     call.resume = resume;
     actor::spawn(
