@@ -331,6 +331,8 @@ impl Shell {
             // The count of the Alerts toggle.
             subscriptions.push(cx.observe(&center, |_, _, cx| cx.notify()));
         }
+        // The tooltips of the toggles and the palette hint name the keys in effect.
+        subscriptions.push(cx.observe_global::<keys::Keys>(|_, cx| cx.notify()));
         let shell = Shell {
             core,
             cores,
