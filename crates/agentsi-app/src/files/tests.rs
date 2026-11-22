@@ -364,3 +364,60 @@ fn the_selection_is_the_target_of_the_palette_and_the_folder_of_the_product_with
         Some(PathBuf::from("/w/a/docs/a.md"))
     );
 }
+
+#[gpui::test]
+fn a_change_out_of_sight_reads_when_the_folder_shows_and_a_gone_folder_is_forgotten(
+    cx: &mut TestAppContext,
+) {
+    let mut ui = ui(cx);
+    ui.root();
+    ui.open("docs");
+    assert_eq!(ui.list_request(), "docs");
+    ui.load("docs", vec![entry("a.md", FileKind::File, None)]);
+    ui.files
+        .update(ui.cx, |f, cx| f.set_folder_open("docs", false, cx));
+    let changed = Notification {
+        jsonrpc: V2,
+        method: "files.changed".into(),
+        params: json!({"product": "a", "path": "docs"}),
+    };
+    let core = ui.core.clone();
+    core.update(ui.cx, |_, cx| cx.emit(FilesNotice(changed.clone())));
+    assert!(ui.no_request());
+    ui.open("docs");
+    assert_eq!(ui.list_request(), "docs");
+    ui.load("docs", vec![]);
+    // The mode hides: a change waits, and the name field closes.
+    ui.files.update_in(ui.cx, |f, window, cx| {
+        f.start_naming(String::new(), NameFor::New(NewKind::File), window, cx)
+    });
+    ui.files.update(ui.cx, |f, cx| f.set_shown(false, cx));
+    assert!(!ui.files.read_with(ui.cx, |f, _| f.is_naming()));
+    core.update(ui.cx, |_, cx| cx.emit(FilesNotice(changed)));
+    assert!(ui.no_request());
+    ui.files.update(ui.cx, |f, cx| f.set_shown(true, cx));
+    assert_eq!(ui.list_request(), "docs");
+    // The root reads with no docs: the tree forgets it, also its open state.
+    ui.load("", vec![entry("README.md", FileKind::File, None)]);
+    ui.load("", vec![entry("docs", FileKind::Folder, None)]);
+    assert_eq!(ui.names(), ["docs"]);
+}
+
+#[gpui::test]
+fn a_new_file_is_selected_once_its_folder_has_read(cx: &mut TestAppContext) {
+    let mut ui = ui(cx);
+    ui.root();
+    ui.files.update(ui.cx, |f, cx| {
+        f.named(&mine(), None, "new.txt".into(), Ok(()), cx)
+    });
+    assert_eq!(ui.list_request(), "");
+    ui.load(
+        "",
+        vec![
+            entry("docs", FileKind::Folder, None),
+            entry("new.txt", FileKind::File, Some(FileGit::New)),
+        ],
+    );
+    let selected = ui.files.read_with(ui.cx, |f, cx| f.selected(cx).unwrap());
+    assert_eq!(selected.path, "new.txt");
+}

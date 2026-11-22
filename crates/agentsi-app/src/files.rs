@@ -99,6 +99,10 @@ pub struct FileTree {
     /// The reads that run, and the folders to read again when their read ends.
     loading: BTreeSet<String>,
     again: BTreeSet<String>,
+    /// The folders that changed while they were out of sight: they read when they show.
+    stale: BTreeSet<String>,
+    /// The entry to select once its folder has read.
+    select_later: Option<String>,
     /// The open folders.
     open: BTreeSet<String>,
     pub show_ignored: bool,
@@ -160,6 +164,8 @@ impl FileTree {
             folders: BTreeMap::new(),
             loading: BTreeSet::new(),
             again: BTreeSet::new(),
+            stale: BTreeSet::new(),
+            select_later: None,
             open: BTreeSet::new(),
             show_ignored: true,
             shown: false,
@@ -187,8 +193,40 @@ impl FileTree {
     /// The mode shows or hides. The folder of the product is read when it first shows.
     pub fn set_shown(&mut self, shown: bool, cx: &mut Context<Self>) {
         self.shown = shown;
-        if shown && self.local().is_some() && !self.folders.contains_key("") {
+        if !shown {
+            self.cancel_naming(cx);
+            return;
+        }
+        if self.local().is_some() && !self.folders.contains_key("") {
             self.load(String::new(), cx);
+        }
+        self.read_stale(cx);
+    }
+
+    /// The folder draws: the mode shows, and it and each folder above it are open.
+    fn in_sight(&self, path: &str) -> bool {
+        self.shown && (path.is_empty() || (self.open.contains(path) && self.in_sight(parent(path))))
+    }
+
+    /// Reads `path` now when it draws, else when it next shows.
+    fn refresh(&mut self, path: String, cx: &mut Context<Self>) {
+        if self.in_sight(&path) {
+            self.load(path, cx);
+        } else {
+            self.stale.insert(path);
+        }
+    }
+
+    fn read_stale(&mut self, cx: &mut Context<Self>) {
+        let due: Vec<String> = self
+            .stale
+            .iter()
+            .filter(|p| self.in_sight(p))
+            .cloned()
+            .collect();
+        for path in due {
+            self.stale.remove(&path);
+            self.load(path, cx);
         }
     }
 
@@ -217,6 +255,8 @@ impl FileTree {
         self.folders.clear();
         self.loading.clear();
         self.again.clear();
+        self.stale.clear();
+        self.select_later = None;
         self.open.clear();
         self.naming = None;
         self.note = None;
@@ -246,7 +286,7 @@ impl FileTree {
     fn take(&mut self, n: &agentsi_proto::rpc::Notification, cx: &mut Context<Self>) {
         if n.method == Lagged::NAME {
             for path in self.folders.keys().cloned().collect::<Vec<_>>() {
-                self.load(path, cx);
+                self.refresh(path, cx);
             }
             return;
         }
@@ -258,7 +298,7 @@ impl FileTree {
         };
         let mine = self.local().is_some_and(|me| me.id == p.product);
         if mine && self.folders.contains_key(&p.path) {
-            self.load(p.path, cx);
+            self.refresh(p.path, cx);
         }
     }
 
@@ -271,6 +311,7 @@ impl FileTree {
             if !self.folders.contains_key(id) {
                 self.load(id.to_string(), cx);
             }
+            self.read_stale(cx);
         } else {
             self.open.remove(id);
         }
@@ -318,6 +359,9 @@ impl FileTree {
                 self.open.remove(&path);
             }
             r => {
+                if let Ok(list) = &r {
+                    self.forget_gone(&path, list);
+                }
                 self.folders.insert(path.clone(), r);
             }
         }
@@ -325,6 +369,37 @@ impl FileTree {
             self.load(path, cx);
         }
         self.rebuild(cx);
+        if let Some(want) = self.select_later.clone()
+            && self.rows.contains_key(&SharedString::from(want.clone()))
+        {
+            self.select_later = None;
+            self.select(&want, cx);
+        }
+    }
+
+    /// Drops what the tree keeps of a folder under `path` that the new list of `path` lacks: a
+    /// folder that went away gets no event of its own.
+    fn forget_gone(&mut self, path: &str, list: &FilesListResult) {
+        let kept: BTreeSet<String> = list
+            .entries
+            .iter()
+            .filter(|e| e.kind == FileKind::Folder)
+            .map(|e| join(path, &e.name))
+            .collect();
+        let gone = |k: &String| {
+            let under = if path.is_empty() {
+                Some(k.as_str())
+            } else {
+                k.strip_prefix(&format!("{path}/"))
+            };
+            under.is_some_and(|rest| {
+                let top = join(path, rest.split('/').next().unwrap_or(rest));
+                !kept.contains(&top)
+            })
+        };
+        self.folders.retain(|k, _| k.is_empty() || !gone(k));
+        self.open.retain(|k| !gone(k));
+        self.stale.retain(|k| !gone(k));
     }
 
     /// The entry under the selection of the tree, or the folder of the product.
@@ -493,7 +568,9 @@ impl FileTree {
                 .collect();
             for o in moved {
                 self.open.remove(&o);
-                self.open.insert(format!("{path}{}", &o[from.len()..]));
+                let to = format!("{path}{}", &o[from.len()..]);
+                self.open.insert(to.clone());
+                self.load(to, cx);
             }
             self.load(parent(from).to_string(), cx);
         }
@@ -504,7 +581,7 @@ impl FileTree {
             self.load(folder.clone(), cx);
             folder = join(&folder, part);
         }
-        self.select(&path, cx);
+        self.select_later = Some(path);
     }
 
     fn select(&mut self, path: &str, cx: &mut Context<Self>) {
