@@ -41,6 +41,7 @@ use crate::layout::{TERMINAL_PANEL, terminal_info};
 use crate::link::{CallError, Link, StreamItem};
 use crate::look::LookGlobal;
 use crate::model::{CoreEvent, CoreState, DEVICE_OFF, HostState, Term};
+use crate::palette::{Closed, ClosedTab};
 
 fn resize_of(item: &StreamItem) -> Option<(u16, u16)> {
     match item {
@@ -861,6 +862,20 @@ impl BasePanel for TerminalPanel {
             return;
         }
         let id = self.id.clone();
+        let closed = self
+            .core
+            .read(cx)
+            .terminals
+            .get(&id)
+            .map(|t| ClosedTab::Terminal {
+                host: self.core.read(cx).remote.clone(),
+                product: t.product.clone(),
+                argv: t.argv.clone(),
+                cwd: t.cwd.clone(),
+            });
+        if let Some(tab) = closed {
+            Closed::push(cx, tab);
+        }
         let was_focused = self.core.update(cx, |s, cx| {
             s.close(&id);
             cx.notify();

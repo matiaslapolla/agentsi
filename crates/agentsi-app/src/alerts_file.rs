@@ -182,6 +182,12 @@ pub struct Setting {
 impl Global for Setting {}
 
 /// Reads the file at `path` and makes it the alerts of the app. The app calls this once.
+/// Reads the file of `install` again and applies it.
+pub fn reload(cx: &mut App) {
+    let path = cx.try_global::<Setting>().and_then(|s| s.path.clone());
+    install(cx, path);
+}
+
 pub fn install(cx: &mut App, path: Option<PathBuf>) {
     let (config, note) = match &path {
         Some(p) => read(p),

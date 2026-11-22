@@ -401,6 +401,16 @@ impl ScreenPanel {
         }
     }
 
+    /// The screen of this panel, as the layout keeps it.
+    pub fn spec(&self) -> ScreenSpec {
+        ScreenSpec {
+            kind: self.kind,
+            host: self.host.clone(),
+            product: self.product.clone(),
+            arg: self.arg.clone(),
+        }
+    }
+
     pub fn is(&self, spec: &ScreenSpec) -> bool {
         self.kind == spec.kind
             && self.host == spec.host
@@ -604,6 +614,13 @@ impl Focusable for ScreenPanel {
 impl BasePanel for ScreenPanel {
     fn panel_name(&self) -> &'static str {
         SCREEN_PANEL
+    }
+
+    /// The owner closed the tab: "Reopen closed tab" can open it again. A quit is no close.
+    fn on_removed(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        if !crate::pane::QUITTING.load(std::sync::atomic::Ordering::Relaxed) {
+            crate::palette::Closed::push(cx, crate::palette::ClosedTab::Screen(self.spec()));
+        }
     }
 
     fn set_active(&mut self, active: bool, _: &mut Window, cx: &mut Context<Self>) {

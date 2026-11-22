@@ -23,16 +23,15 @@ use agentsi_proto::events::Lagged;
 use agentsi_proto::marks_api::Verdict;
 use agentsi_proto::terminal_api::{Create, CreateParams, List};
 use agentsi_ui::bench::{Bench, BenchKind};
-use agentsi_ui::tokens::{control, font, radius, size, space, surface, text};
+use agentsi_ui::tokens::{control, font, size, space, surface, text};
 use futures::StreamExt;
 use futures::channel::mpsc;
 use gpui_kit::component::Placement;
-use gpui_kit::component::command::{Command, CommandItem, CommandState};
 use gpui_kit::component::dock::{DockArea, DockPlacement, PanelId, panel_handle, register_panel};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use crate::actions::{self, ENTRIES};
+use crate::actions;
 use crate::alerts::{AlertTarget, Alerts, Raised};
 use crate::bench::{BenchHandle, BenchPlan};
 use crate::files::RunFile;
@@ -44,6 +43,7 @@ use crate::look::{self, Look, LookData, LookGlobal};
 use crate::menus::{self, Cmd, MenuRequest, Target};
 use crate::model::{CoreEvent, CoreState, Cores, HostState, ProductRef, take_event, take_sessions};
 use crate::nav::{Nav, ScreenRequest};
+use crate::palette::{Opened, Palette, PaletteStep, Recent};
 use crate::pane::{QUITTING, TerminalPanel};
 use crate::prompt::{Choice, Prompt, PromptEvent};
 use crate::screens::git::{GitScreen, Tab as GitTab};
@@ -66,6 +66,9 @@ mod alert_tests;
 mod menu_actions;
 #[cfg(test)]
 mod menu_tests;
+mod palette_actions;
+#[cfg(test)]
+mod palette_tests;
 #[cfg(test)]
 mod roles_tests;
 #[cfg(test)]
@@ -138,18 +141,24 @@ pub enum Ask {
     RenameFavorite(usize),
     /// The favorite that the palette entry of this command acts on.
     PickFavorite(Cmd),
+    /// The branch that the worktree of this product switches to.
+    SwitchBranch(ProductRef),
+    /// The one Confirm before the core of this device restarts.
+    RestartCore,
 }
 
 struct Asking {
     what: Ask,
     prompt: Entity<Prompt>,
+    /// The palette under the question, when a palette entry asked it.
+    step: Option<PaletteStep>,
     _answer: Subscription,
 }
 
 pub struct Shell {
     /// The core of this device.
-    core: Entity<CoreState>,
-    cores: Cores,
+    pub(crate) core: Entity<CoreState>,
+    pub(crate) cores: Cores,
     /// The space of each product with a tab, and Home.
     spaces: BTreeMap<SpaceId, spaces::Space>,
     /// The space on screen.
@@ -160,7 +169,9 @@ pub struct Shell {
     tabs: Entity<TabGroups>,
     sidebar: Entity<Sidebar>,
     open: Rc<RefCell<Open>>,
-    palette: Option<Entity<CommandState>>,
+    pub(crate) palette: Option<Palette>,
+    /// The targets that the owner opened last, for the palette.
+    pub(crate) recent: Recent,
     /// The labels, the colors and the product groups, when the window has a look file.
     look: Option<Entity<Look>>,
     asking: Option<Asking>,
@@ -313,6 +324,7 @@ impl Shell {
             sidebar,
             open,
             palette: None,
+            recent: Recent::default(),
             look,
             asking: None,
             alerts_open: false,
@@ -568,6 +580,7 @@ impl Shell {
                 let tree = std::mem::take(&mut saved.tree);
                 let mode = SidebarMode::from_key(saved.sidebar_mode.as_deref());
                 let hide = saved.hide_ignored;
+                self.recent = Recent::load(&saved.recent);
                 self.sidebar.update(cx, |s, cx| {
                     s.set_open_state(tree, cx);
                     s.files.update(cx, |f, _| f.show_ignored = !hide);
@@ -649,7 +662,7 @@ impl Shell {
         cx.notify();
     }
 
-    fn schedule_save(&mut self, cx: &mut Context<Self>) {
+    pub(crate) fn schedule_save(&mut self, cx: &mut Context<Self>) {
         let Persist::File(path) = self.persist.clone() else {
             return;
         };
@@ -681,6 +694,7 @@ impl Shell {
                 .map(|s| s.0.id().to_string()),
             sidebar_mode: sidebar.mode.key().map(str::to_string),
             hide_ignored: !sidebar.files.read(cx).show_ignored,
+            recent: self.recent.save(),
             dock: None,
             tab_groups: Vec::new(),
         };
@@ -780,7 +794,7 @@ impl Shell {
     }
 
     /// Each product in the order of the sidebar, with its name in the palette.
-    fn products(&self, cx: &App) -> Vec<(ProductRef, String)> {
+    pub(crate) fn products(&self, cx: &App) -> Vec<(ProductRef, String)> {
         let look = LookGlobal::with(cx, LookData::clone).unwrap_or_default();
         self.cores
             .all()
@@ -858,6 +872,9 @@ impl Shell {
             panel.update(cx, |p, cx| p.open_settings_section(s, cx));
         }
         window.focus(&panel.focus_handle(cx), cx);
+        if let Some(target) = Opened::screen(&panel.read(cx).spec()) {
+            self.opened(target, cx);
+        }
     }
 
     /// Opens the call of the minutes that the owner used last, or of the last meeting.
@@ -1334,21 +1351,21 @@ impl Shell {
     fn toggle_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_some() {
             self.close_palette(window, cx);
-            return;
+        } else {
+            self.open_palette("", window, cx);
         }
-        let state = cx.new(|cx| CommandState::new(window, cx));
-        state.update(cx, |s, cx| s.focus(window, cx));
-        self.palette = Some(state);
-        cx.notify();
     }
 
     /// Closes the palette. The focus goes back to the last pane, else to the shell.
-    fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.palette.take().is_none() {
+    pub(crate) fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(palette) = self.palette.take() else {
             return;
-        }
-        // An entry that asks a question has the focus now.
-        if self.asking.is_some() {
+        };
+        // An entry that asks a question has the focus now, and Escape there comes back here.
+        if let Some(asking) = self.asking.as_mut() {
+            asking.step.get_or_insert(PaletteStep {
+                query: palette.query().to_string(),
+            });
             cx.notify();
             return;
         }
@@ -1357,88 +1374,6 @@ impl Shell {
             None => window.focus(&self.focus, cx),
         }
         cx.notify();
-    }
-
-    fn palette(&self, state: Entity<CommandState>, cx: &mut Context<Self>) -> AnyElement {
-        let products = self.products(cx);
-        let mut items: Vec<CommandItem> = ENTRIES
-            .iter()
-            .map(|e| {
-                CommandItem::new()
-                    .label(e.label)
-                    .icon(e.icon.clone())
-                    .keywords(e.keywords.iter().copied())
-                    .action((e.action)())
-            })
-            .collect();
-        let first_product = items.len();
-        for (n, (_, name)) in products.iter().enumerate() {
-            let item = CommandItem::new()
-                .label(format!("Go to {name}"))
-                .keywords(["product", "select"]);
-            items.push(match actions::select_product(n) {
-                Some(a) => item.action(a),
-                None => item,
-            });
-        }
-        // After the products, so a row number still names its product.
-        for section in Section::shown(cx) {
-            items.push(
-                CommandItem::new()
-                    .label(actions::settings_entry(section))
-                    .icon(gpui_kit::component::IconName::Settings)
-                    .keywords(["settings", "section", "preferences"])
-                    .action(Box::new(actions::OpenSettingsSection { section })),
-            );
-        }
-        let this = cx.weak_entity();
-        let cancel = this.clone();
-        div()
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-            .flex()
-            .justify_center()
-            .items_start()
-            .pt(space(16))
-            .bg(surface::base().alpha(control::SCRIM_ALPHA))
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, window, cx| this.close_palette(window, cx)),
-            )
-            .child(
-                div()
-                    .w(control::PALETTE_WIDTH)
-                    .h_auto()
-                    .rounded(radius::lg())
-                    .bg(surface::overlay())
-                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                    .child(
-                        Command::new(&state)
-                            .items(items)
-                            .placeholder("Type a command or a product")
-                            .on_confirm(move |ix, window, cx| {
-                                let row = ix.row;
-                                let _ = this.update(cx, |this, cx| {
-                                    // A product past the ninth has no action: the shell runs it here.
-                                    let n = row.checked_sub(first_product);
-                                    if let Some(n) =
-                                        n.filter(|n| actions::select_product(*n).is_none())
-                                        && let Some((product, _)) = products.get(n)
-                                    {
-                                        this.select_product(product, window, cx);
-                                    }
-                                    this.close_palette(window, cx);
-                                });
-                            })
-                            .on_cancel(move |window, cx| {
-                                let _ =
-                                    cancel.update(cx, |this, cx| this.close_palette(window, cx));
-                            }),
-                    ),
-            )
-            .into_any_element()
     }
 
     /// Opens the question for `what`: the palette entries and, later, the menu entries use it.
@@ -1515,6 +1450,7 @@ impl Shell {
             other => match self
                 .tab_prompt(other, &colors, window, cx)
                 .or_else(|| self.menu_prompt(other, &colors, window, cx))
+                .or_else(|| self.step_prompt(other, window, cx))
             {
                 Some(p) => p,
                 None => return,
@@ -1526,6 +1462,7 @@ impl Shell {
         self.asking = Some(Asking {
             what,
             prompt,
+            step: None,
             _answer: answer,
         });
         cx.notify();
@@ -1570,9 +1507,14 @@ impl Shell {
         let Some(asking) = self.asking.take() else {
             return;
         };
+        if let (PromptEvent::Cancel, Some(step)) = (&event, &asking.step) {
+            self.open_palette(&step.query, window, cx);
+            return;
+        }
         if let PromptEvent::Answer(text) = &event
             && (self.tab_answer(&asking.what, text, window, cx)
-                || self.menu_answer(&asking.what, text, window, cx))
+                || self.menu_answer(&asking.what, text, window, cx)
+                || self.step_answer(&asking.what, text, window, cx))
         {
             self.refocus(window, cx);
             return;
@@ -1636,7 +1578,7 @@ impl Render for Shell {
             keys::text(cx, "new-terminal"),
             keys::text(cx, keys::PALETTE),
         );
-        let palette = self.palette.clone().map(|s| self.palette(s, cx));
+        let palette = self.palette_view(cx);
         div()
             .id("shell")
             .track_focus(&self.focus)
@@ -1694,7 +1636,25 @@ impl Render for Shell {
                 this.on_git(window, cx, |s, _, cx| s.ask_push(cx))
             }))
             .on_action(cx.listener(|this, _: &actions::GitSwitchBranch, window, cx| {
-                this.on_git(window, cx, |s, _, cx| s.set_tab(GitTab::Branches, cx))
+                this.ask_branch(window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::GoToTab, window, cx| {
+                this.open_palette("@", window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::ReopenClosedTab, window, cx| {
+                this.reopen_closed_tab(window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::NextSpace, window, cx| {
+                this.step_space(true, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::PreviousSpace, window, cx| {
+                this.step_space(false, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::RestartCore, window, cx| {
+                this.ask(Ask::RestartCore, window, cx)
+            }))
+            .on_action(cx.listener(|this, _: &actions::ReloadSettingsFiles, _, cx| {
+                this.reload_settings_files(cx)
             }))
             .on_action(cx.listener(|this, _: &actions::GitNewBranch, window, cx| {
                 this.on_git(window, cx, |s, window, cx| {
@@ -1979,7 +1939,7 @@ mod tests {
         }
     }
 
-    fn terminal(id: &str, product: &str, title: &str) -> TerminalInfo {
+    pub(super) fn terminal(id: &str, product: &str, title: &str) -> TerminalInfo {
         serde_json::from_value(json!({
             "id": id, "argv": ["sh"], "cwd": "/", "product": product, "pid": 1,
             "cols": 80, "rows": 24, "title": title, "state": "working",

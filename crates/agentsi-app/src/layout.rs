@@ -58,6 +58,10 @@ pub struct Layout {
     /// The file tree hides the entries that git ignores.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hide_ignored: bool,
+    /// The targets that the owner opened last, newest first. A file from before the palette
+    /// sources has none, so no version bump.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub recent: Vec<RecentSave>,
     /// The one dock of a file of version 1 or 2. Version 3 writes none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dock: Option<DockAreaState>,
@@ -74,6 +78,20 @@ pub struct SpaceSave {
     /// `panel_key`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tab_groups: Vec<TabGroupSave>,
+}
+
+/// One recent target: the keys of a favorite of `favorites.toml`, and the kind `file` for a
+/// file of a product, with its path from the folder of the product as the target.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RecentSave {
+    pub label: String,
+    /// `look::key` of the product. Absent: Home.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub product: Option<String>,
+    pub kind: String,
+    pub target: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub folder: Option<String>,
 }
 
 /// One tab group in the file.
@@ -539,6 +557,13 @@ mod tests {
             settings_section: Some("terminal".into()),
             sidebar_mode: Some("files".into()),
             hide_ignored: true,
+            recent: vec![RecentSave {
+                label: "main.rs".into(),
+                product: Some("demo".into()),
+                kind: "file".into(),
+                target: "src/main.rs".into(),
+                folder: None,
+            }],
             dock: None,
             tab_groups: vec![],
         };

@@ -874,10 +874,15 @@ impl Shell {
         else {
             return;
         };
-        if let Some(spec) = f.screen() {
-            self.show_screen(spec, window, cx);
-            return;
+        match f.screen() {
+            Some(spec) => self.show_screen(spec, window, cx),
+            None => self.open_saved(f, window, cx),
         }
+    }
+
+    /// Opens a folder or a command target in a new terminal of its product.
+    pub(crate) fn open_saved(&mut self, f: Favorite, window: &mut Window, cx: &mut Context<Self>) {
+        self.opened(crate::palette::Opened::Saved(f.clone()), cx);
         let host = f.product.as_ref().and_then(|p| p.host.clone());
         let Some(core) = self.cores.of(host.as_deref()).cloned() else {
             self.notice(

@@ -231,6 +231,12 @@ impl Look {
         Look { path, data, note }
     }
 
+    /// Reads the file again, for an edit by hand.
+    pub fn reload(&mut self, cx: &mut Context<Self>) {
+        *self = Look::open(self.path.take());
+        cx.notify();
+    }
+
     /// Writes the data. A failed save keeps the change in memory and says why in `note`.
     fn save(&mut self) {
         let Some(path) = self.path.clone() else {
