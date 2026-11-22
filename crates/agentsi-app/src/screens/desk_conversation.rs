@@ -227,6 +227,7 @@ impl DeskConversation {
         match result {
             Ok(settings) => {
                 self.desk_settings = Some(settings);
+                self.settings_error = None;
                 self.selects_stale = true;
             }
             Err(e) => {
@@ -247,6 +248,7 @@ impl DeskConversation {
                 "The desk model and the desk effort are loading. Pick again in a moment.".into(),
             );
             self.selects_stale = true;
+            self.read_settings(cx);
             cx.notify();
             return;
         };
@@ -1981,26 +1983,29 @@ mod tests {
     }
 
     #[gpui::test]
-    fn two_quick_picks_keep_each_other_and_a_pick_before_the_settings_load_asks_again(
-        cx: &mut TestAppContext,
-    ) {
+    fn a_pick_before_the_settings_load_reads_them_again(cx: &mut TestAppContext) {
         use super::Field;
         let (conv, mut other, cx) = setup(cx);
         conv_ready(cx, &conv);
-        methods_sent(&mut other);
-        conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
-        assert!(methods_sent(&mut other).is_empty(), "no pair to send yet");
-        conv.read_with(cx, |c, _| assert!(c.settings_error.is_some()));
-
         conv.update(cx, |c, cx| {
-            c.settings_done(Ok(choice(None, None)), cx);
-            c.pick(Field::Model, "sonnet".into(), cx);
-            c.pick(Field::Effort, "max".into(), cx);
+            c.settings_done(Err(CallError::Link("gone".into())), cx)
         });
-        let sent = methods_sent(&mut other);
+        received(&mut other);
+        conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
+        let asked: Vec<Value> = received(&mut other)
+            .into_iter()
+            .map(|r| r["method"].clone())
+            .collect();
+        assert_eq!(asked, [json!("desk.settings")], "no pair to send yet");
+        conv.read_with(cx, |c, _| {
+            assert!(c.settings_error.as_deref().unwrap().contains("loading"))
+        });
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        conv.read_with(cx, |c, _| assert!(c.settings_error.is_none()));
+        conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
         assert_eq!(
-            sent[1].1,
-            json!({"product": "demo", "model": "sonnet", "effort": "max"})
+            methods_sent(&mut other)[0].1,
+            json!({"product": "demo", "model": "opus", "effort": null})
         );
     }
 
