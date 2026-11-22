@@ -8,6 +8,7 @@
 pub mod audio;
 pub mod config;
 pub mod dictate;
+pub mod keep;
 pub mod link;
 pub mod speak;
 pub mod state;

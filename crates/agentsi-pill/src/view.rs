@@ -28,12 +28,15 @@ pub static FRAMES: AtomicU64 = AtomicU64::new(0);
 
 /// Called for each effect, on the window thread. The speech code (U12) plugs in here.
 pub type EffectHook = Arc<dyn Fn(&Effect) + Send + Sync>;
+/// Called for each new keep time of the voice models, on the window thread.
+pub type KeepHook = Arc<dyn Fn(crate::keep::KeepTime) + Send + Sync>;
 
 pub struct Options {
     pub start: Model,
     pub link: LinkSender,
     pub events: UnboundedReceiver<LinkEvent>,
     pub hook: EffectHook,
+    pub keep: KeepHook,
     /// Stop the program after this time. `None` runs until the process ends.
     pub lifetime: Option<Duration>,
 }
@@ -55,6 +58,7 @@ pub fn run(options: Options) {
             link,
             mut events,
             hook,
+            keep,
             lifetime,
         } = options;
         let app = cx.new(|_| PillApp {
@@ -73,6 +77,7 @@ pub fn run(options: Options) {
                 app.update(cx, |app, cx| match event {
                     LinkEvent::Input(input) => app.input(input, cx),
                     LinkEvent::DictationTarget(_) => {}
+                    LinkEvent::Keep(k) => keep(k),
                 });
             }
         })

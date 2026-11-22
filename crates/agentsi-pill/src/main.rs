@@ -16,6 +16,8 @@ usage: agentsi-pill [--input <device>] [--output <device>]
   --toggle   with --show listening, draw the mark of toggle dictation.
   --conversation   with --show, draw the mark of conversation mode.
   settings   <config>/agentsi/pill.toml (keys input, output), then AGENTSI_PILL_INPUT and AGENTSI_PILL_OUTPUT, then the flags.
+             [models] keep in pill.toml: how long a voice model stays after its last use,
+             \"1m\", \"5m\" (default), \"15m\", \"1h\", \"always\", or \"start\" to load the models at the start.
 ";
 
 /// The longest test window.
@@ -104,6 +106,7 @@ fn main() -> ExitCode {
 #[cfg(target_os = "linux")]
 fn run(args: Args) -> ExitCode {
     use agentsi_pill::dictate;
+    use agentsi_pill::keep::{KeepTime, Policy};
     use agentsi_pill::link::{self, LinkEvent};
     use agentsi_pill::speak;
     use agentsi_pill::state::Input;
@@ -122,6 +125,10 @@ fn run(args: Args) -> ExitCode {
             return ExitCode::from(2);
         }
     };
+    let (keep, bad_keep) = config.keep();
+    if let Some(line) = bad_keep {
+        eprintln!("agentsi-pill: {line}");
+    }
     let (tx, events) = futures::channel::mpsc::unbounded::<LinkEvent>();
     let mut start = Model::default();
     let mut lifetime = None;
@@ -168,33 +175,47 @@ fn run(args: Args) -> ExitCode {
         }
         link::spawn(tx.clone());
     }
-    let hook: view::EffectHook = if args.show.is_some() {
-        Arc::new(|effect: &Effect| eprintln!("agentsi-pill: {effect:?}"))
+    let (hook, keep_hook): (view::EffectHook, view::KeepHook) = if args.show.is_some() {
+        (
+            Arc::new(|effect: &Effect| eprintln!("agentsi-pill: {effect:?}")),
+            Arc::new(|_| {}),
+        )
     } else {
-        let speaker = speak::Speaker::start(
+        eprintln!("agentsi-pill: voice models keep {}", keep.key());
+        let speaker = Arc::new(speak::Speaker::start(
             speak::open_voice(),
             speak::open_cpal(config.output.clone()),
             tx.clone(),
+            Policy::new(keep),
             agentsi_pill::stats_enabled(),
-        );
-        let dictator = dictate::Dictator::start(
+        ));
+        let dictator = Arc::new(dictate::Dictator::start(
             dictate::CpalMic::open(config.input.clone()),
             dictate::open_recognizer(),
             dictate::open_detector(),
             Box::new(dictate::CoreDelivery),
             tx.clone(),
+            Policy::new(keep),
             agentsi_pill::stats_enabled(),
-        );
-        Arc::new(move |effect: &Effect| {
-            speaker.effect(effect);
-            dictator.effect(effect);
-        })
+        ));
+        let (s, d) = (speaker.clone(), dictator.clone());
+        (
+            Arc::new(move |effect: &Effect| {
+                speaker.effect(effect);
+                dictator.effect(effect);
+            }),
+            Arc::new(move |keep: KeepTime| {
+                s.set_keep(keep);
+                d.set_keep(keep);
+            }),
+        )
     };
     view::run(view::Options {
         start,
         link: tx,
         events,
         hook,
+        keep: keep_hook,
         lifetime,
     });
     if agentsi_pill::stats_enabled() {
