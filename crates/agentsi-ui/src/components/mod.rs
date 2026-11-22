@@ -7,6 +7,7 @@
 mod button;
 mod card;
 mod display;
+mod pane_toggle;
 mod switch;
 mod tab_chip;
 #[cfg(test)]
@@ -20,6 +21,7 @@ pub use display::{
     ring_spread, state_icon, status_tag,
 };
 pub use gpui_kit::component::{kbd::Kbd, tag::Tag};
+pub use pane_toggle::PaneToggle;
 pub use switch::Switch;
 pub use tab_chip::TabChip;
 pub use tree::{GroupHeader, ItemRow, ProductRow, running_chip};

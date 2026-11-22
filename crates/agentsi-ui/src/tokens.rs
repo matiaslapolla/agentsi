@@ -295,6 +295,23 @@ pub mod accent {
     }
 }
 
+/// A toggle of the pane bar. An open pane has an accent fill and an accent line under it.
+pub mod toggle {
+    use super::{Color, accent, current_palette, surface};
+    /// The fill of the toggle of an open pane, over the base surface of the bar.
+    pub fn open() -> Color {
+        accent::base().over(surface::base(), current_palette().accent_subtle_alpha)
+    }
+    /// The same fill under the pointer: the accent 1.5 times as strong.
+    pub fn open_hover() -> Color {
+        accent::base().over(surface::base(), current_palette().accent_subtle_alpha * 1.5)
+    }
+    /// The line at the bottom of the toggle of an open pane.
+    pub fn line() -> Color {
+        accent::base()
+    }
+}
+
 /// The status colors. Each is a text color, and each has a tint fill.
 pub mod status {
     use super::{Color, current_palette};
@@ -836,7 +853,19 @@ pub mod control {
     pub const SELECTION_INSET: Pixels = px(10.);
     /// The widest trailing element of a list row. The title keeps the rest.
     pub const TRAILING_MAX: Pixels = px(160.);
+    /// The first width of a pane column, and the width that a double click on its edge gives.
     pub const SIDEBAR_WIDTH: Pixels = px(248.);
+    /// The narrowest pane column. The widest is `PANE_COLUMN_MAX` of the window width.
+    pub const PANE_COLUMN_MIN: Pixels = px(180.);
+    pub const PANE_COLUMN_MAX: f32 = 0.5;
+    /// The lowest pane in a column.
+    pub const PANE_MIN_HEIGHT: Pixels = px(120.);
+    /// The accent line under the toggle of an open pane.
+    pub const TOGGLE_LINE: Pixels = px(2.);
+    /// A drop line of a pane drag.
+    pub const DROP_LINE: Pixels = px(2.);
+    /// The app icon of the pane bar.
+    pub const APP_ICON: Pixels = px(18.);
     /// The sample pane of the Terminal section: 4 rows at the largest font size and line height.
     pub const TERMINAL_SAMPLE_HEIGHT: Pixels = px(176.);
     /// The list of the sections of the settings screen.
@@ -967,6 +996,16 @@ fn text_pairs_in_effect() -> Vec<(String, Color, Color)> {
     }
     for fill in [accent::base(), accent::hover(), accent::pressed()] {
         pairs.push(("accent::on() on an accent fill".into(), accent::on(), fill));
+    }
+    for (fname, fill) in [
+        ("toggle::open()", toggle::open()),
+        ("toggle::open_hover()", toggle::open_hover()),
+        (
+            "pressed toggle::open_hover()",
+            state::pressed(toggle::open_hover()),
+        ),
+    ] {
+        pairs.push((format!("text::primary() on {fname}"), text::primary(), fill));
     }
     for s in Status::ALL {
         pairs.push((format!("{s:?} on its tint"), s.color(), s.tint()));
