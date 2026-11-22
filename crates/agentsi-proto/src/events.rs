@@ -18,6 +18,7 @@ pub fn register(c: &mut Catalog) {
         .event::<VoiceSpeak>()
         .event::<VoiceStop>()
         .event::<VoiceMic>()
+        .event::<VoiceModels>()
         .event::<DictationTarget>()
         .event::<DictationStart>()
         .event::<DictationStop>()
@@ -226,6 +227,20 @@ impl Event for VoiceMic {
         sends it with each `dictation.start` and `dictation.stop`, so a client of the voice \
         topic, such as the app, knows when the owner speaks. The pill ignores it.";
     type Params = VoiceMicParams;
+}
+
+pub struct VoiceModels;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct VoiceModelsParams {
+    pub keep: crate::voice_api::KeepTime,
+}
+
+impl Event for VoiceModels {
+    const NAME: &'static str = "voice.models";
+    const DESCRIPTION: &'static str = "The keep time of the voice models changed. The pill drops \
+        a model when the keep time passes with no use, and loads the models at once for `start`.";
+    type Params = VoiceModelsParams;
 }
 
 pub struct DictationTarget;

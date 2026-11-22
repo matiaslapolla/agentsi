@@ -3230,6 +3230,30 @@
         ],
         "type": "object"
       },
+      "KeepTime": {
+        "description": "How long a voice model stays in memory after its last use. `pill.toml` keeps it as\n`[models] keep`.",
+        "oneOf": [
+          {
+            "enum": [
+              "1m",
+              "5m",
+              "15m",
+              "1h"
+            ],
+            "type": "string"
+          },
+          {
+            "const": "always",
+            "description": "A model stays once it loaded.",
+            "type": "string"
+          },
+          {
+            "const": "start",
+            "description": "The models load when the pill starts, and stay.",
+            "type": "string"
+          }
+        ]
+      },
       "LastCommit": {
         "properties": {
           "date": {
@@ -4151,6 +4175,18 @@
           "license",
           "description",
           "size"
+        ],
+        "type": "object"
+      },
+      "ModelsKeepResult": {
+        "properties": {
+          "keep": {
+            "$ref": "#/components/schemas/KeepTime",
+            "description": "The keep time after the call. A missing or bad value in the file reads as `5m`."
+          }
+        },
+        "required": [
+          "keep"
         ],
         "type": "object"
       },
@@ -8131,6 +8167,58 @@
         "name": "result",
         "schema": {
           "$ref": "#/components/schemas/TranscriptResult"
+        }
+      }
+    },
+    {
+      "description": "Sets or reads how long the voice models stay in memory after their last use. The core writes `[models] keep` in pill.toml, keeps the other keys and comments, and sends voice.models, so the pill applies it with no restart.",
+      "errors": [
+        {
+          "code": -32602,
+          "data": {
+            "kind": "invalid"
+          },
+          "message": "invalid"
+        },
+        {
+          "code": -32603,
+          "data": {
+            "kind": "internal"
+          },
+          "message": "internal"
+        },
+        {
+          "code": -32000,
+          "data": {
+            "kind": "unavailable"
+          },
+          "message": "unavailable"
+        }
+      ],
+      "name": "voice.models.keep",
+      "paramStructure": "by-name",
+      "params": [
+        {
+          "description": "The new keep time. Omit it to read the keep time.",
+          "name": "keep",
+          "required": false,
+          "schema": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/KeepTime"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The new keep time. Omit it to read the keep time."
+          }
+        }
+      ],
+      "result": {
+        "name": "result",
+        "schema": {
+          "$ref": "#/components/schemas/ModelsKeepResult"
         }
       }
     },
@@ -16044,6 +16132,19 @@
           "schema": {
             "description": "True from `dictation.start`, false from `dictation.stop`.",
             "type": "boolean"
+          }
+        }
+      ]
+    },
+    {
+      "description": "The keep time of the voice models changed. The pill drops a model when the keep time passes with no use, and loads the models at once for `start`.",
+      "name": "voice.models",
+      "params": [
+        {
+          "name": "keep",
+          "required": true,
+          "schema": {
+            "$ref": "#/components/schemas/KeepTime"
           }
         }
       ]
