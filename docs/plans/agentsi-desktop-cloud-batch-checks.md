@@ -1,6 +1,6 @@
 # Owner checks: the desktop batch of 2026-11-21, and the panes
 
-The build of `main` e2385f9 is installed (`make install` of 2026-11-22). It holds the batch and the panes (#16). Open the app from the launcher, or run `agentsi-app`. Each item says what to check and how. Tick it when it works.
+The build of `main` f9e337e is installed (`make install` of 2026-11-22). It holds the batch, the panes (#16), the desk model selects (#17) and the voice models in memory (#18). Open the app from the launcher, or run `agentsi-app`. Each item says what to check and how. Tick it when it works.
 
 The sidebar is now the Products pane. The pane bar at the top of the window opens and hides each pane, so the items of U4, U7 and U8 name the panes.
 
@@ -90,6 +90,25 @@ Spec: `docs/specs/agentsi-desktop-panes.md`. Keys: `Ctrl+Shift+O` Products, `Ctr
 - [ ] **The notices.** Hide Products while the app shows a notice, for example with a host off. The notice shows under the dock.
 - [ ] **After a restart.** Move and resize the panes, then close and open the app. Each pane has the same column, order, size and open state.
 - [ ] **Smooth drags.** A pane drag and a column resize feel smooth on the M1.
+
+## U1 — Desk model and effort (#17)
+
+Spec: `docs/specs/agentsi-desktop-desk-model.md`.
+
+- [ ] **The selects.** Open the front desk (`Ctrl+Shift+D`). Under the title, a model select shows "Role default (…)", Fable, Opus, Sonnet and Haiku, and an effort select shows "Role default (…)", low, medium, high, xhigh and max.
+- [ ] **A pick works.** Pick Sonnet and send a message. The reply comes back.
+- [ ] **A pick during a reply.** Pick Haiku while a reply runs. The reply finishes, the note "The next message uses Haiku." shows, and the next message uses Haiku.
+- [ ] **The palette.** Press `Ctrl+K` and choose "Desk: Choose model…" or "Desk: Choose effort…". The same lists show, and Escape goes back.
+- [ ] **After a restart.** Close the app and restart the core. The picks of each product stay.
+
+## U2 — Voice models in memory (#18)
+
+Spec: `docs/specs/agentsi-voice-memory.md`. After the install the pill uses 30 MB at start, against 1681 MB before.
+
+- [ ] **Voice still works.** Dictate once, and let the pm voice speak once.
+- [ ] **The first dictation after a drop.** Wait more than 5 minutes. Dictate: the microphone opens at once, and the text comes about 2 s later than usual.
+- [ ] **The keep time.** Open Settings, Voice models, and pick "1 minute". Wait a minute: the memory line falls to about 100 MB. `~/.config/agentsi/pill.toml` keeps its other keys.
+- [ ] **Load at start.** Pick "Load at start". The models load with no restart of the pill, and the memory line rises to about 1.5 GB.
 
 ## Idle frames
 

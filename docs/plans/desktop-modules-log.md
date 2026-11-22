@@ -166,3 +166,12 @@ Spec: `docs/specs/agentsi-desktop-panes.md`. One cloud routine built it, and the
 - **Proof:** CI green on 7f8fc93. The gate ran its 7 checks green and judged AC1 to AC11 met. AC12 to AC14 stay with the owner.
 - **Not run:** the idle bench with two open panes. It is in the owner checks.
 - **Lesson:** a cloud build in the `/tmp` tmpfs (7.7 GB) runs out of disk. Build with `CARGO_TARGET_DIR` on `/home`.
+
+## 2026-11-22 — Desk model selects and voice models in memory
+
+Specs: `docs/specs/agentsi-desktop-desk-model.md`, `docs/specs/agentsi-voice-memory.md`. Merges: #17 (f1bd163), #18 (f9e337e).
+
+- **How:** two local background workers built the first version. The owner then asked for cloud routines in place of local workers, because two local builds took the CPU, the RAM and 40 GB of disk. Each review-fix round ran as one cloud routine, created disabled and fired once with `run`.
+- **Review fixes:** desk: races between `desk.configure` and `desk.send`, quick picks out of order, a choice that started the desk-note backlog, a flaky test that acted before `idle`. Voice: a stale failed preload, audio after a release kept during a model load, a keep change that blocked the dictation thread, a symlinked `pill.toml`, one keep parser for pill and core, limits that now cover a load.
+- **Memory on the M1:** the pill idles at 30 MB at start and 104 MB after a drop, against 1681 MB before. `malloc_trim(0)` after a drop gives the heap back; the ONNX arena options changed nothing.
+- **Follow-up:** `agentsi-core` `server::tests::serve_removes_the_socket_and_keeps_the_lock_for_its_caller` is flaky under load (failed once in the CI of #18, passed on rerun). A local test run left two `agentsi-core serve --detach` processes alive with a temp HOME; find the test that does not stop its detached core.
