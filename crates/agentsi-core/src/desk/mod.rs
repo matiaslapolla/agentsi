@@ -641,6 +641,7 @@ pub fn configure(
     check_choice("model", model.as_deref(), &models)?;
     check_choice("effort", effort.as_deref(), &DESK_EFFORTS)?;
     let store = open_store(core)?;
+    let role = pm_role(&store, product)?;
     let fresh =
         agentsi_agency::desk::new_session_id().map_err(|e| RpcError::internal(e.to_string()))?;
     let (p, at) = (product.to_string(), crate::clock::iso_now());
@@ -661,7 +662,12 @@ pub fn configure(
     if let Some(ended) = ended {
         finish_end(core, product, ended);
     }
-    settings(core, product)
+    Ok(DeskChoice {
+        model,
+        effort,
+        role_model: role.model,
+        role_effort: role.effort,
+    })
 }
 
 /// `desk.stop`: stops the process of a product. False when none ran.
