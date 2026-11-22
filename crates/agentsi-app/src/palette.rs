@@ -377,13 +377,17 @@ impl Shell {
                             .on_confirm(move |ix, window, cx| {
                                 let items = items.clone();
                                 let _ = this.update(cx, |this, cx| {
-                                    this.palette_confirmed(&items, ix.row, window, cx);
+                                    let focused =
+                                        this.palette_confirmed(&items, ix.row, window, cx);
                                     // An entry that opened the palette again keeps it.
-                                    if this
+                                    let same = this
                                         .palette
                                         .as_ref()
-                                        .is_some_and(|p| p.state.entity_id() == confirmed)
-                                    {
+                                        .is_some_and(|p| p.state.entity_id() == confirmed);
+                                    if same && focused {
+                                        this.palette = None;
+                                        cx.notify();
+                                    } else if same {
                                         this.close_palette(window, cx);
                                     }
                                 });
@@ -398,19 +402,24 @@ impl Shell {
         Some(element)
     }
 
-    /// Runs the item at `row`. `Command` dispatched an action already.
+    /// Runs the item at `row`. `Command` dispatched an action already. True when the item put
+    /// the focus on a tab, which the palette then keeps.
     fn palette_confirmed(
         &mut self,
         items: &Rc<Vec<PaletteItem>>,
         row: usize,
         window: &mut Window,
         cx: &mut Context<Self>,
-    ) {
+    ) -> bool {
         let Some(item) = items.get(row) else {
-            return;
+            return false;
         };
+        let focused = matches!(
+            item.run,
+            Run::Product(_) | Run::Tab(_) | Run::Favorite(_) | Run::Recent(_)
+        );
         let run = match &item.run {
-            Run::Action(_) => return,
+            Run::Action(_) => return false,
             Run::Product(p) => Run::Product(p.clone()),
             Run::Tab(p) => Run::Tab(*p),
             Run::File(p, path) => Run::File(p.clone(), path.clone()),
@@ -418,6 +427,7 @@ impl Shell {
             Run::Recent(t) => Run::Recent(t.clone()),
         };
         source(item.source).run(run, self, window, cx);
+        focused && self.asking.is_none()
     }
 
     /// Puts `target` first in the recent targets, and saves the layout.

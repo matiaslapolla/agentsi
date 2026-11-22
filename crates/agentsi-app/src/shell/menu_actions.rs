@@ -506,7 +506,7 @@ impl Shell {
     }
 
     /// The folder of a product, as an absolute path.
-    fn folder_of(&self, p: &ProductRef, cx: &App) -> Option<String> {
+    pub(super) fn folder_of(&self, p: &ProductRef, cx: &App) -> Option<String> {
         let core = self.cores.of(p.host.as_deref())?.read(cx);
         core.product(&p.id)?.path.as_deref().map(expand)
     }

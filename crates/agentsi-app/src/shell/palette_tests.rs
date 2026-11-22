@@ -174,14 +174,12 @@ fn a_file_prefix_asks_the_core_once_after_the_typing_and_lists_the_files_it_foun
             ("app/src/main.rs".to_string(), Kind::Files)
         ]
     );
-    keys(cx, "enter");
-    assert_eq!(palette_query(&f, cx), None);
-    // The file is now the first recent target.
-    type_in(&f, cx, "");
-    assert_eq!(
-        rows(&f, cx)[0],
-        ("src/main.rs · a".to_string(), Kind::Recent)
-    );
+    // A product with no folder on this device opens nothing and records nothing. The test
+    // platform cannot open a file with the system, so no file opens here.
+    f.shell.update_in(cx, |s, window, cx| {
+        s.open_file(product("b"), "src/main.rs".into(), window, cx)
+    });
+    assert!(f.shell.read_with(cx, |s, _| s.recent.0.is_empty()));
 }
 
 fn found(paths: Vec<String>) -> agentsi_proto::files_api::FilesFindResult {
@@ -275,6 +273,9 @@ fn switch_branch_shows_the_branches_as_a_second_step_and_escape_goes_back(cx: &m
 
     // The answer of the second step switches on the git screen.
     keys(cx, "enter");
+    // The owner goes to another product while the question is open.
+    cx.dispatch_action(actions::NextSpace);
+    redraw(cx);
     let _ = received(&mut f.core_end);
     f.shell.update_in(cx, |s, window, cx| {
         s.asked(PromptEvent::Answer("feat".into()), window, cx)
@@ -283,8 +284,9 @@ fn switch_branch_shows_the_branches_as_a_second_step_and_escape_goes_back(cx: &m
     let sent = received(&mut f.core_end);
     let switch = sent.iter().find(|r| r["method"] == "git.switch");
     assert_eq!(
-        switch.map(|r| r["params"]["name"].clone()),
-        Some(json!("feat"))
+        switch.map(|r| (r["params"]["product"].clone(), r["params"]["name"].clone())),
+        Some((json!("a"), json!("feat"))),
+        "the switch acts on the product that the question named"
     );
     assert_eq!(active_tab(&f, cx), "screen:git");
 }

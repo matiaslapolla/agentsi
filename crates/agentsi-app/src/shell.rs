@@ -147,7 +147,7 @@ pub enum Ask {
     RestartCore,
 }
 
-struct Asking {
+pub(crate) struct Asking {
     what: Ask,
     prompt: Entity<Prompt>,
     /// The palette under the question, when a palette entry asked it.
@@ -174,7 +174,7 @@ pub struct Shell {
     pub(crate) recent: Recent,
     /// The labels, the colors and the product groups, when the window has a look file.
     look: Option<Entity<Look>>,
-    asking: Option<Asking>,
+    pub(crate) asking: Option<Asking>,
     /// The alert log is open.
     alerts_open: bool,
     /// The context menu that is open.

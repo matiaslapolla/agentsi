@@ -9,9 +9,7 @@ use gpui_kit::*;
 
 use super::{Ask, Shell, shell_argv_for};
 use crate::favorites::FavoritesGlobal;
-use crate::files::FileRef;
 use crate::look::LookGlobal;
-use crate::menus::{Cmd, Target};
 use crate::model::ProductRef;
 use crate::palette::{Closed, ClosedTab, Opened};
 use crate::prompt::{Choice, Prompt};
@@ -83,21 +81,25 @@ impl Shell {
             .collect()
     }
 
-    /// Opens a file of a product as the file tree opens it, and keeps it in the recent targets.
+    /// Opens a file of a product with the program of the system, as the file tree opens it, and
+    /// keeps it in the recent targets. The path comes from the product itself, not from the tree.
     pub(crate) fn open_file(
         &mut self,
         product: ProductRef,
         path: String,
-        window: &mut Window,
+        _: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        self.opened(Opened::File(product.clone(), path.clone()), cx);
-        let file = FileRef {
-            product,
-            path,
-            folder: false,
+        let abs = (product.host.is_none())
+            .then(|| self.folder_of(&product, cx))
+            .flatten()
+            .map(|dir| std::path::Path::new(&dir).join(&path));
+        let Some(abs) = abs else {
+            self.notice("This product has no folder on this device.", cx);
+            return;
         };
-        self.run_menu(Target::File(file), Cmd::Open, window, cx);
+        self.opened(Opened::File(product, path), cx);
+        cx.open_with_system(&abs);
     }
 
     /// The prompt of a second step that only the palette asks.
@@ -166,7 +168,9 @@ impl Shell {
         cx: &mut Context<Self>,
     ) -> bool {
         match what {
-            Ask::SwitchBranch(_) => {
+            Ask::SwitchBranch(p) => {
+                // The active product may have changed while the question was open.
+                self.select_product(p, window, cx);
                 let name = answer.to_string();
                 self.on_git(window, cx, move |s, _, cx| {
                     s.set_tab(GitTab::Branches, cx);
@@ -251,6 +255,18 @@ impl Shell {
         self.before_quit(cx);
         cx.spawn(async move |_, cx| {
             let stopped = call.await;
+            // The core removes its socket when it exits: a new app before that would attach
+            // to the old core.
+            if let Ok(socket) = agentsi_proto::socket::socket_path() {
+                for _ in 0..100 {
+                    if !socket.path.exists() {
+                        break;
+                    }
+                    cx.background_executor()
+                        .timer(std::time::Duration::from_millis(50))
+                        .await;
+                }
+            }
             let started = std::env::current_exe().and_then(|exe| {
                 std::process::Command::new(exe)
                     .args(std::env::args_os().skip(1))
