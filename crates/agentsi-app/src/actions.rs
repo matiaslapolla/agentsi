@@ -30,8 +30,6 @@ gpui_kit::actions!(
         ToggleProducts,
         /// Shows or hides the Files pane.
         ToggleFiles,
-        /// Shows or hides the Alerts pane.
-        ToggleAlerts,
         /// Hides each open pane, and the next time shows the same panes again.
         ToggleAllPanes,
         /// Opens the front desk of the active product.
@@ -395,8 +393,8 @@ key_table! {
     ("next-space", "Next space", "ctrl-tab", || Box::new(NextSpace)),
     ("previous-space", "Previous space", "ctrl-shift-tab", || Box::new(PreviousSpace)),
     ("toggle-products", "Toggle Products", "secondary-shift-o", || Box::new(ToggleProducts)),
-    ("toggle-files", "Toggle Files", "secondary-shift-u", || Box::new(ToggleFiles)),
-    ("toggle-alerts", "Toggle Alerts", "secondary-shift-n", || Box::new(ToggleAlerts)),
+    ("toggle-files", "Toggle Files", "secondary-shift-j", || Box::new(ToggleFiles)),
+    ("toggle-alerts", "Show alerts", "secondary-shift-n", || Box::new(ShowAlerts)),
     ("toggle-panes", "Toggle all panes", "secondary-shift-h", || Box::new(ToggleAllPanes)),
     ("product-1", "Go to product 1", "secondary-1", || Box::new(SelectProduct1)),
     ("product-2", "Go to product 2", "secondary-2", || Box::new(SelectProduct2)),
@@ -1173,6 +1171,10 @@ pub const ENTRIES: &[Entry] = &[
             "bell",
             "blocked",
             "failed",
+            "pane",
+            "show",
+            "hide",
+            "toggle",
         ],
         action: || Box::new(ShowAlerts),
     },
@@ -1307,12 +1309,6 @@ pub const ENTRIES: &[Entry] = &[
         icon: IconName::Folder,
         keywords: &["pane", "sidebar", "files", "explorer", "show", "hide"],
         action: || Box::new(ToggleFiles),
-    },
-    Entry {
-        label: "Toggle Alerts",
-        icon: IconName::Bell,
-        keywords: &["pane", "alerts", "log", "bell", "show", "hide"],
-        action: || Box::new(ToggleAlerts),
     },
     Entry {
         label: "Toggle all panes",

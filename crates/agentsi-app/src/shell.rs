@@ -1653,9 +1653,6 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::ToggleFiles, window, cx| {
                 this.toggle_pane(PaneKind::Files, window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::ToggleAlerts, window, cx| {
-                this.toggle_pane(PaneKind::Alerts, window, cx)
-            }))
             .on_action(
                 cx.listener(|this, _: &actions::ToggleAllPanes, window, cx| {
                     this.toggle_all_panes(window, cx)

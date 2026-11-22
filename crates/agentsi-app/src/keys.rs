@@ -863,7 +863,7 @@ mod tests {
         }
         // Another modifier, a digit or a symbol is fine.
         for key in [
-            "ctrl-shift-j",
+            "ctrl-shift-x",
             "ctrl-alt-c",
             "ctrl-0",
             "ctrl-.",
