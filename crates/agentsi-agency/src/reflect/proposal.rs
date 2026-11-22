@@ -19,6 +19,7 @@ use crate::roles::load::load_role;
 use crate::roster::{parse_agent_file, read_overlays};
 use crate::story::claude::Call;
 use agentsi_proto::agency_api::{Owner, ReadyAgent};
+use agentsi_proto::desk_session_api::DESK_EFFORTS;
 use agentsi_proto::reflect_api::{
     Proposal, ProposalCandidate, ProposalTrigger, ReplayReport, SharedLesson,
 };
@@ -36,7 +37,6 @@ pub const PROPOSAL_MODEL: &str = "sonnet";
 pub const OVERLAY_MAX_CHARS: usize = 4000;
 /// The only frontmatter keys that a proposal may change.
 pub const EDITABLE_FRONTMATTER: [&str; 2] = ["model", "effort"];
-const EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
 
 static PUNCTUATION: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"[\p{P}\p{S}]").unwrap());
 static SPACES: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\s+").unwrap());
@@ -216,7 +216,7 @@ pub fn render_proposal(t: &ProposalTarget, proposed: &str) -> Result<String, Str
         if key == "model" && !MODEL.is_match(value) {
             return Err(format!("modelo inválido \"{value}\""));
         }
-        if key == "effort" && !EFFORTS.contains(&value.as_str()) {
+        if key == "effort" && !DESK_EFFORTS.contains(&value.as_str()) {
             return Err(format!("effort inválido \"{value}\""));
         }
         changes.push((key, value.clone()));

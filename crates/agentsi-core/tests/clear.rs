@@ -74,7 +74,7 @@ fn seed(c: &Connection, p: &str) {
            ('{p}', 'minutes', '{m1}'), ('{p}', 'story', 'S001'), ('{p}', 'story', 'S003');
          insert into tickets (product, id, kind, state, title, author, updated_by, created_at, updated_at)
            values ('{p}', 'C001', 'note', 'open', 't', '{{}}', '{{}}', 'x', 'x');
-         insert into desk_sessions values ('{p}', 'u-{p}', 'x');
+         insert into desk_sessions (product, session, created_at) values ('{p}', 'u-{p}', 'x');
          insert into desk_items (product, seq, kind, body, at) values ('{p}', 1, 'owner', '{{}}', 'x');"
     ))
     .unwrap();

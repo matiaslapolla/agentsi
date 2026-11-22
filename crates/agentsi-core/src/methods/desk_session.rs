@@ -9,6 +9,9 @@ use agentsi_proto::desk_session_api::{
     DeskSendParams, DeskSendResult, DeskSeqResult, DeskShow, DeskShowParams, DeskShowResult,
     DeskState, DeskStop, DeskStopResult, View,
 };
+use agentsi_proto::desk_session_api::{
+    DeskChoice, DeskConfigure, DeskConfigureParams, DeskSettings,
+};
 use agentsi_proto::rpc::{ErrorKind, RpcError};
 use agentsi_store::desk as rows;
 
@@ -20,6 +23,8 @@ pub fn register(r: Router) -> Router {
         .add(DeskSend, send)
         .add(DeskStop, stop)
         .add(DeskReset, reset)
+        .add(DeskSettings, settings)
+        .add(DeskConfigure, configure)
         .add(DeskShow, show)
         .add(DeskAuth, auth)
         .add(DeskCheck, check)
@@ -128,6 +133,18 @@ async fn reset(ctx: Ctx, p: DeskProductParams) -> Result<DeskResetResult, RpcErr
     })
     .await
     .map_err(join)?
+}
+
+async fn settings(ctx: Ctx, p: DeskProductParams) -> Result<DeskChoice, RpcError> {
+    crate::blocking::spawn(move || desk::settings(&ctx.core, &p.product))
+        .await
+        .map_err(join)?
+}
+
+async fn configure(ctx: Ctx, p: DeskConfigureParams) -> Result<DeskChoice, RpcError> {
+    crate::blocking::spawn(move || desk::configure(&ctx.core, &p.product, p.model, p.effort))
+        .await
+        .map_err(join)?
 }
 
 async fn auth(ctx: Ctx, p: DeskAuthParams) -> Result<DeskAuthResult, RpcError> {

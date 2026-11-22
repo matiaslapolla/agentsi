@@ -247,6 +247,8 @@ pub const LOCAL_TABLES: &[Table] = &[
             c("product", Text),
             c("session", Text),
             c("created_at", Time),
+            c("desk_model", Text),
+            c("desk_effort", Text),
         ],
         key: &["product"],
     },

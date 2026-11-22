@@ -54,6 +54,17 @@ _Avoid_: Rich message
 One line about a write of product data, which the core adds to the next owner message. An example is "The owner approved decision 14." The pane `/agentsi` and the app both cause desk notes.
 _Avoid_: Sync message, system message
 
+**Desk model**:
+The model of the desk session of one product. The owner picks it in the desk conversation, and the core stores it. With none stored, the desk session uses the role default.
+_Avoid_: Choice, pick, desk choice
+
+**Desk effort**:
+The effort of the desk session of one product. The owner picks it in the desk conversation, and the core stores it. With none stored, the desk session uses the role default.
+_Avoid_: Choice, pick, desk choice
+
+**Role default**:
+The model or the effort of the `pm` role of the product. With no desk model or desk effort, the desk session uses it.
+
 **Auth state**:
 The result of the login check of `claude` (`claude auth status --json`): `ready`, `signed_out`, `missing`, `not_read` or `unknown`. The desk conversation shows the message of a state that is not `ready` in place of the input, with a "Check again" button.
 _Avoid_: Login status, session expired

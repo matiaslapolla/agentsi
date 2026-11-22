@@ -133,6 +133,10 @@ impl DeskScreen {
         }
     }
 
+    pub fn conversation(&self) -> &Entity<super::desk_conversation::DeskConversation> {
+        &self.conversation
+    }
+
     /// The palette entry "Ask the front desk": the input of the conversation takes the focus.
     pub fn ask(&mut self, cx: &mut Context<Self>) {
         self.touch(cx);
@@ -1110,7 +1114,7 @@ mod tests {
     fn is_part_read(method: &str) -> bool {
         matches!(
             method,
-            "ticket.list" | "mark.pending" | "desk.history" | "decision.get"
+            "ticket.list" | "mark.pending" | "desk.history" | "desk.settings" | "decision.get"
         )
     }
 

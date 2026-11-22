@@ -21,6 +21,7 @@ pub mod agent_row;
 pub mod call;
 pub mod desk;
 pub mod desk_conversation;
+pub mod desk_model;
 pub mod desk_tickets;
 pub mod form;
 pub mod git;

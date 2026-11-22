@@ -13,12 +13,22 @@ use crate::look::LookGlobal;
 use crate::model::ProductRef;
 use crate::palette::{Closed, ClosedTab, Opened};
 use crate::prompt::{Choice, Prompt};
+use crate::screens::desk_model::Field as DeskField;
 use crate::screens::git::Tab as GitTab;
+use crate::screens::parts::Live;
 use crate::tabs::SpaceId;
 use crate::tree::ItemKey;
 
 /// The answer of the Confirm of a restart.
 const RESTART: &str = "restart";
+
+fn desk_field(what: &Ask) -> Option<DeskField> {
+    match what {
+        Ask::DeskModel => Some(DeskField::Model),
+        Ask::DeskEffort => Some(DeskField::Effort),
+        _ => None,
+    }
+}
 
 /// One open tab, for the palette.
 pub struct OpenTab {
@@ -141,6 +151,25 @@ impl Shell {
                 .detach();
                 Some(prompt)
             }
+            Ask::DeskModel | Ask::DeskEffort => {
+                let desk = Live::desk(cx)?;
+                let field = desk_field(what)?;
+                let (options, now) = desk.read(cx).conversation().read(cx).options(field);
+                let at = options.iter().position(|o| o.value == now).unwrap_or(0);
+                let choices = options
+                    .into_iter()
+                    .map(|o| Choice::new(o.label, o.value))
+                    .collect();
+                let title = match field {
+                    DeskField::Model => "Model of the desk conversation",
+                    DeskField::Effort => "Effort of the desk conversation",
+                };
+                Some(cx.new(|cx| {
+                    Prompt::pick(title, choices, at, window, cx).with_hint(
+                        "A reply that runs keeps its model. The next message uses the pick.",
+                    )
+                }))
+            }
             Ask::RestartCore => Some(cx.new(|cx| {
                 Prompt::pick(
                     "Restart the core of this device?",
@@ -177,6 +206,13 @@ impl Shell {
                     s.switch_to(name.clone(), cx);
                 });
             }
+            Ask::DeskModel | Ask::DeskEffort => {
+                if let (Some(desk), Some(field)) = (Live::desk(cx), desk_field(what)) {
+                    let conversation = desk.read(cx).conversation().clone();
+                    let value = answer.to_string();
+                    conversation.update(cx, |c, cx| c.pick(field, value, cx));
+                }
+            }
             Ask::RestartCore => {
                 if answer == RESTART {
                     self.restart_core(cx);
@@ -185,6 +221,16 @@ impl Shell {
             _ => return false,
         }
         true
+    }
+
+    /// Asks for the model or the effort of the desk conversation on screen. With none open,
+    /// a notice says so.
+    pub(super) fn ask_desk_pick(&mut self, what: Ask, window: &mut Window, cx: &mut Context<Self>) {
+        if Live::desk(cx).is_none() {
+            self.notice("Open the front desk first.", cx);
+            return;
+        }
+        self.ask(what, window, cx);
     }
 
     /// Asks for a branch of the active product.
