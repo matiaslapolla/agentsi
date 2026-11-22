@@ -368,10 +368,11 @@ impl FileTree {
             s.set_value(initial, window, cx);
             s
         });
-        let sub = cx.subscribe(&input, |this, _, e: &InputEvent, cx| match e {
-            InputEvent::PressEnter { .. } => this.commit_naming(cx),
-            InputEvent::Blur => this.cancel_naming(cx),
-            _ => {}
+        // No cancel on blur: the menu that asked for the field gives the focus back after it.
+        let sub = cx.subscribe(&input, |this, _, e: &InputEvent, cx| {
+            if matches!(e, InputEvent::PressEnter { .. }) {
+                this.commit_naming(cx)
+            }
         });
         let focus = input.focus_handle(cx);
         window.defer(cx, move |window, cx| window.focus(&focus, cx));

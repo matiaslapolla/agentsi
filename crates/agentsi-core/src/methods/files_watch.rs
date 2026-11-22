@@ -197,7 +197,7 @@ fn add(mut watcher: Option<&mut RecommendedWatcher>, folders: &mut Folders, f: F
     if folders.order.len() >= MAX_FOLDERS
         && let Some(old) = folders.order.front().cloned()
     {
-        folders.drop_dir(watcher.as_deref_mut(), &old);
+        folders.drop_dir(watcher, &old);
     }
     folders.touch(&f.dir);
     folders.by_dir.insert(
