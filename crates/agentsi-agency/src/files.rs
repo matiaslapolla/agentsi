@@ -285,7 +285,6 @@ impl Root {
     }
 }
 
-/// A rename that fails with `AlreadyExists` when `dst` exists, also when it came after the check.
 impl Root {
     /// The files whose name holds `query`, with no regard to case, best first. A query with a
     /// `/` matches the path. The walk skips what git ignores and `.git`, and follows no link.
@@ -302,7 +301,9 @@ impl Root {
         }
         let by_path = query.contains('/');
         let tail = format!("/{query}");
+        // Outside a git repo the `.gitignore` files still keep `target` and the like out.
         let walk = walker(&self.dir)
+            .require_git(false)
             .filter_entry(|e| e.depth() == 0 || !e.file_name().eq_ignore_ascii_case(".git"))
             .build()
             .filter_map(std::result::Result::ok)
@@ -342,6 +343,7 @@ impl Root {
     }
 }
 
+/// A rename that fails with `AlreadyExists` when `dst` exists, also when it came after the check.
 fn rename_no_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
