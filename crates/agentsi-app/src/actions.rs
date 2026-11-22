@@ -128,6 +128,10 @@ gpui_kit::actions!(
         NewDecision,
         /// Puts the focus in the input of the desk conversation of the front desk.
         AskDesk,
+        /// Asks for the model of the desk conversation of the front desk, as a second step.
+        DeskChooseModel,
+        /// Asks for the effort of the desk conversation of the front desk, as a second step.
+        DeskChooseEffort,
         /// Shows or hides the archived decisions of the front desk.
         ShowArchivedDecisions,
         /// Opens a Claude pane with the action of the decision approved last.
@@ -1261,6 +1265,27 @@ pub const ENTRIES: &[Entry] = &[
         icon: IconName::Bot,
         keywords: &["ask", "claude", "conversation", "chat", "desk", "question"],
         action: || Box::new(AskDesk),
+    },
+    Entry {
+        label: "Desk: Choose model…",
+        icon: IconName::Bot,
+        keywords: &[
+            "desk",
+            "model",
+            "claude",
+            "fable",
+            "opus",
+            "sonnet",
+            "haiku",
+            "conversation",
+        ],
+        action: || Box::new(DeskChooseModel),
+    },
+    Entry {
+        label: "Desk: Choose effort…",
+        icon: IconName::Bot,
+        keywords: &["desk", "effort", "claude", "thinking", "conversation"],
+        action: || Box::new(DeskChooseEffort),
     },
     Entry {
         label: "Show the archived decisions",

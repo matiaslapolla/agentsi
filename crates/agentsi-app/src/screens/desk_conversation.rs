@@ -13,9 +13,10 @@ use std::collections::HashMap;
 
 use agentsi_proto::Event as _;
 use agentsi_proto::desk_session_api::{
-    DeskAuth, DeskAuthParams, DeskAuthResult, DeskDelta, DeskEntry, DeskHistory, DeskHistoryParams,
-    DeskHistoryResult, DeskItem, DeskItemEvent, DeskProductParams, DeskReset, DeskResetResult,
-    DeskSend, DeskSendParams, DeskState, DeskStateEvent, DeskStop, View,
+    DeskAuth, DeskAuthParams, DeskAuthResult, DeskChoice, DeskConfigure, DeskConfigureParams,
+    DeskDelta, DeskEntry, DeskHistory, DeskHistoryParams, DeskHistoryResult, DeskItem,
+    DeskItemEvent, DeskProductParams, DeskReset, DeskResetResult, DeskSend, DeskSendParams,
+    DeskSettings, DeskState, DeskStateEvent, DeskStop, View,
 };
 use agentsi_proto::events::{DataChanged, Lagged};
 use agentsi_proto::marks_api::{
@@ -41,6 +42,8 @@ use crate::model::{CoreEvent, CoreState, DeskNotice};
 #[path = "desk_views.rs"]
 mod desk_views;
 use desk_views as views;
+
+use super::desk_model::{self as model, Field, Selects};
 
 /// The text of the first suggestion in an empty conversation.
 const ASK_PENDING: &str = "What waits for me?";
@@ -111,6 +114,15 @@ pub struct DeskConversation {
     /// `desk.send` waits for the core.
     sending: bool,
     flash: Option<Flash>,
+    /// The model and the effort of the desk session, as the core stores them.
+    choice: Option<DeskChoice>,
+    selects: Option<Selects>,
+    /// The next draw shows `choice` in the selects.
+    selects_stale: bool,
+    /// One line under the selects: the core refused a pick, or it did not answer.
+    pick_error: Option<String>,
+    /// A pick came while a reply runs: the note says which model the next message uses.
+    picked_while_working: bool,
     _subs: Vec<Subscription>,
 }
 
@@ -146,6 +158,11 @@ impl DeskConversation {
             busy: false,
             sending: false,
             flash: None,
+            choice: None,
+            selects: None,
+            selects_stale: false,
+            pick_error: None,
+            picked_while_working: false,
             _subs: vec![notices, up],
         };
         me.reload(cx);
@@ -183,6 +200,102 @@ impl DeskConversation {
             let _ = this.update(cx, |this, cx| this.history_done(result, cx));
         })
         .detach();
+        self.read_settings(cx);
+    }
+
+    fn read_settings(&mut self, cx: &mut Context<Self>) {
+        let call = self
+            .core
+            .read(cx)
+            .link
+            .call::<DeskSettings>(&DeskProductParams {
+                product: self.product.clone(),
+            });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.settings_done(result, cx));
+        })
+        .detach();
+    }
+
+    pub(crate) fn settings_done(
+        &mut self,
+        result: Result<DeskChoice, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        match result {
+            Ok(choice) => {
+                self.choice = Some(choice);
+                self.selects_stale = true;
+            }
+            Err(e) => self.pick_error = Some(format!("The model settings did not load: {e}")),
+        }
+        cx.notify();
+    }
+
+    /// A pick of a select: the core stores it, and the select shows what the core answers.
+    pub(crate) fn pick(&mut self, field: Field, value: String, cx: &mut Context<Self>) {
+        let value = (!value.is_empty()).then_some(value);
+        let (mut model, mut effort) = (
+            self.choice.as_ref().and_then(|c| c.model.clone()),
+            self.choice.as_ref().and_then(|c| c.effort.clone()),
+        );
+        match field {
+            Field::Model => model = value,
+            Field::Effort => effort = value,
+        }
+        self.configure(model, effort, cx);
+    }
+
+    /// `desk.configure`. A pick while a reply runs does not wait: the reply keeps its process.
+    pub fn configure(
+        &mut self,
+        model: Option<String>,
+        effort: Option<String>,
+        cx: &mut Context<Self>,
+    ) {
+        let call = self
+            .core
+            .read(cx)
+            .link
+            .call::<DeskConfigure>(&DeskConfigureParams {
+                product: self.product.clone(),
+                model,
+                effort,
+            });
+        cx.spawn(async move |this, cx| {
+            let result = call.await;
+            let _ = this.update(cx, |this, cx| this.configure_done(result, cx));
+        })
+        .detach();
+    }
+
+    pub(crate) fn configure_done(
+        &mut self,
+        result: Result<DeskChoice, CallError>,
+        cx: &mut Context<Self>,
+    ) {
+        match result {
+            Ok(choice) => {
+                self.pick_error = None;
+                self.picked_while_working |=
+                    matches!(self.state, DeskState::Working | DeskState::Starting);
+                self.choice = Some(choice);
+            }
+            Err(e) => self.pick_error = Some(e.to_string()),
+        }
+        // A refused pick shows the stored value again.
+        self.selects_stale = true;
+        cx.notify();
+    }
+
+    /// The entries of the model or the effort step of the palette, and the value that is picked.
+    pub fn options(&self, field: Field) -> (Vec<model::Pick>, String) {
+        let c = self.choice.as_ref();
+        match field {
+            Field::Model => (model::model_options(c), model::model_value(c)),
+            Field::Effort => (model::effort_options(c), model::effort_value(c)),
+        }
     }
 
     pub(crate) fn history_done(
@@ -324,6 +437,9 @@ impl DeskConversation {
     }
 
     fn set_state(&mut self, state: DeskState, message: Option<String>, cx: &mut Context<Self>) {
+        if !matches!(state, DeskState::Working | DeskState::Starting) {
+            self.picked_while_working = false;
+        }
         self.state = state;
         self.message = message;
         cx.notify();
@@ -643,6 +759,27 @@ impl DeskConversation {
         cx.notify();
     }
 
+    /// Makes the selects at the first draw, and shows the stored choice after a change of it.
+    fn ensure_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        match &self.selects {
+            None => {
+                let selects = Selects::new(
+                    self.choice.as_ref(),
+                    window,
+                    cx,
+                    |this: &mut Self, field, value, cx| this.pick(field, value, cx),
+                );
+                self.selects = Some(selects);
+                self.selects_stale = false;
+            }
+            Some(selects) if self.selects_stale => {
+                selects.show(self.choice.as_ref(), window, cx);
+                self.selects_stale = false;
+            }
+            Some(_) => {}
+        }
+    }
+
     fn ensure_input(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.input.is_none() {
             let input = cx.new(|cx| InputState::new(window, cx).placeholder("Ask the front desk"));
@@ -926,8 +1063,9 @@ impl DeskConversation {
 impl Render for DeskConversation {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_input(window, cx);
+        self.ensure_selects(window, cx);
         let working = matches!(self.state, DeskState::Working | DeskState::Starting);
-        let header = div()
+        let title_row = div()
             .flex()
             .items_center()
             .justify_between()
@@ -969,6 +1107,24 @@ impl Render for DeskConversation {
                             .on_click(cx.listener(|this, _, _, cx| this.ask_reset(cx))),
                     ),
             );
+        let next_note = self
+            .choice
+            .as_ref()
+            .filter(|_| working && self.picked_while_working)
+            .map(model::next_message_note);
+        let header = div()
+            .flex()
+            .flex_col()
+            .gap(space(2))
+            .child(title_row)
+            .children(self.selects.as_ref().map(Selects::row))
+            .children(self.pick_error.clone().map(failed_text))
+            .children(next_note.map(|n| {
+                div()
+                    .text_size(size::sm())
+                    .text_color(text::tertiary())
+                    .child(n)
+            }));
 
         let weak = cx.weak_entity();
         let body = match &self.history {
@@ -1129,9 +1285,9 @@ mod tests {
     // No `use super::*`: it would bring the glob of `gpui_kit` and its `test` macro, and
     // the `#[test]` that `#[gpui::test]` writes would expand again and again.
     use super::{
-        CallError, DecideResult, DecisionInfo, DeskAuthResult, DeskConversation, DeskDelta,
-        DeskHistoryResult, DeskItem, DeskItemEvent, DeskResetResult, DeskState, DeskStateEvent,
-        Flash, Notification, Row, Verdict,
+        CallError, DecideResult, DecisionInfo, DeskAuthResult, DeskChoice, DeskConversation,
+        DeskDelta, DeskHistoryResult, DeskItem, DeskItemEvent, DeskResetResult, DeskState,
+        DeskStateEvent, Flash, Notification, Row, Verdict,
     };
     use crate::link::Link;
     use crate::model::CoreState;
@@ -1174,9 +1330,11 @@ mod tests {
         cx.update(|window, cx| window.draw(cx).clear(cx));
     }
 
+    /// The requests that the core received, without the read of the model settings.
     pub(super) fn methods_sent(other: &mut UnixStream) -> Vec<(String, Value)> {
         received(other)
             .into_iter()
+            .filter(|r| r["method"] != "desk.settings")
             .map(|r| {
                 (
                     r["method"].as_str().unwrap_or_default().to_string(),
@@ -1694,6 +1852,155 @@ mod tests {
                 .all(|(m, _)| m != "decision.decide" && m != "archive.archive"),
             "a letter in the input must not act on a decision"
         );
+    }
+
+    fn choice(model: Option<&str>, effort: Option<&str>) -> DeskChoice {
+        DeskChoice {
+            model: model.map(String::from),
+            effort: effort.map(String::from),
+            role_model: "claude-opus-5-5".into(),
+            role_effort: None,
+        }
+    }
+
+    fn labels(options: Vec<super::model::Pick>) -> Vec<String> {
+        options.into_iter().map(|o| o.label).collect()
+    }
+
+    #[gpui::test]
+    fn the_selects_list_the_role_default_and_each_alias_and_level(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        draw(cx);
+        let asked: Vec<String> = received(&mut other)
+            .iter()
+            .map(|r| r["method"].as_str().unwrap_or_default().to_string())
+            .collect();
+        assert_eq!(asked, ["desk.history", "desk.settings"]);
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert_eq!(
+                labels(c.options(Field::Model).0),
+                [
+                    "Role default (claude-opus-5-5)",
+                    "Fable",
+                    "Opus",
+                    "Sonnet",
+                    "Haiku"
+                ]
+            );
+            assert_eq!(
+                labels(c.options(Field::Effort).0),
+                [
+                    "Role default (none)",
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                ]
+            );
+            assert_eq!(c.options(Field::Model).1, "");
+        });
+    }
+
+    #[gpui::test]
+    fn a_pick_sends_desk_configure_with_the_other_field_kept_and_the_core_answer_shows(
+        cx: &mut TestAppContext,
+    ) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| {
+            c.settings_done(Ok(choice(Some("opus"), Some("high"))), cx)
+        });
+        draw(cx);
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| c.pick(Field::Model, "sonnet".into(), cx));
+        let sent = methods_sent(&mut other);
+        assert_eq!(sent.len(), 1);
+        assert_eq!(sent[0].0, "desk.configure");
+        assert_eq!(
+            sent[0].1,
+            json!({"product": "demo", "model": "sonnet", "effort": "high"})
+        );
+        conv.update(cx, |c, cx| {
+            c.configure_done(Ok(choice(Some("sonnet"), Some("high"))), cx)
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert_eq!(c.options(Field::Model).1, "sonnet");
+            assert!(c.pick_error.is_none());
+        });
+
+        // The role default clears the field.
+        conv.update(cx, |c, cx| c.pick(Field::Effort, String::new(), cx));
+        assert_eq!(
+            methods_sent(&mut other)[0].1,
+            json!({"product": "demo", "model": "sonnet", "effort": null})
+        );
+    }
+
+    #[gpui::test]
+    fn a_refused_pick_shows_one_line_and_the_stored_value(cx: &mut TestAppContext) {
+        use super::Field;
+        let (conv, _other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| {
+            c.settings_done(Ok(choice(Some("opus"), None)), cx);
+            c.configure_done(Err(CallError::Link("Unknown model \"x\".".into())), cx);
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert!(c.pick_error.as_deref().unwrap().contains("Unknown model"));
+            assert_eq!(c.options(Field::Model).1, "opus");
+        });
+    }
+
+    #[gpui::test]
+    fn a_pick_while_a_reply_runs_shows_the_note_until_the_reply_ends(cx: &mut TestAppContext) {
+        let (conv, _other, cx) = setup(cx);
+        conv.update(cx, |c, cx| {
+            c.history_done(Ok(history("working", None, json!([]))), cx);
+            c.settings_done(Ok(choice(None, None)), cx);
+            c.configure_done(Ok(choice(Some("sonnet"), None)), cx);
+        });
+        draw(cx);
+        conv.read_with(cx, |c, _| {
+            assert!(c.picked_while_working);
+            let c = c.choice.as_ref().unwrap();
+            assert_eq!(
+                super::model::next_message_note(c),
+                "The next message uses Sonnet."
+            );
+        });
+        conv.update(cx, |c, cx| {
+            c.take(
+                &note::<DeskStateEvent>(&DeskStateParams {
+                    product: "demo".into(),
+                    state: DeskState::Idle,
+                    message: None,
+                }),
+                cx,
+            )
+        });
+        conv.read_with(cx, |c, _| assert!(!c.picked_while_working));
+    }
+
+    #[gpui::test]
+    fn the_selects_update_once_after_a_change_and_an_idle_draw_changes_nothing(
+        cx: &mut TestAppContext,
+    ) {
+        let (conv, _other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        conv.update(cx, |c, cx| c.settings_done(Ok(choice(None, None)), cx));
+        draw(cx);
+        conv.read_with(cx, |c, _| assert!(!c.selects_stale && c.selects.is_some()));
+        // A draw with nothing new sets nothing stale, so it asks for no new frame.
+        draw(cx);
+        conv.read_with(cx, |c, _| assert!(!c.selects_stale));
     }
 
     fn conv_ready(cx: &mut VisualTestContext, conv: &Entity<DeskConversation>) {
