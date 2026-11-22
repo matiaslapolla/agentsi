@@ -101,7 +101,7 @@ The plugin runs the `agentsi` command, so `agentsi` must be on the `PATH` of Cla
 
 ## The window
 
-The window has a sidebar on the left and a dock on the right. The dock holds tabs. A tab is a terminal or a screen.
+The window has the pane bar at the top, the panes in a column at each side, and the dock in the middle. The dock holds tabs. A tab is a terminal or a screen.
 
 ### The sidebar tree
 
@@ -122,7 +122,16 @@ You give a label and a color to a product, a pane or a tab. You put products int
 
 *The sidebar tree. A product shows its terminals, its meeting and its story sessions.*
 
-The switch at the top of the sidebar shows Products or Files. Files shows the folders and files of the selected product. `Ctrl+Shift+E` shows Files too.
+The sidebar tree is one of three panes: Products, Files and Alerts. The pane bar at the top of the window has one toggle for each pane. A bright toggle is an open pane, and a muted toggle is a hidden pane. The Alerts toggle shows the count of the alerts that you did not see.
+
+- A click on a toggle opens or hides its pane. The keys are `Ctrl+Alt+P` for Products, `Ctrl+Alt+F` for Files and `Ctrl+Alt+A` for Alerts. `Ctrl+Alt+B` hides each open pane, and the next press shows the same panes again.
+- Files shows the folders and files of the selected product. `Ctrl+Shift+E` opens Files and puts the focus in the tree.
+- Drag the inner edge of a column to resize it. A column is 180 px wide at least, and half the window at most. A double click on the edge sets it back to 248 px.
+- Two panes in one column share its height. Drag the edge between them to resize them.
+- Drag the header of a pane to move it. A line shows each place where it can go: between the panes of a column, and at the top edge of an empty column. Escape ends the drag and changes nothing.
+- The app keeps the panes, their places and their sizes for the next start.
+
+In the Files pane:
 
 - A folder reads its entries when you open it. A file that a terminal makes shows within a second.
 - The color of a name shows its git state: changed, new or ignored. The eye button shows or hides the ignored entries.
