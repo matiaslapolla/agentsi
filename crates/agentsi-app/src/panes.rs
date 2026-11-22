@@ -78,17 +78,52 @@ pub struct PaneSave {
     pub open: bool,
 }
 
-/// The field `panes` of `layout.json`.
+/// The field `panes` of `layout.json`. A pane or a value that does not read is dropped, and
+/// `Panes::load` fills its default: a file of a newer app, or one edited by hand, must not cost
+/// the spaces of the rest of the file.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PanesSave {
+    #[serde(default, deserialize_with = "readable")]
     pub panes: Vec<PaneSave>,
-    /// The widths of the two columns, in px.
+    /// The widths of the two columns, in px. A missing width reads as 0, which `load` resets.
+    #[serde(default)]
     pub left_width: f32,
+    #[serde(default)]
     pub right_width: f32,
     /// The panes that "Toggle all panes" hid, to show again.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        deserialize_with = "readable",
+        skip_serializing_if = "Vec::is_empty"
+    )]
     pub stashed: Vec<PaneKind>,
 }
+
+/// The items of a list that read as `T`.
+fn readable<'de, D, T>(d: D) -> Result<Vec<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: serde::de::DeserializeOwned,
+{
+    let values = Vec::<serde_json::Value>::deserialize(d)?;
+    Ok(values
+        .into_iter()
+        .filter_map(|v| serde_json::from_value(v).ok())
+        .collect())
+}
+
+/// The field `panes` of `layout.json`, or `None` when it does not read at all.
+pub fn read_saved<'de, D>(d: D) -> Result<Option<PanesSave>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let value = Option::<serde_json::Value>::deserialize(d)?;
+    Ok(value.and_then(|v| serde_json::from_value(v).ok()))
+}
+
+/// The largest share that a file can give a pane. A larger one, or one that is not a positive
+/// number, reads as 1: the sum of the shares of a column must stay finite.
+const SHARE_MAX: f32 = 1e4;
 
 #[derive(Clone, Debug, PartialEq)]
 struct Entry {
@@ -126,7 +161,7 @@ impl Default for Panes {
             share: 1.,
             open,
         };
-        let width = f32::from(control::SIDEBAR_WIDTH);
+        let width = f32::from(control::PANE_COLUMN_WIDTH);
         Panes {
             entries: vec![
                 entry(PaneKind::Products, Side::Left, true),
@@ -174,7 +209,7 @@ impl Panes {
             entries.push(Entry {
                 kind: p.pane,
                 side: p.column,
-                share: if p.share.is_finite() && p.share > 0. {
+                share: if p.share > 0. && p.share <= SHARE_MAX {
                     p.share
                 } else {
                     1.
@@ -192,7 +227,7 @@ impl Panes {
             if w.is_finite() && w > 0. {
                 w
             } else {
-                f32::from(control::SIDEBAR_WIDTH)
+                f32::from(control::PANE_COLUMN_WIDTH)
             }
         };
         let mut stashed = saved.stashed.clone();
@@ -282,12 +317,32 @@ impl Panes {
         }
     }
 
-    /// The width that the column takes in a window `window` px wide: 0 with no open pane.
-    pub fn shown_width(&self, side: Side, window: Pixels) -> Pixels {
-        if self.column(side).is_empty() {
-            return Pixels::ZERO;
+    fn width_mut(&mut self, side: Side) -> &mut f32 {
+        match side {
+            Side::Left => &mut self.left,
+            Side::Right => &mut self.right,
         }
-        Pixels::from(clamp_width(self.width(side), f32::from(window)))
+    }
+
+    /// The width that the column takes in a window `window` px wide: 0 with no open pane. When
+    /// the two columns would leave the dock less than `DOCK_MIN_WIDTH`, both get narrower in
+    /// the same ratio.
+    pub fn shown_width(&self, side: Side, window: Pixels) -> Pixels {
+        let window = f32::from(window);
+        let clamped = |s: Side| {
+            if self.column(s).is_empty() {
+                0.
+            } else {
+                clamp_width(self.width(s), window)
+            }
+        };
+        let (own, both) = (clamped(side), clamped(Side::Left) + clamped(Side::Right));
+        let room = (window - f32::from(control::DOCK_MIN_WIDTH)).max(0.);
+        if both > room {
+            Pixels::from(own * room / both)
+        } else {
+            Pixels::from(own)
+        }
     }
 
     /// Opens or hides a pane. Returns false when it was so already.
@@ -327,30 +382,21 @@ impl Panes {
 
     /// Sets the width of a column from the window width. Returns false when it stays.
     pub fn set_width(&mut self, side: Side, width: f32, window: f32) -> bool {
-        let w = clamp_width(width, window);
-        let slot = match side {
-            Side::Left => &mut self.left,
-            Side::Right => &mut self.right,
-        };
-        if *slot == w {
+        self.put_width(side, clamp_width(width, window))
+    }
+
+    fn put_width(&mut self, side: Side, width: f32) -> bool {
+        let slot = self.width_mut(side);
+        if *slot == width {
             return false;
         }
-        *slot = w;
+        *slot = width;
         true
     }
 
     /// The double click on the edge of a column: back to the first width.
     pub fn reset_width(&mut self, side: Side) -> bool {
-        let w = f32::from(control::SIDEBAR_WIDTH);
-        let slot = match side {
-            Side::Left => &mut self.left,
-            Side::Right => &mut self.right,
-        };
-        if *slot == w {
-            return false;
-        }
-        *slot = w;
-        true
+        self.put_width(side, f32::from(control::PANE_COLUMN_WIDTH))
     }
 
     /// The heights of the open panes of a column `height` px high, top to bottom.
@@ -516,7 +562,7 @@ mod tests {
         assert_eq!(p.side(F), Side::Right);
         assert_eq!(p.share(F), 1.);
         assert!(!p.is_open(P) && !p.is_open(A));
-        assert_eq!(p.width(Side::Left), f32::from(control::SIDEBAR_WIDTH));
+        assert_eq!(p.width(Side::Left), f32::from(control::PANE_COLUMN_WIDTH));
     }
 
     #[test]
@@ -557,6 +603,69 @@ mod tests {
             gpui_kit::Pixels::ZERO,
             "a column with no open pane takes no width"
         );
+    }
+
+    #[test]
+    fn two_wide_columns_leave_the_dock_its_minimum_width() {
+        let window = gpui_kit::Pixels::from(1280.);
+        let mut p = Panes::default();
+        p.set_open(A, true);
+        p.set_width(Side::Left, 640., 1280.);
+        p.set_width(Side::Right, 640., 1280.);
+        let (l, r) = (
+            p.shown_width(Side::Left, window),
+            p.shown_width(Side::Right, window),
+        );
+        assert_eq!(l, r, "both columns give up the same ratio");
+        assert_eq!(window - l - r, control::DOCK_MIN_WIDTH);
+        let narrow = gpui_kit::Pixels::from(300.);
+        let both = p.shown_width(Side::Left, narrow) + p.shown_width(Side::Right, narrow);
+        assert_eq!(narrow - both, control::DOCK_MIN_WIDTH);
+    }
+
+    #[test]
+    fn a_pane_or_a_value_that_does_not_read_is_dropped_and_the_file_still_reads() {
+        let text = r#"{"version":3,"spaces":{},"panes":{
+            "panes":[
+                {"pane":"git","column":"left","order":0,"share":1,"open":true},
+                {"pane":"files","column":"right","order":-1,"share":1,"open":true},
+                {"pane":"alerts","column":"right","order":0,"open":true},
+                {"pane":"products","column":"right","order":1,"share":2,"open":true}
+            ],
+            "stashed":["git","files"]
+        }}"#;
+        let layout: crate::layout::Layout = serde_json::from_str(text).expect("the file reads");
+        let saved = layout.panes.expect("the panes read");
+        assert_eq!(saved.panes.len(), 1, "only the products entry reads");
+        assert_eq!(saved.stashed, [F]);
+        let p = Panes::load(Some(&saved), None);
+        assert_eq!(p.column(Side::Right), [P]);
+        assert_eq!(p.share(P), 2.);
+        assert_eq!(p.width(Side::Left), f32::from(control::PANE_COLUMN_WIDTH));
+
+        let text = r#"{"version":3,"panes":"newer"}"#;
+        let layout: crate::layout::Layout = serde_json::from_str(text).expect("the file reads");
+        assert_eq!(layout.panes, None);
+    }
+
+    #[test]
+    fn a_huge_share_reads_as_one_so_the_sum_stays_finite() {
+        let mut saved = Panes::default().save();
+        for e in &mut saved.panes {
+            e.share = 3e38;
+            e.open = true;
+            e.column = Side::Left;
+        }
+        let mut p = Panes::load(Some(&saved), None);
+        assert!(p.heights(Side::Left, 600.).iter().all(|(_, h)| *h == 200.));
+        p.move_to(
+            A,
+            Place {
+                side: Side::Right,
+                before: None,
+            },
+        );
+        assert!(p.save().panes.iter().all(|e| e.share.is_finite()));
     }
 
     #[test]

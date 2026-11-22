@@ -57,7 +57,11 @@ pub struct Layout {
     pub sidebar_mode: Option<String>,
     /// The places, sizes and open state of the panes. A file from before the panes has none,
     /// so no version bump.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "crate::panes::read_saved",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub panes: Option<crate::panes::PanesSave>,
     /// The file tree hides the entries that git ignores.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]

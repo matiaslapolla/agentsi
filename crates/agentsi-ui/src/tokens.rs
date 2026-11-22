@@ -853,11 +853,15 @@ pub mod control {
     pub const SELECTION_INSET: Pixels = px(10.);
     /// The widest trailing element of a list row. The title keeps the rest.
     pub const TRAILING_MAX: Pixels = px(160.);
-    /// The first width of a pane column, and the width that a double click on its edge gives.
+    /// The width of a side list, for example the branches of the git screen.
     pub const SIDEBAR_WIDTH: Pixels = px(248.);
+    /// The first width of a pane column, and the width that a double click on its edge gives.
+    pub const PANE_COLUMN_WIDTH: Pixels = SIDEBAR_WIDTH;
     /// The narrowest pane column. The widest is `PANE_COLUMN_MAX` of the window width.
     pub const PANE_COLUMN_MIN: Pixels = px(180.);
     pub const PANE_COLUMN_MAX: f32 = 0.5;
+    /// The narrowest dock beside two pane columns. The columns get narrower to keep it.
+    pub const DOCK_MIN_WIDTH: Pixels = px(240.);
     /// The lowest pane in a column.
     pub const PANE_MIN_HEIGHT: Pixels = px(120.);
     /// The accent line under the toggle of an open pane.
