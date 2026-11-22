@@ -1,6 +1,8 @@
-# Owner checks: the desktop batch of 2026-11-21
+# Owner checks: the desktop batch of 2026-11-21, and the panes
 
-The build of `main` 5314936 is installed (`make install` of 2026-11-22). Open the app from the launcher, or run `agentsi-app`. Each item says what to check and how. Tick it when it works.
+The build of `main` e2385f9 is installed (`make install` of 2026-11-22). It holds the batch and the panes (#16). Open the app from the launcher, or run `agentsi-app`. Each item says what to check and how. Tick it when it works.
+
+The sidebar is now the Products pane. The pane bar at the top of the window opens and hides each pane, so the items of U4, U7 and U8 name the panes.
 
 ## U1 — PATH (#6)
 
@@ -28,9 +30,9 @@ The build of `main` 5314936 is installed (`make install` of 2026-11-22). Open th
 ## U4 — Spaces, pinned tabs and favorites (#12)
 
 - [ ] **One space for each product.** Open a terminal in product A, then select product B. The top bar shows only B's tabs. Go back to A: the terminal still runs.
-- [ ] **The tabs in the sidebar.** Under each product in the sidebar, its open tabs show. A click on a tab row selects the product and focuses that tab.
+- [ ] **The tabs in the Products pane.** Under each product in the Products pane, its open tabs show. A click on a tab row selects the product and focuses that tab.
 - [ ] **Pin a tab.** Right-click a tab and pin it. It moves to the left, gets narrow, and survives "Close others". Closing it asks for a confirm.
-- [ ] **A favorite.** Right-click a terminal and add it to favorites. Click the favorite in the sidebar: a terminal opens with the same command and folder.
+- [ ] **A favorite.** Right-click a terminal and add it to favorites. Click the favorite in the Products pane: a terminal opens with the same command and folder.
 - [ ] **After a restart.** Close and open the app. The spaces, the pinned tabs and the favorites are the same.
 - [ ] **Next space.** Press `Ctrl+Tab`. The next product shows.
 
@@ -52,7 +54,7 @@ The build of `main` 5314936 is installed (`make install` of 2026-11-22). Open th
 
 ## U7 — File explorer (#14)
 
-- [ ] **The Files mode.** Press `Ctrl+Shift+E`, or use the switch at the top of the sidebar. The tree of the selected product shows.
+- [ ] **The Files pane.** Press `Ctrl+Shift+E`, or click the Files toggle in the pane bar. The tree of the selected product shows.
 - [ ] **New folder and new file.** Right-click a folder and choose "New folder". Type a name and press Enter: the folder appears.
 - [ ] **A change from a terminal.** Run `touch x.txt` in a terminal of the product. The file shows in the tree in less than 1 s.
 - [ ] **Move to trash.** Right-click the file and choose "Move to trash". It goes to the system trash, not away for good.
@@ -61,7 +63,7 @@ The build of `main` 5314936 is installed (`make install` of 2026-11-22). Open th
 
 ## U8 — Git marks (#13)
 
-- [ ] **The product rows.** In Products mode, each product row shows its branch. With changes, it shows `·N`, and `↑a ↓b` when it is ahead or behind.
+- [ ] **The product rows.** In the Products pane, each product row shows its branch. With changes, it shows `·N`, and `↑a ↓b` when it is ahead or behind.
 - [ ] **The tab dot.** Change a file in the folder of a terminal. Its tab shows a small dot, and the tooltip shows the git summary.
 
 ## U9 — Palette (#15)
@@ -73,6 +75,22 @@ The build of `main` 5314936 is installed (`make install` of 2026-11-22). Open th
 - [ ] **Reopen a tab.** Close a tab, then press `Ctrl+Alt+T`. The tab comes back in its product.
 - [ ] **Restart core, with care.** "Restart core" relaunches the app and ends every terminal of this device. Try it only with no work open.
 
+## P1 — Panes and the pane bar (#16)
+
+Spec: `docs/specs/agentsi-desktop-panes.md`. Keys: `Ctrl+Shift+O` Products, `Ctrl+Shift+J` Files, `Ctrl+Shift+N` Alerts, `Ctrl+Shift+H` all panes.
+
+- [ ] **Bright and muted.** Look at the pane bar. The toggle of an open pane is bright, with an accent line under it. The toggle of a hidden pane is muted.
+- [ ] **Open and hide.** Click each toggle, then press each key. The pane opens or hides, and its toggle changes at once.
+- [ ] **Two panes in one column.** Open Products and Files. Files shows under Products. Drag the line between them: their heights change, and neither gets lower than about 120 px.
+- [ ] **The column width.** Drag the inner edge of the left column. It stays between 180 px and half the window. A double click on the edge sets it back to 248 px.
+- [ ] **Move a pane.** Drag the header of Files to the right edge of the window, then drag it above Products. A line shows where it drops. Escape during a drag leaves it where it was.
+- [ ] **Escape in a terminal.** Run `claude` in a terminal, start a pane drag and press Escape. The drag ends, and `claude` does not get the Escape.
+- [ ] **Toggle all panes.** Press `Ctrl+Shift+H`. The dock takes the whole width. Press it again: the same panes come back.
+- [ ] **The alert count.** Hide Alerts and let a terminal raise an alert. The Alerts toggle shows the count.
+- [ ] **The notices.** Hide Products while the app shows a notice, for example with a host off. The notice shows under the dock.
+- [ ] **After a restart.** Move and resize the panes, then close and open the app. Each pane has the same column, order, size and open state.
+- [ ] **Smooth drags.** A pane drag and a column resize feel smooth on the M1.
+
 ## Idle frames
 
-- [ ] **The idle bench.** Run `agentsi-app --bench idle` and, for Settings, `agentsi-app --bench idle --screen settings`. Both report 0 frames while idle.
+- [ ] **The idle bench.** Run `agentsi-app --bench idle` with Products and Files open and, for Settings, `agentsi-app --bench idle --screen settings`. Both report 0 frames while idle.

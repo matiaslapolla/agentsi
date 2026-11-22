@@ -156,3 +156,13 @@ Plan: `docs/plans/agentsi-desktop-cloud-batch.md`. Each unit ran in a cloud rout
 - **Decisions in the units:** the git watcher and the files watcher walk only folders git keeps (`ignore` crate) and poll every 10 s when a watch cannot be added. A push respects `push.default=simple` and never forces. Reopen closed tab is `Ctrl+Alt+T` (`Ctrl+Shift+T` is New Claude). "Restart core" relaunches the app and ends the terminals of this device.
 - **Follow-up:** the first general role copies the five builtin roles into the data root, so later builtin versions are not read (read per file with a builtin fallback). Flaky under load: `agentsi-core` `hook.rs` `a_core_that_does_not_answer_costs_at_most_the_time_limit` and `stop.rs`. The CI job `node` crashes now and then inside V8 (`jit_page`); a rerun passes.
 - **Owner checks:** the visual and idle-bench items of each spec, listed in each PR body.
+
+## 2026-11-22 — Panes and the pane bar on a cloud agent
+
+Spec: `docs/specs/agentsi-desktop-panes.md`. One cloud routine built it, and the merge is #16 (e2385f9).
+
+- **Double fire:** the routine started twice: once from a manual `run`, once from its own `run_once_at`. Two agents built the unit. The second pushed to `feat/panes-b` (4a8922c) and did not touch `feat/panes`. The coordinator kept `feat/panes`.
+- **Review fixes before the merge** (1494bda, 82f29b1, c156dcc): Escape of a pane drag reached the focused terminal; a pane kind that the file did not know cost the whole `layout.json`; two wide columns left the dock 0 px; the notices vanished with Products hidden; the focus left a tree that stayed in sight; the menu key of the file tree opened at a fixed point; two actions did the same for the Alerts pane. Toggle Files moved to `Ctrl+Shift+J`, because IBus reads `Ctrl+Shift+U`.
+- **Proof:** CI green on 7f8fc93. The gate ran its 7 checks green and judged AC1 to AC11 met. AC12 to AC14 stay with the owner.
+- **Not run:** the idle bench with two open panes. It is in the owner checks.
+- **Lesson:** a cloud build in the `/tmp` tmpfs (7.7 GB) runs out of disk. Build with `CARGO_TARGET_DIR` on `/home`.
