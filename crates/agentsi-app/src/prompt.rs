@@ -2,7 +2,8 @@
 //!
 //! The palette entries "Label the active product", "Color the active product", "Move the active
 //! product to a group", "Rename the active pane" and "Color the active pane" use it. The context
-//! menus of unit N8 use the same prompt, so a menu entry and its palette entry ask alike.
+//! menus of unit N8 use the same prompt, so a menu entry and its palette entry ask alike. An
+//! entry of the palette that asks opens the prompt as the second step of the palette.
 //!
 //! A text prompt has an input, and an optional list of suggestions under it. `Enter` answers with
 //! the text, or with the suggestion under the cursor after `Down`. A choice prompt has the list
@@ -129,6 +130,33 @@ impl Prompt {
             focus,
             _subscriptions: Vec::new(),
         }
+    }
+
+    /// A line under the list, for example while the choices load.
+    pub fn with_hint(mut self, hint: impl Into<SharedString>) -> Prompt {
+        self.hint = Some(hint.into());
+        self
+    }
+
+    /// The choices that came after the prompt opened, with the cursor on `current`. `hint`
+    /// replaces the line under the list.
+    pub fn set_choices(
+        &mut self,
+        choices: Vec<Choice>,
+        current: usize,
+        hint: Option<SharedString>,
+        cx: &mut Context<Self>,
+    ) {
+        self.cursor = (!choices.is_empty()).then(|| current.min(choices.len() - 1));
+        self.choices = choices;
+        self.hint = hint;
+        cx.notify();
+    }
+
+    /// The labels of the choices, for the tests.
+    #[cfg(test)]
+    pub fn labels(&self) -> Vec<String> {
+        self.choices.iter().map(|c| c.label.to_string()).collect()
     }
 
     /// The text in the input, or none for a choice prompt.

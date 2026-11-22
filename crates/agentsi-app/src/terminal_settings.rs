@@ -155,6 +155,12 @@ impl Global for Setting {}
 
 /// Reads the file at `path` and makes it the terminal settings of the app. The app calls this
 /// once, at start.
+/// Reads the file of `install` again and applies it.
+pub fn reload(cx: &mut App) {
+    let path = cx.try_global::<Setting>().and_then(|s| s.path.clone());
+    install(cx, path);
+}
+
 pub fn install(cx: &mut App, path: Option<PathBuf>) {
     let (settings, note) = match &path {
         Some(p) => read(p),

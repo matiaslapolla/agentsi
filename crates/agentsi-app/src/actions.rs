@@ -44,7 +44,8 @@ gpui_kit::actions!(
         GitPull,
         /// Asks the confirm of a push of the active product on its git screen.
         GitPush,
-        /// Opens the Branches tab of the git screen of the active product.
+        /// Asks for a branch of the active product and switches its worktree to it, on its git
+        /// screen.
         GitSwitchBranch,
         /// Opens the form of a new branch from the head on the git screen of the active product.
         GitNewBranch,
@@ -284,6 +285,18 @@ gpui_kit::actions!(
         RevealSelectedFile,
         /// Saves the selected folder of the file tree as a favorite.
         AddSelectedFolderToFavorites,
+        /// Opens the palette at the open tabs of each space.
+        GoToTab,
+        /// Opens the tab that closed last in its space.
+        ReopenClosedTab,
+        /// Shows the space of the next product of the sidebar.
+        NextSpace,
+        /// Shows the space of the previous product of the sidebar.
+        PreviousSpace,
+        /// Restarts the core of this device after one Confirm. Its terminals end.
+        RestartCore,
+        /// Reads the settings files of the app again.
+        ReloadSettingsFiles,
         /// Closes the window. The core and its terminals keep running.
         Quit,
         SelectProduct1,
@@ -369,6 +382,10 @@ key_table! {
     ("call", "Call", "secondary-shift-p", || Box::new(OpenCall)),
     ("settings", "Settings", "secondary-,", || Box::new(OpenSettings)),
     ("context-menu", "Context menu", "shift-f10", || Box::new(OpenContextMenu)),
+    ("reopen-tab", "Reopen closed tab", "secondary-alt-t", || Box::new(ReopenClosedTab)),
+    // Literal Ctrl on macOS too: Cmd+Tab belongs to the system.
+    ("next-space", "Next space", "ctrl-tab", || Box::new(NextSpace)),
+    ("previous-space", "Previous space", "ctrl-shift-tab", || Box::new(PreviousSpace)),
     ("product-1", "Go to product 1", "secondary-1", || Box::new(SelectProduct1)),
     ("product-2", "Go to product 2", "secondary-2", || Box::new(SelectProduct2)),
     ("product-3", "Go to product 3", "secondary-3", || Box::new(SelectProduct3)),
@@ -1027,7 +1044,7 @@ pub const ENTRIES: &[Entry] = &[
     Entry {
         label: "Open the folder of the active product",
         icon: IconName::Folder,
-        keywords: &["open", "folder", "files", "product", "manager"],
+        keywords: &["open", "folder", "files", "product", "manager", "system"],
         action: || Box::new(OpenProductFolder),
     },
     Entry {
@@ -1334,6 +1351,50 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(AddSelectedFolderToFavorites),
     },
     Entry {
+        label: "Go to tab…",
+        icon: IconName::ArrowRight,
+        keywords: &["tab", "tabs", "go", "switch", "find", "open"],
+        action: || Box::new(GoToTab),
+    },
+    Entry {
+        label: "Reopen closed tab",
+        icon: IconName::Undo2,
+        keywords: &["reopen", "closed", "tab", "undo", "restore", "again"],
+        action: || Box::new(ReopenClosedTab),
+    },
+    Entry {
+        label: "Next space",
+        icon: IconName::ChevronRight,
+        keywords: &["space", "next", "product", "switch"],
+        action: || Box::new(NextSpace),
+    },
+    Entry {
+        label: "Previous space",
+        icon: IconName::ChevronLeft,
+        keywords: &["space", "previous", "product", "switch"],
+        action: || Box::new(PreviousSpace),
+    },
+    Entry {
+        label: "Restart core",
+        icon: IconName::RefreshCw,
+        keywords: &["restart", "core", "daemon", "server", "reconnect"],
+        action: || Box::new(RestartCore),
+    },
+    Entry {
+        label: "Reload settings files",
+        icon: IconName::RefreshCw,
+        keywords: &[
+            "reload",
+            "settings",
+            "files",
+            "keys",
+            "toml",
+            "config",
+            "favorites",
+        ],
+        action: || Box::new(ReloadSettingsFiles),
+    },
+    Entry {
         label: "Close the window (terminals keep running)",
         icon: IconName::Close,
         keywords: &["quit", "exit"],
@@ -1493,6 +1554,31 @@ mod tests {
             assert_eq!(BINDINGS[at].0, format!("secondary-{}", n + 1));
         }
         assert_eq!(super::product_id(9), None);
+    }
+
+    #[test]
+    fn no_two_bindings_share_a_key_and_each_new_key_follows_the_key_rules() {
+        use crate::keys::{OperatingSystem, check_rules, parse_key};
+        for os in [OperatingSystem::Linux, OperatingSystem::Mac] {
+            let keys: Vec<_> = BINDINGS
+                .iter()
+                .map(|(k, _)| parse_key(k, os).unwrap())
+                .collect();
+            for (n, a) in keys.iter().enumerate() {
+                assert!(
+                    keys[n + 1..]
+                        .iter()
+                        .all(|b| a.modifiers != b.modifiers || a.key != b.key),
+                    "{} is taken twice",
+                    BINDINGS[n].0
+                );
+            }
+        }
+        for id in ["reopen-tab", "next-space", "previous-space"] {
+            let at = KEY_ACTIONS.iter().position(|a| a.id == id).unwrap();
+            let ks = parse_key(BINDINGS[at].0, OperatingSystem::Linux).unwrap();
+            assert_eq!(check_rules(&ks), Ok(()), "{id}");
+        }
     }
 
     #[test]

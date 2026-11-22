@@ -380,6 +380,18 @@ _Avoid_: Tint, theme color
 The small question over the window that takes one line of text or one choice. The palette entries "Label the active product", "Color the active product", "Move the active product to a group", "Rename the active pane" and "Color the active pane" open it. The context menus open the same prompt, and a Confirm is a prompt with two choices.
 _Avoid_: Dialog, modal
 
+**Palette source**:
+One kind of result in the command palette: actions, tabs, settings, files, favorites or recent targets (`palette.rs`). A recent target is one of the last 20 screens, files, folders or commands that the owner opened, saved in `layout.json`.
+_Avoid_: Provider, category
+
+**Prefix**:
+The first character of a palette query that limits the palette to one palette source: `>` actions, `@` tabs, `#` settings, `/` files. The files source asks the core with `files.find` only after this prefix.
+_Avoid_: Sigil, mode
+
+**Palette step**:
+The second step of a palette entry: the prompt of the entry, over the query of the palette. Escape in the prompt opens the palette again at that query. "Git: Switch branch…" and "Move the active tab to a product" use it.
+_Avoid_: Sub-palette, wizard
+
 **Clear plan**:
 The list of rows and files that a delete of the "Data" section removes, with counts and bytes. `data.clear_plan` makes it and writes nothing. `data.clear` deletes only a plan of the last 5 minutes whose counts still match.
 _Avoid_: Preview, dry run

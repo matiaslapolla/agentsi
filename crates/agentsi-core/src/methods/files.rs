@@ -14,6 +14,7 @@ pub fn register(r: Router) -> Router {
         .add(FilesCreate, create)
         .add(FilesRename, rename)
         .add(FilesTrash, trash)
+        .add(FilesFind, find)
 }
 
 fn rpc(e: Error) -> RpcError {
@@ -98,4 +99,9 @@ async fn rename(_: Ctx, p: FilesRenameParams) -> Result<FilesDone, RpcError> {
 async fn trash(_: Ctx, p: FilesPathParams) -> Result<FilesDone, RpcError> {
     in_root(p.product, move |root| root.trash(&p.path)).await?;
     Ok(FilesDone {})
+}
+
+async fn find(_: Ctx, p: FilesFindParams) -> Result<FilesFindResult, RpcError> {
+    let limit = p.limit.unwrap_or(50);
+    in_root(p.product, move |root| Ok(root.find(&p.query, limit))).await
 }

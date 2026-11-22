@@ -134,6 +134,15 @@ impl Favorites {
         cx.notify();
     }
 
+    /// Reads the file again, for an edit by hand.
+    pub fn reload(&mut self, cx: &mut Context<Self>) {
+        (self.list, self.note) = match &self.path {
+            Some(p) => read(p),
+            None => (Vec::new(), None),
+        };
+        cx.notify();
+    }
+
     /// Adds `favorite` at the end. An empty label takes the target as its label.
     pub fn add(&mut self, mut favorite: Favorite, cx: &mut Context<Self>) {
         favorite.label =
@@ -238,7 +247,12 @@ fn parse(text: &str, path: &Path) -> (Vec<Favorite>, Option<String>) {
 }
 
 fn entry(t: &Table) -> Result<Favorite, String> {
-    let text = |k: &str| t.get(k).and_then(Item::as_str);
+    from_fields(|k| t.get(k).and_then(Item::as_str))
+}
+
+/// The favorite of the keys of one entry: `label`, `product`, `kind`, `target` and `folder`.
+/// The recent targets of `layout.json` use the same keys.
+pub fn from_fields<'a>(text: impl Fn(&str) -> Option<&'a str>) -> Result<Favorite, String> {
     let target = text("target")
         .filter(|s| !s.trim().is_empty())
         .ok_or("it has no target")?;
@@ -279,6 +293,17 @@ fn entry(t: &Table) -> Result<Favorite, String> {
         product,
         saved,
     })
+}
+
+impl Favorite {
+    /// The `kind`, the `target` and the `folder` of the entry of this favorite.
+    pub fn fields(&self) -> (&'static str, String, Option<String>) {
+        let folder = match &self.saved {
+            Saved::Command { folder, .. } => Some(folder.clone()),
+            _ => None,
+        };
+        (self.saved.kind(), self.saved.target(), folder)
+    }
 }
 
 /// Writes the list into the file in place: the entries change, the other keys of the file stay,
