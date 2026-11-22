@@ -112,10 +112,14 @@ impl Shell {
         {
             center.update(cx, |c, cx| c.mark_seen(cx));
         }
-        let hid_a_tree = [PaneKind::Products, PaneKind::Files]
-            .into_iter()
-            .any(|k| before.is_open(k) && !self.panes.is_open(k));
-        if hid_a_tree && self.sidebar.read(cx).has_focus(window, cx) {
+        let hid = |k| before.is_open(k) && !self.panes.is_open(k);
+        let sidebar = self.sidebar.read(cx);
+        let lost_focus = (hid(PaneKind::Products) && sidebar.products_focused(window, cx))
+            || (hid(PaneKind::Files) && sidebar.files.read(cx).has_focus(window, cx));
+        self.sidebar.update(cx, |s, cx| {
+            s.set_products_shown(self.panes.is_open(PaneKind::Products), cx)
+        });
+        if lost_focus {
             self.refocus(window, cx);
         }
         self.schedule_save(cx);
@@ -187,11 +191,16 @@ impl Shell {
 
     fn start_move(&mut self, pane: PaneKind, cx: &mut Context<Self>) {
         self.gesture = Some(Gesture::Move { pane, to: None });
-        // Before the key bindings: an input or a menu with the focus would keep Escape.
+        // Before the key bindings: an input or a menu with the focus would keep Escape. The
+        // focused terminal must not get it either, or it would stop the program in it.
         let shell = cx.weak_entity();
         self.escape = Some(cx.intercept_keystrokes(move |e, window, cx| {
-            if e.keystroke.key == "escape" {
-                let _ = shell.update(cx, |s, cx| s.cancel_move(window, cx));
+            if e.keystroke.key == "escape"
+                && shell
+                    .update(cx, |s, cx| s.cancel_move(window, cx))
+                    .unwrap_or(false)
+            {
+                cx.stop_propagation();
             }
         }));
         cx.notify();

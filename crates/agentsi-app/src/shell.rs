@@ -1989,7 +1989,8 @@ impl Render for Shell {
 
 impl Shell {
     /// The dock of the shown space, with the hint of an empty dock and the drop lines of an
-    /// empty column.
+    /// empty column. With the Products pane hidden, the notices of the sidebar show under the
+    /// dock.
     fn dock_area(
         &self,
         empty: bool,
@@ -1997,20 +1998,32 @@ impl Shell {
         palette_key: &str,
         drops: Vec<Div>,
     ) -> impl IntoElement {
+        // Not cached: a cached view takes the size of its style, and the notices have none.
+        // Hidden, the sidebar draws only its notices, so the draw costs little.
+        let notices = (!self.panes.is_open(PaneKind::Products)).then(|| self.sidebar.clone());
         div()
             .debug_selector(|| "dock-area".into())
             .flex_1()
             .min_w_0()
             .h_full()
             .relative()
-            .child(match self.plan.as_ref().and_then(|p| p.size) {
-                Some((w, h)) => div()
-                    .w(Pixels::from(w))
-                    .h(Pixels::from(h))
-                    .child(self.dock.clone())
-                    .into_any_element(),
-                None => self.dock.clone().into_any_element(),
-            })
+            .flex()
+            .flex_col()
+            .child(
+                div()
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
+                    .child(match self.plan.as_ref().and_then(|p| p.size) {
+                        Some((w, h)) => div()
+                            .w(Pixels::from(w))
+                            .h(Pixels::from(h))
+                            .child(self.dock.clone())
+                            .into_any_element(),
+                        None => self.dock.clone().into_any_element(),
+                    }),
+            )
+            .children(notices)
             .when(empty, |el| {
                 el.child(
                     div()

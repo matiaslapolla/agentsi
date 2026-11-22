@@ -22,7 +22,9 @@ use agentsi_ui::components::{
     GroupHeader, ItemRow, Kbd, ProductRow, StateMark, StatusDot, neutral_tag, running_chip,
 };
 use agentsi_ui::style::StyleExt as _;
-use agentsi_ui::tokens::{Status, WorkState, accent, control, line, size, space, text, weight};
+use agentsi_ui::tokens::{
+    Status, WorkState, accent, control, line, size, space, surface, text, weight,
+};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
@@ -143,6 +145,9 @@ pub struct Sidebar {
     open: BTreeMap<String, bool>,
     /// The hosts whose archived products show. The empty name is this device. Not saved.
     show_archived: std::collections::BTreeSet<String>,
+    /// The Products pane is open. Hidden, the view draws only the notices, which the shell
+    /// shows under the dock: they must stay in sight.
+    products_shown: bool,
     _observe: Vec<Subscription>,
 }
 
@@ -215,6 +220,7 @@ impl Sidebar {
             placed: Rc::default(),
             open: BTreeMap::new(),
             show_archived: Default::default(),
+            products_shown: true,
             _observe: observe,
             core: cores.local.clone(),
             cores,
@@ -314,7 +320,19 @@ impl Sidebar {
 
     /// The products or the file tree has the keyboard focus.
     pub fn has_focus(&self, window: &Window, cx: &App) -> bool {
-        self.focus.contains_focused(window, cx) || self.files.read(cx).has_focus(window, cx)
+        self.products_focused(window, cx) || self.files.read(cx).has_focus(window, cx)
+    }
+
+    /// The tree of the products has the keyboard focus.
+    pub fn products_focused(&self, window: &Window, cx: &App) -> bool {
+        self.focus.contains_focused(window, cx)
+    }
+
+    pub fn set_products_shown(&mut self, shown: bool, cx: &mut Context<Self>) {
+        if self.products_shown != shown {
+            self.products_shown = shown;
+            cx.notify();
+        }
     }
 
     /// Opens the menu of the row of the cursor of the focused tree, just under the row. Returns
@@ -324,7 +342,7 @@ impl Sidebar {
             let Some(file) = self.files.read(cx).selected(cx) else {
                 return false;
             };
-            let at = Point::new(space(8), control::TOOLBAR_HEIGHT * 2.);
+            let at = self.files.read(cx).menu_point();
             menus::request(cx, Target::File(file), at);
             return true;
         }
@@ -1095,6 +1113,31 @@ impl Render for Sidebar {
                     .collect::<Vec<_>>(),
             )
         };
+        let host_off = match &host_state {
+            HostState::Off(why) => Some(why.clone()),
+            _ => None,
+        };
+        let notice_block = (host_off.is_some() || !notices.is_empty()).then(|| {
+            div()
+                .debug_selector(|| "sidebar-notices".into())
+                .flex()
+                .flex_col()
+                .gap(space(2))
+                .p(space(3))
+                .border_t_1()
+                .border_color(line::border())
+                .when_some(host_off, |el, why| el.child(caption(why)))
+                .children(notices.into_iter().map(caption))
+        });
+        if !self.products_shown {
+            return div()
+                .flex()
+                .flex_col()
+                .w_full()
+                .bg(surface::base())
+                .children(notice_block)
+                .into_any_element();
+        }
         let favorite_rows = self.favorite_rows(focused, cx);
         let home_rows = self.home_rows(focused, cx);
         let rows = self.product_rows(None, None, &products, false, 0, focused, cx);
@@ -1107,10 +1150,6 @@ impl Render for Sidebar {
             first += h.products.len();
         }
         let empty = rows.is_empty();
-        let host_off = match &host_state {
-            HostState::Off(why) => Some(why.clone()),
-            _ => None,
-        };
         div()
             .debug_selector(|| "sidebar".into())
             .flex()
@@ -1140,19 +1179,8 @@ impl Render for Sidebar {
                     })
                     .children(remote),
             )
-            .when(host_off.is_some() || !notices.is_empty(), |el| {
-                el.child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(space(2))
-                        .p(space(3))
-                        .border_t_1()
-                        .border_color(line::border())
-                        .when_some(host_off, |el, why| el.child(caption(why)))
-                        .children(notices.into_iter().map(caption)),
-                )
-            })
+            .children(notice_block)
+            .into_any_element()
     }
 }
 

@@ -119,7 +119,7 @@ fn the_toggles_are_bright_for_open_panes_and_muted_for_hidden_ones(cx: &mut Test
             Box::new(crate::actions::ToggleProducts) as Box<dyn gpui::Action>,
         ),
         (F, Box::new(crate::actions::ToggleFiles)),
-        (A, Box::new(crate::actions::ToggleAlerts)),
+        (A, Box::new(crate::actions::ShowAlerts)),
     ] {
         let was = panes(&f, cx).is_open(kind);
         cx.update(|window, cx| window.dispatch_action(action.boxed_clone(), cx));
@@ -169,8 +169,11 @@ fn with_all_panes_hidden_the_dock_takes_the_full_width_and_toggle_all_brings_the
     let (f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
     click_toggle(cx, A);
     let dock = bounds(cx, "dock-area");
-    assert_eq!(dock.left(), control::SIDEBAR_WIDTH);
-    assert_eq!(dock.right(), control::WINDOW_WIDTH - control::SIDEBAR_WIDTH);
+    assert_eq!(dock.left(), control::PANE_COLUMN_WIDTH);
+    assert_eq!(
+        dock.right(),
+        control::WINDOW_WIDTH - control::PANE_COLUMN_WIDTH
+    );
     cx.dispatch_action(crate::actions::ToggleAllPanes);
     redraw(cx);
     assert!(panes(&f, cx).open().is_empty());
@@ -197,7 +200,7 @@ fn a_column_edge_resizes_within_its_limits_saves_at_the_end_and_a_double_click_r
     f.shell.update(cx, |s, _| s.restored = true);
     redraw(cx);
     let width = |cx: &mut VisualTestContext| bounds(cx, "pane-column:left").size.width;
-    assert_eq!(width(cx), control::SIDEBAR_WIDTH);
+    assert_eq!(width(cx), control::PANE_COLUMN_WIDTH);
     let y = Pixels::from(400.);
     let edge = |cx: &mut VisualTestContext| Point::new(bounds(cx, "pane-edge:left").center().x, y);
     let from = edge(cx);
@@ -224,7 +227,7 @@ fn a_column_edge_resizes_within_its_limits_saves_at_the_end_and_a_double_click_r
     }
     let at = edge(cx);
     double_click(cx, at);
-    assert_eq!(width(cx), control::SIDEBAR_WIDTH);
+    assert_eq!(width(cx), control::PANE_COLUMN_WIDTH);
 }
 
 #[gpui::test]
@@ -417,4 +420,87 @@ fn the_alerts_toggle_counts_the_unseen_alerts_also_when_the_pane_is_hidden(
     assert!(at(cx, "alert-row-0").is_some());
     click_toggle(cx, A);
     assert!(!panes(&f, cx).is_open(A));
+}
+
+gpui::actions!(pane_tests, [EscapeHeard]);
+
+#[gpui::test]
+fn escape_during_a_drag_reaches_no_key_binding(cx: &mut TestAppContext) {
+    let dir = folder("panes-escape");
+    let (_f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    let heard = std::rc::Rc::new(std::cell::Cell::new(0));
+    cx.update(|_, cx| {
+        cx.bind_keys([gpui::KeyBinding::new("escape", EscapeHeard, None)]);
+        let heard = heard.clone();
+        cx.on_action(move |_: &EscapeHeard, _| heard.set(heard.get() + 1));
+    });
+    cx.simulate_keystrokes("escape");
+    assert_eq!(
+        heard.get(),
+        1,
+        "the test binding hears an Escape out of a drag"
+    );
+    let from = bounds(cx, "pane-header:products").center();
+    let edge = Point::new(control::WINDOW_WIDTH - Pixels::from(4.), Pixels::from(300.));
+    drag_to(cx, from, edge, false);
+    cx.simulate_keystrokes("escape");
+    redraw(cx);
+    assert_eq!(heard.get(), 1, "the Escape of a drag ends the drag only");
+    cx.simulate_mouse_up(edge, MouseButton::Left, Modifiers::none());
+}
+
+#[gpui::test]
+fn hiding_one_tree_keeps_the_focus_in_the_other(cx: &mut TestAppContext) {
+    let dir = folder("panes-focus");
+    let (f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    // The tree draws only for a product with a folder.
+    f.core.update(cx, |s, cx| {
+        let mut a = s.product("a").cloned().unwrap();
+        a.path = Some("/work/a".into());
+        let b = s.product("b").cloned().unwrap();
+        s.set_products(vec![a, b], cx);
+    });
+    let a = crate::model::ProductRef {
+        id: "a".into(),
+        host: None,
+    };
+    f.shell
+        .update_in(cx, |s, window, cx| s.select_product(&a, window, cx));
+    cx.dispatch_action(crate::actions::ShowFiles);
+    redraw(cx);
+    let files_focused = |f: &Fixture, cx: &mut VisualTestContext| {
+        f.shell.update_in(cx, |s, window, cx| {
+            s.sidebar.read(cx).files.read(cx).has_focus(window, cx)
+        })
+    };
+    assert!(files_focused(&f, cx));
+    cx.dispatch_action(crate::actions::ToggleProducts);
+    redraw(cx);
+    assert_eq!(panes(&f, cx).open(), [F]);
+    assert!(files_focused(&f, cx), "the tree in sight keeps the focus");
+    cx.dispatch_action(crate::actions::ToggleFiles);
+    redraw(cx);
+    assert!(!files_focused(&f, cx), "a hidden tree gives the focus back");
+}
+
+#[gpui::test]
+fn the_notices_stay_in_sight_with_the_products_pane_hidden(cx: &mut TestAppContext) {
+    let dir = folder("panes-notices");
+    let (f, cx) = fixture(cx, Persist::None, &dir.join("look.toml"));
+    f.core.update(cx, |c, cx| {
+        c.notices.push("The saved layout was not read.".into());
+        cx.notify();
+    });
+    redraw(cx);
+    let in_pane = bounds(cx, "sidebar-notices");
+    assert!(in_pane.right() <= bounds(cx, "pane-column:left").right());
+    cx.dispatch_action(crate::actions::ToggleProducts);
+    redraw(cx);
+    assert!(at(cx, "sidebar").is_none());
+    let under_dock = bounds(cx, "sidebar-notices");
+    let dock = bounds(cx, "dock-area");
+    assert!(
+        under_dock.left() >= dock.left() && under_dock.bottom() <= dock.bottom(),
+        "{under_dock:?} in {dock:?}"
+    );
 }
