@@ -114,13 +114,14 @@ pub struct DeskConversation {
     /// `desk.send` waits for the core.
     sending: bool,
     flash: Option<Flash>,
-    /// The model and the effort of the desk session, as the core stores them.
-    choice: Option<DeskChoice>,
+    /// The desk model, the desk effort and the role default, as the core stores them, with the
+    /// last pick applied.
+    desk_settings: Option<DeskChoice>,
     selects: Option<Selects>,
-    /// The next draw shows `choice` in the selects.
+    /// The next draw shows `desk_settings` in the selects.
     selects_stale: bool,
     /// One line under the selects: the core refused a pick, or it did not answer.
-    pick_error: Option<String>,
+    settings_error: Option<String>,
     /// A pick came while a reply runs: the note says which model the next message uses.
     picked_while_working: bool,
     _subs: Vec<Subscription>,
@@ -158,10 +159,10 @@ impl DeskConversation {
             busy: false,
             sending: false,
             flash: None,
-            choice: None,
+            desk_settings: None,
             selects: None,
             selects_stale: false,
-            pick_error: None,
+            settings_error: None,
             picked_while_working: false,
             _subs: vec![notices, up],
         };
@@ -224,11 +225,15 @@ impl DeskConversation {
         cx: &mut Context<Self>,
     ) {
         match result {
-            Ok(choice) => {
-                self.choice = Some(choice);
+            Ok(settings) => {
+                self.desk_settings = Some(settings);
                 self.selects_stale = true;
             }
-            Err(e) => self.pick_error = Some(format!("The model settings did not load: {e}")),
+            Err(e) => {
+                self.settings_error = Some(format!(
+                    "The desk model and the desk effort did not load: {e}"
+                ))
+            }
         }
         cx.notify();
     }
@@ -237,19 +242,21 @@ impl DeskConversation {
     pub(crate) fn pick(&mut self, field: Field, value: String, cx: &mut Context<Self>) {
         let value = (!value.is_empty()).then_some(value);
         // `desk.configure` replaces both fields, so a pick needs the stored pair.
-        let Some(choice) = self.choice.as_mut() else {
-            self.pick_error =
-                Some("The model settings are loading. Pick again in a moment.".into());
+        let Some(settings) = self.desk_settings.as_mut() else {
+            self.settings_error = Some(
+                "The desk model and the desk effort are loading. Pick again in a moment.".into(),
+            );
             self.selects_stale = true;
             cx.notify();
             return;
         };
         match field {
-            Field::Model => choice.model = value,
-            Field::Effort => choice.effort = value,
+            Field::Model => settings.model = value,
+            Field::Effort => settings.effort = value,
         }
-        // The pair stays in `choice` until the core answers, so a second pick keeps the first.
-        let (model, effort) = (choice.model.clone(), choice.effort.clone());
+        // The pair stays in `desk_settings` until the core answers, so a second pick keeps the
+        // first.
+        let (model, effort) = (settings.model.clone(), settings.effort.clone());
         self.configure(model, effort, cx);
     }
 
@@ -282,14 +289,14 @@ impl DeskConversation {
         cx: &mut Context<Self>,
     ) {
         match result {
-            Ok(choice) => {
-                self.pick_error = None;
+            Ok(settings) => {
+                self.settings_error = None;
                 self.picked_while_working |=
                     matches!(self.state, DeskState::Working | DeskState::Starting);
-                self.choice = Some(choice);
+                self.desk_settings = Some(settings);
             }
             Err(e) => {
-                self.pick_error = Some(e.to_string());
+                self.settings_error = Some(e.to_string());
                 // The pair of a refused pick is not stored: read what the core holds.
                 self.read_settings(cx);
             }
@@ -300,7 +307,7 @@ impl DeskConversation {
 
     /// The entries of the model or the effort step of the palette, and the value that is picked.
     pub fn options(&self, field: Field) -> (Vec<model::Pick>, String) {
-        let c = self.choice.as_ref();
+        let c = self.desk_settings.as_ref();
         match field {
             Field::Model => (model::model_options(c), model::model_value(c)),
             Field::Effort => (model::effort_options(c), model::effort_value(c)),
@@ -768,12 +775,12 @@ impl DeskConversation {
         cx.notify();
     }
 
-    /// Makes the selects at the first draw, and shows the stored choice after a change of it.
+    /// Makes the selects at the first draw, and shows the desk settings after a change of them.
     fn ensure_selects(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         match &self.selects {
             None => {
                 let selects = Selects::new(
-                    self.choice.as_ref(),
+                    self.desk_settings.as_ref(),
                     window,
                     cx,
                     |this: &mut Self, field, value, cx| this.pick(field, value, cx),
@@ -782,7 +789,7 @@ impl DeskConversation {
                 self.selects_stale = false;
             }
             Some(selects) if self.selects_stale => {
-                selects.show(self.choice.as_ref(), window, cx);
+                selects.show(self.desk_settings.as_ref(), window, cx);
                 self.selects_stale = false;
             }
             Some(_) => {}
@@ -1117,7 +1124,7 @@ impl Render for DeskConversation {
                     ),
             );
         let next_note = self
-            .choice
+            .desk_settings
             .as_ref()
             .filter(|_| working && self.picked_while_working)
             .map(model::next_message_note);
@@ -1127,7 +1134,7 @@ impl Render for DeskConversation {
             .gap(space(2))
             .child(title_row)
             .children(self.selects.as_ref().map(Selects::row))
-            .children(self.pick_error.clone().map(failed_text))
+            .children(self.settings_error.clone().map(failed_text))
             .children(next_note.map(|n| {
                 div()
                     .text_size(size::sm())
@@ -1941,7 +1948,7 @@ mod tests {
         draw(cx);
         conv.read_with(cx, |c, _| {
             assert_eq!(c.options(Field::Model).1, "sonnet");
-            assert!(c.pick_error.is_none());
+            assert!(c.settings_error.is_none());
         });
 
         // The role default clears the field.
@@ -1963,7 +1970,12 @@ mod tests {
         });
         draw(cx);
         conv.read_with(cx, |c, _| {
-            assert!(c.pick_error.as_deref().unwrap().contains("Unknown model"));
+            assert!(
+                c.settings_error
+                    .as_deref()
+                    .unwrap()
+                    .contains("Unknown model")
+            );
             assert_eq!(c.options(Field::Model).1, "opus");
         });
     }
@@ -1978,7 +1990,7 @@ mod tests {
         methods_sent(&mut other);
         conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
         assert!(methods_sent(&mut other).is_empty(), "no pair to send yet");
-        conv.read_with(cx, |c, _| assert!(c.pick_error.is_some()));
+        conv.read_with(cx, |c, _| assert!(c.settings_error.is_some()));
 
         conv.update(cx, |c, cx| {
             c.settings_done(Ok(choice(None, None)), cx);
@@ -2003,7 +2015,7 @@ mod tests {
         draw(cx);
         conv.read_with(cx, |c, _| {
             assert!(c.picked_while_working);
-            let c = c.choice.as_ref().unwrap();
+            let c = c.desk_settings.as_ref().unwrap();
             assert_eq!(
                 super::model::next_message_note(c),
                 "The next message uses Sonnet."

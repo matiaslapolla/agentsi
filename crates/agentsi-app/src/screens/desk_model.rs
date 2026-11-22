@@ -1,5 +1,5 @@
-//! The model select and the effort select of the desk conversation. The core keeps the choice
-//! of each product (`desk.settings`, `desk.configure`). A pick applies to the next owner message.
+//! The model select and the effort select of the desk conversation. The core keeps the desk
+//! model and the desk effort of each product (`desk.settings`, `desk.configure`). A pick applies to the next owner message.
 //!
 //! Spec: `docs/specs/agentsi-desktop-desk-model.md`.
 
@@ -10,7 +10,7 @@ use gpui_kit::component::Sizable as _;
 use gpui_kit::component::select::{SearchableVec, Select, SelectEvent, SelectItem, SelectState};
 use gpui_kit::*;
 
-/// The value of the first entry of each select: no choice, the role default.
+/// The value of the first entry of each select: the role default.
 pub const ROLE_DEFAULT: &str = "";
 
 /// One entry of a select, and one answer of a palette step: a label and a value.
