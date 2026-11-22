@@ -5,6 +5,8 @@
 //! read the key with [`agentsi_voice::keep::keep_in`], so they agree on it.
 
 use agentsi_proto::voice_api::KeepTime;
+use std::io::Write as _;
+use std::os::unix::fs::{OpenOptionsExt as _, PermissionsExt as _};
 use std::path::{Path, PathBuf};
 use toml_edit::{DocumentMut, Item, Table, value};
 
@@ -21,8 +23,15 @@ pub fn read_keep(path: &Path) -> KeepTime {
     })
 }
 
-/// Sets `[models] keep` and keeps the rest of the file.
+/// Sets `[models] keep` and keeps the rest of the file. A `pill.toml` that is a symlink stays
+/// one: the write goes to its target, with the mode of the target.
 pub fn write_keep(path: &Path, keep: KeepTime) -> Result<(), String> {
+    let path = match std::fs::canonicalize(path) {
+        Ok(target) => target,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => path.to_owned(),
+        Err(e) => return Err(format!("{}: {e}", path.display())),
+    };
+    let path = path.as_path();
     let text = match std::fs::read_to_string(path) {
         Ok(text) => text,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
@@ -46,11 +55,37 @@ pub fn write_keep(path: &Path, keep: KeepTime) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
     }
+    let mode = std::fs::metadata(path)
+        .ok()
+        .map(|m| m.permissions().mode() & 0o7777);
+    replace(path, &doc.to_string(), mode)
+}
+
+/// Writes `text` to a file next to `path`, then renames it over `path`, so a reader never sees
+/// half a file. The new file gets `mode`. A failure leaves no temporary file.
+fn replace(path: &Path, text: &str, mode: Option<u32>) -> Result<(), String> {
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
-    std::fs::write(&tmp, doc.to_string()).map_err(|e| format!("{}: {e}", tmp.display()))?;
-    std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display()))
+    let written = (|| {
+        let mut options = std::fs::OpenOptions::new();
+        options.write(true).create(true).truncate(true);
+        if let Some(mode) = mode {
+            options.mode(mode);
+        }
+        let mut file = options.open(&tmp)?;
+        // The umask cuts the mode of a new file, and an old temporary file keeps its own.
+        if let Some(mode) = mode {
+            file.set_permissions(std::fs::Permissions::from_mode(mode))?;
+        }
+        file.write_all(text.as_bytes())
+    })()
+    .map_err(|e| format!("{}: {e}", tmp.display()))
+    .and_then(|()| std::fs::rename(&tmp, path).map_err(|e| format!("{}: {e}", path.display())));
+    if written.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    written
 }
 
 #[cfg(test)]
@@ -75,6 +110,40 @@ mod tests {
         assert_eq!(again.matches("[models]").count(), 1);
         assert_eq!(read_keep(&path), KeepTime::Start);
         assert!(!dir.path().join("agentsi/pill.toml.tmp").exists());
+    }
+
+    #[test]
+    fn a_symlinked_file_stays_a_symlink_and_keeps_its_mode() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("dotfiles/pill.toml");
+        std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+        std::fs::write(&target, "input = \"USB\"\n").unwrap();
+        std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600)).unwrap();
+        let link = dir.path().join("agentsi/pill.toml");
+        std::fs::create_dir_all(link.parent().unwrap()).unwrap();
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        write_keep(&link, KeepTime::OneHour).unwrap();
+        assert!(std::fs::symlink_metadata(&link).unwrap().is_symlink());
+        assert_eq!(read_keep(&link), KeepTime::OneHour);
+        assert_eq!(
+            std::fs::read_to_string(&target).unwrap(),
+            "input = \"USB\"\n\n[models]\nkeep = \"1h\"\n"
+        );
+        let mode = std::fs::metadata(&target).unwrap().permissions().mode() & 0o7777;
+        assert_eq!(mode, 0o600);
+        assert!(!dir.path().join("dotfiles/pill.toml.tmp").exists());
+        assert!(!dir.path().join("agentsi/pill.toml.tmp").exists());
+    }
+
+    #[test]
+    fn a_failed_rename_leaves_no_temporary_file() {
+        let dir = tempfile::tempdir().unwrap();
+        // A folder that is not empty cannot be replaced by a file.
+        let path = dir.path().join("pill.toml");
+        std::fs::create_dir_all(path.join("inside")).unwrap();
+        assert!(replace(&path, "[models]\nkeep = \"1h\"\n", Some(0o644)).is_err());
+        assert!(!dir.path().join("pill.toml.tmp").exists());
+        assert!(path.join("inside").is_dir());
     }
 
     #[test]
