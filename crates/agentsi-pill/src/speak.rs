@@ -302,11 +302,23 @@ impl Worker {
         (self.clock)()
     }
 
-    /// The engine, opened now if it is not loaded.
-    fn load<'a>(&mut self, engine: &'a mut Loaded) -> Result<&'a mut Box<dyn Engine>, String> {
+    /// The engine, opened now if it is not loaded. For a job, the pill learns of the load, so
+    /// that its wait for the first sound covers it.
+    fn load<'a>(
+        &mut self,
+        engine: &'a mut Loaded,
+        for_job: bool,
+    ) -> Result<&'a mut Box<dyn Engine>, String> {
         if engine.is_none() {
             let opened = Instant::now();
-            match (self.open_engine)() {
+            if for_job {
+                self.loading(true);
+            }
+            let result = (self.open_engine)();
+            if for_job {
+                self.loading(false);
+            }
+            match result {
                 Ok(e) => {
                     eprintln!("agentsi-pill: voice ready in {:?}", opened.elapsed());
                     *engine = Some(e);
@@ -322,10 +334,16 @@ impl Worker {
         Ok(engine.as_mut().expect("set above"))
     }
 
+    fn loading(&self, on: bool) {
+        let _ = self
+            .events
+            .unbounded_send(LinkEvent::Input(Input::Loading(on)));
+    }
+
     fn set_keep(&mut self, keep: KeepTime, engine: &mut Loaded) {
         self.keeper.set(keep);
         if keep.loads_at_start() {
-            let _ = self.load(engine);
+            let _ = self.load(engine, false);
         }
     }
 
@@ -349,7 +367,7 @@ impl Worker {
     fn run(mut self) {
         let mut engine: Loaded = None;
         if self.keeper.keep().loads_at_start() {
-            let _ = self.load(&mut engine);
+            let _ = self.load(&mut engine, false);
         }
         let mut next: Option<Job> = None;
         loop {
@@ -363,7 +381,7 @@ impl Worker {
             if job.epoch != self.shared.epoch() {
                 continue;
             }
-            let result = match self.load(&mut engine) {
+            let result = match self.load(&mut engine, true) {
                 Ok(e) => self.speak(e.as_mut(), &job),
                 Err(e) => {
                     self.report(job.ticket, SpeechEvent::Failed(e));
@@ -805,6 +823,7 @@ mod tests {
             loop {
                 if let Ok(event) = self.events.try_recv() {
                     match event {
+                        LinkEvent::Input(Input::Loading(_)) => {}
                         LinkEvent::Input(input) => return input,
                         other => panic!("not a speech event: {other:?}"),
                     }
@@ -822,7 +841,7 @@ mod tests {
         }
     }
 
-    fn wait_for(cond: impl Fn() -> bool) {
+    fn wait_for(mut cond: impl FnMut() -> bool) {
         let start = std::time::Instant::now();
         while !cond() {
             assert!(start.elapsed() < Duration::from_secs(5), "timed out");
@@ -1041,6 +1060,53 @@ mod tests {
         rig.speaker.effect(&Effect::StopSpeech { terminal: None });
         assert_eq!(rig.speaker.shared().epoch(), before + 1);
         assert_eq!(rig.speaker.shared().queued(), 0);
+    }
+
+    #[test]
+    fn the_load_of_the_voice_for_a_reply_is_told_to_the_pill_and_a_loaded_voice_is_not() {
+        let mut rig = rig(None, None);
+        rig.open_gate(10);
+        rig.speaker.speak(1, "pm", "one");
+        let mut inputs = Vec::new();
+        wait_for(|| {
+            while let Ok(LinkEvent::Input(input)) = rig.events.try_recv() {
+                inputs.push(input);
+            }
+            inputs.len() >= 3
+        });
+        assert_eq!(
+            inputs,
+            [
+                Input::Loading(true),
+                Input::Loading(false),
+                Input::Speech {
+                    ticket: 1,
+                    event: SpeechEvent::Playing
+                },
+            ]
+        );
+        rig.play_all();
+        assert_eq!(
+            rig.next_event(),
+            Input::Speech {
+                ticket: 1,
+                event: SpeechEvent::Done
+            }
+        );
+        rig.speaker.speak(2, "pm", "two");
+        let first = loop {
+            if let Ok(LinkEvent::Input(input)) = rig.events.try_recv() {
+                break input;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        };
+        assert_eq!(
+            first,
+            Input::Speech {
+                ticket: 2,
+                event: SpeechEvent::Playing
+            }
+        );
     }
 
     #[test]
