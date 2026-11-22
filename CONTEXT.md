@@ -296,6 +296,18 @@ _Avoid_: Continuous dictation, open mic
 The model that marks each 32 ms of audio as speech or no speech. It is Silero VAD v5, the catalog entry `silero-vad-v5`.
 _Avoid_: VAD (in text for the owner), silence detector
 
+**Voice models**:
+The speech model (Parakeet, for dictation), the voice detector and the voice model (Kokoro, for speech out), as the pill holds them in memory.
+_Avoid_: Engines, voices (when you mean the models)
+
+**Keep time**:
+How long a voice model stays in memory after its last use: 1 minute, 5 minutes (the default), 15 minutes, 1 hour, Always, or "Load at start". `[models] keep` in `pill.toml` holds it, and `voice.models.keep` sets it.
+_Avoid_: Timeout, TTL, idle time
+
+**Load on use**:
+A voice model loads at its first use, not at the start of the pill. A dictation opens the microphone at once and records while the speech model loads.
+_Avoid_: Lazy load, warm up
+
 **Piece**:
 The speech of toggle dictation between two pauses of 0.6 s. The pill transcribes each piece at once and sends its text with `voice.transcript`. A piece is never longer than 30 s.
 _Avoid_: Chunk, segment
