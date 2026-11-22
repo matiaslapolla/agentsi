@@ -54,7 +54,11 @@ fn parts(rel: &str) -> Result<Vec<&str>> {
         .split('/')
         .filter(|n| !n.is_empty() && *n != ".")
         .collect();
-    if names.iter().any(|n| *n == ".." || *n == ".git") {
+    // A disk that ignores case reads `.GIT` as `.git`.
+    if names
+        .iter()
+        .any(|n| *n == ".." || n.eq_ignore_ascii_case(".git"))
+    {
         return Err(invalid());
     }
     Ok(names)
@@ -111,9 +115,10 @@ impl Root {
 
     /// A resolved path that must stay inside the folder, and in no `.git` folder.
     fn inside(&self, resolved: PathBuf, rel: &str) -> Result<PathBuf> {
-        let in_git = resolved
-            .strip_prefix(&self.dir)
-            .map(|r| r.iter().any(|n| n == ".git"));
+        let in_git = resolved.strip_prefix(&self.dir).map(|r| {
+            r.iter()
+                .any(|n| n.to_str().is_some_and(|n| n.eq_ignore_ascii_case(".git")))
+        });
         match in_git {
             Ok(false) => Ok(resolved),
             _ => Err(Error::Invalid(format!(
@@ -276,13 +281,14 @@ impl Root {
     }
 }
 
-#[cfg(target_os = "linux")]
+/// A rename that fails with `AlreadyExists` when `dst` exists, also when it came after the check.
 fn rename_no_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
     use std::ffi::CString;
     use std::os::unix::ffi::OsStrExt;
     let c = |p: &Path| CString::new(p.as_os_str().as_bytes()).map_err(std::io::Error::other);
     let (src, dst) = (c(src)?, c(dst)?);
     // SAFETY: both are valid NUL-terminated paths, and AT_FDCWD needs no open descriptor.
+    #[cfg(target_os = "linux")]
     let r = unsafe {
         libc::renameat2(
             libc::AT_FDCWD,
@@ -292,16 +298,14 @@ fn rename_no_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
             libc::RENAME_NOREPLACE,
         )
     };
+    // SAFETY: both are valid NUL-terminated paths.
+    #[cfg(target_os = "macos")]
+    let r = unsafe { libc::renamex_np(src.as_ptr(), dst.as_ptr(), libc::RENAME_EXCL) };
     if r == 0 {
         Ok(())
     } else {
         Err(std::io::Error::last_os_error())
     }
-}
-
-#[cfg(not(target_os = "linux"))]
-fn rename_no_replace(src: &Path, dst: &Path) -> std::io::Result<()> {
-    std::fs::rename(src, dst)
 }
 
 /// A walk that keeps what git keeps: it reads `.gitignore`, `.git/info/exclude` and the global
@@ -581,7 +585,15 @@ mod tests {
     #[test]
     fn a_path_that_leaves_the_product_is_refused_and_nothing_is_made_outside() {
         let (base, root, outside) = product();
-        for bad in ["../x", "a/../../x", "/etc/x", ".git/x", "src/.git", "a\0b"] {
+        for bad in [
+            "../x",
+            "a/../../x",
+            "/etc/x",
+            ".git/x",
+            ".GIT/hooks/x",
+            "src/.git",
+            "a\0b",
+        ] {
             assert!(
                 matches!(root.create(bad, NewKind::File), Err(Error::Invalid(_))),
                 "{bad:?}"
