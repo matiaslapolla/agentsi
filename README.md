@@ -83,7 +83,7 @@ The desktop app:
 - A front desk conversation. Claude reads the product, and the answer shows decisions, priorities, stories, diffs, tickets, tables and charts. You approve or reject a decision in place.
 - Tickets: notes, todos and questions, with filters. `Ctrl+Shift+I` opens them. You promote a ticket to a story.
 - Agent cards on the meeting, call and desk screens. Each card shows the live state of its role.
-- Alerts: a border in the state color, toasts, tones, an alert log behind the bell and system notifications.
+- Alerts: a border in the state color, toasts, tones, an Alerts pane with the unseen count on its toggle, and system notifications.
 - A setup screen that creates a product from a folder, with a dry run before it saves.
 - Actions that needed a command before: new decisions, marks, archive and restore, reflect, and "Run in Claude".
 - Settings: owner, appearance (density, corners, text size, Dark or Light theme, motion), health checks, backups, alerts and "Clear data". "Clear data" makes a backup first.

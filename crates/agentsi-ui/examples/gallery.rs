@@ -8,8 +8,8 @@ use std::time::{Duration, Instant};
 
 use agentsi_ui::bench::Bench;
 use agentsi_ui::components::{
-    Button, Card, Force, GroupHeader, ItemRow, ListRow, ProductRow, StateMark, StatusDot, Switch,
-    TabChip, key_hint, neutral_tag, running_chip, status_tag,
+    Button, Card, Force, GroupHeader, ItemRow, ListRow, PaneToggle, ProductRow, StateMark,
+    StatusDot, Switch, TabChip, key_hint, neutral_tag, running_chip, status_tag,
 };
 use agentsi_ui::tokens::label::Hue;
 use agentsi_ui::tokens::{
@@ -239,6 +239,23 @@ impl StatesPanel {
                             .checked(false)
                             .force(f)
                             .disabled(d),
+                    )
+                    .into_any_element()
+            }))
+            .child(row("Pane toggle", &|i, f, _| {
+                div()
+                    .flex()
+                    .gap(space(3))
+                    .child(
+                        PaneToggle::new(format!("g-pt-on-{i}"), IconName::Folder, true)
+                            .label("Files")
+                            .force(f),
+                    )
+                    .child(
+                        PaneToggle::new(format!("g-pt-off-{i}"), IconName::Bell, false)
+                            .label("Alerts")
+                            .count(3)
+                            .force(f),
                     )
                     .into_any_element()
             }))

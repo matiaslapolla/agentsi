@@ -1,4 +1,5 @@
-//! The window: the sidebar, the dock of panels, and the command palette.
+//! The window: the pane bar, the panes in their columns, the dock of panels, and the command
+//! palette.
 //!
 //! At start the shell reads the products and the terminals of the core, then
 //! restores the saved layout. It drops each terminal panel whose terminal the core
@@ -23,7 +24,7 @@ use agentsi_proto::events::Lagged;
 use agentsi_proto::marks_api::Verdict;
 use agentsi_proto::terminal_api::{Create, CreateParams, List};
 use agentsi_ui::bench::{Bench, BenchKind};
-use agentsi_ui::tokens::{control, font, size, space, surface, text};
+use agentsi_ui::tokens::{font, size, space, surface, text};
 use futures::StreamExt;
 use futures::channel::mpsc;
 use gpui_kit::component::Placement;
@@ -45,6 +46,7 @@ use crate::model::{CoreEvent, CoreState, Cores, HostState, ProductRef, take_even
 use crate::nav::{Nav, ScreenRequest};
 use crate::palette::{Opened, Palette, PaletteStep, Recent};
 use crate::pane::{QUITTING, TerminalPanel};
+use crate::panes::{PaneKind, Panes, Side};
 use crate::prompt::{Choice, Prompt, PromptEvent};
 use crate::screens::git::{GitScreen, Tab as GitTab};
 use crate::screens::meeting;
@@ -53,8 +55,7 @@ use crate::screens::parts::{FIRST_SCREEN_READY, first_screen_ready};
 use crate::screens::settings::{ModelFeed, ModelFeedGlobal, OpenedSection, Section};
 use crate::screens::{ScreenKind, ScreenPanel, ScreenSpec, screen_of};
 use crate::sidebar::{
-    CloseTab, NewProduct, OpenFavorite, OpenItem, SelectProduct, ShowAlerts, Sidebar, SidebarMode,
-    TreeChanged,
+    CloseTab, NewProduct, OpenFavorite, OpenItem, SelectProduct, Sidebar, TreeChanged,
 };
 use crate::tabs::{GroupId, SpaceId, TabGroups};
 use crate::tree::ItemKey;
@@ -69,6 +70,9 @@ mod menu_tests;
 mod palette_actions;
 #[cfg(test)]
 mod palette_tests;
+mod pane_actions;
+#[cfg(test)]
+mod pane_tests;
 #[cfg(test)]
 mod roles_tests;
 #[cfg(test)]
@@ -175,8 +179,14 @@ pub struct Shell {
     /// The labels, the colors and the product groups, when the window has a look file.
     look: Option<Entity<Look>>,
     pub(crate) asking: Option<Asking>,
-    /// The alert log is open.
-    alerts_open: bool,
+    /// The places, sizes and open state of the panes.
+    panes: Panes,
+    /// The resize or the move of a pane that the pointer does now.
+    gesture: Option<pane_actions::Gesture>,
+    /// Ends a pane move on Escape, while one runs.
+    escape: Option<Subscription>,
+    /// The content of the Alerts pane.
+    alert_log: Entity<alert_actions::AlertLog>,
     /// The context menu that is open.
     menu: Option<menu_actions::OpenMenu>,
     /// The link under the pointer when the menu of a pane opened, for Open link and Copy link.
@@ -258,9 +268,6 @@ impl Shell {
             cx.subscribe_in(&sidebar, window, |this, _, e: &NewProduct, window, cx| {
                 this.show_screen(ScreenSpec::setup("").on(e.0.clone()), window, cx)
             }),
-            cx.subscribe(&sidebar, |this, _, _: &ShowAlerts, cx| {
-                this.toggle_alert_log(cx)
-            }),
             cx.subscribe(&sidebar, |this, _, _: &TreeChanged, cx| {
                 this.schedule_save(cx)
             }),
@@ -314,6 +321,20 @@ impl Shell {
             cx.set_global(BenchHandle(b.clone()));
             b.start(window, cx);
         }
+        let alert_log = cx.new(|cx| alert_actions::AlertLog::new(cores.clone(), cx));
+        subscriptions.push(cx.subscribe_in(
+            &alert_log,
+            window,
+            |this, _, e: &alert_actions::OpenAlert, window, cx| {
+                this.open_alert_target(&e.0, window, cx)
+            },
+        ));
+        if let Some(center) = Alerts::try_get(cx) {
+            // The count of the Alerts toggle.
+            subscriptions.push(cx.observe(&center, |_, _, cx| cx.notify()));
+        }
+        // The tooltips of the toggles and the palette hint name the keys in effect.
+        subscriptions.push(cx.observe_global::<keys::Keys>(|_, cx| cx.notify()));
         let shell = Shell {
             core,
             cores,
@@ -327,7 +348,10 @@ impl Shell {
             recent: Recent::default(),
             look,
             asking: None,
-            alerts_open: false,
+            panes: Panes::default(),
+            gesture: None,
+            escape: None,
+            alert_log,
             menu: None,
             menu_link: None,
             persist,
@@ -578,14 +602,14 @@ impl Shell {
                 };
                 self.prune_look(&known, cx);
                 let tree = std::mem::take(&mut saved.tree);
-                let mode = SidebarMode::from_key(saved.sidebar_mode.as_deref());
                 let hide = saved.hide_ignored;
                 self.recent = Recent::load(&saved.recent);
                 self.sidebar.update(cx, |s, cx| {
                     s.set_open_state(tree, cx);
                     s.files.update(cx, |f, _| f.show_ignored = !hide);
-                    s.set_mode(mode, cx);
                 });
+                let panes = Panes::load(saved.panes.as_ref(), saved.sidebar_mode.as_deref());
+                self.set_panes(panes, window, cx);
                 // Before the dock loads, so a saved settings screen opens at the section.
                 if let Some(s) = saved.settings_section.as_deref().and_then(Section::from_id) {
                     cx.set_global(OpenedSection(s));
@@ -692,7 +716,8 @@ impl Shell {
             settings_section: cx
                 .try_global::<OpenedSection>()
                 .map(|s| s.0.id().to_string()),
-            sidebar_mode: sidebar.mode.key().map(str::to_string),
+            sidebar_mode: None,
+            panes: Some(self.panes.save()),
             hide_ignored: !sidebar.files.read(cx).show_ignored,
             recent: self.recent.save(),
             dock: None,
@@ -795,25 +820,7 @@ impl Shell {
 
     /// Each product in the order of the sidebar, with its name in the palette.
     pub(crate) fn products(&self, cx: &App) -> Vec<(ProductRef, String)> {
-        let look = LookGlobal::with(cx, LookData::clone).unwrap_or_default();
-        self.cores
-            .all()
-            .flat_map(|c| {
-                let core = c.read(cx);
-                // The order of the sidebar: the products with no group, then each group.
-                let order = look.arrange(core.remote.as_deref(), &core.products).flat();
-                order.into_iter().map(|i| {
-                    let p = &core.products[i];
-                    let name = match &core.remote {
-                        Some(host) => format!("{} on {host}", p.name),
-                        None => p.name.clone(),
-                    };
-                    let id = p.id.clone();
-                    let host = core.remote.clone();
-                    (ProductRef { host, id }, name)
-                })
-            })
-            .collect()
+        product_names(&self.cores, cx)
     }
 
     /// Opens a screen of the active product.
@@ -1560,6 +1567,29 @@ impl Shell {
     }
 }
 
+/// Each product of `cores` in the order of the sidebar, with its name in the palette.
+pub(crate) fn product_names(cores: &Cores, cx: &App) -> Vec<(ProductRef, String)> {
+    let look = LookGlobal::with(cx, LookData::clone).unwrap_or_default();
+    cores
+        .all()
+        .flat_map(|c| {
+            let core = c.read(cx);
+            // The order of the sidebar: the products with no group, then each group.
+            let order = look.arrange(core.remote.as_deref(), &core.products).flat();
+            order.into_iter().map(|i| {
+                let p = &core.products[i];
+                let name = match &core.remote {
+                    Some(host) => format!("{} on {host}", p.name),
+                    None => p.name.clone(),
+                };
+                let id = p.id.clone();
+                let host = core.remote.clone();
+                (ProductRef { host, id }, name)
+            })
+        })
+        .collect()
+}
+
 /// The program of a new shell. `remote` is true for a terminal on an SSH host: a path of this
 /// device may not exist there, so the shell of the settings is for this device only.
 fn shell_argv_for(remote: bool, cx: &App) -> Vec<String> {
@@ -1572,8 +1602,12 @@ fn shell_argv_for(remote: bool, cx: &App) -> Vec<String> {
 }
 
 impl Render for Shell {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let empty = self.dock.read(cx).is_empty(DockPlacement::Center, cx);
+        let pane_bar = self.pane_bar(cx);
+        let left = self.pane_column(Side::Left, window, cx);
+        let right = self.pane_column(Side::Right, window, cx);
+        let drops = self.empty_column_drops();
         let (terminal_key, palette_key) = (
             keys::text(cx, "new-terminal"),
             keys::text(cx, keys::PALETTE),
@@ -1585,12 +1619,15 @@ impl Render for Shell {
             .key_context("Shell")
             .size_full()
             .flex()
+            .flex_col()
             .relative()
             .bg(surface::panel())
             .text_color(text::primary())
             .font_family(font::ui())
             .text_size(size::base())
-            .on_action(cx.listener(|this, _: &actions::TogglePalette, window, cx| this.toggle_palette(window, cx)))
+            .on_action(cx.listener(|this, _: &actions::TogglePalette, window, cx| {
+                this.toggle_palette(window, cx)
+            }))
             .on_action(cx.listener(|this, _: &actions::NewTerminal, window, cx| {
                 this.open_terminal(this.shell_argv(cx), window, cx)
             }))
@@ -1605,18 +1642,33 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::OpenMinutes, window, cx| {
                 this.show_active(ScreenSpec::minutes, window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::ShowFiles, window, cx| {
-                this.sidebar.update(cx, |s, cx| s.show_files(window, cx))
+            .on_action(
+                cx.listener(|this, _: &actions::ShowFiles, window, cx| this.show_files(window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::ToggleProducts, window, cx| {
+                    this.toggle_pane(PaneKind::Products, window, cx)
+                }),
+            )
+            .on_action(cx.listener(|this, _: &actions::ToggleFiles, window, cx| {
+                this.toggle_pane(PaneKind::Files, window, cx)
             }))
+            .on_action(
+                cx.listener(|this, _: &actions::ToggleAllPanes, window, cx| {
+                    this.toggle_all_panes(window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::OpenRoles, window, cx| {
                 this.show_active(ScreenSpec::roles, window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::NewGeneralRole, window, cx| {
-                this.show_active(ScreenSpec::roles, window, cx);
-                this.on_active(ScreenSpec::roles, window, cx, |p, _, cx| {
-                    p.roles_new_general(cx)
-                });
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::NewGeneralRole, window, cx| {
+                    this.show_active(ScreenSpec::roles, window, cx);
+                    this.on_active(ScreenSpec::roles, window, cx, |p, _, cx| {
+                        p.roles_new_general(cx)
+                    });
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::OpenStories, window, cx| {
                 this.show_active(ScreenSpec::stories, window, cx)
             }))
@@ -1635,15 +1687,19 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::GitPush, window, cx| {
                 this.on_git(window, cx, |s, _, cx| s.ask_push(cx))
             }))
-            .on_action(cx.listener(|this, _: &actions::GitSwitchBranch, window, cx| {
-                this.ask_branch(window, cx)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::GitSwitchBranch, window, cx| {
+                    this.ask_branch(window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::GoToTab, window, cx| {
                 this.open_palette("@", window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::ReopenClosedTab, window, cx| {
-                this.reopen_closed_tab(window, cx)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::ReopenClosedTab, window, cx| {
+                    this.reopen_closed_tab(window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::NextSpace, window, cx| {
                 this.step_space(true, window, cx)
             }))
@@ -1653,9 +1709,11 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::RestartCore, window, cx| {
                 this.ask(Ask::RestartCore, window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::ReloadSettingsFiles, _, cx| {
-                this.reload_settings_files(cx)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::ReloadSettingsFiles, _, cx| {
+                    this.reload_settings_files(cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::GitNewBranch, window, cx| {
                 this.on_git(window, cx, |s, window, cx| {
                     s.set_tab(GitTab::Branches, cx);
@@ -1666,7 +1724,12 @@ impl Render for Shell {
                 this.show_active(ScreenSpec::setup, window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::NewProduct, window, cx| {
-                let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
+                let host = this
+                    .core
+                    .read(cx)
+                    .active
+                    .as_ref()
+                    .and_then(|p| p.host.clone());
                 this.show_screen(ScreenSpec::setup("").on(host), window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::OpenMeeting, window, cx| {
@@ -1687,45 +1750,68 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::RejectProposal, _, cx| {
                 this.on_memory(cx, |s, cx| s.decide_pending(Verdict::Rejected, cx));
             }))
-            .on_action(cx.listener(|this, _: &actions::OpenMeetingMinutes, window, cx| {
-                if let Some(p) = this.core.read(cx).active.clone()
-                    && let Some(core) = this.cores.of(p.host.as_deref())
-                    && let Some(id) = meeting::minutes_of(&p.id, core, cx)
-                {
-                    this.show_screen(ScreenSpec::minute(&p.id, &id).on(p.host), window, cx);
-                }
-            }))
-            .on_action(cx.listener(|this, _: &actions::OpenCall, window, cx| {
-                this.open_call(window, cx)
-            }))
-            .on_action(cx.listener(|this, _: &actions::ReloadScreens, _, cx| this.reload_screens(cx)))
+            .on_action(
+                cx.listener(|this, _: &actions::OpenMeetingMinutes, window, cx| {
+                    if let Some(p) = this.core.read(cx).active.clone()
+                        && let Some(core) = this.cores.of(p.host.as_deref())
+                        && let Some(id) = meeting::minutes_of(&p.id, core, cx)
+                    {
+                        this.show_screen(ScreenSpec::minute(&p.id, &id).on(p.host), window, cx);
+                    }
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::OpenCall, window, cx| this.open_call(window, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::ReloadScreens, _, cx| this.reload_screens(cx)),
+            )
             .on_action(cx.listener(|this, _: &actions::OpenSettings, window, cx| {
                 this.show_screen(ScreenSpec::settings(), window, cx)
             }))
-            .on_action(cx.listener(|this, a: &actions::OpenSettingsSection, window, cx| {
-                this.show_screen(ScreenSpec::settings_at(a.section), window, cx)
-            }))
-            .on_action(cx.listener(|this, _: &actions::OpenDataSettings, window, cx| {
-                this.show_screen(ScreenSpec::settings_at(Section::Data), window, cx)
-            }))
-            .on_action(cx.listener(|this, _: &actions::ShowMeetingContext, window, cx| {
-                this.show_active(ScreenSpec::meeting, window, cx);
-                this.on_active(ScreenSpec::meeting, window, cx, |p, _, cx| p.meeting_context(cx));
-            }))
-            .on_action(cx.listener(|this, _: &actions::AskMeetingRole, window, cx| {
-                this.show_active(ScreenSpec::meeting, window, cx);
-                this.on_active(ScreenSpec::meeting, window, cx, |p, window, cx| {
-                    p.meeting_ask(window, cx)
-                });
-            }))
-            .on_action(cx.listener(|this, _: &actions::ToggleArchivedProducts, _, cx| {
-                let host = this.core.read(cx).active.as_ref().and_then(|p| p.host.clone());
-                this.sidebar
-                    .update(cx, |s, cx| s.toggle_archived(host.as_deref(), cx));
-            }))
-            .on_action(cx.listener(|this, _: &actions::OpenOwnerSettings, window, cx| {
-                this.show_screen(ScreenSpec::settings_at(Section::Owner), window, cx)
-            }))
+            .on_action(
+                cx.listener(|this, a: &actions::OpenSettingsSection, window, cx| {
+                    this.show_screen(ScreenSpec::settings_at(a.section), window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::OpenDataSettings, window, cx| {
+                    this.show_screen(ScreenSpec::settings_at(Section::Data), window, cx)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::ShowMeetingContext, window, cx| {
+                    this.show_active(ScreenSpec::meeting, window, cx);
+                    this.on_active(ScreenSpec::meeting, window, cx, |p, _, cx| {
+                        p.meeting_context(cx)
+                    });
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::AskMeetingRole, window, cx| {
+                    this.show_active(ScreenSpec::meeting, window, cx);
+                    this.on_active(ScreenSpec::meeting, window, cx, |p, window, cx| {
+                        p.meeting_ask(window, cx)
+                    });
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::ToggleArchivedProducts, _, cx| {
+                    let host = this
+                        .core
+                        .read(cx)
+                        .active
+                        .as_ref()
+                        .and_then(|p| p.host.clone());
+                    this.sidebar
+                        .update(cx, |s, cx| s.toggle_archived(host.as_deref(), cx));
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::OpenOwnerSettings, window, cx| {
+                    this.show_screen(ScreenSpec::settings_at(Section::Owner), window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::CheckHealth, window, cx| {
                 this.show_screen(ScreenSpec::settings_at(Section::Health), window, cx);
                 for p in this.open_screens(cx) {
@@ -1745,35 +1831,43 @@ impl Render for Shell {
             .on_action(cx.listener(|this, _: &actions::OpenGuide, window, cx| {
                 this.show_screen(ScreenSpec::guide(), window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::OpenGuideStart, window, cx| {
-                this.show_screen(ScreenSpec::guide(), window, cx);
-                for p in this.open_screens(cx) {
-                    if p.read(cx).is(&ScreenSpec::guide()) {
-                        p.update(cx, |p, cx| p.reveal_section(crate::guide::INSTALL, cx));
+            .on_action(
+                cx.listener(|this, _: &actions::OpenGuideStart, window, cx| {
+                    this.show_screen(ScreenSpec::guide(), window, cx);
+                    for p in this.open_screens(cx) {
+                        if p.read(cx).is(&ScreenSpec::guide()) {
+                            p.update(cx, |p, cx| p.reveal_section(crate::guide::INSTALL, cx));
+                        }
                     }
-                }
-            }))
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::LabelProduct, window, cx| {
                 this.ask_product(Ask::ProductLabel, window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::ColorProduct, window, cx| {
                 this.ask_product(Ask::ProductColor, window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::MoveProductToGroup, window, cx| {
-                this.ask_product(Ask::ProductGroup, window, cx)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::MoveProductToGroup, window, cx| {
+                    this.ask_product(Ask::ProductGroup, window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::RenamePane, window, cx| {
                 this.ask_pane(Ask::PaneLabel, window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::ColorPane, window, cx| {
                 this.ask_pane(Ask::PaneColor, window, cx)
             }))
-            .on_action(cx.listener(|this, _: &actions::CloseOtherTabs, window, cx| {
-                this.on_active_tab(window, cx, Self::close_others)
-            }))
-            .on_action(cx.listener(|this, _: &actions::CloseTabsToTheRight, window, cx| {
-                this.on_active_tab(window, cx, Self::close_to_the_right)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::CloseOtherTabs, window, cx| {
+                    this.on_active_tab(window, cx, Self::close_others)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::CloseTabsToTheRight, window, cx| {
+                    this.on_active_tab(window, cx, Self::close_to_the_right)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::NewTabGroup, window, cx| {
                 this.on_active_tab(window, cx, |this, p, window, cx| {
                     this.ask(Ask::NewTabGroup(p), window, cx)
@@ -1784,30 +1878,36 @@ impl Render for Shell {
                     this.ask(Ask::AddToTabGroup(p), window, cx)
                 })
             }))
-            .on_action(cx.listener(|this, _: &actions::RemoveTabFromGroup, window, cx| {
-                this.on_active_tab(window, cx, Self::leave_group)
-            }))
-            .on_action(cx.listener(|this, _: &actions::RenameTabGroup, window, cx| {
-                this.on_active_group(window, cx, |this, g, window, cx| {
-                    this.ask(Ask::RenameTabGroup(g), window, cx)
-                })
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::RemoveTabFromGroup, window, cx| {
+                    this.on_active_tab(window, cx, Self::leave_group)
+                }),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::RenameTabGroup, window, cx| {
+                    this.on_active_group(window, cx, |this, g, window, cx| {
+                        this.ask(Ask::RenameTabGroup(g), window, cx)
+                    })
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::ColorTabGroup, window, cx| {
                 this.on_active_group(window, cx, |this, g, window, cx| {
                     this.ask(Ask::ColorTabGroup(g), window, cx)
                 })
             }))
-            .on_action(cx.listener(|this, _: &actions::ToggleTabGroup, window, cx| {
-                this.on_active_group(window, cx, Self::toggle_group)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::ToggleTabGroup, window, cx| {
+                    this.on_active_group(window, cx, Self::toggle_group)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::UngroupTabs, window, cx| {
                 this.on_active_group(window, cx, Self::ungroup)
             }))
             .on_action(cx.listener(|this, _: &actions::CloseTabGroup, window, cx| {
                 this.on_active_group(window, cx, Self::close_group)
             }))
-            .on_action(cx.listener(|this, _: &actions::ShowAlerts, _, cx| {
-                this.toggle_alert_log(cx)
+            .on_action(cx.listener(|this, _: &actions::ShowAlerts, window, cx| {
+                this.toggle_pane(PaneKind::Alerts, window, cx)
             }))
             .on_action(cx.listener(|this, _: &actions::ToggleVoice, window, cx| {
                 if let Some(p) = this.focused_terminal(window, cx) {
@@ -1820,42 +1920,97 @@ impl Render for Shell {
                 }
             }))
             .map(|el| menu_actions::handlers(el, cx))
-            .on_action(cx.listener(|this, _: &actions::OpenContextMenu, window, cx| {
-                this.open_context_menu(window, cx)
-            }))
+            .on_action(
+                cx.listener(|this, _: &actions::OpenContextMenu, window, cx| {
+                    this.open_context_menu(window, cx)
+                }),
+            )
             .on_action(cx.listener(|this, _: &actions::Quit, window, cx| {
                 this.before_quit(cx);
                 window.remove_window();
             }))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct1, w, cx| this.select_nth(0, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct2, w, cx| this.select_nth(1, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct3, w, cx| this.select_nth(2, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct4, w, cx| this.select_nth(3, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct5, w, cx| this.select_nth(4, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct6, w, cx| this.select_nth(5, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct7, w, cx| this.select_nth(6, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct8, w, cx| this.select_nth(7, w, cx)))
-            .on_action(cx.listener(|this, _: &actions::SelectProduct9, w, cx| this.select_nth(8, w, cx)))
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct1, w, cx| this.select_nth(0, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct2, w, cx| this.select_nth(1, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct3, w, cx| this.select_nth(2, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct4, w, cx| this.select_nth(3, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct5, w, cx| this.select_nth(4, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct6, w, cx| this.select_nth(5, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct7, w, cx| this.select_nth(6, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct8, w, cx| this.select_nth(7, w, cx)),
+            )
+            .on_action(
+                cx.listener(|this, _: &actions::SelectProduct9, w, cx| this.select_nth(8, w, cx)),
+            )
             .when_some(
                 self.bench
                     .as_ref()
                     // The start bench times the first paint of the front desk: from the
                     // moment that its first screen has its data.
                     .filter(|b| {
-                        b.kind() != BenchKind::Start
-                            || FIRST_SCREEN_READY.load(Ordering::Relaxed)
+                        b.kind() != BenchKind::Start || FIRST_SCREEN_READY.load(Ordering::Relaxed)
                     }),
                 |el, b| el.child(b.marker()),
             )
-            .child(self.sidebar.clone().cached(
-                StyleRefinement::default().h_full().w(control::SIDEBAR_WIDTH).flex_none(),
-            ))
+            .map(|el| self.pane_listeners(el, cx))
+            .child(pane_bar)
+            .child(
+                div()
+                    .flex()
+                    .flex_1()
+                    .min_h_0()
+                    .w_full()
+                    .children(left)
+                    .child(self.dock_area(empty, &terminal_key, &palette_key, drops))
+                    .children(right),
+            )
+            .children(palette)
+            .children(self.asking.as_ref().map(|a| a.prompt.clone()))
+            .children(self.menu_layer())
+    }
+}
+
+impl Shell {
+    /// The dock of the shown space, with the hint of an empty dock and the drop lines of an
+    /// empty column. With the Products pane hidden, the notices of the sidebar show under the
+    /// dock.
+    fn dock_area(
+        &self,
+        empty: bool,
+        terminal_key: &str,
+        palette_key: &str,
+        drops: Vec<Div>,
+    ) -> impl IntoElement {
+        // Not cached: a cached view takes the size of its style, and the notices have none.
+        // Hidden, the sidebar draws only its notices, so the draw costs little.
+        let notices = (!self.panes.is_open(PaneKind::Products)).then(|| self.sidebar.clone());
+        div()
+            .debug_selector(|| "dock-area".into())
+            .flex_1()
+            .min_w_0()
+            .h_full()
+            .relative()
+            .flex()
+            .flex_col()
             .child(
                 div()
                     .flex_1()
-                    .min_w_0()
-                    .h_full()
-                    .relative()
+                    .min_h_0()
+                    .w_full()
                     .child(match self.plan.as_ref().and_then(|p| p.size) {
                         Some((w, h)) => div()
                             .w(Pixels::from(w))
@@ -1863,36 +2018,34 @@ impl Render for Shell {
                             .child(self.dock.clone())
                             .into_any_element(),
                         None => self.dock.clone().into_any_element(),
-                    })
-                    .when(empty, |el| {
-                        el.child(
-                            div()
-                                .absolute()
-                                .top_0()
-                                .left_0()
-                                .size_full()
-                                .flex()
-                                .flex_col()
-                                .items_center()
-                                .justify_center()
-                                .gap(space(2))
-                                .text_color(text::secondary())
-                                .child(format!(
-                                    "Pick a product in the sidebar, or press {terminal_key} for a terminal."
-                                ))
-                                .child(
-                                    div()
-                                        .text_size(size::sm())
-                                        .text_color(text::tertiary())
-                                        .child(format!("{palette_key} lists each action.")),
-                                ),
-                        )
                     }),
             )
-            .children(palette)
-            .children(self.alert_log(cx))
-            .children(self.asking.as_ref().map(|a| a.prompt.clone()))
-            .children(self.menu_layer())
+            .children(notices)
+            .when(empty, |el| {
+                el.child(
+                    div()
+                        .absolute()
+                        .top_0()
+                        .left_0()
+                        .size_full()
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .justify_center()
+                        .gap(space(2))
+                        .text_color(text::secondary())
+                        .child(format!(
+                            "Pick a product in the Products pane, or press {terminal_key} for a terminal."
+                        ))
+                        .child(
+                            div()
+                                .text_size(size::sm())
+                                .text_color(text::tertiary())
+                                .child(format!("{palette_key} lists each action.")),
+                        ),
+                )
+            })
+            .children(drops)
     }
 }
 

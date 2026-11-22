@@ -16,11 +16,10 @@
 use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
-use std::sync::{Arc, LazyLock};
 
 use agentsi_proto::desk_api::ProductInfo;
 use agentsi_ui::components::{
-    Button, GroupHeader, ItemRow, Kbd, ProductRow, StateMark, StatusDot, neutral_tag, running_chip,
+    GroupHeader, ItemRow, Kbd, ProductRow, StateMark, StatusDot, neutral_tag, running_chip,
 };
 use agentsi_ui::style::StyleExt as _;
 use agentsi_ui::tokens::{
@@ -47,14 +46,6 @@ use crate::tree::{self, Item, ItemKey, TabRow};
 use gpui_kit::component::dock::PanelId;
 use gpui_kit::component::{Icon, IconName};
 
-/// The icon of the desktop entry. `img` renders an SVG in its own colors.
-static APP_ICON: LazyLock<Arc<Image>> = LazyLock::new(|| {
-    Arc::new(Image::from_bytes(
-        ImageFormat::Svg,
-        include_bytes!("../../../packaging/icons/agentsi.svg").to_vec(),
-    ))
-});
-
 /// The owner picked a product in the sidebar.
 pub struct SelectProduct(pub ProductRef);
 
@@ -76,9 +67,6 @@ pub struct OpenFavorite(pub usize);
 /// The owner pressed "New product" at the end of a host group: the host, or `None` for this
 /// device. The shell opens the setup screen.
 pub struct NewProduct(pub Option<String>);
-
-/// The owner pressed the bell: the shell shows the alert log.
-pub struct ShowAlerts;
 
 /// A product opened or closed: the shell saves the layout again.
 pub struct TreeChanged;
@@ -132,34 +120,8 @@ impl Render for DraggedProduct {
     }
 }
 
-/// What the sidebar shows. Saved in `layout.json`.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum SidebarMode {
-    #[default]
-    Products,
-    Files,
-}
-
-impl SidebarMode {
-    /// The value in `layout.json`. The products have none.
-    pub fn key(self) -> Option<&'static str> {
-        match self {
-            SidebarMode::Products => None,
-            SidebarMode::Files => Some("files"),
-        }
-    }
-
-    pub fn from_key(key: Option<&str>) -> SidebarMode {
-        match key {
-            Some("files") => SidebarMode::Files,
-            _ => SidebarMode::Products,
-        }
-    }
-}
-
 pub struct Sidebar {
-    pub mode: SidebarMode,
-    /// The file tree of the Files mode.
+    /// The file tree of the Files pane. The shell draws it.
     pub files: Entity<FileTree>,
     core: Entity<CoreState>,
     cores: Cores,
@@ -183,13 +145,15 @@ pub struct Sidebar {
     open: BTreeMap<String, bool>,
     /// The hosts whose archived products show. The empty name is this device. Not saved.
     show_archived: std::collections::BTreeSet<String>,
+    /// The Products pane is open. Hidden, the view draws only the notices, which the shell
+    /// shows under the dock: they must stay in sight.
+    products_shown: bool,
     _observe: Vec<Subscription>,
 }
 
 impl EventEmitter<SelectProduct> for Sidebar {}
 impl EventEmitter<OpenItem> for Sidebar {}
 impl EventEmitter<TreeChanged> for Sidebar {}
-impl EventEmitter<ShowAlerts> for Sidebar {}
 impl EventEmitter<NewProduct> for Sidebar {}
 impl EventEmitter<CloseTab> for Sidebar {}
 impl EventEmitter<OpenFavorite> for Sidebar {}
@@ -243,7 +207,6 @@ impl Sidebar {
         }));
         observe.push(cx.subscribe(&files, |_, _, e: &RunFile, cx| cx.emit(e.clone())));
         Sidebar {
-            mode: SidebarMode::Products,
             files,
             probe,
             hosts,
@@ -257,27 +220,11 @@ impl Sidebar {
             placed: Rc::default(),
             open: BTreeMap::new(),
             show_archived: Default::default(),
+            products_shown: true,
             _observe: observe,
             core: cores.local.clone(),
             cores,
         }
-    }
-
-    /// Shows the products or the file tree, and tells the shell to save.
-    pub fn set_mode(&mut self, mode: SidebarMode, cx: &mut Context<Self>) {
-        let shown = mode == SidebarMode::Files;
-        self.files.update(cx, |f, cx| f.set_shown(shown, cx));
-        if self.mode != mode {
-            self.mode = mode;
-            cx.emit(TreeChanged);
-            cx.notify();
-        }
-    }
-
-    /// Shows the file tree and gives it the keyboard focus.
-    pub fn show_files(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.set_mode(SidebarMode::Files, cx);
-        self.files.update(cx, |f, cx| f.take_focus(window, cx));
     }
 
     /// The products that the owner opened or closed, for `layout.json`.
@@ -371,19 +318,31 @@ impl Sidebar {
         window.focus(&self.focus, cx);
     }
 
-    /// The sidebar has the keyboard focus.
+    /// The products or the file tree has the keyboard focus.
     pub fn has_focus(&self, window: &Window, cx: &App) -> bool {
-        self.focus.contains_focused(window, cx) || self.files.read(cx).has_focus(window, cx)
+        self.products_focused(window, cx) || self.files.read(cx).has_focus(window, cx)
     }
 
-    /// Opens the menu of the row of the cursor, just under the row. Returns false when no row
-    /// has the cursor.
-    pub fn open_menu_at_cursor(&mut self, cx: &mut Context<Self>) -> bool {
-        if self.mode == SidebarMode::Files {
+    /// The tree of the products has the keyboard focus.
+    pub fn products_focused(&self, window: &Window, cx: &App) -> bool {
+        self.focus.contains_focused(window, cx)
+    }
+
+    pub fn set_products_shown(&mut self, shown: bool, cx: &mut Context<Self>) {
+        if self.products_shown != shown {
+            self.products_shown = shown;
+            cx.notify();
+        }
+    }
+
+    /// Opens the menu of the row of the cursor of the focused tree, just under the row. Returns
+    /// false when no row has the cursor.
+    pub fn open_menu_at_cursor(&mut self, window: &Window, cx: &mut Context<Self>) -> bool {
+        if self.files.read(cx).has_focus(window, cx) {
             let Some(file) = self.files.read(cx).selected(cx) else {
                 return false;
             };
-            let at = Point::new(space(8), control::TOOLBAR_HEIGHT * 2.);
+            let at = self.files.read(cx).menu_point();
             menus::request(cx, Target::File(file), at);
             return true;
         }
@@ -1154,6 +1113,31 @@ impl Render for Sidebar {
                     .collect::<Vec<_>>(),
             )
         };
+        let host_off = match &host_state {
+            HostState::Off(why) => Some(why.clone()),
+            _ => None,
+        };
+        let notice_block = (host_off.is_some() || !notices.is_empty()).then(|| {
+            div()
+                .debug_selector(|| "sidebar-notices".into())
+                .flex()
+                .flex_col()
+                .gap(space(2))
+                .p(space(3))
+                .border_t_1()
+                .border_color(line::border())
+                .when_some(host_off, |el, why| el.child(caption(why)))
+                .children(notices.into_iter().map(caption))
+        });
+        if !self.products_shown {
+            return div()
+                .flex()
+                .flex_col()
+                .w_full()
+                .bg(surface::base())
+                .children(notice_block)
+                .into_any_element();
+        }
         let favorite_rows = self.favorite_rows(focused, cx);
         let home_rows = self.home_rows(focused, cx);
         let rows = self.product_rows(None, None, &products, false, 0, focused, cx);
@@ -1166,136 +1150,37 @@ impl Render for Sidebar {
             first += h.products.len();
         }
         let empty = rows.is_empty();
-        let unseen = Alerts::try_get(cx).map_or(0, |c| c.read(cx).unseen());
-        let host_off = match &host_state {
-            HostState::Off(why) => Some(why.clone()),
-            _ => None,
-        };
         div()
             .debug_selector(|| "sidebar".into())
             .flex()
             .flex_col()
-            .flex_none()
-            .w(control::SIDEBAR_WIDTH)
-            .h_full()
-            .bg(surface::base())
-            .border_r_1()
-            .border_color(line::border())
+            .size_full()
             .child(
                 div()
-                    .debug_selector(|| "sidebar-header".into())
+                    .id("products")
+                    .track_focus(&self.focus)
+                    .key_context("Sidebar")
+                    .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.key_down(e, cx)))
                     .flex()
-                    .items_center()
-                    .justify_between()
-                    .h(control::TOOLBAR_HEIGHT)
-                    .pad_x(space(4))
-                    .border_b_1()
-                    .border_color(line::border())
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(space(2))
-                            .child(img(APP_ICON.clone()).size(px(18.)).flex_none())
-                            .child(
-                                div()
-                                    .text_size(size::md())
-                                    .font_weight(weight::SEMIBOLD)
-                                    .text_color(text::primary())
-                                    .child("AgentSI"),
-                            ),
-                    )
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap(space(2))
-                            .child(
-                                Button::new("alerts-bell")
-                                    .icon(IconName::Bell)
-                                    .when(unseen > 0, |b| b.label(unseen.to_string()))
-                                    .ghost()
-                                    .small()
-                                    .on_click(cx.listener(|_, _, _, cx| cx.emit(ShowAlerts))),
-                            )
-                            .child(keys::hint(cx, keys::PALETTE)),
-                    ),
+                    .flex_col()
+                    .flex_1()
+                    .min_h_0()
+                    .overflow_y_scroll()
+                    .gap(space(1))
+                    .p(space(2))
+                    .children(favorite_rows)
+                    .children(home_rows)
+                    .child(local_header)
+                    .children(rows)
+                    .when(empty, |el| {
+                        el.child(div().pad_x(space(2)).child(caption(
+                            error.unwrap_or_else(|| "No products in the store yet.".into()),
+                        )))
+                    })
+                    .children(remote),
             )
-            .child(self.mode_switch(cx))
-            .when(self.mode == SidebarMode::Files, |el| {
-                el.child(self.files.clone())
-            })
-            .when(self.mode == SidebarMode::Products, |el| {
-                el.child(
-                    div()
-                        .id("products")
-                        .track_focus(&self.focus)
-                        .key_context("Sidebar")
-                        .on_key_down(
-                            cx.listener(|this, e: &KeyDownEvent, _, cx| this.key_down(e, cx)),
-                        )
-                        .flex()
-                        .flex_col()
-                        .flex_1()
-                        .min_h_0()
-                        .overflow_y_scroll()
-                        .gap(space(1))
-                        .p(space(2))
-                        .children(favorite_rows)
-                        .children(home_rows)
-                        .child(local_header)
-                        .children(rows)
-                        .when(empty, |el| {
-                            el.child(div().pad_x(space(2)).child(caption(
-                                error.unwrap_or_else(|| "No products in the store yet.".into()),
-                            )))
-                        })
-                        .children(remote),
-                )
-            })
-            .when(host_off.is_some() || !notices.is_empty(), |el| {
-                el.child(
-                    div()
-                        .flex()
-                        .flex_col()
-                        .gap(space(2))
-                        .p(space(3))
-                        .border_t_1()
-                        .border_color(line::border())
-                        .when_some(host_off, |el, why| el.child(caption(why)))
-                        .children(notices.into_iter().map(caption)),
-                )
-            })
-    }
-}
-
-impl Sidebar {
-    /// The segmented control of the two modes, under the header.
-    fn mode_switch(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let button = |mode: SidebarMode, id: &'static str, label: &'static str| {
-            let b = Button::new(id).label(label).small();
-            let b = if self.mode == mode {
-                b.secondary()
-            } else {
-                b.ghost()
-            };
-            b.on_click(cx.listener(move |this, _, window, cx| {
-                if mode == SidebarMode::Files {
-                    this.show_files(window, cx);
-                } else {
-                    this.set_mode(mode, cx);
-                }
-            }))
-        };
-        div()
-            .debug_selector(|| "sidebar-modes".into())
-            .flex()
-            .gap(space(1))
-            .p(space(2))
-            .border_b_1()
-            .border_color(line::border())
-            .child(button(SidebarMode::Products, "mode-products", "Products"))
-            .child(button(SidebarMode::Files, "mode-files", "Files"))
+            .children(notice_block)
+            .into_any_element()
     }
 }
 
@@ -1367,6 +1252,25 @@ mod tests {
         }
     }
 
+    /// The sidebar in a left column of the first width, as the shell draws the Products pane.
+    struct Column(gpui::Entity<Sidebar>);
+
+    impl gpui::Render for Column {
+        fn render(
+            &mut self,
+            _: &mut gpui::Window,
+            _: &mut gpui::Context<Self>,
+        ) -> impl gpui::IntoElement {
+            use gpui::{InteractiveElement as _, ParentElement as _, Styled as _};
+            gpui::div()
+                .debug_selector(|| "sidebar-column".into())
+                .w(control::SIDEBAR_WIDTH)
+                .h_full()
+                .border_r_1()
+                .child(self.0.clone())
+        }
+    }
+
     /// A sidebar with three products in a window of the app size. The core end must stay open.
     fn fixture(
         cx: &mut TestAppContext,
@@ -1384,8 +1288,9 @@ mod tests {
                 cx,
             )
         });
-        let (_, cx) =
-            cx.add_window_view(|window, cx| Sidebar::new(Cores::new(core), None, window, cx));
+        let (_, cx) = cx.add_window_view(|window, cx| {
+            Column(cx.new(|cx| Sidebar::new(Cores::new(core), None, window, cx)))
+        });
         cx.simulate_resize(gpui::size(control::WINDOW_WIDTH, control::WINDOW_HEIGHT));
         (core_end, cx)
     }
@@ -1450,18 +1355,18 @@ mod tests {
     ) {
         let (_core_end, cx) = fixture(cx);
         cx.update(|window, cx| window.draw(cx).clear(cx));
-        // x, y, width and height, measured with the arrow of the tree (N5). The switch of the
-        // sidebar modes takes 45 px under the header.
+        // x, y, width and height, measured with the arrow of the tree (N5). The header (48 px)
+        // and the switch of the sidebar modes (45 px) went to the pane bar, so each row is
+        // 93 px higher than before the panes.
         let before = [
-            ("sidebar", [0., 0., 248., 820.]),
-            ("sidebar-header", [0., 0., 247., 48.]),
-            ("sidebar-modes", [0., 48., 247., 45.]),
-            ("tree-row:product-a", [8., 142., 231., 44.]),
-            ("tree-row:product-b", [8., 190., 231., 44.]),
-            ("tree-row:product-c", [8., 238., 231., 44.]),
-            ("tree-row:product-a:text", [46., 143.5, 115., 40.5]),
-            ("tree-row:product-b:text", [46., 201.5, 115., 21.]),
-            ("tree-row:product-c:text", [46., 239.5, 115., 40.5]),
+            ("sidebar-column", [0., 0., 248., 820.]),
+            ("sidebar", [0., 0., 247., 820.]),
+            ("tree-row:product-a", [8., 49., 231., 44.]),
+            ("tree-row:product-b", [8., 97., 231., 44.]),
+            ("tree-row:product-c", [8., 145., 231., 44.]),
+            ("tree-row:product-a:text", [46., 50.5, 115., 40.5]),
+            ("tree-row:product-b:text", [46., 108.5, 115., 21.]),
+            ("tree-row:product-c:text", [46., 146.5, 115., 40.5]),
         ];
         for (name, want) in before {
             let b = bounds(cx, name);
@@ -1485,12 +1390,12 @@ mod tests {
                 window.draw(cx).clear(cx);
             });
             let ctx = format!("{a:?}");
+            assert_eq!(
+                bounds(cx, "sidebar-column").size.width,
+                control::SIDEBAR_WIDTH,
+                "{ctx}"
+            );
             let side = bounds(cx, "sidebar");
-            assert_eq!(side.size.width, control::SIDEBAR_WIDTH, "{ctx}");
-            let header = bounds(cx, "sidebar-header");
-            assert_eq!(header.size.height, control::TOOLBAR_HEIGHT, "{ctx}");
-            let title_ink = f32::from(size::md()) * INK_EM;
-            assert!(title_ink <= f32::from(header.size.height), "{ctx}");
             let rows: Vec<_> = ["a", "b", "c"]
                 .iter()
                 .map(|id| bounds(cx, &format!("tree-row:product-{id}")))
@@ -1502,10 +1407,7 @@ mod tests {
                     r.left() >= side.left() && r.right() <= side.right(),
                     "{ctx}: row {i} is cut at the side"
                 );
-                assert!(
-                    r.top() >= header.bottom(),
-                    "{ctx}: row {i} is under the header"
-                );
+                assert!(r.top() >= side.top(), "{ctx}: row {i} is cut at the top");
                 assert!(
                     r.bottom() <= side.bottom(),
                     "{ctx}: row {i} is cut at the bottom"
@@ -1959,49 +1861,6 @@ mod tests {
             assert!(at(cx, "new-product:").is_some());
             click(cx, "new-product:");
             assert_eq!(*t.told.borrow(), [Told::New(None)]);
-        }
-
-        #[gpui::test]
-        fn the_switch_shows_the_file_tree_of_the_selected_product_and_back(
-            cx: &mut TestAppContext,
-        ) {
-            let (t, cx) = tree(cx, "modes");
-            t.core.update(cx, |s, cx| {
-                let mut a = product("a");
-                a.path = Some("/w/a".into());
-                s.set_products(vec![a, product("b")], cx);
-                s.active = Some(mine("a"));
-                cx.notify();
-            });
-            redraw(cx);
-            assert!(at(cx, "sidebar-modes").is_some());
-            assert!(at(cx, "files").is_none());
-            click(cx, "button:mode-files");
-            assert_eq!(
-                t.sidebar.read_with(cx, |s, _| s.mode),
-                super::super::SidebarMode::Files
-            );
-            assert_eq!(*t.told.borrow(), [Told::Tree]);
-            assert!(at(cx, "files").is_some());
-            assert!(at(cx, "tree-row:product-a").is_none());
-            let files = t.sidebar.read_with(cx, |s, _| s.files.clone());
-            let names = files.read_with(cx, |f, cx| f.shown_names(cx));
-            assert_eq!(names, ["Reading…"]);
-            assert!(t.sidebar.read_with(cx, |s, cx| {
-                let selected = s.files.read(cx).selected(cx).unwrap();
-                selected.product == mine("a") && selected.path.is_empty()
-            }));
-            click(cx, "button:mode-products");
-            assert!(at(cx, "files").is_none());
-            assert!(at(cx, "tree-row:product-a").is_some());
-            assert_eq!(
-                super::super::SidebarMode::from_key(super::super::SidebarMode::Files.key()),
-                super::super::SidebarMode::Files
-            );
-            assert_eq!(
-                super::super::SidebarMode::from_key(None),
-                super::super::SidebarMode::Products
-            );
         }
 
         #[gpui::test]

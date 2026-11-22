@@ -7,6 +7,7 @@
 //! The filter matches the names that the tree read, and opens the folders of each match.
 //! New file, New folder and Rename show an inline name field in the tree.
 
+use std::cell::Cell;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -114,6 +115,8 @@ pub struct FileTree {
     tree: Entity<TreeState>,
     rows: Rc<HashMap<SharedString, Row>>,
     focus: FocusHandle,
+    /// Where the tree was drawn last, for the menu key: the pane can be in either column.
+    drawn: Rc<Cell<Bounds<Pixels>>>,
     _subs: Vec<Subscription>,
 }
 
@@ -175,6 +178,7 @@ impl FileTree {
             tree,
             rows: Rc::default(),
             focus: cx.focus_handle(),
+            drawn: Rc::default(),
             _subs: subs,
         };
         t.follow_active(cx);
@@ -183,6 +187,13 @@ impl FileTree {
 
     pub fn has_focus(&self, window: &Window, cx: &App) -> bool {
         self.focus.contains_focused(window, cx)
+    }
+
+    /// The point where the menu key opens the menu of the selected entry: inside the tree,
+    /// under its filter row.
+    pub fn menu_point(&self) -> Point<Pixels> {
+        let at = self.drawn.get().origin;
+        Point::new(at.x + space(8), at.y + control::TOOLBAR_HEIGHT)
     }
 
     /// Puts the keyboard focus in the tree.
@@ -922,9 +933,16 @@ impl Render for FileTree {
             )
         });
         let ignored = self.show_ignored;
+        let drawn = self.drawn.clone();
         div()
             .debug_selector(|| "files".into())
             .track_focus(&self.focus)
+            .relative()
+            .child(
+                canvas(move |bounds, _, _| drawn.set(bounds), |_, _, _, _| {})
+                    .absolute()
+                    .size_full(),
+            )
             .flex()
             .flex_col()
             .flex_1()

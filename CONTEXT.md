@@ -416,9 +416,17 @@ _Avoid_: Sticky tab, locked tab
 A saved target with a label: a screen of a product, a folder, or a terminal command with its folder. `<config>/agentsi/favorites.toml` keeps the list in the order of the section "Favorites" of the sidebar. A click opens the target in the space of its product.
 _Avoid_: Bookmark, shortcut
 
-**Sidebar mode**:
-What the sidebar shows: Products (the tree of the products and their items) or Files (the file tree of the selected product). A switch at the top of the sidebar changes it, and `layout.json` keeps it (`sidebar_mode`).
-_Avoid_: Sidebar tab, sidebar view
+**Pane**:
+One tool outside the dock: Products (the tree of the products and their items), Files (the file tree of the selected product) or Alerts (the alert log). A pane is open or hidden. A hidden pane takes no place. The panes are global: each space shows the same panes. `layout.json` keeps each pane, its column, its order, its height share and its open state (`panes`). A file of before the panes opens with its old `sidebar_mode`. Not a terminal pane, which is a tab in the dock.
+_Avoid_: Sidebar mode, panel, tool window
+
+**Column**:
+The left or the right side of the window. A column holds its open panes top to bottom, and the owner resizes it and each pane in it. A column with no open pane takes no width.
+_Avoid_: Sidebar, dock (the dock is the middle)
+
+**Pane bar**:
+The row at the top of the window. It shows the app icon and name, one toggle for each pane and the palette hint. A bright toggle is an open pane, and a muted toggle a hidden pane. The Alerts toggle shows the count of the unseen alerts.
+_Avoid_: Top bar, toolbar, icon rail
 
 **File tree**:
 The folders and files of the selected product, as the core reads them one folder at a time (`files.list`). A row shows the name, an icon of its kind and the color of its git state: changed, new or ignored. New file, New folder and Rename show an inline name field. Move to trash moves to the system trash, and nothing deletes for good. The core refuses a path that leaves the folder of the product.
@@ -444,5 +452,5 @@ The file `agentsi.desktop` that `install.sh` writes to `${XDG_DATA_HOME:-~/.loca
 _Avoid_: Launcher entry, shortcut, .desktop file
 
 **App icon**:
-The file `agentsi.svg` that `install.sh` writes to the `hicolor` icon theme of the owner. The launcher and the sidebar header show it.
+The file `agentsi.svg` that `install.sh` writes to the `hicolor` icon theme of the owner. The launcher and the pane bar show it.
 _Avoid_: Logo, icon (alone)

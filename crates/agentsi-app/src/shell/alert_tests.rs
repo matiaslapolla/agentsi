@@ -1,4 +1,5 @@
-//! The toast, the bell, the log and the open action over the real shell, with a fake core.
+//! The toast, the count of the Alerts toggle, the log and the open action over the real shell,
+//! with a fake core.
 
 use agentsi_proto::rpc::Notification;
 use gpui::{TestAppContext, VisualTestContext};
@@ -43,7 +44,9 @@ fn blocked(id: &str) -> Notification {
 }
 
 #[gpui::test]
-fn a_blocked_pane_in_a_hidden_tab_shows_a_toast_and_the_bell_counts_it(cx: &mut TestAppContext) {
+fn a_blocked_pane_in_a_hidden_tab_shows_a_toast_and_the_alerts_toggle_counts_it(
+    cx: &mut TestAppContext,
+) {
     let look = folder("alert-toast").join("look.toml");
     let (f, cx) = fixture(cx, Persist::None, &look);
     with_tabs(&f, cx);
@@ -63,7 +66,9 @@ fn a_blocked_pane_in_a_hidden_tab_shows_a_toast_and_the_bell_counts_it(cx: &mut 
 }
 
 #[gpui::test]
-fn the_bell_opens_the_log_and_open_shows_the_pane_and_ends_its_glow(cx: &mut TestAppContext) {
+fn the_alerts_toggle_opens_the_log_and_open_shows_the_pane_and_ends_its_glow(
+    cx: &mut TestAppContext,
+) {
     let look = folder("alert-log").join("look.toml");
     let (f, cx) = fixture(cx, Persist::None, &look);
     with_tabs(&f, cx);
@@ -72,8 +77,8 @@ fn the_bell_opens_the_log_and_open_shows_the_pane_and_ends_its_glow(cx: &mut Tes
         note("terminal.state", json!({"id": "t1-a", "state": "error"})),
     );
     assert!(at(cx, "alert-log").is_none());
-    click(cx, "button:alerts-bell");
-    assert!(at(cx, "alert-log").is_some(), "the popover opens");
+    click(cx, "pane-toggle:alerts:hidden");
+    assert!(at(cx, "alert-log").is_some(), "the pane opens");
     let unseen = cx.update(|_, cx| Alerts::try_get(cx).unwrap().read(cx).unseen());
     assert_eq!(unseen, 0, "opening the log counts the alerts as seen");
     assert!(at(cx, "alert-row-0").is_some());
@@ -86,14 +91,14 @@ fn the_bell_opens_the_log_and_open_shows_the_pane_and_ends_its_glow(cx: &mut Tes
     click(cx, "button:alert-open-0");
     assert_eq!(active_tab(&f, cx), "terminal:t1-a");
     assert!(glow(cx).is_none(), "opening the target ends the glow");
-    assert!(at(cx, "alert-log").is_none(), "the popover closes");
+    assert!(at(cx, "alert-log").is_some(), "the pane stays open");
 }
 
 #[gpui::test]
 fn an_empty_log_says_so(cx: &mut TestAppContext) {
     let look = folder("alert-empty").join("look.toml");
-    let (f, cx) = fixture(cx, Persist::None, &look);
-    f.shell.update(cx, |s, cx| s.toggle_alert_log(cx));
+    let (_f, cx) = fixture(cx, Persist::None, &look);
+    cx.dispatch_action(crate::actions::ShowAlerts);
     redraw(cx);
     assert!(at(cx, "alert-log").is_some());
     assert!(at(cx, "alert-row-0").is_none());
