@@ -236,14 +236,20 @@ impl DeskConversation {
     /// A pick of a select: the core stores it, and the select shows what the core answers.
     pub(crate) fn pick(&mut self, field: Field, value: String, cx: &mut Context<Self>) {
         let value = (!value.is_empty()).then_some(value);
-        let (mut model, mut effort) = (
-            self.choice.as_ref().and_then(|c| c.model.clone()),
-            self.choice.as_ref().and_then(|c| c.effort.clone()),
-        );
+        // `desk.configure` replaces both fields, so a pick needs the stored pair.
+        let Some(choice) = self.choice.as_mut() else {
+            self.pick_error =
+                Some("The model settings are loading. Pick again in a moment.".into());
+            self.selects_stale = true;
+            cx.notify();
+            return;
+        };
         match field {
-            Field::Model => model = value,
-            Field::Effort => effort = value,
+            Field::Model => choice.model = value,
+            Field::Effort => choice.effort = value,
         }
+        // The pair stays in `choice` until the core answers, so a second pick keeps the first.
+        let (model, effort) = (choice.model.clone(), choice.effort.clone());
         self.configure(model, effort, cx);
     }
 
@@ -282,9 +288,12 @@ impl DeskConversation {
                     matches!(self.state, DeskState::Working | DeskState::Starting);
                 self.choice = Some(choice);
             }
-            Err(e) => self.pick_error = Some(e.to_string()),
+            Err(e) => {
+                self.pick_error = Some(e.to_string());
+                // The pair of a refused pick is not stored: read what the core holds.
+                self.read_settings(cx);
+            }
         }
-        // A refused pick shows the stored value again.
         self.selects_stale = true;
         cx.notify();
     }
@@ -1957,6 +1966,30 @@ mod tests {
             assert!(c.pick_error.as_deref().unwrap().contains("Unknown model"));
             assert_eq!(c.options(Field::Model).1, "opus");
         });
+    }
+
+    #[gpui::test]
+    fn two_quick_picks_keep_each_other_and_a_pick_before_the_settings_load_asks_again(
+        cx: &mut TestAppContext,
+    ) {
+        use super::Field;
+        let (conv, mut other, cx) = setup(cx);
+        conv_ready(cx, &conv);
+        methods_sent(&mut other);
+        conv.update(cx, |c, cx| c.pick(Field::Model, "opus".into(), cx));
+        assert!(methods_sent(&mut other).is_empty(), "no pair to send yet");
+        conv.read_with(cx, |c, _| assert!(c.pick_error.is_some()));
+
+        conv.update(cx, |c, cx| {
+            c.settings_done(Ok(choice(None, None)), cx);
+            c.pick(Field::Model, "sonnet".into(), cx);
+            c.pick(Field::Effort, "max".into(), cx);
+        });
+        let sent = methods_sent(&mut other);
+        assert_eq!(
+            sent[1].1,
+            json!({"product": "demo", "model": "sonnet", "effort": "max"})
+        );
     }
 
     #[gpui::test]

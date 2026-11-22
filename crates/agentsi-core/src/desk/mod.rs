@@ -470,11 +470,22 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
     {
         let _ = old.send(Cmd::Stop);
     }
+    let previous = slot.state;
     if let Some(c) = &slot.commands
         && c.send(Cmd::Send(message.clone())).is_ok()
     {
+        // The state changes under the lock, so a `desk.configure` never sees `Idle` after
+        // the message reached the process.
+        slot.state = DeskState::Working;
+        let changed = slot.message.take().is_some() || previous != DeskState::Working;
         drop(slots);
-        set_state(core, product, None, DeskState::Working, None);
+        if changed {
+            core.publish::<DeskStateEvent>(&DeskStateParams {
+                product: product.to_string(),
+                state: DeskState::Working,
+                message: None,
+            });
+        }
         return Ok(seq);
     }
     let generation = core.desks.next_generation();
@@ -610,17 +621,28 @@ pub fn configure(
         agentsi_agency::desk::new_session_id().map_err(|e| RpcError::internal(e.to_string()))?;
     let (p, at) = (product.to_string(), crate::clock::iso_now());
     let (m, e) = (model.clone(), effort.clone());
-    store
-        .write(move |tx| desk::set_choice(tx, &p, m.as_deref(), e.as_deref(), &fresh, &at))
+    let changed = store
+        .write(move |tx| {
+            let same = desk::choice(tx, &p)? == (m.clone(), e.clone());
+            desk::set_choice(tx, &p, m.as_deref(), e.as_deref(), &fresh, &at)?;
+            Ok(!same)
+        })
         .map_err(rpc_store)?;
-    let idle = {
-        let slots = lock(&core.desks.slots);
+    // An idle process ends, in the same critical section that checks it, so a `desk.send`
+    // never finds it half ended and a reply that runs never ends.
+    let ended = {
+        let mut slots = lock(&core.desks.slots);
         slots
-            .get(product)
-            .is_some_and(|s| s.state == DeskState::Idle && !s.sending && s.commands.is_some())
+            .get_mut(product)
+            .filter(|s| changed && s.state == DeskState::Idle && !s.sending && s.commands.is_some())
+            .and_then(|s| {
+                s.generation = core.desks.next_generation();
+                s.commands.take()
+            })
     };
-    if idle {
-        stop(core, product);
+    if let Some(commands) = ended {
+        let _ = commands.send(Cmd::Stop);
+        set_state(core, product, None, DeskState::Stopped, None);
     }
     settings(core, product)
 }

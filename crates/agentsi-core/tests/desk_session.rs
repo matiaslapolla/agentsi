@@ -786,6 +786,14 @@ fn a_model_pick_shows_in_the_settings_and_makes_the_next_process_run_it_with_the
     assert_eq!(arg_after(&second, "--resume"), Some(session.clone()));
     assert!(!second.contains("--session-id"));
 
+    // The same pick again keeps the warm process.
+    assert_eq!(history(&mut c)["state"], "idle");
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "sonnet", "effort": "high"}),
+    );
+    assert_eq!(history(&mut c)["state"], "idle");
+
     // A null clears the choice back to the role default.
     let s = c.ok(
         "desk.configure",
