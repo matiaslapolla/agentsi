@@ -10,7 +10,7 @@ use agentsi_proto::core_api::Topic;
 use agentsi_proto::events::{FilesChanged, FilesChangedParams};
 use notify::event::ModifyKind;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 use std::path::PathBuf;
 use std::sync::mpsc::{self, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, Weak};
@@ -69,8 +69,8 @@ impl FileWatch {
 }
 
 struct Watched {
-    product: String,
-    path: String,
+    /// Each product and path that read this folder: two products can share a folder.
+    owners: BTreeSet<(String, String)>,
     sent: Option<Instant>,
     due: Option<Instant>,
 }
@@ -136,14 +136,22 @@ fn run(core: Weak<Core>, fs: Sender<Msg>, rx: mpsc::Receiver<Msg>) {
     };
     let mut folders = Folders::default();
     loop {
-        let wait = folders
-            .next_due()
-            .map_or(TICK, |d| d.saturating_duration_since(Instant::now()))
-            .min(TICK);
-        let msg = match rx.recv_timeout(wait) {
-            Ok(m) => Some(m),
-            Err(RecvTimeoutError::Timeout) => None,
-            Err(RecvTimeoutError::Disconnected) => return,
+        // With no folder there is nothing to time: the thread sleeps until the next list.
+        let msg = if folders.by_dir.is_empty() {
+            match rx.recv() {
+                Ok(m) => Some(m),
+                Err(_) => return,
+            }
+        } else {
+            let wait = folders
+                .next_due()
+                .map_or(TICK, |d| d.saturating_duration_since(Instant::now()))
+                .min(TICK);
+            match rx.recv_timeout(wait) {
+                Ok(m) => Some(m),
+                Err(RecvTimeoutError::Timeout) => None,
+                Err(RecvTimeoutError::Disconnected) => return,
+            }
         };
         let Some(core) = core.upgrade() else {
             return;
@@ -168,10 +176,12 @@ fn run(core: Weak<Core>, fs: Sender<Msg>, rx: mpsc::Receiver<Msg>) {
             if w.due.is_some_and(|d| d <= now) {
                 w.due = None;
                 w.sent = Some(now);
-                core.publish::<FilesChanged>(&FilesChangedParams {
-                    product: w.product.clone(),
-                    path: w.path.clone(),
-                });
+                for (product, path) in &w.owners {
+                    core.publish::<FilesChanged>(&FilesChangedParams {
+                        product: product.clone(),
+                        path: path.clone(),
+                    });
+                }
             }
         }
     }
@@ -179,8 +189,7 @@ fn run(core: Weak<Core>, fs: Sender<Msg>, rx: mpsc::Receiver<Msg>) {
 
 fn add(mut watcher: Option<&mut RecommendedWatcher>, folders: &mut Folders, f: Folder) {
     if let Some(w) = folders.by_dir.get_mut(&f.dir) {
-        w.product = f.product;
-        w.path = f.path;
+        w.owners.insert((f.product, f.path));
         folders.touch(&f.dir);
         return;
     }
@@ -203,8 +212,7 @@ fn add(mut watcher: Option<&mut RecommendedWatcher>, folders: &mut Folders, f: F
     folders.by_dir.insert(
         f.dir,
         Watched {
-            product: f.product,
-            path: f.path,
+            owners: BTreeSet::from([(f.product, f.path)]),
             sent: None,
             due: None,
         },
@@ -242,8 +250,12 @@ mod tests {
             f.by_dir.insert(
                 dir,
                 Watched {
-                    product: "a".into(),
-                    path: d.trim_start_matches("/p").trim_start_matches('/').into(),
+                    owners: BTreeSet::from([(
+                        "a".to_string(),
+                        d.trim_start_matches("/p")
+                            .trim_start_matches('/')
+                            .to_string(),
+                    )]),
                     sent: None,
                     due: None,
                 },
