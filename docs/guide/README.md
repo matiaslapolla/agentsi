@@ -377,7 +377,7 @@ The desk has three more buttons. "Update the index" reads the repos of the produ
 
 After you approve a decision that has an action, the button "Run in Claude" opens a Claude pane in the folder of the product with that action. Nothing runs before you click it.
 
-The conversation at the right of the desk has two selects, "Model" and "Effort". Each lists "Role default", then Fable, Opus, Sonnet and Haiku, or low, medium, high, xhigh and max. "Role default" uses the model or the effort of the `pm` role. The choice is for each product, and it stays after a restart. A pick applies to the next message. A reply that runs keeps its model, and a note says which model the next message uses. The palette entries "Desk: Choose model…" and "Desk: Choose effort…" make the same pick. The pick changes the desk conversation only, and meetings keep the model of their roles.
+The conversation at the right of the desk has two selects, "Model" and "Effort". Each lists "Role default", then Fable, Opus, Sonnet and Haiku, or low, medium, high, xhigh and max. "Role default" uses the model or the effort of the `pm` role. The desk model and the desk effort are for each product, and they stay after a restart. A pick applies to the next message. A pick while a reply runs does not end the reply: the reply finishes with its model, a note says which model the next message uses, and the next message uses the new model. The palette entries "Desk: Choose model…" and "Desk: Choose effort…" make the same pick. The pick changes the desk conversation only, and meetings keep the model of their roles.
 
 An approved decision can carry an action. The action says what an agent does after your approval. A decision that AgentSI could not apply shows the reason.
 
