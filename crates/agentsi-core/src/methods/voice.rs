@@ -8,13 +8,14 @@ use crate::voice_session;
 use agentsi_proto::RpcError;
 use agentsi_proto::core_api::Empty;
 use agentsi_proto::events::{
-    ProgramState, VoiceSpeak, VoiceSpeakParams, VoiceStop, VoiceStopParams,
+    ProgramState, VoiceModels, VoiceModelsParams, VoiceSpeak, VoiceSpeakParams, VoiceStop,
+    VoiceStopParams,
 };
 use agentsi_proto::voice_api::{
     Converse, ConverseParams, ConverseResult, Dictate, DictateParams, FocusReport,
     FocusReportParams, HookEvent, HookEventParams, HookEventResult, HookKind, Mode, ModeParams,
-    ModeResult, SessionMode, SessionModeParams, SessionModeResult, Transcript, TranscriptParams,
-    TranscriptResult,
+    ModeResult, ModelsKeep, ModelsKeepParams, ModelsKeepResult, SessionMode, SessionModeParams,
+    SessionModeResult, Transcript, TranscriptParams, TranscriptResult,
 };
 use agentsi_voice::{RULES, VOICE, spoken_sentences, transcript_entry, transcript_head};
 use serde_json::Value;
@@ -27,6 +28,7 @@ pub fn register(r: Router) -> Router {
         .add(Dictate, dictate)
         .add(Converse, converse)
         .add(Transcript, transcript)
+        .add(ModelsKeep, models_keep)
         .add(HookEvent, hook)
         .add(FocusReport, focus)
 }
@@ -85,6 +87,35 @@ async fn transcript(ctx: Ctx, p: TranscriptParams) -> Result<TranscriptResult, R
     crate::blocking::spawn(move || crate::dictate::transcript(&core, &p.text))
         .await
         .map_err(|e| RpcError::internal(e.to_string()))?
+}
+
+/// Writes the keep time of the voice models in `pill.toml`, and sends it to the pill. One
+/// change at a time, so the file and the last event agree.
+async fn models_keep(ctx: Ctx, p: ModelsKeepParams) -> Result<ModelsKeepResult, RpcError> {
+    static CHANGE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let unavailable = |message: String, hint: &str| {
+        RpcError::new(agentsi_proto::rpc::ErrorKind::Unavailable, message, hint)
+    };
+    let path = crate::pill_config::path().ok_or_else(|| {
+        unavailable(
+            "no config folder: HOME is not set".into(),
+            "Set XDG_CONFIG_HOME or HOME for the core.",
+        )
+    })?;
+    let core = ctx.core.clone();
+    crate::blocking::spawn(move || match p.keep {
+        Some(keep) => {
+            let _one = CHANGE.lock().unwrap_or_else(|e| e.into_inner());
+            crate::pill_config::write_keep(&path, keep)?;
+            core.publish::<VoiceModels>(&VoiceModelsParams { keep });
+            Ok(keep)
+        }
+        None => Ok(crate::pill_config::read_keep(&path)),
+    })
+    .await
+    .map_err(|e| RpcError::internal(e.to_string()))?
+    .map(|keep| ModelsKeepResult { keep })
+    .map_err(|e: String| unavailable(e, "Fix or remove pill.toml, then choose again."))
 }
 
 /// The state that a hook event gives, or `None` when it leaves the state as it is.

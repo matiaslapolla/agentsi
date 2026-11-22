@@ -14,6 +14,7 @@
 use agentsi_core::server::{bind, euid};
 use agentsi_core::state::Core;
 use agentsi_pill::dictate::{CoreDelivery, Dictator, Mic, OpenMic, Recognizer};
+use agentsi_pill::keep::{KeepTime, Policy};
 use agentsi_pill::link::{self, LinkEvent, LinkSender};
 use agentsi_pill::state::{Effect, Input, Model, Phase, SpeechEvent};
 use agentsi_proto::client::Client;
@@ -237,10 +238,9 @@ fn start_pill(
         Box::new(|| Ok(Box::new(Loud) as Box<dyn Classifier + Send>)),
         Box::new(CoreDelivery),
         tx.clone(),
+        Policy::new(KeepTime::default()),
         false,
     ));
-    // A press while the model loads is refused, so the test waits for the model.
-    assert!(dictator.wait_until_loaded(Duration::from_secs(30)));
     let phases = Arc::new(Mutex::new(vec![Phase::Hidden]));
     let heard_the_voice = Arc::new(AtomicBool::new(false));
     let spoken = Arc::new(AtomicUsize::new(0));

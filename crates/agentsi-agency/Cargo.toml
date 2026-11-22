@@ -25,5 +25,4 @@ unicode-normalization = "=0.1.26"
 url = "=2.5.8"
 toml = { workspace = true }
 trash = { workspace = true }
-# The version that `toml` 0.8 uses: it keeps the comments of git.toml.
-toml_edit = "=0.22.27"
+toml_edit = { workspace = true }

@@ -10,6 +10,9 @@ pub const ERROR_SHOWN: Duration = Duration::from_secs(3);
 pub const PREPARING_LIMIT: Duration = Duration::from_secs(10);
 /// How long the pill waits for the text after a recording ends.
 pub const TRANSCRIBING_LIMIT: Duration = Duration::from_secs(30);
+/// What a voice model that loads adds to [`PREPARING_LIMIT`] and [`TRANSCRIBING_LIMIT`]. The
+/// limit starts again when the model is ready.
+pub const LOAD_ALLOWANCE: Duration = Duration::from_secs(60);
 /// The longest recording of hold dictation. At this limit the pill ends the recording and
 /// transcribes it. Toggle dictation has no such limit: it sends a piece at each pause.
 pub const LISTENING_LIMIT: Duration = Duration::from_secs(120);
@@ -182,6 +185,8 @@ pub enum Input {
     Click,
     /// The limit of a phase ended. `generation` tells which phase started it.
     Timeout { generation: u64 },
+    /// A job waits for a voice model to load (`true`), or the load ended (`false`).
+    Loading(bool),
     /// The link to the core broke.
     Disconnected,
 }
@@ -251,6 +256,8 @@ pub struct Model {
     /// The ticket that started the speech phases now shown. The replies from it to
     /// `ticket` play one after the other, so the first sound of any of them counts.
     first_ticket: u64,
+    /// The voice models that load for a job now.
+    loads: u32,
 }
 
 impl Default for Model {
@@ -266,6 +273,7 @@ impl Default for Model {
             toggle: false,
             conversation: None,
             first_ticket: 0,
+            loads: 0,
         }
     }
 }
@@ -329,9 +337,16 @@ impl Model {
     pub fn limit(&self) -> Option<Duration> {
         if self.phase == Phase::Listening && (self.toggle || self.conversation.is_some()) {
             None
+        } else if self.loads > 0 && self.waits_for_a_model() {
+            self.phase.limit().map(|l| l + LOAD_ALLOWANCE)
         } else {
             self.phase.limit()
         }
+    }
+
+    /// The phases whose limit covers the load of a voice model.
+    fn waits_for_a_model(&self) -> bool {
+        matches!(self.phase, Phase::Preparing | Phase::Transcribing)
     }
 
     /// The same model, in toggle dictation. For the screenshots.
@@ -648,6 +663,18 @@ impl Model {
                     Phase::Waiting => self.fail(WAITING_STOPPED),
                     _ => Vec::new(),
                 }
+            }
+            Input::Loading(on) => {
+                self.loads = if on {
+                    self.loads + 1
+                } else {
+                    self.loads.saturating_sub(1)
+                };
+                // A new generation arms the limit again, from now.
+                if self.waits_for_a_model() {
+                    self.generation += 1;
+                }
+                Vec::new()
             }
             Input::Disconnected => {
                 if self.conversation.take().is_some() {
@@ -1000,6 +1027,56 @@ mod tests {
         );
         assert_eq!(model.phase(), Phase::Transcribing);
         assert_eq!(model.limit(), Some(TRANSCRIBING_LIMIT));
+    }
+
+    #[test]
+    fn a_model_that_loads_adds_to_the_limit_which_starts_again_when_it_is_ready() {
+        // A hold dictation whose model loads: the release waits for the text longer.
+        let mut model = Model::default();
+        model.apply(Input::DictationStart {
+            at_us: 1,
+            toggle: false,
+        });
+        let listening = model.generation();
+        model.apply(Input::Loading(true));
+        assert_eq!(model.generation(), listening, "the recording limit stays");
+        assert_eq!(model.limit(), Some(LISTENING_LIMIT));
+        model.apply(Input::DictationStop { at_us: 2 });
+        assert_eq!(model.phase(), Phase::Transcribing);
+        assert_eq!(model.limit(), Some(TRANSCRIBING_LIMIT + LOAD_ALLOWANCE));
+        let loading = model.generation();
+        model.apply(Input::Loading(false));
+        assert_eq!(model.limit(), Some(TRANSCRIBING_LIMIT));
+        // The timer armed during the load is old: the limit starts again now.
+        assert!(
+            model
+                .apply(Input::Timeout {
+                    generation: loading
+                })
+                .is_empty()
+        );
+        assert_eq!(model.phase(), Phase::Transcribing);
+        let ready = model.generation();
+        assert_ne!(ready, loading);
+        model.apply(Input::Timeout { generation: ready });
+        assert_eq!(model.error(), Some("The text did not arrive"));
+        // A reply whose voice loads.
+        let mut model = Model::default();
+        model.apply(speak("t1"));
+        assert_eq!(model.phase(), Phase::Preparing);
+        let preparing = model.generation();
+        model.apply(Input::Loading(true));
+        assert_eq!(model.limit(), Some(PREPARING_LIMIT + LOAD_ALLOWANCE));
+        assert!(
+            model
+                .apply(Input::Timeout {
+                    generation: preparing
+                })
+                .is_empty()
+        );
+        assert_eq!(model.phase(), Phase::Preparing);
+        model.apply(Input::Loading(false));
+        assert_eq!(model.limit(), Some(PREPARING_LIMIT));
     }
 
     #[test]

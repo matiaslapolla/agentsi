@@ -21,6 +21,7 @@ use agentsi_core::state::Core;
 use agentsi_pill::dictate::{
     CoreDelivery, Dictator, Mic, OpenDetector, OpenRecognizer, Recognizer,
 };
+use agentsi_pill::keep::{KeepTime, Policy};
 use agentsi_pill::link::{self, LinkEvent};
 use agentsi_pill::state::{Model, Phase};
 use agentsi_proto::client::Client;
@@ -179,10 +180,9 @@ fn start_pill_with(
         open_detector,
         Box::new(CoreDelivery),
         tx.clone(),
+        Policy::new(KeepTime::default()),
         true,
     ));
-    // A press while the model loads is refused, so the test waits for the model.
-    assert!(dictator.wait_until_loaded(Duration::from_secs(120)));
     let phases = Arc::new(Mutex::new(vec![Phase::Hidden]));
     let stopped = Arc::new(std::sync::atomic::AtomicBool::new(false));
     let (effects, seen_by_thread, stop) = (dictator.clone(), phases.clone(), stopped.clone());

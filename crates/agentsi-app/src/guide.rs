@@ -281,6 +281,11 @@ mod tests {
             (3, "Brief, roster and audit", "brief-roster-and-audit"),
             (2, "Voice", "voice"),
             (3, "Download the models", "download-the-models"),
+            (
+                3,
+                "Memory of the voice models",
+                "memory-of-the-voice-models",
+            ),
             (3, "Dictation", "dictation"),
             (3, "Conversation mode", "conversation-mode"),
             (3, "Voice mode", "voice-mode"),

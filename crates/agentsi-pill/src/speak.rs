@@ -4,16 +4,19 @@
 //! queue. The output stream plays from the queue, so the first sentence plays while
 //! the next one renders. A stop empties the queue at once: the stream plays silence
 //! from its next buffer, and the thread drops the jobs that the stop made old.
+//!
+//! The voice model loads at the first job, and drops when the keep time passes with no job.
 
+use crate::keep::{Clock, KeepTime, Keeper, Policy, dropped_line};
 use crate::link::{LinkEvent, LinkSender};
 use crate::state::{Effect, Input, SpeechEvent};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{FromSample, Sample, SampleFormat, SizedSample, StreamConfig};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{self, RecvTimeoutError, TryRecvError};
+use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 /// The rate of the voice.
 pub const VOICE_RATE: u32 = agentsi_voice::tts::RATE;
@@ -61,7 +64,8 @@ pub trait Output {
     fn pause(&mut self);
 }
 
-pub type OpenEngine = Box<dyn FnOnce() -> Result<Box<dyn Engine>, String> + Send>;
+/// Called at the first job, and again at a job after a failed load or a drop.
+pub type OpenEngine = Box<dyn FnMut() -> Result<Box<dyn Engine>, String> + Send>;
 pub type OpenOutput = Box<dyn Fn(Arc<Shared>) -> Result<Box<dyn Output>, String> + Send>;
 
 fn unix_nanos() -> u128 {
@@ -173,19 +177,25 @@ struct Job {
     text: String,
 }
 
+enum Msg {
+    Speak(Job),
+    Keep(KeepTime),
+}
+
 /// The speech of the pill. The window thread calls it for each effect.
 pub struct Speaker {
-    jobs: Mutex<mpsc::Sender<Job>>,
+    jobs: Mutex<mpsc::Sender<Msg>>,
     shared: Arc<Shared>,
 }
 
 impl Speaker {
-    /// Starts the speech thread. It opens the engine at once, because that takes seconds,
-    /// and the output stream at the first job.
+    /// Starts the speech thread. It opens the engine at the first job, or at once when the
+    /// keep time is "Load at start", and the output stream at the first job.
     pub fn start(
         open_engine: OpenEngine,
         open_output: OpenOutput,
         events: LinkSender,
+        policy: Policy,
         stats: bool,
     ) -> Speaker {
         let shared = Arc::new(Shared::new(stats));
@@ -200,8 +210,11 @@ impl Speaker {
                     events,
                     open_output,
                     output: None,
+                    open_engine,
+                    keeper: Keeper::new(policy.keep),
+                    clock: policy.clock,
                 }
-                .run(open_engine)
+                .run()
             })
             .expect("the OS starts a thread");
         Speaker {
@@ -210,22 +223,30 @@ impl Speaker {
         }
     }
 
+    fn send(&self, msg: Msg) {
+        let _ = self
+            .jobs
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .send(msg);
+    }
+
+    /// A new keep time for the voice model. It applies at once.
+    pub fn set_keep(&self, keep: KeepTime) {
+        self.send(Msg::Keep(keep));
+    }
+
     pub fn shared(&self) -> &Arc<Shared> {
         &self.shared
     }
 
     pub fn speak(&self, ticket: u64, role: &str, text: &str) {
-        let job = Job {
+        self.send(Msg::Speak(Job {
             ticket,
             epoch: self.shared.epoch(),
             role: role.to_owned(),
             text: text.to_owned(),
-        };
-        let _ = self
-            .jobs
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .send(job);
+        }));
     }
 
     /// Silence from the next buffer of the stream, and no more sound from the jobs so far.
@@ -249,12 +270,25 @@ impl Speaker {
     }
 }
 
+type Loaded = Option<Box<dyn Engine>>;
+
+/// What a wait for a message gave.
+enum Got {
+    Job(Job),
+    /// A new keep time, or the end of the wait limit.
+    Woke,
+    Gone,
+}
+
 struct Worker {
     shared: Arc<Shared>,
-    jobs: mpsc::Receiver<Job>,
+    jobs: mpsc::Receiver<Msg>,
     events: LinkSender,
     open_output: OpenOutput,
     output: Option<Box<dyn Output>>,
+    open_engine: OpenEngine,
+    keeper: Keeper,
+    clock: Clock,
 }
 
 impl Worker {
@@ -264,18 +298,82 @@ impl Worker {
             .unbounded_send(LinkEvent::Input(Input::Speech { ticket, event }));
     }
 
-    fn run(mut self, open_engine: OpenEngine) {
-        let opened = std::time::Instant::now();
-        let mut engine = open_engine();
-        match &engine {
-            Ok(_) => eprintln!("agentsi-pill: voice ready in {:?}", opened.elapsed()),
-            Err(e) => eprintln!("agentsi-pill: the voice cannot start: {e}"),
+    fn now(&self) -> Instant {
+        (self.clock)()
+    }
+
+    /// The engine, opened now if it is not loaded. For a job, the pill learns of the load, so
+    /// that its wait for the first sound covers it.
+    fn load<'a>(
+        &mut self,
+        engine: &'a mut Loaded,
+        for_job: bool,
+    ) -> Result<&'a mut Box<dyn Engine>, String> {
+        if engine.is_none() {
+            let opened = Instant::now();
+            if for_job {
+                self.loading(true);
+            }
+            let result = (self.open_engine)();
+            if for_job {
+                self.loading(false);
+            }
+            match result {
+                Ok(e) => {
+                    eprintln!("agentsi-pill: voice ready in {:?}", opened.elapsed());
+                    *engine = Some(e);
+                    let now = self.now();
+                    self.keeper.used(now);
+                }
+                Err(e) => {
+                    eprintln!("agentsi-pill: the voice cannot start: {e}");
+                    return Err(e);
+                }
+            }
+        }
+        Ok(engine.as_mut().expect("set above"))
+    }
+
+    fn loading(&self, on: bool) {
+        let _ = self
+            .events
+            .unbounded_send(LinkEvent::Input(Input::Loading(on)));
+    }
+
+    fn set_keep(&mut self, keep: KeepTime, engine: &mut Loaded) {
+        self.keeper.set(keep);
+        if keep.loads_at_start() {
+            let _ = self.load(engine, false);
+        }
+    }
+
+    /// Waits for the next message, at most `limit`. A new keep time applies here.
+    fn recv(&mut self, limit: Option<Duration>, engine: &mut Loaded) -> Got {
+        let msg = match limit {
+            None => self.jobs.recv().map_err(|_| RecvTimeoutError::Disconnected),
+            Some(limit) => self.jobs.recv_timeout(limit),
+        };
+        match msg {
+            Ok(Msg::Speak(job)) => Got::Job(job),
+            Ok(Msg::Keep(keep)) => {
+                self.set_keep(keep, engine);
+                Got::Woke
+            }
+            Err(RecvTimeoutError::Timeout) => Got::Woke,
+            Err(RecvTimeoutError::Disconnected) => Got::Gone,
+        }
+    }
+
+    fn run(mut self) {
+        let mut engine: Loaded = None;
+        if self.keeper.keep().loads_at_start() {
+            let _ = self.load(&mut engine, false);
         }
         let mut next: Option<Job> = None;
         loop {
             let job = match next.take() {
                 Some(job) => job,
-                None => match self.idle() {
+                None => match self.idle(&mut engine) {
                     Some(job) => job,
                     None => return,
                 },
@@ -283,15 +381,17 @@ impl Worker {
             if job.epoch != self.shared.epoch() {
                 continue;
             }
-            let engine = match &mut engine {
-                Ok(engine) => engine,
+            let result = match self.load(&mut engine, true) {
+                Ok(e) => self.speak(e.as_mut(), &job),
                 Err(e) => {
-                    self.report(job.ticket, SpeechEvent::Failed(e.clone()));
+                    self.report(job.ticket, SpeechEvent::Failed(e));
                     continue;
                 }
             };
-            match self.speak(engine.as_mut(), &job) {
-                Ok(true) => next = self.drain(&job),
+            let now = self.now();
+            self.keeper.used(now);
+            match result {
+                Ok(true) => next = self.drain(&job, &mut engine),
                 Ok(false) => {}
                 Err(e) => {
                     eprintln!("agentsi-pill: the speech failed: {e}");
@@ -304,20 +404,43 @@ impl Worker {
     }
 
     /// Waits for the next job. With an empty queue, the stream plays silence for `TAIL`
-    /// and then pauses. `None` when the speaker is gone.
-    fn idle(&mut self) -> Option<Job> {
+    /// and then pauses. Then the wait lasts until the drop time of the engine, or has no limit
+    /// with no engine loaded. `None` when the speaker is gone.
+    fn idle(&mut self, engine: &mut Loaded) -> Option<Job> {
         if self.output.is_some() && self.shared.queued() == 0 {
-            match self.jobs.recv_timeout(TAIL) {
-                Ok(job) => return Some(job),
-                Err(RecvTimeoutError::Disconnected) => return None,
-                Err(RecvTimeoutError::Timeout) => {}
+            let end = Instant::now() + TAIL;
+            loop {
+                match self.recv(Some(end.saturating_duration_since(Instant::now())), engine) {
+                    Got::Job(job) => return Some(job),
+                    Got::Gone => return None,
+                    Got::Woke if Instant::now() < end => {}
+                    Got::Woke => break,
+                }
             }
             if let Some(output) = self.output.as_mut() {
                 output.pause();
             }
             self.shared.mark_silence();
         }
-        self.jobs.recv().ok()
+        loop {
+            let now = self.now();
+            if engine.is_some() && self.keeper.due(now) {
+                *engine = None;
+                agentsi_voice::release_memory();
+                self.keeper.dropped();
+                eprintln!("{}", dropped_line("voice", self.keeper.keep()));
+            }
+            let limit = if engine.is_some() {
+                self.keeper.wait(now)
+            } else {
+                None
+            };
+            match self.recv(limit, engine) {
+                Got::Job(job) => return Some(job),
+                Got::Woke => {}
+                Got::Gone => return None,
+            }
+        }
     }
 
     fn output(&mut self) -> Result<&mut Box<dyn Output>, String> {
@@ -363,11 +486,11 @@ impl Worker {
 
     /// Waits until the queue played to its end, then reports `Done`. A new job that comes
     /// first is returned, so it renders while the queue still plays.
-    fn drain(&mut self, job: &Job) -> Option<Job> {
-        match self.jobs.try_recv() {
-            Ok(next) => return Some(next),
-            Err(TryRecvError::Disconnected) => return None,
-            Err(TryRecvError::Empty) => {}
+    fn drain(&mut self, job: &Job, engine: &mut Loaded) -> Option<Job> {
+        match self.recv(Some(Duration::ZERO), engine) {
+            Got::Job(next) => return Some(next),
+            Got::Gone => return None,
+            Got::Woke => {}
         }
         loop {
             if self.shared.epoch() != job.epoch {
@@ -380,19 +503,25 @@ impl Worker {
                 return None;
             }
             if self.shared.queued() == 0 {
-                return match self.jobs.recv_timeout(TAIL) {
-                    Ok(next) => Some(next),
-                    Err(RecvTimeoutError::Disconnected) => None,
-                    Err(RecvTimeoutError::Timeout) => {
-                        self.report(job.ticket, SpeechEvent::Done);
-                        None
+                let end = Instant::now() + TAIL;
+                loop {
+                    match self.recv(Some(end.saturating_duration_since(Instant::now())), engine) {
+                        Got::Job(next) => return Some(next),
+                        Got::Gone => return None,
+                        Got::Woke if Instant::now() < end => {}
+                        Got::Woke => {
+                            let now = self.now();
+                            self.keeper.used(now);
+                            self.report(job.ticket, SpeechEvent::Done);
+                            return None;
+                        }
                     }
-                };
+                }
             }
-            match self.jobs.recv_timeout(DRAIN_POLL) {
-                Ok(next) => return Some(next),
-                Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => return None,
+            match self.recv(Some(DRAIN_POLL), engine) {
+                Got::Job(next) => return Some(next),
+                Got::Woke => {}
+                Got::Gone => return None,
             }
         }
     }
@@ -539,6 +668,7 @@ pub fn open_cpal(wanted: Option<String>) -> OpenOutput {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::keep::FakeClock;
     use futures::channel::mpsc::{UnboundedReceiver, unbounded};
     use std::sync::atomic::AtomicUsize;
 
@@ -549,6 +679,13 @@ mod tests {
         shared: Arc<Mutex<Option<Arc<Shared>>>>,
         gate: Arc<(Mutex<usize>, std::sync::Condvar)>,
         fail_on: Option<&'static str>,
+        drops: Arc<AtomicUsize>,
+    }
+
+    impl Drop for Fake {
+        fn drop(&mut self) {
+            self.drops.fetch_add(1, Ordering::SeqCst);
+        }
     }
 
     impl Engine for Fake {
@@ -611,23 +748,46 @@ mod tests {
         gate: Arc<(Mutex<usize>, std::sync::Condvar)>,
         plays: Arc<AtomicUsize>,
         pauses: Arc<AtomicUsize>,
+        /// The engine opens and drops so far.
+        opens: Arc<AtomicUsize>,
+        drops: Arc<AtomicUsize>,
     }
 
     fn rig(fail_on: Option<&'static str>, engine_error: Option<&'static str>) -> Rig {
+        rig_with(fail_on, engine_error, Policy::new(KeepTime::default()))
+    }
+
+    fn rig_with(
+        fail_on: Option<&'static str>,
+        engine_error: Option<&'static str>,
+        policy: Policy,
+    ) -> Rig {
         let renders = Arc::new(Mutex::new(Vec::new()));
         let shared_slot = Arc::new(Mutex::new(None));
         let gate = Arc::new((Mutex::new(1), std::sync::Condvar::new()));
         let plays = Arc::new(AtomicUsize::new(0));
         let pauses = Arc::new(AtomicUsize::new(0));
-        let fake = Fake {
-            renders: renders.clone(),
-            shared: shared_slot.clone(),
-            gate: gate.clone(),
-            fail_on,
-        };
-        let open_engine: OpenEngine = Box::new(move || match engine_error {
-            Some(e) => Err(e.to_owned()),
-            None => Ok(Box::new(fake) as Box<dyn Engine>),
+        let opens = Arc::new(AtomicUsize::new(0));
+        let drops = Arc::new(AtomicUsize::new(0));
+        let (r, slot, g, o, d) = (
+            renders.clone(),
+            shared_slot.clone(),
+            gate.clone(),
+            opens.clone(),
+            drops.clone(),
+        );
+        let open_engine: OpenEngine = Box::new(move || {
+            o.fetch_add(1, Ordering::SeqCst);
+            match engine_error {
+                Some(e) => Err(e.to_owned()),
+                None => Ok(Box::new(Fake {
+                    renders: r.clone(),
+                    shared: slot.clone(),
+                    gate: g.clone(),
+                    fail_on,
+                    drops: d.clone(),
+                }) as Box<dyn Engine>),
+            }
         });
         let sink_plays = plays.clone();
         let sink_pauses = pauses.clone();
@@ -640,12 +800,14 @@ mod tests {
         });
         let (tx, events) = unbounded();
         Rig {
-            speaker: Speaker::start(open_engine, open_output, tx, false),
+            speaker: Speaker::start(open_engine, open_output, tx, policy, false),
             events,
             renders,
             gate,
             plays,
             pauses,
+            opens,
+            drops,
         }
     }
 
@@ -661,6 +823,7 @@ mod tests {
             loop {
                 if let Ok(event) = self.events.try_recv() {
                     match event {
+                        LinkEvent::Input(Input::Loading(_)) => {}
                         LinkEvent::Input(input) => return input,
                         other => panic!("not a speech event: {other:?}"),
                     }
@@ -678,7 +841,7 @@ mod tests {
         }
     }
 
-    fn wait_for(cond: impl Fn() -> bool) {
+    fn wait_for(mut cond: impl FnMut() -> bool) {
         let start = std::time::Instant::now();
         while !cond() {
             assert!(start.elapsed() < Duration::from_secs(5), "timed out");
@@ -897,6 +1060,177 @@ mod tests {
         rig.speaker.effect(&Effect::StopSpeech { terminal: None });
         assert_eq!(rig.speaker.shared().epoch(), before + 1);
         assert_eq!(rig.speaker.shared().queued(), 0);
+    }
+
+    #[test]
+    fn the_load_of_the_voice_for_a_reply_is_told_to_the_pill_and_a_loaded_voice_is_not() {
+        let mut rig = rig(None, None);
+        rig.open_gate(10);
+        rig.speaker.speak(1, "pm", "one");
+        let mut inputs = Vec::new();
+        wait_for(|| {
+            while let Ok(LinkEvent::Input(input)) = rig.events.try_recv() {
+                inputs.push(input);
+            }
+            inputs.len() >= 3
+        });
+        assert_eq!(
+            inputs,
+            [
+                Input::Loading(true),
+                Input::Loading(false),
+                Input::Speech {
+                    ticket: 1,
+                    event: SpeechEvent::Playing
+                },
+            ]
+        );
+        rig.play_all();
+        assert_eq!(
+            rig.next_event(),
+            Input::Speech {
+                ticket: 1,
+                event: SpeechEvent::Done
+            }
+        );
+        rig.speaker.speak(2, "pm", "two");
+        let first = loop {
+            if let Ok(LinkEvent::Input(input)) = rig.events.try_recv() {
+                break input;
+            }
+            std::thread::sleep(Duration::from_millis(2));
+        };
+        assert_eq!(
+            first,
+            Input::Speech {
+                ticket: 2,
+                event: SpeechEvent::Playing
+            }
+        );
+    }
+
+    #[test]
+    fn a_new_speaker_holds_no_voice_and_the_first_reply_loads_it_and_plays_whole() {
+        let mut rig = rig(None, None);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(rig.opens.load(Ordering::SeqCst), 0, "no voice at the start");
+        rig.open_gate(10);
+        rig.speaker.speak(1, "pm", "one\ntwo\nthree");
+        assert_eq!(
+            rig.next_event(),
+            Input::Speech {
+                ticket: 1,
+                event: SpeechEvent::Playing
+            }
+        );
+        wait_for(|| rig.speaker.shared().queued() >= 3 * 2400);
+        let played = rig.play_all();
+        for n in [1.0, 2.0, 3.0] {
+            assert!(played.contains(&n), "sentence {n} plays");
+        }
+        assert_eq!(
+            rig.next_event(),
+            Input::Speech {
+                ticket: 1,
+                event: SpeechEvent::Done
+            }
+        );
+        assert_eq!(rig.opens.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn with_a_keep_time_of_1_minute_an_unused_voice_drops_and_a_voice_in_use_stays() {
+        let clock = FakeClock::new();
+        let mut rig = rig_with(None, None, clock.policy(KeepTime::OneMinute));
+        rig.speaker.speak(1, "pm", "one\ntwo");
+        rig.next_event();
+        // Sentence two waits at the gate: the voice is in use while 2 minutes pass.
+        wait_for(|| rig.renders.lock().unwrap().len() == 2);
+        clock.advance(Duration::from_secs(120));
+        rig.speaker.set_keep(KeepTime::OneMinute);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(rig.drops.load(Ordering::SeqCst), 0, "a voice in use stays");
+        rig.open_gate(10);
+        wait_for(|| rig.speaker.shared().queued() >= 2 * 2400);
+        rig.play_all();
+        rig.next_event();
+        // The reply ended at the new time: 59 s later the voice stays, 61 s later it drops.
+        clock.advance(Duration::from_secs(59));
+        rig.speaker.set_keep(KeepTime::OneMinute);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(rig.drops.load(Ordering::SeqCst), 0);
+        clock.advance(Duration::from_secs(2));
+        rig.speaker.set_keep(KeepTime::OneMinute);
+        wait_for(|| rig.drops.load(Ordering::SeqCst) == 1);
+        // The next reply loads the voice again.
+        rig.speaker.speak(2, "pm", "three");
+        assert_eq!(
+            rig.next_event(),
+            Input::Speech {
+                ticket: 2,
+                event: SpeechEvent::Playing
+            }
+        );
+        assert_eq!(rig.opens.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn an_idle_speaker_wakes_only_at_the_drop_time() {
+        let clock = FakeClock::new();
+        let mut rig = rig_with(None, None, clock.policy(KeepTime::OneMinute));
+        rig.open_gate(10);
+        rig.speaker.speak(1, "pm", "one");
+        rig.next_event();
+        rig.play_all();
+        rig.next_event();
+        // After the tail and the pause, the thread waits for the drop time and reads no clock.
+        wait_for(|| rig.pauses.load(Ordering::SeqCst) == 1);
+        std::thread::sleep(Duration::from_millis(200));
+        let reads = clock.reads();
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(clock.reads(), reads, "no wake before the drop time");
+        // With no voice loaded, a speaker waits with no limit.
+        let idle = rig_with(None, None, clock.policy(KeepTime::OneMinute));
+        std::thread::sleep(Duration::from_millis(200));
+        let reads = clock.reads();
+        std::thread::sleep(Duration::from_millis(300));
+        assert_eq!(clock.reads(), reads);
+        assert_eq!(idle.opens.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    fn always_keeps_the_voice_and_load_at_start_loads_it_at_once() {
+        let clock = FakeClock::new();
+        let mut rig = rig_with(None, None, clock.policy(KeepTime::Always));
+        rig.open_gate(10);
+        rig.speaker.speak(1, "pm", "one");
+        rig.next_event();
+        rig.play_all();
+        rig.next_event();
+        clock.advance(Duration::from_secs(24 * 3600));
+        rig.speaker.set_keep(KeepTime::Always);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(rig.drops.load(Ordering::SeqCst), 0);
+        let at_start = rig_with(None, None, clock.policy(KeepTime::Start));
+        wait_for(|| at_start.opens.load(Ordering::SeqCst) == 1);
+        clock.advance(Duration::from_secs(24 * 3600));
+        at_start.speaker.set_keep(KeepTime::Start);
+        std::thread::sleep(Duration::from_millis(50));
+        assert_eq!(at_start.drops.load(Ordering::SeqCst), 0);
+        assert_eq!(at_start.opens.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_new_keep_time_applies_with_no_restart() {
+        let clock = FakeClock::new();
+        let rig = rig_with(None, None, clock.policy(KeepTime::FiveMinutes));
+        // "Load at start" chosen while the pill runs loads the voice now.
+        rig.speaker.set_keep(KeepTime::Start);
+        wait_for(|| rig.opens.load(Ordering::SeqCst) == 1);
+        clock.advance(Duration::from_secs(120));
+        // A keep time of 1 minute, 2 minutes after the last use, drops it at once.
+        rig.speaker.set_keep(KeepTime::OneMinute);
+        wait_for(|| rig.drops.load(Ordering::SeqCst) == 1);
     }
 
     #[test]

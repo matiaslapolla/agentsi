@@ -11,6 +11,7 @@ pub mod dictate;
 pub mod hook;
 pub mod import;
 pub mod methods;
+pub mod pill_config;
 pub mod relay;
 pub mod server;
 pub mod session;

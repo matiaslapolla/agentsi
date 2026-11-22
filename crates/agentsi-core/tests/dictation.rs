@@ -8,15 +8,15 @@ use agentsi_proto::Event as _;
 use agentsi_proto::client::Client;
 use agentsi_proto::client::ClientError;
 use agentsi_proto::core_api::{Empty, Subscribe, SubscribeParams, Topic};
-use agentsi_proto::events::{DictationStart, DictationStop, VoiceMic};
+use agentsi_proto::events::{DictationStart, DictationStop, VoiceMic, VoiceModels};
 use agentsi_proto::rpc::ErrorKind;
 use agentsi_proto::terminal_api::{Create, CreateParams};
 use agentsi_proto::vocabulary_api::{
     VocabularyEntry, VocabularyGet, VocabularySet, VocabularySetParams,
 };
 use agentsi_proto::voice_api::{
-    Dictate, DictateAction, DictateParams, FocusReport, FocusReportParams, Transcript,
-    TranscriptParams,
+    Dictate, DictateAction, DictateParams, FocusReport, FocusReportParams, KeepTime, ModelsKeep,
+    ModelsKeepParams, Transcript, TranscriptParams,
 };
 use common::{BIN, CoreProc, TempDir, wait_until};
 use std::path::Path;
@@ -390,4 +390,47 @@ fn each_dictate_start_and_stop_also_sends_voice_mic_on_the_voice_topic() {
     // The pill keeps only its own topic: its next events are the dictation edges.
     let first = pill.next_notification().unwrap();
     assert_eq!(first.method, DictationStart::NAME);
+}
+
+#[test]
+fn the_keep_time_goes_into_pill_toml_and_to_the_pill() {
+    let dir = TempDir::new();
+    let config = dir.0.join("config");
+    let file = config.join("agentsi/pill.toml");
+    std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+    let before = "# The USB microphone.\ninput = \"USB\"\n\n[models]\nkeep = \"2m\" # a typo\n";
+    std::fs::write(&file, before).unwrap();
+    let (core, mut client) = core(&dir, &config);
+    let mut pill = Client::connect(&core.socket.path).unwrap();
+    pill.set_timeout(Some(Duration::from_secs(10))).unwrap();
+    pill.call::<Subscribe>(&SubscribeParams {
+        topics: vec![Topic::Voice, Topic::Dictation],
+    })
+    .unwrap();
+    // A bad value reads as the default.
+    let read = client
+        .call::<ModelsKeep>(&ModelsKeepParams { keep: None })
+        .unwrap();
+    assert_eq!(read.keep, KeepTime::FiveMinutes);
+    let set = client
+        .call::<ModelsKeep>(&ModelsKeepParams {
+            keep: Some(KeepTime::OneMinute),
+        })
+        .unwrap();
+    assert_eq!(set.keep, KeepTime::OneMinute);
+    let n = pill.next_notification().unwrap();
+    assert_eq!(n.method, VoiceModels::NAME);
+    assert_eq!(n.parse::<VoiceModels>().unwrap().keep, KeepTime::OneMinute);
+    let after = std::fs::read_to_string(&file).unwrap();
+    assert!(
+        after.starts_with("# The USB microphone.\ninput = \"USB\"\n\n[models]\nkeep = \"1m\""),
+        "{after}"
+    );
+    assert_eq!(
+        client
+            .call::<ModelsKeep>(&ModelsKeepParams { keep: None })
+            .unwrap()
+            .keep,
+        KeepTime::OneMinute
+    );
 }

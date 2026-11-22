@@ -13,6 +13,7 @@ pub fn register(c: &mut Catalog) {
         .method::<Dictate>()
         .method::<Converse>()
         .method::<Transcript>()
+        .method::<ModelsKeep>()
         .method::<HookEvent>()
         .method::<FocusReport>();
 }
@@ -178,6 +179,106 @@ impl Method for Transcript {
     type Result = TranscriptResult;
 }
 
+/// How long a voice model stays in memory after its last use. `pill.toml` keeps it as
+/// `[models] keep`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+pub enum KeepTime {
+    #[serde(rename = "1m")]
+    OneMinute,
+    #[default]
+    #[serde(rename = "5m")]
+    FiveMinutes,
+    #[serde(rename = "15m")]
+    FifteenMinutes,
+    #[serde(rename = "1h")]
+    OneHour,
+    /// A model stays once it loaded.
+    #[serde(rename = "always")]
+    Always,
+    /// The models load when the pill starts, and stay.
+    #[serde(rename = "start")]
+    Start,
+}
+
+impl KeepTime {
+    pub const ALL: [KeepTime; 6] = [
+        KeepTime::OneMinute,
+        KeepTime::FiveMinutes,
+        KeepTime::FifteenMinutes,
+        KeepTime::OneHour,
+        KeepTime::Always,
+        KeepTime::Start,
+    ];
+
+    /// The word in `pill.toml`.
+    pub const fn key(self) -> &'static str {
+        match self {
+            KeepTime::OneMinute => "1m",
+            KeepTime::FiveMinutes => "5m",
+            KeepTime::FifteenMinutes => "15m",
+            KeepTime::OneHour => "1h",
+            KeepTime::Always => "always",
+            KeepTime::Start => "start",
+        }
+    }
+
+    pub fn from_key(key: &str) -> Option<KeepTime> {
+        KeepTime::ALL.into_iter().find(|k| k.key() == key)
+    }
+
+    /// The time with no use after which a model drops. `None` keeps it.
+    pub const fn limit(self) -> Option<std::time::Duration> {
+        let minutes = match self {
+            KeepTime::OneMinute => 1,
+            KeepTime::FiveMinutes => 5,
+            KeepTime::FifteenMinutes => 15,
+            KeepTime::OneHour => 60,
+            KeepTime::Always | KeepTime::Start => return None,
+        };
+        Some(std::time::Duration::from_secs(minutes * 60))
+    }
+
+    pub const fn loads_at_start(self) -> bool {
+        matches!(self, KeepTime::Start)
+    }
+}
+
+/// The `VmRSS` value of a `/proc/<pid>/status` text, in KB: the resident memory of a process.
+pub fn rss_kb(status: &str) -> Option<u64> {
+    status
+        .lines()
+        .find_map(|l| l.strip_prefix("VmRSS:"))?
+        .split_whitespace()
+        .next()?
+        .parse()
+        .ok()
+}
+
+pub struct ModelsKeep;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ModelsKeepParams {
+    /// The new keep time. Omit it to read the keep time.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keep: Option<KeepTime>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct ModelsKeepResult {
+    /// The keep time after the call. A missing or bad value in the file reads as `5m`.
+    pub keep: KeepTime,
+}
+
+impl Method for ModelsKeep {
+    const NAME: &'static str = "voice.models.keep";
+    const DESCRIPTION: &'static str = "Sets or reads how long the voice models stay in memory \
+        after their last use. The core writes `[models] keep` in pill.toml, keeps the other keys \
+        and comments, and sends voice.models, so the pill applies it with no restart.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::Unavailable];
+    type Params = ModelsKeepParams;
+    type Result = ModelsKeepResult;
+}
+
 /// A Claude Code hook event that the bridge forwards.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub enum HookKind {
@@ -261,6 +362,13 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_status_file_gives_the_resident_memory() {
+        let status = "Name:\tagentsi-pill\nVmPeak:\t 9000 kB\nVmRSS:\t  143360 kB\nThreads:\t9\n";
+        assert_eq!(rss_kb(status), Some(143_360));
+        assert_eq!(rss_kb("Name:\tx\n"), None);
+    }
+
+    #[test]
     fn the_bridge_reads_an_event_in_any_case() {
         assert_eq!(HookKind::parse("stop"), Some(HookKind::Stop));
         assert_eq!(
@@ -273,5 +381,24 @@ mod tests {
         );
         assert_eq!(HookKind::parse("posttooluse"), Some(HookKind::PostToolUse));
         assert_eq!(HookKind::parse("PreToolUse"), None);
+    }
+
+    #[test]
+    fn each_keep_time_reads_back_from_its_key() {
+        for keep in KeepTime::ALL {
+            assert_eq!(KeepTime::from_key(keep.key()), Some(keep));
+            assert_eq!(
+                serde_json::to_value(keep).unwrap(),
+                serde_json::Value::String(keep.key().into())
+            );
+        }
+        assert_eq!(KeepTime::from_key("2m"), None);
+        assert_eq!(KeepTime::default(), KeepTime::FiveMinutes);
+        assert_eq!(
+            KeepTime::OneMinute.limit(),
+            Some(std::time::Duration::from_secs(60))
+        );
+        assert_eq!(KeepTime::Always.limit(), None);
+        assert!(KeepTime::Start.loads_at_start());
     }
 }

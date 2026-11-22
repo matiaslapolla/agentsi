@@ -38,8 +38,13 @@ fn the_pill_subscribes_reads_voice_events_and_sends_stop() {
     let dir = std::env::temp_dir().join(format!("agentsi-pill-link-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let socket = dir.join("core.sock");
+    std::fs::create_dir_all(dir.join("agentsi")).unwrap();
+    std::fs::write(dir.join("agentsi/pill.toml"), "[models]\nkeep = \"1h\"\n").unwrap();
     // SAFETY: this is the only test of this process, and no other thread runs yet.
-    unsafe { std::env::set_var("AGENTSI_CORE_SOCKET", &socket) };
+    unsafe {
+        std::env::set_var("AGENTSI_CORE_SOCKET", &socket);
+        std::env::set_var("XDG_CONFIG_HOME", &dir);
+    }
     let listener = UnixListener::bind(&socket).unwrap();
     let (seen_tx, seen) = mpsc::channel();
     let events = vec![
@@ -57,6 +62,11 @@ fn the_pill_subscribes_reads_voice_events_and_sends_stop() {
     let (tx, mut rx) = futures::channel::mpsc::unbounded();
     link::spawn(tx.clone());
     let mut next = || futures::executor::block_on(within_10_seconds(rx.next())).flatten();
+    // Each new connection reads the keep time of the file, in case an event was lost.
+    assert_eq!(
+        next(),
+        Some(LinkEvent::Keep(agentsi_proto::voice_api::KeepTime::OneHour))
+    );
     assert_eq!(
         next(),
         Some(LinkEvent::Input(Input::Speak {

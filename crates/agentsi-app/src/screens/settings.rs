@@ -45,6 +45,7 @@ mod fonts;
 mod git;
 mod guide;
 mod health;
+mod keep;
 mod owner;
 mod terminal;
 use crate::model::{CoreState, HostState};
@@ -338,6 +339,8 @@ pub struct SettingsScreen {
     /// The refusal of the last change, with the row it belongs to.
     keys_note: Option<(&'static str, String)>,
     models: Load<ModelsListResult>,
+    /// The keep time of the voice models, and the memory of the pill.
+    keep: keep::KeepState,
     voices: Load<VoicesResult>,
     vocab: Load<VocabularyList>,
     /// The form needs a window, so the first render makes it.
@@ -390,6 +393,9 @@ impl SettingsScreen {
 
     /// Shows `section` from its top, and keeps it for the next start.
     pub fn open_section(&mut self, section: Section, cx: &mut Context<Self>) {
+        if section == Section::VoiceModels && self.section != section {
+            self.read_pill_memory(cx);
+        }
         self.section = section;
         self.scroll.set_offset(Point::default());
         if cx.try_global::<OpenedSection>() != Some(&OpenedSection(section)) {
@@ -515,6 +521,7 @@ impl SettingsScreen {
             alerts_error: None,
             keys_note: None,
             models: Load::Loading,
+            keep: keep::KeepState::default(),
             voices: Load::Loading,
             vocab: Load::Loading,
             vocab_form: None,
@@ -569,6 +576,7 @@ impl SettingsScreen {
         let voices = link.call::<ModelsVoices>(&Empty {});
         let vocab = link.call::<VocabularyGet>(&Empty {});
         self.pending.get_or_insert_default();
+        self.load_keep(cx);
         self.git.update(cx, |g, cx| g.reload(cx));
         self.load_owner(cx);
         cx.spawn(async move |this, cx| {
@@ -1374,13 +1382,17 @@ impl SettingsScreen {
             Load::Loading => {
                 return head
                     .child(section("Voice models", None))
+                    .child(self.keep_rows(cx))
                     .child(mono("Reading the models…"));
             }
             Load::Failed(e) => {
-                return head.child(section("Voice models", None)).child(notice(
-                    format!("The models were not read: {e}"),
-                    Some("Check that the core runs, then reload the screen.".into()),
-                ));
+                return head
+                    .child(section("Voice models", None))
+                    .child(self.keep_rows(cx))
+                    .child(notice(
+                        format!("The models were not read: {e}"),
+                        Some("Check that the core runs, then reload the screen.".into()),
+                    ));
             }
             Load::Ready(list) => list.clone(),
         };
@@ -1391,6 +1403,7 @@ impl SettingsScreen {
             .map(|(i, m)| self.model_card(i, m, cx))
             .collect();
         head.child(section("Voice models", Some(cards.len())))
+            .child(self.keep_rows(cx))
             .child(mono(format!(
                 "{} · each file has a pinned SHA-256",
                 models.root

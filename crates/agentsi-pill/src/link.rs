@@ -7,7 +7,7 @@ use agentsi_proto::client::{Client, ClientError, connect_or_start, find_core_bin
 use agentsi_proto::core_api::{Hello, HelloParams, Subscribe, SubscribeParams, Topic};
 use agentsi_proto::events::{
     ConverseState, ConverseStateKind, DictationStart, DictationStop, DictationTarget, Lagged,
-    VoiceSpeak, VoiceStop,
+    VoiceModels, VoiceSpeak, VoiceStop,
 };
 use agentsi_proto::rpc::Notification;
 use agentsi_proto::socket::socket_path;
@@ -33,6 +33,8 @@ pub enum LinkEvent {
     Input(Input),
     /// `dictation.target`: the terminal that gets dictated text.
     DictationTarget(Option<String>),
+    /// `voice.models`, or the keep time of `pill.toml` at a new connection to the core.
+    Keep(crate::keep::KeepTime),
 }
 
 pub type LinkSender = UnboundedSender<LinkEvent>;
@@ -63,6 +65,9 @@ pub fn translate(n: &Notification) -> Option<LinkEvent> {
     }
     if let Some(p) = n.parse::<DictationTarget>() {
         return Some(LinkEvent::DictationTarget(p.terminal));
+    }
+    if let Some(p) = n.parse::<VoiceModels>() {
+        return Some(LinkEvent::Keep(p.keep));
     }
     if let Some(p) = n.parse::<ConverseState>() {
         let terminal = p.terminal.unwrap_or_default();
@@ -152,6 +157,13 @@ fn session(tx: &LinkSender, start: bool, wait: &mut Duration) -> Result<(), Stri
         })
         .map_err(|e| describe(&e))?;
     *wait = RETRY_FIRST;
+    // A `voice.models` event sent while the link was down is lost, so the file tells.
+    if tx
+        .unbounded_send(LinkEvent::Keep(crate::config::keep_now()))
+        .is_err()
+    {
+        return Ok(());
+    }
     // The wait for an event has no limit. The core sends nothing while the pill is idle.
     client.set_timeout(None).map_err(|e| e.to_string())?;
     loop {
@@ -307,6 +319,16 @@ mod tests {
     fn a_dictation_target_keeps_its_terminal() {
         let n = Notification::of::<DictationTarget>(&DictationTargetParams { terminal: None });
         assert_eq!(translate(&n), Some(LinkEvent::DictationTarget(None)));
+    }
+
+    #[test]
+    fn a_models_event_gives_the_keep_time() {
+        use agentsi_proto::events::VoiceModelsParams;
+        use agentsi_proto::voice_api::KeepTime;
+        let n = Notification::of::<VoiceModels>(&VoiceModelsParams {
+            keep: KeepTime::OneHour,
+        });
+        assert_eq!(translate(&n), Some(LinkEvent::Keep(KeepTime::OneHour)));
     }
 
     #[test]

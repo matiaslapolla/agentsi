@@ -509,6 +509,22 @@ Open Settings. The section "Voice models" lists each model with its size, its li
 
 *The voice models in Settings.*
 
+### Memory of the voice models
+
+The pill loads each voice model at its first use. A model that you do not use stays out of memory. The speech model takes about 1.1 GB when loaded, and the voice about 0.45 GB.
+
+Choose how long a model stays after its last use in Settings, section "Voice models", row "Keep the models in memory":
+
+- "1 minute", "5 minutes" (the default), "15 minutes" or "1 hour": the pill frees the model after this time with no use.
+- "Always": a model stays once it loaded.
+- "Load at start": the models load when the pill starts, and stay. Choose it if the first word must have no wait.
+
+The choice applies at once, with no restart of the pill. The line under the choice shows the memory of the pill now.
+
+After a drop, the first dictation opens the microphone at once, and the model loads while you speak. No audio is lost. The text can come about 2 seconds later than usual. The first reply after a drop starts about 1 second later.
+
+The choice lives in `pill.toml` in the config folder, as `keep` in the `[models]` table.
+
 ### Dictation
 
 Hold the dictation key and speak. When you release the key, the text goes to the focused pane. With no focused pane, it goes to the clipboard. A recording stops after 120 seconds.
