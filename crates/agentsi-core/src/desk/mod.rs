@@ -14,10 +14,11 @@ use agentsi_agency::registry::Registry;
 use agentsi_agency::roles::files::RoleFiles;
 use agentsi_agency::roles::load::load_role;
 use agentsi_proto::desk_session_api::{
-    AuthState, DeskItem, DeskItemEvent, DeskItemParams, DeskState, DeskStateEvent, DeskStateParams,
-    View,
+    AuthState, DESK_EFFORTS, DESK_MODELS, DeskChoice, DeskItem, DeskItemEvent, DeskItemParams,
+    DeskState, DeskStateEvent, DeskStateParams, View,
 };
 use agentsi_proto::path;
+use agentsi_proto::roles_api::RoleDef;
 use agentsi_proto::rpc::{ErrorKind, RpcError};
 use agentsi_store::{Store, desk};
 use std::collections::HashMap;
@@ -101,6 +102,8 @@ struct Slot {
     commands: Option<mpsc::Sender<Cmd>>,
     /// A `desk.send` holds the slot, between its check and its delivery.
     sending: bool,
+    /// The model and the effort that the process of the slot runs with.
+    launched: Option<(String, Option<String>)>,
 }
 
 impl Default for Slot {
@@ -111,6 +114,7 @@ impl Default for Slot {
             generation: 0,
             commands: None,
             sending: false,
+            launched: None,
         }
     }
 }
@@ -331,7 +335,28 @@ struct Plan {
     cwd: PathBuf,
 }
 
-/// The `pm` agent of the product, with its model, effort and persona, and the folder.
+/// The `pm` role of the product, as the desk session and the settings read it.
+fn pm_role(store: &Store, product: &str) -> Result<RoleDef, RpcError> {
+    let id = product.to_string();
+    let overlays = store
+        .read(move |c| {
+            agentsi_agency::roster::read_overlays(c, &id)
+                .map_err(|e| agentsi_store::Error::Other(e.to_string()))
+        })
+        .map_err(rpc_store)?;
+    let root = agentsi_store::paths::data_root(None).map_err(rpc_store)?;
+    load_role(
+        "pm",
+        product,
+        &RoleFiles::at(&root),
+        &overlays,
+        &mut Vec::new(),
+    )
+    .map_err(RpcError::internal)
+}
+
+/// The `pm` agent of the product, with its model, effort and persona, and the folder. The
+/// model and the effort come from the choice of the owner, else from the role.
 fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     let registry = registry()?;
     let p = registry
@@ -347,22 +372,10 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     })?;
     let store = open_store(core)?;
     let id = p.id.clone();
-    let (overlays, brief) = store
-        .read(move |c| {
-            let overlays = agentsi_agency::roster::read_overlays(c, &id)
-                .map_err(|e| agentsi_store::Error::Other(e.to_string()))?;
-            Ok((overlays, agentsi_store::read::brief(c, &id)?))
-        })
+    let (brief, (model, effort)) = store
+        .read(move |c| Ok((agentsi_store::read::brief(c, &id)?, desk::choice(c, &id)?)))
         .map_err(rpc_store)?;
-    let root = agentsi_store::paths::data_root(None).map_err(rpc_store)?;
-    let def = load_role(
-        "pm",
-        product,
-        &RoleFiles::at(&root),
-        &overlays,
-        &mut Vec::new(),
-    )
-    .map_err(RpcError::internal)?;
+    let def = pm_role(&store, product)?;
     let cwd_text = cwd.to_string_lossy().into_owned();
     let system = system_prompt(
         &def.body,
@@ -376,8 +389,8 @@ fn plan(core: &Core, product: &str) -> Result<Plan, RpcError> {
     );
     Ok(Plan {
         call: DeskCall {
-            model: def.model,
-            effort: def.effort,
+            model: model.unwrap_or(def.model),
+            effort: effort.or(def.effort),
             system,
             agentsi: agentsi_program(),
             socket: socket(core),
@@ -449,6 +462,14 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
         text: owner_text(&texts, text),
         notes: seqs,
     };
+    // A process that runs another model or effort ends, so the message starts one with the
+    // choice of the owner. The session resumes, so the conversation stays whole.
+    let wanted = (plan.call.model.clone(), plan.call.effort.clone());
+    if slot.launched.as_ref().is_some_and(|l| *l != wanted)
+        && let Some(old) = slot.commands.take()
+    {
+        let _ = old.send(Cmd::Stop);
+    }
     if let Some(c) = &slot.commands
         && c.send(Cmd::Send(message.clone())).is_ok()
     {
@@ -460,6 +481,7 @@ pub fn send(core: &Arc<Core>, product: &str, text: &str) -> Result<i64, RpcError
     let (commands, inbox) = mpsc::channel();
     slot.generation = generation;
     slot.commands = Some(commands);
+    slot.launched = Some(wanted);
     drop(slots);
     set_state(core, product, None, DeskState::Starting, None);
     let mut call = plan.call;
@@ -538,6 +560,69 @@ fn record_owner(core: &Core, product: &str, text: &str) -> Result<Recorded, RpcE
         resume,
         notes,
     })
+}
+
+/// The stored choice of a product with the defaults of its `pm` role.
+pub fn settings(core: &Core, product: &str) -> Result<DeskChoice, RpcError> {
+    registry()?
+        .product(product)
+        .map_err(|_| unknown_product(product))?;
+    let store = open_store(core)?;
+    let id = product.to_string();
+    let (model, effort) = store
+        .read(move |c| desk::choice(c, &id))
+        .map_err(rpc_store)?;
+    let role = pm_role(&store, product)?;
+    Ok(DeskChoice {
+        model,
+        effort,
+        role_model: role.model,
+        role_effort: role.effort,
+    })
+}
+
+fn check_choice(what: &str, value: Option<&str>, allowed: &[&str]) -> Result<(), RpcError> {
+    match value {
+        Some(v) if !allowed.contains(&v) => Err(RpcError::invalid_params(format!(
+            "Unknown {what} \"{v}\". Use one of: {}.",
+            allowed.join(", ")
+        ))),
+        _ => Ok(()),
+    }
+}
+
+/// `desk.configure`: stores the model and the effort of a product. A reply that runs keeps
+/// its process. An idle process ends, so the next message starts one with the new values.
+pub fn configure(
+    core: &Core,
+    product: &str,
+    model: Option<String>,
+    effort: Option<String>,
+) -> Result<DeskChoice, RpcError> {
+    registry()?
+        .product(product)
+        .map_err(|_| unknown_product(product))?;
+    let models: Vec<&str> = DESK_MODELS.iter().map(|(id, _)| *id).collect();
+    check_choice("model", model.as_deref(), &models)?;
+    check_choice("effort", effort.as_deref(), &DESK_EFFORTS)?;
+    let store = open_store(core)?;
+    let fresh =
+        agentsi_agency::desk::new_session_id().map_err(|e| RpcError::internal(e.to_string()))?;
+    let (p, at) = (product.to_string(), crate::clock::iso_now());
+    let (m, e) = (model.clone(), effort.clone());
+    store
+        .write(move |tx| desk::set_choice(tx, &p, m.as_deref(), e.as_deref(), &fresh, &at))
+        .map_err(rpc_store)?;
+    let idle = {
+        let slots = lock(&core.desks.slots);
+        slots
+            .get(product)
+            .is_some_and(|s| s.state == DeskState::Idle && !s.sending && s.commands.is_some())
+    };
+    if idle {
+        stop(core, product);
+    }
+    settings(core, product)
 }
 
 /// `desk.stop`: stops the process of a product. False when none ran.

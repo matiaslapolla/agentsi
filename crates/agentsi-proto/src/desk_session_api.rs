@@ -13,6 +13,8 @@ pub fn register(c: &mut Catalog) {
         .method::<DeskSend>()
         .method::<DeskStop>()
         .method::<DeskReset>()
+        .method::<DeskSettings>()
+        .method::<DeskConfigure>()
         .method::<DeskShow>()
         .method::<DeskAuth>()
         .method::<DeskCheck>()
@@ -345,6 +347,69 @@ impl Method for DeskStop {
     const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound];
     type Params = DeskProductParams;
     type Result = DeskStopResult;
+}
+
+/// The models of the desk select: the id that `claude --model` takes, and its label. An alias
+/// follows the newest model of its family. The core checks `desk.configure` against this list,
+/// and the app shows it.
+pub const DESK_MODELS: [(&str, &str); 4] = [
+    ("fable", "Fable"),
+    ("opus", "Opus"),
+    ("sonnet", "Sonnet"),
+    ("haiku", "Haiku"),
+];
+
+/// The levels of `claude --effort`, in the order of the desk select.
+pub const DESK_EFFORTS: [&str; 5] = ["low", "medium", "high", "xhigh", "max"];
+
+pub struct DeskSettings;
+
+/// The model and the effort of the desk session of a product. Spec:
+/// `docs/specs/agentsi-desktop-desk-model.md`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeskChoice {
+    /// The stored model (an id of `DESK_MODELS`), or null for the role default.
+    pub model: Option<String>,
+    /// The stored effort (an id of `DESK_EFFORTS`), or null for the role default.
+    pub effort: Option<String>,
+    /// The model of the `pm` role of the product: the role default.
+    pub role_model: String,
+    /// The effort of the `pm` role, or null when the role sets none.
+    pub role_effort: Option<String>,
+}
+
+impl Method for DeskSettings {
+    const NAME: &'static str = "desk.settings";
+    const DESCRIPTION: &'static str = "Gives the model and the effort of the desk session of a \
+        product: the stored choice and the defaults of the `pm` role.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::NotFound];
+    type Params = DeskProductParams;
+    type Result = DeskChoice;
+}
+
+pub struct DeskConfigure;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct DeskConfigureParams {
+    pub product: String,
+    /// An id of `DESK_MODELS`. Null or absent clears the choice to the role default.
+    #[serde(default)]
+    pub model: Option<String>,
+    /// An id of `DESK_EFFORTS`. Null or absent clears the choice to the role default.
+    #[serde(default)]
+    pub effort: Option<String>,
+}
+
+impl Method for DeskConfigure {
+    const NAME: &'static str = "desk.configure";
+    const DESCRIPTION: &'static str = "Stores the model and the effort of the desk session of a \
+        product, and gives the new settings. A value that is not in the lists (fable, opus, \
+        sonnet, haiku; low, medium, high, xhigh, max) is `invalid`, and nothing changes. A reply \
+        that runs keeps its process. The next owner message starts the process with the new \
+        values and resumes the session.";
+    const ERRORS: &'static [ErrorKind] = &[ErrorKind::Invalid, ErrorKind::NotFound];
+    type Params = DeskConfigureParams;
+    type Result = DeskChoice;
 }
 
 pub struct DeskReset;

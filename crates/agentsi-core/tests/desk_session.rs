@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 /// A fake `claude`. `auth status` prints `$dir/auth`. Else it counts its starts, keeps its
 /// arguments and answers each stdin line. A line with `hang` never ends its reply, and a line
-/// with `crash` stops the program.
+/// with `slow` ends it after two seconds, and a line with `crash` stops the program.
 const FAKE: &str = r#"#!/bin/sh
 dir="$(dirname "$0")"
 if [ "$1" = auth ]; then cat "$dir/auth"; exit 0; fi
@@ -24,6 +24,7 @@ while IFS= read -r line; do
   printf '%s\n' "$line" >> "$dir/stdin"
   case "$line" in
     *hang*) sleep 60;;
+    *slow*) sleep 2;;
     *crash*) echo 'it broke' >&2; exit 3;;
   esac
   echo '{"type":"stream_event","event":{"type":"content_block_delta","delta":{"type":"text_delta","text":"Hi"}}}'
@@ -725,5 +726,188 @@ fn a_desk_note_stays_unsent_when_the_process_does_not_start() {
     assert_eq!(
         last["message"]["content"],
         "Desk notes:\n- The owner approved decision 1.\n\nthree"
+    );
+}
+
+/// The value after `flag` in the keep file of the arguments of a start, or `None`.
+fn arg_after(args: &str, flag: &str) -> Option<String> {
+    let lines: Vec<&str> = args.lines().collect();
+    lines
+        .iter()
+        .position(|l| *l == flag)
+        .map(|i| lines[i + 1].to_string())
+}
+
+#[test]
+fn a_model_pick_shows_in_the_settings_and_makes_the_next_process_run_it_with_the_same_session() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    let s = c.ok("desk.settings", json!({"product": "alpha"}));
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (Value::Null, Value::Null)
+    );
+    let role_model = s["role_model"].as_str().unwrap().to_string();
+
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    let first = read(&w.bin.join("args-1"));
+    assert_eq!(arg_after(&first, "--model"), Some(role_model.clone()));
+
+    // An idle process ends at once, and the next message resumes the session.
+    let s = c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "sonnet", "effort": "high"}),
+    );
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (json!("sonnet"), json!("high"))
+    );
+    assert_eq!(s["role_model"], role_model.as_str());
+    wait_until("the idle process ends", || {
+        history(&mut c)["state"] == "stopped"
+    });
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    items_until(&mut c, "end");
+    let second = read(&w.bin.join("args-2"));
+    assert_eq!(
+        arg_after(&second, "--model").as_deref(),
+        Some("sonnet"),
+        "{second}"
+    );
+    assert_eq!(
+        arg_after(&second, "--effort").as_deref(),
+        Some("high"),
+        "{second}"
+    );
+    assert_eq!(arg_after(&second, "--resume"), Some(session.clone()));
+    assert!(!second.contains("--session-id"));
+
+    // A null clears the choice back to the role default.
+    let s = c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": null, "effort": null}),
+    );
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (Value::Null, Value::Null)
+    );
+    c.ok("desk.send", json!({"product": "alpha", "text": "three"}));
+    items_until(&mut c, "end");
+    let third = read(&w.bin.join("args-3"));
+    assert_eq!(arg_after(&third, "--model"), Some(role_model));
+    assert_eq!(arg_after(&third, "--resume"), Some(session));
+}
+
+#[test]
+fn a_pick_while_a_reply_runs_keeps_the_reply_and_the_next_message_uses_the_new_model() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok("desk.send", json!({"product": "alpha", "text": "slow one"}));
+    let running =
+        |c: &mut Framed| ["starting", "working"].contains(&history(c)["state"].as_str().unwrap());
+    assert!(running(&mut c));
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "haiku"}),
+    );
+    assert!(running(&mut c));
+    // The reply ends in its own process.
+    assert_eq!(items_until(&mut c, "end"), ["owner", "reply", "end"]);
+    assert_eq!(read(&w.bin.join("starts")).trim(), "1");
+
+    // The process still runs the old model, so the next message replaces it.
+    c.ok("desk.send", json!({"product": "alpha", "text": "two"}));
+    items_until(&mut c, "end");
+    assert_eq!(read(&w.bin.join("starts")).trim(), "2");
+    let second = read(&w.bin.join("args-2"));
+    assert_eq!(
+        arg_after(&second, "--model").as_deref(),
+        Some("haiku"),
+        "{second}"
+    );
+    let session = history(&mut c)["session"].as_str().unwrap().to_string();
+    assert_eq!(arg_after(&second, "--resume"), Some(session));
+}
+
+#[test]
+fn a_value_outside_the_lists_is_refused_and_the_choice_stays() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    c.ok(
+        "desk.configure",
+        json!({"product": "alpha", "model": "opus", "effort": "low"}),
+    );
+    for bad in [
+        json!({"product": "alpha", "model": "gpt-5", "effort": "high"}),
+        json!({"product": "alpha", "model": "sonnet", "effort": "extreme"}),
+        json!({"product": "alpha", "model": "claude-opus-5-5"}),
+    ] {
+        let r = c.call("desk.configure", bad);
+        assert_eq!(kind(&r), "invalid", "{r}");
+        assert!(
+            r["error"]["message"]
+                .as_str()
+                .unwrap()
+                .contains("Use one of"),
+            "{r}"
+        );
+    }
+    let r = c.call(
+        "desk.configure",
+        json!({"product": "nope", "model": "opus"}),
+    );
+    assert_eq!(kind(&r), "not_found", "{r}");
+    let s = c.ok("desk.settings", json!({"product": "alpha"}));
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (json!("opus"), json!("low"))
+    );
+}
+
+#[test]
+fn the_choice_stays_after_a_core_restart_and_starts_the_first_process() {
+    let dir = TempDir::new();
+    let w = setup(&dir, READY);
+    {
+        let core = start(&dir, &w, &[]);
+        let mut c = connect(&core);
+        c.ok(
+            "desk.configure",
+            json!({"product": "alpha", "model": "sonnet", "effort": "max"}),
+        );
+    }
+    let core = start(&dir, &w, &[]);
+    let mut c = connect(&core);
+    let s = c.ok("desk.settings", json!({"product": "alpha"}));
+    assert_eq!(
+        (s["model"].clone(), s["effort"].clone()),
+        (json!("sonnet"), json!("max"))
+    );
+    c.ok("desk.send", json!({"product": "alpha", "text": "one"}));
+    items_until(&mut c, "end");
+    let args = read(&w.bin.join("args-1"));
+    assert_eq!(
+        arg_after(&args, "--model").as_deref(),
+        Some("sonnet"),
+        "{args}"
+    );
+    assert_eq!(
+        arg_after(&args, "--effort").as_deref(),
+        Some("max"),
+        "{args}"
+    );
+    // A reset keeps the choice.
+    c.ok("desk.reset", json!({"product": "alpha"}));
+    assert_eq!(
+        c.ok("desk.settings", json!({"product": "alpha"}))["model"],
+        "sonnet"
     );
 }
