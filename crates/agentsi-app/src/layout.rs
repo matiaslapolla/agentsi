@@ -51,10 +51,14 @@ pub struct Layout {
     /// sections has none, so no version bump.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub settings_section: Option<String>,
-    /// The mode of the sidebar: `files` for the file tree. Absent: the products. A file from
-    /// before the file tree has none, so no version bump.
+    /// The mode of the sidebar of a file from before the panes: `files` for the file tree.
+    /// Read only, when the file has no `panes`. The app writes none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub sidebar_mode: Option<String>,
+    /// The places, sizes and open state of the panes. A file from before the panes has none,
+    /// so no version bump.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub panes: Option<crate::panes::PanesSave>,
     /// The file tree hides the entries that git ignores.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hide_ignored: bool,
@@ -555,7 +559,13 @@ mod tests {
                 (HOME.to_string(), space(tabs(0, vec![term("t9-a")]), vec![])),
             ]),
             settings_section: Some("terminal".into()),
-            sidebar_mode: Some("files".into()),
+            sidebar_mode: None,
+            panes: Some({
+                let mut p = crate::panes::Panes::default();
+                p.toggle(crate::panes::PaneKind::Alerts);
+                p.set_width(crate::panes::Side::Right, 300., 1280.);
+                p.save()
+            }),
             hide_ignored: true,
             recent: vec![RecentSave {
                 label: "main.rs".into(),
@@ -584,6 +594,7 @@ mod tests {
         assert!(old.dock.is_some());
         assert_eq!(old.settings_section, None);
         assert_eq!(old.version, 1);
+        assert_eq!(old.panes, None);
         // A space with no group writes no `tab_groups` key.
         let mut bare = layout.clone();
         for s in bare.spaces.values_mut() {
@@ -600,6 +611,53 @@ mod tests {
         std::fs::write(&file, r#"{"version": 9, "dock": {"center": {"panel_name": "", "children": [], "info": {"panel": null}}}}"#).unwrap();
         assert!(read(&file).unwrap_err().contains("version 9"));
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_panes_round_trip_and_a_file_of_before_them_opens_its_sidebar_mode() {
+        use crate::panes::{PaneKind, Panes, Side};
+        let dir = std::env::temp_dir().join(format!("agentsi-panes-{}", std::process::id()));
+        let file = dir.join("layout.json");
+        let mut panes = Panes::default();
+        panes.toggle(PaneKind::Files);
+        panes.toggle(PaneKind::Alerts);
+        panes.move_to(
+            PaneKind::Alerts,
+            crate::panes::Place {
+                side: Side::Left,
+                before: Some(PaneKind::Products),
+            },
+        );
+        panes.drag_split(Side::Left, 0, 200., 600.);
+        panes.set_width(Side::Left, 400., 1280.);
+        let layout = Layout {
+            version: VERSION,
+            panes: Some(panes.save()),
+            ..Layout::default()
+        };
+        write(&file, &layout).unwrap();
+        let back = read(&file).unwrap().unwrap();
+        let again = Panes::load(back.panes.as_ref(), back.sidebar_mode.as_deref());
+        assert_eq!(again, panes);
+        assert_eq!(
+            again.column(Side::Left),
+            [PaneKind::Alerts, PaneKind::Products, PaneKind::Files]
+        );
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.contains("\"left_width\": 400.0"), "{text}");
+        assert!(!text.contains("sidebar_mode"), "{text}");
+        for (mode, open) in [
+            (r#", "sidebar_mode": "files""#, PaneKind::Files),
+            ("", PaneKind::Products),
+        ] {
+            std::fs::write(&file, format!(r#"{{"version": 3{mode}}}"#)).unwrap();
+            let old = read(&file).unwrap().unwrap();
+            assert_eq!(old.panes, None);
+            let p = Panes::load(old.panes.as_ref(), old.sidebar_mode.as_deref());
+            assert_eq!(p.open(), [open], "{mode}");
+            assert_eq!(p.side(open), Side::Left);
+        }
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     #[test]

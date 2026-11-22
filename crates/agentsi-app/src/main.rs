@@ -28,6 +28,7 @@ mod model;
 mod nav;
 mod palette;
 mod pane;
+mod panes;
 mod prompt;
 mod screens;
 mod shell;

@@ -693,6 +693,7 @@ impl Shell {
                 .try_global::<OpenedSection>()
                 .map(|s| s.0.id().to_string()),
             sidebar_mode: sidebar.mode.key().map(str::to_string),
+            panes: None,
             hide_ignored: !sidebar.files.read(cx).show_ignored,
             recent: self.recent.save(),
             dock: None,
