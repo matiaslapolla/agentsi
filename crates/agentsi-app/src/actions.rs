@@ -24,8 +24,16 @@ gpui_kit::actions!(
         NewTerminal,
         /// Opens `claude` in the folder of the active product.
         NewClaude,
-        /// Opens the log of the alerts of this run.
+        /// Shows or hides the Alerts pane: the log of the alerts of this run.
         ShowAlerts,
+        /// Shows or hides the Products pane.
+        ToggleProducts,
+        /// Shows or hides the Files pane.
+        ToggleFiles,
+        /// Shows or hides the Alerts pane.
+        ToggleAlerts,
+        /// Hides each open pane, and the next time shows the same panes again.
+        ToggleAllPanes,
         /// Opens the front desk of the active product.
         OpenDesk,
         /// Opens the minutes of the active product.
@@ -263,7 +271,7 @@ gpui_kit::actions!(
         ColorGroup,
         /// Removes the product group of the active product and keeps its products.
         RemoveGroup,
-        /// Shows the Files mode of the sidebar and puts the focus in the tree.
+        /// Opens the Files pane and puts the focus in the tree.
         ShowFiles,
         /// Shows the inline name field of a new file in the selected folder of the file tree.
         NewFile,
@@ -376,7 +384,7 @@ key_table! {
     ("stories", "Stories", "secondary-shift-s", || Box::new(OpenStories)),
     ("tickets", "Tickets", "secondary-shift-i", || Box::new(OpenTickets)),
     ("git", "Git", "secondary-shift-b", || Box::new(OpenGit)),
-    ("files", "Files of the sidebar", "secondary-shift-e", || Box::new(ShowFiles)),
+    ("files", "Files pane with the focus", "secondary-shift-e", || Box::new(ShowFiles)),
     ("meeting", "Meeting", "secondary-shift-g", || Box::new(OpenMeeting)),
     ("memory", "Memory", "secondary-shift-y", || Box::new(OpenMemory)),
     ("call", "Call", "secondary-shift-p", || Box::new(OpenCall)),
@@ -386,6 +394,10 @@ key_table! {
     // Literal Ctrl on macOS too: Cmd+Tab belongs to the system.
     ("next-space", "Next space", "ctrl-tab", || Box::new(NextSpace)),
     ("previous-space", "Previous space", "ctrl-shift-tab", || Box::new(PreviousSpace)),
+    ("toggle-products", "Toggle Products", "secondary-alt-p", || Box::new(ToggleProducts)),
+    ("toggle-files", "Toggle Files", "secondary-alt-f", || Box::new(ToggleFiles)),
+    ("toggle-alerts", "Toggle Alerts", "secondary-alt-a", || Box::new(ToggleAlerts)),
+    ("toggle-panes", "Toggle all panes", "secondary-alt-b", || Box::new(ToggleAllPanes)),
     ("product-1", "Go to product 1", "secondary-1", || Box::new(SelectProduct1)),
     ("product-2", "Go to product 2", "secondary-2", || Box::new(SelectProduct2)),
     ("product-3", "Go to product 3", "secondary-3", || Box::new(SelectProduct3)),
@@ -1285,6 +1297,30 @@ pub const ENTRIES: &[Entry] = &[
         action: || Box::new(OpenGuideStart),
     },
     Entry {
+        label: "Toggle Products",
+        icon: IconName::LayoutDashboard,
+        keywords: &["pane", "sidebar", "products", "tree", "show", "hide"],
+        action: || Box::new(ToggleProducts),
+    },
+    Entry {
+        label: "Toggle Files",
+        icon: IconName::Folder,
+        keywords: &["pane", "sidebar", "files", "explorer", "show", "hide"],
+        action: || Box::new(ToggleFiles),
+    },
+    Entry {
+        label: "Toggle Alerts",
+        icon: IconName::Bell,
+        keywords: &["pane", "alerts", "log", "bell", "show", "hide"],
+        action: || Box::new(ToggleAlerts),
+    },
+    Entry {
+        label: "Toggle all panes",
+        icon: IconName::Maximize,
+        keywords: &["panes", "sidebar", "hide", "show", "focus", "zen"],
+        action: || Box::new(ToggleAllPanes),
+    },
+    Entry {
         label: "Show files",
         icon: IconName::Folder,
         keywords: &["files", "explorer", "tree", "sidebar", "folder"],
@@ -1574,7 +1610,15 @@ mod tests {
                 );
             }
         }
-        for id in ["reopen-tab", "next-space", "previous-space"] {
+        for id in [
+            "reopen-tab",
+            "next-space",
+            "previous-space",
+            "toggle-products",
+            "toggle-files",
+            "toggle-alerts",
+            "toggle-panes",
+        ] {
             let at = KEY_ACTIONS.iter().position(|a| a.id == id).unwrap();
             let ks = parse_key(BINDINGS[at].0, OperatingSystem::Linux).unwrap();
             assert_eq!(check_rules(&ks), Ok(()), "{id}");

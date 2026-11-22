@@ -253,7 +253,8 @@ impl StatesPanel {
                     )
                     .child(
                         PaneToggle::new(format!("g-pt-off-{i}"), IconName::Bell, false)
-                            .label("3")
+                            .label("Alerts")
+                            .count(3)
                             .force(f),
                     )
                     .into_any_element()

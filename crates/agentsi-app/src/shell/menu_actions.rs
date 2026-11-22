@@ -199,7 +199,9 @@ impl Shell {
     /// The menu key: the menu of the row under the cursor of the sidebar, else of the pane in view.
     pub(super) fn open_context_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.sidebar.read(cx).has_focus(window, cx)
-            && self.sidebar.update(cx, |s, cx| s.open_menu_at_cursor(cx))
+            && self
+                .sidebar
+                .update(cx, |s, cx| s.open_menu_at_cursor(window, cx))
         {
             return;
         }
@@ -426,7 +428,7 @@ impl Shell {
                 } else {
                     NewKind::Folder
                 };
-                self.sidebar.update(cx, |s, cx| s.show_files(window, cx));
+                self.show_files(window, cx);
                 files.update(cx, |t, cx| {
                     t.start_naming(f.folder_path(), NameFor::New(kind), window, cx)
                 });
@@ -436,7 +438,7 @@ impl Shell {
                 cx,
             ),
             Cmd::Rename => {
-                self.sidebar.update(cx, |s, cx| s.show_files(window, cx));
+                self.show_files(window, cx);
                 files.update(cx, |t, cx| {
                     t.start_naming(
                         crate::files::parent(&f.path).to_string(),
@@ -463,7 +465,7 @@ impl Shell {
             Cmd::CopyFilePath => cx.write_to_clipboard(ClipboardItem::new_string(text(&abs))),
             Cmd::Reveal => cx.reveal_path(&abs),
             Cmd::Open if f.folder => {
-                self.sidebar.update(cx, |s, cx| s.show_files(window, cx));
+                self.show_files(window, cx);
             }
             Cmd::Open => cx.open_with_system(&abs),
             Cmd::OpenInEditor => {

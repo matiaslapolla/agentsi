@@ -31,12 +31,13 @@ pub(crate) fn toggle_colors(open: bool, look: Look) -> (Hsla, Hsla) {
 
 /// A toggle of the pane bar: an icon, an optional label, and the open state of its pane.
 /// Hover and press move in 120 ms. The test selector is `pane-toggle:<id>:open` or
-/// `pane-toggle:<id>:hidden`.
+/// `pane-toggle:<id>:hidden`, and `pane-toggle-count:<id>:<n>` for the count.
 #[derive(IntoElement)]
 pub struct PaneToggle {
     id: SharedString,
     icon: IconName,
     label: Option<SharedString>,
+    count: usize,
     open: bool,
     tooltip: Option<SharedString>,
     force: Force,
@@ -49,6 +50,7 @@ impl PaneToggle {
             id: id.into(),
             icon,
             label: None,
+            count: 0,
             open,
             tooltip: None,
             force: Force::None,
@@ -57,6 +59,11 @@ impl PaneToggle {
     }
     pub fn label(mut self, label: impl Into<SharedString>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+    /// A number after the label, for example the unseen alerts. 0 shows none.
+    pub fn count(mut self, count: usize) -> Self {
+        self.count = count;
         self
     }
     pub fn tooltip(mut self, tooltip: impl Into<SharedString>) -> Self {
@@ -110,6 +117,15 @@ impl RenderOnce for PaneToggle {
             .children(focus_ring(ring, radius::md()))
             .child(Icon::new(self.icon).size(control::icon_sm()).text_color(fg))
             .when_some(self.label, |el, l| el.child(l))
+            .when(self.count > 0, |el| {
+                let (id, n) = (self.id.clone(), self.count);
+                el.child(
+                    div()
+                        .debug_selector(move || format!("pane-toggle-count:{id}:{n}"))
+                        .font_weight(weight::SEMIBOLD)
+                        .child(n.to_string()),
+                )
+            })
             .when(self.open, |el| {
                 el.child(
                     div()

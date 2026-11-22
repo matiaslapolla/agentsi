@@ -13,6 +13,7 @@ use crate::favorites::{self, Favorite, Saved};
 use crate::layout;
 use crate::menus::{Cmd, Target};
 use crate::model::{ProductRef, two_cores::received};
+use crate::panes::PaneKind;
 use crate::screens::{ScreenKind, ScreenSpec};
 use crate::tabs::SpaceId;
 use crate::tree::ItemKey;
@@ -509,8 +510,10 @@ fn the_file_tree_opens_a_terminal_in_a_folder_saves_a_favorite_and_trashes_after
     select(&f, cx, "a");
     cx.dispatch_action(crate::actions::ShowFiles);
     redraw(cx);
-    let mode = f.shell.read_with(cx, |s, cx| s.sidebar.read(cx).mode);
-    assert_eq!(mode, crate::sidebar::SidebarMode::Files);
+    let open = f
+        .shell
+        .read_with(cx, |s, _| s.panes.is_open(PaneKind::Files));
+    assert!(open, "Show files opens the Files pane");
     let _ = sent(&mut f);
     let docs = Target::File(crate::files::FileRef {
         product: product("a"),

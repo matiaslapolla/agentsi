@@ -1,20 +1,23 @@
 //! What the shell does when an alert is raised: the tone, the toast and the system
-//! notification. It also draws the alert log and opens the target of an alert.
+//! notification. It also opens the target of an alert. The alert log is the Alerts pane.
 
 use std::time::Instant;
 
 use agentsi_ui::components::{Button, StateMark, state_icon};
-use agentsi_ui::tokens::{control, line, radius, size, space, surface, text};
+use agentsi_ui::tokens::{line, size, space, text};
 use gpui_kit::component::notification::{Notification, NotificationDelivery};
 use gpui_kit::component::{Icon, WindowExt as _};
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
 
-use super::Shell;
+use super::{Shell, product_names};
 use crate::alerts::{Alert, AlertTarget, Alerts};
 use crate::alerts_file::{self, format_time, local_minute};
 use crate::chime::{self, ChimeGlobal, Scene};
+use crate::look::LookGlobal;
+use crate::model::Cores;
 use crate::model::ProductRef;
+use crate::panes::PaneKind;
 use crate::screens::{ScreenKind, ScreenSpec};
 
 /// The id type of the toasts of the alerts. The key is the target.
@@ -80,6 +83,12 @@ impl Shell {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        // The open log shows the alert at once.
+        if self.panes.is_open(PaneKind::Alerts)
+            && let Some(center) = Alerts::try_get(cx)
+        {
+            center.update(cx, |c, cx| c.mark_seen(cx));
+        }
         let visible = self.target_visible(&alert.target, window, cx);
         self.play_tone(alert, visible, cx);
         if !Alert::is_alertable(alert.state) {
@@ -144,26 +153,61 @@ impl Shell {
         }
     }
 
-    /// Opens or closes the alert log. Opening it counts the alerts as seen.
-    pub(super) fn toggle_alert_log(&mut self, cx: &mut Context<Self>) {
-        self.alerts_open = !self.alerts_open;
-        if self.alerts_open
-            && let Some(center) = Alerts::try_get(cx)
-        {
-            center.update(cx, |c, cx| c.mark_seen(cx));
+    fn play_tone(&mut self, alert: &Alert, visible: bool, cx: &mut Context<Self>) {
+        let Some(chime) = cx.try_global::<ChimeGlobal>().map(|g| g.0.clone()) else {
+            return;
+        };
+        let now = Instant::now();
+        let scene = Scene {
+            now,
+            minute: alerts_file::local_minute(std::time::SystemTime::now()),
+            visible,
+            call_playing: chime::call_playing(),
+        };
+        let config = alerts_file::current(cx);
+        if chime.borrow_mut().consider(alert, &config, scene).is_err() {
+            return;
         }
-        cx.notify();
+        chime::close_when_idle(cx);
     }
+}
 
-    /// The popover with the alerts of this run, newest first.
-    pub(super) fn alert_log(&self, cx: &mut Context<Self>) -> Option<AnyElement> {
-        if !self.alerts_open {
-            return None;
+/// The owner pressed Open on a row of the log.
+pub struct OpenAlert(pub AlertTarget);
+
+/// The Alerts pane: the alerts of this run, newest first.
+pub struct AlertLog {
+    cores: Cores,
+    _observe: Vec<Subscription>,
+}
+
+impl EventEmitter<OpenAlert> for AlertLog {}
+
+impl AlertLog {
+    pub fn new(cores: Cores, cx: &mut Context<Self>) -> Self {
+        let mut observe: Vec<Subscription> = cores
+            .all()
+            .map(|c| cx.observe(c, |_, _, cx| cx.notify()))
+            .collect();
+        if let Some(center) = Alerts::try_get(cx) {
+            observe.push(cx.observe(&center, |_, _, cx| cx.notify()));
         }
+        if let Some(l) = cx.try_global::<LookGlobal>().map(|g| g.0.clone()) {
+            observe.push(cx.observe(&l, |_, _, cx| cx.notify()));
+        }
+        AlertLog {
+            cores,
+            _observe: observe,
+        }
+    }
+}
+
+impl Render for AlertLog {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let rows: Vec<Alert> = Alerts::try_get(cx)
             .map(|c| c.read(cx).log().cloned().collect())
             .unwrap_or_default();
-        let products = self.products(cx);
+        let products = product_names(&self.cores, cx);
         let name = move |alert: &Alert| -> Option<String> {
             let id = alert.product.as_deref()?;
             let host = alert.target.host();
@@ -172,12 +216,23 @@ impl Shell {
                 .find(|(p, _)| p.id == id && p.host.as_deref() == host)
                 .map(|(_, n)| n.clone())
         };
-        let list = div()
-            .id("alert-log-list")
+        div()
+            .id("alert-log")
+            .debug_selector(|| "alert-log".into())
             .flex()
             .flex_col()
-            .max_h(control::ALERT_LOG_HEIGHT)
+            .size_full()
             .overflow_y_scroll()
+            .px(space(3))
+            .when(rows.is_empty(), |el| {
+                el.child(
+                    div()
+                        .py(space(2))
+                        .text_size(size::sm())
+                        .text_color(text::tertiary())
+                        .child("No alerts in this run."),
+                )
+            })
             .children(rows.iter().enumerate().map(|(i, alert)| {
                 let target = alert.target.clone();
                 let who = [
@@ -217,75 +272,11 @@ impl Shell {
                                     .small()
                                     .secondary()
                                     .label("Open")
-                                    .on_click(cx.listener(move |this, _, window, cx| {
-                                        this.alerts_open = false;
-                                        this.open_alert_target(&target, window, cx);
+                                    .on_click(cx.listener(move |_, _, _, cx| {
+                                        cx.emit(OpenAlert(target.clone()))
                                     })),
                             ),
                     )
-            }));
-        Some(
-            div()
-                .absolute()
-                .top_0()
-                .left_0()
-                .size_full()
-                .on_mouse_down(
-                    MouseButton::Left,
-                    cx.listener(|this, _, _, cx| {
-                        this.alerts_open = false;
-                        cx.notify();
-                    }),
-                )
-                .child(
-                    div()
-                        .debug_selector(|| "alert-log".into())
-                        .absolute()
-                        .top(control::TOOLBAR_HEIGHT)
-                        .left(space(2))
-                        .w(control::PALETTE_WIDTH)
-                        .p(space(3))
-                        .rounded(radius::lg())
-                        .border_1()
-                        .border_color(line::border())
-                        .bg(surface::overlay())
-                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-                        .child(
-                            div()
-                                .text_size(size::md())
-                                .text_color(text::primary())
-                                .child("Alerts"),
-                        )
-                        .child(if rows.is_empty() {
-                            div()
-                                .py(space(2))
-                                .text_size(size::sm())
-                                .text_color(text::tertiary())
-                                .child("No alerts in this run.")
-                                .into_any_element()
-                        } else {
-                            list.into_any_element()
-                        }),
-                )
-                .into_any_element(),
-        )
-    }
-
-    fn play_tone(&mut self, alert: &Alert, visible: bool, cx: &mut Context<Self>) {
-        let Some(chime) = cx.try_global::<ChimeGlobal>().map(|g| g.0.clone()) else {
-            return;
-        };
-        let now = Instant::now();
-        let scene = Scene {
-            now,
-            minute: alerts_file::local_minute(std::time::SystemTime::now()),
-            visible,
-            call_playing: chime::call_playing(),
-        };
-        let config = alerts_file::current(cx);
-        if chime.borrow_mut().consider(alert, &config, scene).is_err() {
-            return;
-        }
-        chime::close_when_idle(cx);
+            }))
     }
 }
