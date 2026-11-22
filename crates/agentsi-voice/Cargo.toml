@@ -54,3 +54,7 @@ required-features = ["stt"]
 [[test]]
 name = "vad"
 required-features = ["stt"]
+
+[[test]]
+name = "memory"
+required-features = ["tts", "stt"]

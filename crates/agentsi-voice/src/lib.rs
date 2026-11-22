@@ -17,4 +17,19 @@ pub mod tts;
 pub mod vad;
 pub mod vocabulary;
 
+/// Gives the free pages of the heap back to the system. Call it after a model drops: glibc
+/// keeps the freed pages of a large heap, so the resident memory would not fall.
+pub fn release_memory() {
+    #[cfg(all(target_os = "linux", target_env = "gnu"))]
+    {
+        unsafe extern "C" {
+            fn malloc_trim(pad: usize) -> std::ffi::c_int;
+        }
+        // SAFETY: malloc_trim only returns free heap pages to the system.
+        unsafe {
+            malloc_trim(0);
+        }
+    }
+}
+
 pub use text::{RULES, SCREEN_LINE, VOICE, spoken_sentences, transcript_entry, transcript_head};
