@@ -145,3 +145,14 @@ The final report lists each change to the protocol, the database schema and the 
 - **Screenshots:** the five shots that show the state border or the agent cards were taken again after `review-fixes`. The gallery of the delivered result is the artifact https://claude.ai/artifact/PSwESgySsJ95ffvrXcSbN2.
 - **Watcher:** the user service `agentsi-build-watch` is stopped.
 - **Not run:** the release idle and alert benches. The owner checks the tones, the system notifications, the desk with the real `claude` and a real setup by hand.
+
+## 2026-11-22 — Desktop batch of 2026-11-21 on cloud agents
+
+Plan: `docs/plans/agentsi-desktop-cloud-batch.md`. Each unit ran in a cloud routine (environment `agentsi-build`, no connectors), pushed a branch, and merged by PR on a green Rust CI. The M1 compiled once, at the end.
+
+- **Infra:** #4 (fe27439) CI builds `libghostty-vt` and publishes it as prerelease `ghostty-vt-<commit>`, because zig cannot download through the cloud proxy. #5 (6574028) `cargo fmt`: the Rust workflow had stopped at fmt since 2026-11-19. #9 (4c43f37) bubblewrap and `--no-fail-fast` in the Rust workflow; the goldens no longer depend on the machine's git excludes file.
+- **Units:** U1 PATH #6 (f457aff), U2 settings sections, fonts and terminal #8 (9794181), U3 general roles #7 (6786606), U5 terminal links #10 (4209fa0), U6 git #11 (3d96a77), U4 spaces, pinned tabs and favorites #12 (80ef539), U8 git marks #13 (c9f54ab), U7 file explorer #14 (de35e21), U9 palette sources #15 (5314936).
+- **Proof:** each PR passed fmt, clippy and the full workspace tests on GitHub. Each unit had a fresh-context review before its push. `agentsi doctor` on the M1 after `make install`: PATH merged, `claude` found.
+- **Decisions in the units:** the git watcher and the files watcher walk only folders git keeps (`ignore` crate) and poll every 10 s when a watch cannot be added. A push respects `push.default=simple` and never forces. Reopen closed tab is `Ctrl+Alt+T` (`Ctrl+Shift+T` is New Claude). "Restart core" relaunches the app and ends the terminals of this device.
+- **Follow-up:** the first general role copies the five builtin roles into the data root, so later builtin versions are not read (read per file with a builtin fallback). Flaky under load: `agentsi-core` `hook.rs` `a_core_that_does_not_answer_costs_at_most_the_time_limit` and `stop.rs`. The CI job `node` crashes now and then inside V8 (`jit_page`); a rerun passes.
+- **Owner checks:** the visual and idle-bench items of each spec, listed in each PR body.
