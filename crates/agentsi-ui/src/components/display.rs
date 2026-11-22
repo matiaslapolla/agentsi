@@ -7,7 +7,8 @@ use gpui_kit::*;
 
 use crate::tokens::label::Hue;
 use crate::tokens::{
-    Color, Status, WorkState, control, grid, radius, size, space, status, surface, text, weight,
+    Color, Status, WorkState, accent, control, grid, radius, size, space, status, surface, text,
+    weight,
 };
 
 /// The `gpui-component` tag in a status color on its tint. Long text ends with an ellipsis.
@@ -65,6 +66,21 @@ impl RenderOnce for StatusDot {
             .size(grid(2))
             .rounded(radius::FULL)
             .bg(self.0.color().hsla())
+    }
+}
+
+/// A 6 px dot of the accent color: the git tree of a tab has changes. The tab tooltip says how
+/// many.
+#[derive(IntoElement)]
+pub struct ChangesDot;
+
+impl RenderOnce for ChangesDot {
+    fn render(self, _: &mut Window, _: &mut App) -> impl IntoElement {
+        div()
+            .flex_none()
+            .size(grid(3) / 2.)
+            .rounded(radius::FULL)
+            .bg(accent::base().hsla())
     }
 }
 

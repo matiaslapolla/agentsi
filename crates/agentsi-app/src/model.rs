@@ -22,6 +22,7 @@ use futures::future::LocalBoxFuture;
 use gpui_kit::{App, AppContext as _, AsyncApp, Context, Entity, EventEmitter};
 
 use crate::alerts::{Alerts, Name};
+use crate::git_marks::GitMarks;
 use crate::link::{CallError, Link};
 use crate::screens::meeting::MeetingFeed;
 
@@ -226,6 +227,8 @@ pub struct CoreState {
     /// The products with a reflection that this window started and that runs. The core has no
     /// list of running reflections, so a reflection that the CLI started does not show here.
     pub reflecting: BTreeSet<String>,
+    /// The git summaries of the products and the terminal folders of this core.
+    pub git: Option<Entity<GitMarks>>,
 }
 
 impl CoreState {
@@ -245,6 +248,7 @@ impl CoreState {
             gone: BTreeSet::new(),
             sessions: BTreeMap::new(),
             reflecting: BTreeSet::new(),
+            git: None,
         }
     }
 

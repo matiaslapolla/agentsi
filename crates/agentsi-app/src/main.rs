@@ -15,6 +15,7 @@ mod chime;
 mod dictation_bind;
 mod favorites;
 mod format;
+mod git_marks;
 mod guide;
 mod hosts;
 mod keys;
