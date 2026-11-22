@@ -122,9 +122,9 @@ You give a label and a color to a product, a pane or a tab. You put products int
 
 *The sidebar tree. A product shows its terminals, its meeting and its story sessions.*
 
-The sidebar tree is one of three panes: Products, Files and Alerts. The pane bar at the top of the window has one toggle for each pane. A bright toggle is an open pane, and a muted toggle is a hidden pane. The Alerts toggle shows the count of the alerts that you did not see.
+This tree is the Products pane. The app has three panes: Products, Files and Alerts. The pane bar at the top of the window has one toggle for each pane. A bright toggle is an open pane, and a muted toggle is a hidden pane. The Alerts toggle shows the count of the alerts that you did not see.
 
-- A click on a toggle opens or hides its pane. The keys are `Ctrl+Shift+O` for Products, `Ctrl+Shift+U` for Files and `Ctrl+Shift+N` for Alerts. `Ctrl+Shift+H` hides each open pane, and the next press shows the same panes again.
+- A click on a toggle opens or hides its pane. The keys are `Ctrl+Shift+O` for Products, `Ctrl+Shift+J` for Files and `Ctrl+Shift+N` for Alerts. `Ctrl+Shift+H` hides each open pane, and the next press shows the same panes again.
 - Files shows the folders and files of the selected product. `Ctrl+Shift+E` opens Files and puts the focus in the tree.
 - Drag the inner edge of a column to resize it. A column is 180 px wide at least, and half the window at most. A double click on the edge sets it back to 248 px.
 - Two panes in one column share its height. Drag the edge between them to resize them.

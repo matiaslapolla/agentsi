@@ -452,5 +452,5 @@ The file `agentsi.desktop` that `install.sh` writes to `${XDG_DATA_HOME:-~/.loca
 _Avoid_: Launcher entry, shortcut, .desktop file
 
 **App icon**:
-The file `agentsi.svg` that `install.sh` writes to the `hicolor` icon theme of the owner. The launcher and the sidebar header show it.
+The file `agentsi.svg` that `install.sh` writes to the `hicolor` icon theme of the owner. The launcher and the pane bar show it.
 _Avoid_: Logo, icon (alone)
