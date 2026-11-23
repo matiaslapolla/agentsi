@@ -80,13 +80,13 @@ The owner picks the next work by hand in each session. `ROADMAP.md` has no order
 - `CONTEXT.md` gets the term **North star**. The code and `setup.md` use it.
 
 ## Acceptance criteria
-- [ ] `docs/product.md` exists and has the nine headings and the Stage line of the design in that order.
-- [ ] `docs/product.md` maps each section of `ROADMAP.md` to objective 1, objective 2, `## Later` or `## Out of scope`, as in `docs/ideas/agentsi-north-star-eval.md`.
-- [ ] `docs/product.md` gives a `sqlite3` query for each signal, the review date 2026-12-31, the owner override and the conditions to stop.
-- [ ] `grep -niE "macos|mobile app|remote client" ROADMAP.md` prints nothing.
-- [ ] `ROADMAP.md` has a section "The switch-over" that says the work is in progress. The other sections keep their text and their order.
-- [ ] A `node --import tsx` script calls `validateBrief` on the brief JSON and prints no failures. It uses the repo root and the roster `pm`, `dev`, `qa`.
-- [ ] The brief JSON has `stage` `building`, the objective ids `o1` and `o2`, each with `due` 2026-12-31, and `north_stars: ["docs/product.md"]`.
-- [ ] On the owner's machine, the owner runs the dry run, reads the diff and applies with `--yes`. Then `agentsi roles validate` passes for `agentsi`.
-- [ ] `CONTEXT.md` defines **North star**.
-- [ ] `wc -w` gives 1000 or less for the spec and 600 or less for the plan.
+- [x] `docs/product.md` exists and has the nine headings and the Stage line of the design in that order.
+- [x] `docs/product.md` maps each section of `ROADMAP.md` to objective 1, objective 2, `## Later` or `## Out of scope`, as in `docs/ideas/agentsi-north-star-eval.md`.
+- [x] `docs/product.md` gives a `sqlite3` query for each signal, the review date 2026-12-31, the owner override and the conditions to stop.
+- [x] `grep -niE "macos|mobile app|remote client" ROADMAP.md` prints nothing.
+- [x] `ROADMAP.md` has a section "The switch-over" that says the work is in progress. The other sections keep their text and their order.
+- [x] A `node --import tsx` script calls `validateBrief` on the brief JSON and prints no failures. It uses the repo root and the roster `pm`, `dev`, `qa`.
+- [x] The brief JSON has `stage` `building`, the objective ids `o1` and `o2`, each with `due` 2026-12-31, and `north_stars: ["docs/product.md"]`.
+- [x] On the owner's machine, the owner runs the dry run, reads the diff and applies with `--yes`. Then `agentsi roles validate` passes for `agentsi`.
+- [x] `CONTEXT.md` defines **North star**.
+- [x] `wc -w` gives 1000 or less for the spec and 600 or less for the plan.
