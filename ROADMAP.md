@@ -64,12 +64,11 @@ AgentSI is open source and free forever. It is made in Argentina. This file list
 ## More connectivity
 
 - Connect more devices to the same agency.
-- Control the agency from a remote client.
-- Add a mobile app.
 
-## macOS and the switch-over
+## The switch-over
 
-- Port the app to macOS.
+The switch-over is in progress.
+
 - Run the switch-over: the Rust programs replace the TypeScript app, and the repo drops `apps/` and `packages/`.
 
 ## And much more
