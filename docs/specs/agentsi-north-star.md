@@ -23,7 +23,7 @@ The owner picks the next work by hand in each session. `ROADMAP.md` has no order
 ## Terms
 **North star**: A doc of a product that the `north_stars` field of its brief names. The PM ranks the priorities against it. For AgentSI it is `docs/product.md`.
 
-**Review date**: The `due` of an objective of AgentSI. It is the date of the monthly review, not a delivery date.
+**Review date**: The `due` of an objective of AgentSI. It is the date of the monthly review.
 
 **Outside list**: The list of the tasks that the owner still does outside the app. `docs/product.md` keeps it.
 
@@ -87,6 +87,6 @@ The owner picks the next work by hand in each session. `ROADMAP.md` has no order
 - [ ] `ROADMAP.md` has a section "The switch-over" that says the work is in progress. The other sections keep their text and their order.
 - [ ] A `node --import tsx` script calls `validateBrief` on the brief JSON and prints no failures. It uses the repo root and the roster `pm`, `dev`, `qa`.
 - [ ] The brief JSON has `stage` `building`, the objective ids `o1` and `o2`, each with `due` 2026-12-31, and `north_stars: ["docs/product.md"]`.
-- [ ] On the owner's machine, the owner runs the dry run, reads the diff, applies with `--yes`, and `agentsi roles validate` passes for `agentsi`.
+- [ ] On the owner's machine, the owner runs the dry run, reads the diff and applies with `--yes`. Then `agentsi roles validate` passes for `agentsi`.
 - [ ] `CONTEXT.md` defines **North star**.
 - [ ] `wc -w` gives 1000 or less for the spec and 600 or less for the plan.
