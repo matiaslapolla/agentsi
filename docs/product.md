@@ -13,7 +13,7 @@ AgentSI is an agency of role agents for the products of the owner. The roles rea
 The owner opens a product, and AgentSI says what to do next and why. The owner approves, and the roles do the work. The means is one place for each product: terminals, git, tickets, meetings and voice.
 
 ## Objectives
-The `due` of each objective is a review date, not a delivery date. The data is in `agentsi.db` of the data root. The queries use the default data root, `~/.local/share/agentsi/data`. Each query below is for December 2026. For another month, change `2026-12`.
+The `due` of each objective is the date of the monthly review. The data is in `agentsi.db` of the data root. The queries use the default data root, `~/.local/share/agentsi/data`. Each query below is for December 2026. For another month, change `2026-12`.
 
 1. **The app is the daily workplace** (`o1`).
    - Sections of `ROADMAP.md`:
@@ -42,7 +42,7 @@ The `due` of each objective is a review date, not a delivery date. The data is i
      sqlite3 ~/.local/share/agentsi/data/agentsi.db \
        "select round(100.0 * sum(p.mark = 'accepted') / count(*), 1)
         from priorities p join minutes m on m.id = p.minutes_id
-        where m.product = 'agentsi' and p.mark is not null
+        where p.mark is not null
           and substr(m.created_at, 1, 7) = '2026-12'"
      ```
 
@@ -73,7 +73,7 @@ The owner does the review once a month, on the review date of the objectives. Th
 
    ```sh
    sqlite3 ~/.local/share/agentsi/data/agentsi.db \
-     "select count(*) from minutes where product = 'agentsi'"
+     "select count(*) from minutes where product = 'agentsi' and status = 'valid'"
    ```
 
 After the review, the owner moves the review date of each objective to the last day of the next month. The owner applies the new date with `/agentsi setup` in update mode.
