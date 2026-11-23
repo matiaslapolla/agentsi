@@ -35,6 +35,7 @@ use gpui_kit::*;
 use crate::actions;
 use crate::alerts::{AlertTarget, Alerts, Raised};
 use crate::bench::{BenchHandle, BenchPlan};
+use crate::columns::ScreenColumns;
 use crate::files::RunFile;
 use crate::hosts::HostsGlobal;
 use crate::keys;
@@ -307,6 +308,7 @@ impl Shell {
             ));
         }
         subscriptions.push(cx.observe_global::<OpenedSection>(|this, cx| this.schedule_save(cx)));
+        subscriptions.push(cx.observe_global::<ScreenColumns>(|this, cx| this.schedule_save(cx)));
         let hub = menus::install(cx);
         subscriptions.push(cx.subscribe_in(
             &hub,
@@ -614,6 +616,7 @@ impl Shell {
                 });
                 let panes = Panes::load(saved.panes.as_ref(), saved.sidebar_mode.as_deref());
                 self.set_panes(panes, window, cx);
+                cx.set_global(ScreenColumns::load(&saved.columns));
                 // Before the dock loads, so a saved settings screen opens at the section.
                 if let Some(s) = saved.settings_section.as_deref().and_then(Section::from_id) {
                     cx.set_global(OpenedSection(s));
@@ -722,6 +725,10 @@ impl Shell {
                 .map(|s| s.0.id().to_string()),
             sidebar_mode: None,
             panes: Some(self.panes.save()),
+            columns: cx
+                .try_global::<ScreenColumns>()
+                .map(ScreenColumns::save)
+                .unwrap_or_default(),
             hide_ignored: !sidebar.files.read(cx).show_ignored,
             recent: self.recent.save(),
             dock: None,

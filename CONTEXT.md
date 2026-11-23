@@ -447,6 +447,10 @@ _Avoid_: Sidebar mode, panel, tool window
 The left or the right side of the window. A column holds its open panes top to bottom, and the owner resizes it and each pane in it. A column with no open pane takes no width.
 _Avoid_: Sidebar, dock (the dock is the middle)
 
+**Screen column**:
+A side column inside a screen whose width the owner drags: the section list of Settings, the list of the Git screen, the commit list of the Git history view and the desk conversation. It has the limits and the double click of a column. `layout.json` keeps one width for each screen column (`columns`).
+_Avoid_: Sidebar, side panel, column (when you mean a column of the window)
+
 **Pane bar**:
 The row at the top of the window. It shows the app icon and name, one toggle for each pane and the palette hint. A bright toggle is an open pane, and a muted toggle a hidden pane. The Alerts toggle shows the count of the unseen alerts.
 _Avoid_: Top bar, toolbar, icon rail

@@ -16,7 +16,7 @@ use agentsi_proto::marks_api::{
     PendingDecisionItem, PendingItem, PendingPriority, Verdict,
 };
 use agentsi_ui::components::{Button, Card, Force, ListRow, neutral_tag, status_tag};
-use agentsi_ui::tokens::{Status, control, line, radius, size, space, surface, text, weight};
+use agentsi_ui::tokens::{Status, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::IconName;
 use gpui_kit::prelude::FluentBuilder as _;
 use gpui_kit::*;
@@ -29,6 +29,7 @@ use super::parts::{
     minutes_status, mono, notice, role_label, section, stat, stats, write_through,
     write_through_with,
 };
+use crate::columns::{self, ScreenColumn};
 use crate::format;
 use crate::link::CallError;
 use crate::model::CoreState;
@@ -62,6 +63,7 @@ pub struct DeskScreen {
     archived: Option<Vec<ArchivedDecision>>,
     /// Repaints the agent cards when a meeting, a session or the speech changes.
     _agent_subs: Vec<Subscription>,
+    _columns: Subscription,
 }
 
 /// `write_through` shows one fixed line for a reply, so a reply that did not do what the
@@ -85,6 +87,7 @@ impl DeskScreen {
         };
         let mut screen = DeskScreen {
             _agent_subs: super::agent_row::watch(&core, cx),
+            _columns: columns::observe(cx),
             conversation,
             tickets,
             product,
@@ -694,8 +697,7 @@ impl Render for DeskScreen {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         self.ensure_form(window, cx);
         let main = self.main(cx);
-        div()
-            .id("desk")
+        columns::on_column_drag(div().id("desk"), ScreenColumn::DeskConversation, cx)
             .track_focus(&self.focus)
             .key_context("Desk")
             .on_key_down(cx.listener(|this, e: &KeyDownEvent, window, cx| {
@@ -713,15 +715,15 @@ impl Render for DeskScreen {
             .flex()
             .flex_row()
             .child(main)
-            .child(
+            .child(columns::screen_column(
+                ScreenColumn::DeskConversation,
                 div()
-                    .flex_none()
-                    .w(control::DESK_CONVERSATION_WIDTH)
-                    .h_full()
+                    .size_full()
                     .border_l_1()
                     .border_color(line::border())
                     .child(self.conversation.clone()),
-            )
+                cx,
+            ))
     }
 }
 

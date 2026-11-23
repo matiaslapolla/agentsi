@@ -2,6 +2,7 @@
 //! the diff of one file at the right, in the diff view of Changes.
 
 use super::{DiffView, GitScreen, cut_line, day, diff_body, patch_view, state_tag};
+use crate::columns::{self, ScreenColumn};
 use crate::screens::parts::{Load, mono, notice};
 use agentsi_proto::git_api::{GitShow, GitShowFile, GitShowParams, GitShowResult};
 use agentsi_ui::components::ListRow;
@@ -210,29 +211,27 @@ impl GitScreen {
 
     pub(super) fn history_view(&self, cx: &mut Context<Self>) -> AnyElement {
         let files = self.commit_files(cx);
-        div()
+        let column = div()
             .size_full()
             .flex()
-            .child(
-                div()
-                    .w(control::SIDEBAR_WIDTH)
-                    .flex_none()
-                    .flex()
-                    .flex_col()
-                    .border_r_1()
-                    .border_color(line::border())
-                    .child(div().flex_1().min_h_0().child(self.commit_list(cx)))
-                    .when_some(files, |el, files| {
-                        el.child(
-                            div()
-                                .flex_1()
-                                .min_h_0()
-                                .border_t_1()
-                                .border_color(line::border())
-                                .child(files),
-                        )
-                    }),
-            )
+            .flex_col()
+            .border_r_1()
+            .border_color(line::border())
+            .child(div().flex_1().min_h_0().child(self.commit_list(cx)))
+            .when_some(files, |el, files| {
+                el.child(
+                    div()
+                        .flex_1()
+                        .min_h_0()
+                        .border_t_1()
+                        .border_color(line::border())
+                        .child(files),
+                )
+            });
+        columns::on_column_drag(div(), ScreenColumn::GitHistory, cx)
+            .size_full()
+            .flex()
+            .child(columns::screen_column(ScreenColumn::GitHistory, column, cx))
             .child(self.commit_diff())
             .into_any_element()
     }
