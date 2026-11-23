@@ -12,6 +12,7 @@ mod appearance;
 mod atomic;
 mod bench;
 mod chime;
+mod columns;
 mod dictation_bind;
 mod favorites;
 mod files;

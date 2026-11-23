@@ -24,9 +24,7 @@ use agentsi_proto::vocabulary_api::{
 };
 use agentsi_ui::components::{Button, Card, ItemRow, neutral_tag, status_tag};
 use agentsi_ui::style::StyleExt as _;
-use agentsi_ui::tokens::{
-    Status, accent, control, font, line, radius, size, space, surface, text, weight,
-};
+use agentsi_ui::tokens::{Status, accent, font, line, radius, size, space, surface, text, weight};
 use gpui_kit::component::IconName;
 use gpui_kit::component::input::{Input, InputEvent, InputState};
 use gpui_kit::prelude::FluentBuilder as _;
@@ -34,6 +32,7 @@ use gpui_kit::*;
 
 use super::git_config::GitConfigEditor;
 use super::parts::{Load, column, mono, notice, section};
+use crate::columns::{self, ScreenColumn};
 use crate::hosts::{Hosts, HostsGlobal, RemoteHost};
 use crate::keys::{self, Captured};
 
@@ -356,6 +355,7 @@ pub struct SettingsScreen {
     _feed: Option<Subscription>,
     hosts: Option<Entity<Hosts>>,
     _hosts: Option<Subscription>,
+    _columns: Subscription,
     /// The draw that the events since the last draw wait for.
     redraw: Option<Task<()>>,
     /// The events that arrive while `models.list` runs. They apply to its answer, which
@@ -434,9 +434,7 @@ impl SettingsScreen {
             .debug_selector(|| "settings-nav".into())
             .track_focus(&self.nav_focus)
             .on_key_down(cx.listener(|this, e: &KeyDownEvent, _, cx| this.nav_key(e, cx)))
-            .flex_none()
-            .w(control::SETTINGS_NAV_WIDTH)
-            .h_full()
+            .size_full()
             .overflow_y_scroll()
             .flex()
             .flex_col()
@@ -536,6 +534,7 @@ impl SettingsScreen {
                 .as_ref()
                 .map(|h| cx.observe(h, |_, _, cx| cx.notify())),
             hosts,
+            _columns: columns::observe(cx),
             redraw: None,
             pending: None,
         };
@@ -1465,8 +1464,8 @@ impl Render for SettingsScreen {
         let now = self.shown_section(&shown);
         let nav = self.nav(&shown, now, window, cx);
         let content = self.render_section(now, window, cx);
-        div()
-            .id("settings")
+        let root = div().id("settings");
+        columns::on_column_drag(root, ScreenColumn::SettingsNav, cx)
             .debug_selector(|| "settings-root".into())
             .size_full()
             .flex()
@@ -1476,7 +1475,7 @@ impl Render for SettingsScreen {
                 MouseButton::Left,
                 cx.listener(|this, _, _, cx| this.cancel_captures(cx)),
             )
-            .child(nav)
+            .child(columns::screen_column(ScreenColumn::SettingsNav, nav, cx))
             .child(
                 div()
                     .id("settings-page")

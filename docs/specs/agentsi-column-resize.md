@@ -9,7 +9,7 @@ The owner can drag the width of the two pane columns of the shell. The side colu
 - The owner can drag the width of each side column of a screen:
   1. the section list of Settings (200 px now),
   2. the list of the Git screen (248 px now),
-  3. the file list of the Git history view (248 px now),
+  3. the commit list of the Git history view (248 px now),
   4. the desk conversation of the front desk (380 px now).
 - A drag works like the edge of a pane column: the same handle, the same limits rule and a double click that gives the first width again.
 - `layout.json` keeps each width, so the width stays after a restart.
@@ -26,17 +26,17 @@ The owner can drag the width of the two pane columns of the shell. The side colu
 ## Design
 
 ### The model, `crates/agentsi-app/src/columns.rs`
-- `enum ScreenColumn { SettingsNav, GitList, GitFiles, DeskConversation }`. Each one gives its key in `layout.json`, its first width and its edge: trailing for a left column, leading for the desk conversation.
+- `enum ScreenColumn { SettingsNav, GitList, GitHistory, DeskConversation }`. Each one gives its key in `layout.json`, its first width and its edge: trailing for a left column, leading for the desk conversation.
 - `struct ScreenColumns` is a gpui `Global`. It keeps one width for each screen column that the owner changed.
-- `width(column, row)` gives the shown width. It clamps the width between `PANE_COLUMN_MIN` and `PANE_COLUMN_MAX` of the row width. This is the rule of `Panes::shown_width`.
-- `set(column, width, row) -> bool` and `reset(column) -> bool` change the width. They return `false` if nothing changed, so a drag does not notify on each move.
+- `width(column)` gives the width, at least `PANE_COLUMN_MIN`.
+- `set(column, width, row) -> bool` clamps the width between `PANE_COLUMN_MIN` and `PANE_COLUMN_MAX` of the row width, with `panes::clamp_width`. `reset(column) -> bool` removes the width. Each one returns `false` if nothing changed, so a move that changes nothing does not notify.
 - `save()` and `load()` read and write `BTreeMap<String, f32>`. A key that does not read, or a width that is not finite and positive, is dropped.
 
 ### The element
-- `screen_column(column, row_width, content, cx)` wraps the content in a `flex_none` div of the shown width, with a `resize_handle` of gpui-kit on its edge.
-- The handle starts a drag of `ColumnDrag(ScreenColumn)`. A double click calls `reset`.
-- `on_column_drag(row, entity, cx)` adds the `on_drag_move::<ColumnDrag>` listener to the flex row that holds the column. The bounds of the row give the new width: `x - row.left` for a trailing edge, `row.right - x` for a leading edge.
-- The screen keeps the last row width from the drag event or from a `canvas` measure, because `width` needs it to clamp.
+- `screen_column(column, content, cx)` wraps the content in a `flex_none` div of the width, with a `resize_handle` of gpui-kit on its edge. `max_w(relative(PANE_COLUMN_MAX))` keeps the column to the half of its row, so the screen does not measure the row.
+- The handle starts a drag of `ColumnDrag { column, owner }`, where `owner` is the entity of the screen. A double click calls `reset`.
+- `on_column_drag(row, column, cx)` adds the `on_drag_move::<ColumnDrag>` listener to the flex row that holds the column. It ignores a drag of another column or another screen, because two screens can show at the same time. The bounds of the row give the new width: `x - row.left` for a trailing edge, `row.right - x` for a leading edge.
+- Each screen observes the global, so a drag in one screen also draws the other screens again.
 
 ### The screens
 - `screens/settings.rs`, `screens/git.rs`, `screens/git/history.rs` and `screens/desk.rs` use `screen_column` in place of the fixed `.w(...)`.

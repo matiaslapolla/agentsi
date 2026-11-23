@@ -129,6 +129,7 @@ This tree is the Products pane. The app has three panes: Products, Files and Ale
 - Drag the inner edge of a column to resize it. A column is 180 px wide at least, and half the window at most. A double click on the edge sets it back to 248 px.
 - Two panes in one column share its height. Drag the edge between them to resize them.
 - Drag the header of a pane to move it. A line shows each place where it can go: between the panes of a column, and at the top edge of an empty column. Escape ends the drag and changes nothing.
+- The side columns inside a screen resize the same way: the section list of Settings, the list and the commit list of Git, and the desk conversation. A double click on the edge sets the first width again.
 - The app keeps the panes, their places and their sizes for the next start.
 
 In the Files pane:

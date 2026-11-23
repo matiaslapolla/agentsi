@@ -63,6 +63,14 @@ pub struct Layout {
         skip_serializing_if = "Option::is_none"
     )]
     pub panes: Option<crate::panes::PanesSave>,
+    /// The widths that the owner gave the screen columns, by `ScreenColumn::key`. A file from
+    /// before the screen columns has none, so no version bump.
+    #[serde(
+        default,
+        deserialize_with = "crate::columns::read_saved",
+        skip_serializing_if = "BTreeMap::is_empty"
+    )]
+    pub columns: BTreeMap<String, f32>,
     /// The file tree hides the entries that git ignores.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub hide_ignored: bool,
@@ -570,6 +578,7 @@ mod tests {
                 p.set_width(crate::panes::Side::Right, 300., 1280.);
                 p.save()
             }),
+            columns: BTreeMap::from([("git-list".to_string(), 320.)]),
             hide_ignored: true,
             recent: vec![RecentSave {
                 label: "main.rs".into(),
@@ -599,6 +608,8 @@ mod tests {
         assert_eq!(old.settings_section, None);
         assert_eq!(old.version, 1);
         assert_eq!(old.panes, None);
+        assert!(old.columns.is_empty());
+        assert!(text.contains("\"git-list\": 320.0"), "{text}");
         // A space with no group writes no `tab_groups` key.
         let mut bare = layout.clone();
         for s in bare.spaces.values_mut() {

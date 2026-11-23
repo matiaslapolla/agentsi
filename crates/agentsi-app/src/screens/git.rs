@@ -31,6 +31,7 @@ use gpui_kit::*;
 use super::git_config::GitConfigEditor;
 use super::minutes::cursor_after;
 use super::parts::{Load, first_screen_ready, mono, notice};
+use crate::columns::{self, ScreenColumn};
 use crate::model::{CoreState, GitNotice};
 use agentsi_proto::Event as _;
 use agentsi_proto::rpc::Notification;
@@ -135,6 +136,7 @@ pub struct GitScreen {
     focus: FocusHandle,
     scroll: UniformListScrollHandle,
     _inputs: Vec<Subscription>,
+    _columns: Subscription,
 }
 
 impl GitScreen {
@@ -166,6 +168,7 @@ impl GitScreen {
             focus: cx.focus_handle().tab_stop(true),
             scroll: UniformListScrollHandle::new(),
             _inputs: vec![notices],
+            _columns: columns::observe(cx),
         };
         screen.reload(cx);
         screen
@@ -833,8 +836,7 @@ impl Render for GitScreen {
                 .flex()
                 .flex_col()
                 .child(
-                    div()
-                        .id("git-body")
+                    columns::on_column_drag(div().id("git-body"), ScreenColumn::GitList, cx)
                         .track_focus(&self.focus)
                         .key_context("GitList")
                         .on_key_down(
@@ -843,17 +845,18 @@ impl Render for GitScreen {
                         .flex_1()
                         .min_h_0()
                         .flex()
-                        .child(
+                        .child(columns::screen_column(
+                            ScreenColumn::GitList,
                             div()
                                 .debug_selector(|| "git-list".into())
-                                .w(control::SIDEBAR_WIDTH)
-                                .flex_none()
+                                .size_full()
                                 .flex()
                                 .flex_col()
                                 .border_r_1()
                                 .border_color(line::border())
                                 .child(self.file_list(window, cx)),
-                        )
+                            cx,
+                        ))
                         .child(self.diff_pane(cx)),
                 )
                 .child(self.commit_bar(window, cx))
