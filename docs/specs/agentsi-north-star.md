@@ -14,14 +14,14 @@ The owner picks the next work by hand in each session. `ROADMAP.md` has no order
 - The PM then ranks the sections of `ROADMAP.md` against `o1` and `o2`.
 
 ## Non-goals
-- A code change. The core, the app and the plugin stay as they are.
+- A code change.
 - A signal view in the app. The owner uses `sqlite3`.
 - An order of the sections inside `ROADMAP.md`. The PM gives the order in the minutes.
 - An objective for the second audience, the devs who see AgentSI on X.
 - The registration itself. The registry is on the owner's machine, so the owner runs it.
 
 ## Terms
-**North star**: The doc that `north_stars` of a brief names. The PM ranks the priorities against it. For AgentSI it is `docs/product.md`.
+**North star**: A doc of a product that the `north_stars` field of its brief names. The PM ranks the priorities against it. For AgentSI it is `docs/product.md`.
 
 **Review date**: The `due` of an objective of AgentSI. It is the date of the monthly review, not a delivery date.
 
@@ -41,7 +41,7 @@ The owner picks the next work by hand in each session. `ROADMAP.md` has no order
   - More git,
   - The switch-over.
 - Objective 1 has two signals:
-  - 20 days or more in each month with an owner message at the front desk (`desk_items`, kind `owner`),
+  - 20 days or more in each month with an owner message at the front desk of any product (`desk_items`, kind `owner`),
   - an outside list that gets shorter at each review.
 - Objective 2, "The roles know the product and are correct", covers these sections:
   - Context injection into agents,
@@ -74,18 +74,18 @@ The owner picks the next work by hand in each session. `ROADMAP.md` has no order
 - The file is the `brief.json` of `setup.md` section 4 for the product `agentsi`.
 - It has `stage` `building`, the objectives `o1` and `o2`, `north_stars: ["docs/product.md"]` and the out-of-scope items of `docs/product.md`.
 - The roster is `pm`, `dev` and `qa`. The `roles` field has one line for each.
-- The plan gives the `roster.json` and the commands of `setup.md` section 7: the dry run, the diff, the owner's yes, the apply and `agentsi roles validate`.
+- The plan gives `roster.json` and the commands of `setup.md` section 7. The dry run and the diff come before the apply.
 
 ### The terms, `CONTEXT.md`
 - `CONTEXT.md` gets the term **North star**. The code and `setup.md` use it.
 
 ## Acceptance criteria
-- [ ] `docs/product.md` exists and has the ten headings of the design in that order.
+- [ ] `docs/product.md` exists and has the nine headings and the Stage line of the design in that order.
 - [ ] `docs/product.md` maps each section of `ROADMAP.md` to objective 1, objective 2, `## Later` or `## Out of scope`, as in `docs/ideas/agentsi-north-star-eval.md`.
 - [ ] `docs/product.md` gives a `sqlite3` query for each signal, the review date 2026-12-31, the owner override and the conditions to stop.
 - [ ] `grep -niE "macos|mobile app|remote client" ROADMAP.md` prints nothing.
 - [ ] `ROADMAP.md` has a section "The switch-over" that says the work is in progress. The other sections keep their text and their order.
-- [ ] A `node --import tsx` script that calls `validateBrief` on the brief JSON, with the repo root as the product path and the roster `pm`, `dev` and `qa`, prints no failures.
+- [ ] A `node --import tsx` script calls `validateBrief` on the brief JSON and prints no failures. It uses the repo root and the roster `pm`, `dev`, `qa`.
 - [ ] The brief JSON has `stage` `building`, the objective ids `o1` and `o2`, each with `due` 2026-12-31, and `north_stars: ["docs/product.md"]`.
 - [ ] On the owner's machine, the owner runs the dry run, reads the diff, applies with `--yes`, and `agentsi roles validate` passes for `agentsi`.
 - [ ] `CONTEXT.md` defines **North star**.
