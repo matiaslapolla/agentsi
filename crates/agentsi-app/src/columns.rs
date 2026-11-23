@@ -105,9 +105,10 @@ impl ScreenColumns {
         Pixels::from(w.max(f32::from(control::PANE_COLUMN_MIN)))
     }
 
-    /// Sets the width from the width of the row. Returns false when it stays.
+    /// Sets the width from the width of the row. Returns false when it stays. A row too narrow
+    /// for the minimum stores the minimum, and the element shows the half of the row.
     pub fn set(&mut self, column: ScreenColumn, width: f32, row: f32) -> bool {
-        let width = clamp_width(width, row);
+        let width = clamp_width(width, row).max(f32::from(control::PANE_COLUMN_MIN));
         if f32::from(self.width(column)) == width {
             return false;
         }
@@ -115,21 +116,24 @@ impl ScreenColumns {
         true
     }
 
-    /// The double click on the edge: back to the first width. Returns false when it is so.
+    /// The double click on the edge: back to the first width. Returns false when the column
+    /// already has its first width.
     pub fn reset(&mut self, column: ScreenColumn) -> bool {
         self.widths.remove(&column).is_some()
     }
 }
 
-/// The field `columns` of `layout.json`. A value that is not a number is dropped, so an edit
-/// by hand costs only that width.
+/// The field `columns` of `layout.json`. A value that is not a number is dropped, and a field
+/// that is not a map reads as empty. An edit by hand costs only the widths, never the layout.
 pub fn read_saved<'de, D>(d: D) -> Result<BTreeMap<String, f32>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
-    let values = Option::<BTreeMap<String, serde_json::Value>>::deserialize(d)?;
-    Ok(values
-        .unwrap_or_default()
+    let value = Option::<serde_json::Value>::deserialize(d)?;
+    let Some(serde_json::Value::Object(map)) = value else {
+        return Ok(BTreeMap::new());
+    };
+    Ok(map
         .into_iter()
         .filter_map(|(k, v)| v.as_f64().map(|w| (k, w as f32)))
         .collect())
@@ -229,9 +233,13 @@ mod tests {
 
     use gpui_kit::Pixels;
 
+    use agentsi_ui::tokens::control;
+
     use super::{ScreenColumn, ScreenColumns, read_saved};
 
-    const MIN: f32 = 180.;
+    fn min() -> f32 {
+        f32::from(control::PANE_COLUMN_MIN)
+    }
 
     #[test]
     fn columns_width_starts_at_the_first_width_and_keeps_the_minimum() {
@@ -242,7 +250,7 @@ mod tests {
         let saved = BTreeMap::from([("git-list".to_string(), 40.)]);
         assert_eq!(
             ScreenColumns::load(&saved).width(ScreenColumn::GitList),
-            Pixels::from(MIN)
+            Pixels::from(min())
         );
     }
 
@@ -254,9 +262,13 @@ mod tests {
         assert_eq!(c.width(col), Pixels::from(500.));
         assert!(!c.set(col, 500., 1200.), "the same width changes nothing");
         assert!(c.set(col, 40., 1200.));
-        assert_eq!(c.width(col), Pixels::from(MIN));
+        assert_eq!(c.width(col), Pixels::from(min()));
         assert!(c.set(col, 1000., 1200.));
         assert_eq!(c.width(col), Pixels::from(600.));
+        // A row narrower than two minimums stores the minimum once.
+        assert!(c.set(col, 200., 300.));
+        assert!(!c.set(col, 200., 300.), "a second move changes nothing");
+        assert_eq!(c.save(), BTreeMap::from([(col.key().to_string(), min())]));
     }
 
     #[test]
@@ -293,8 +305,10 @@ mod tests {
         let f: F = serde_json::from_str(r#"{"columns": {"git-list": 300, "git-history": "wide"}}"#)
             .unwrap();
         assert_eq!(f.columns, BTreeMap::from([("git-list".to_string(), 300.)]));
-        let f: F = serde_json::from_str(r#"{"columns": null}"#).unwrap();
-        assert!(f.columns.is_empty());
+        for bad in ["null", "[300]", "5", "\"wide\""] {
+            let f: F = serde_json::from_str(&format!(r#"{{"columns": {bad}}}"#)).unwrap();
+            assert!(f.columns.is_empty(), "{bad} reads as empty");
+        }
         let f: F = serde_json::from_str("{}").unwrap();
         assert!(f.columns.is_empty());
     }
