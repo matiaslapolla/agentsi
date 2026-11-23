@@ -3,19 +3,18 @@
 **Status:** shaped · **Date:** 2026-11-23 · **AI level:** Level 0, no AI
 
 ## Idea
-AgentSI gets a north star in `docs/product.md` and becomes one more product in its own registry. The PM then ranks the sections of `ROADMAP.md` against two objectives. The PM can then say why one section goes before another.
+AgentSI gets a north star in `docs/product.md` and becomes one more product in its own registry. Then the PM ranks the 12 sections of `ROADMAP.md` against two objectives.
 
 ## Problem
-- **Who:** the owner, the only developer. AgentSI is a personal tool. The owner shows it on X sometimes.
-- **Today:** the owner picks the next work by hand, in each session. `ROADMAP.md` has 12 sections with no order and no signal. PRs #17, #18 and #19 came from no minutes.
+- **Who:** the owner, the only developer. The owner shows AgentSI on X sometimes.
+- **Today:** the owner picks the next work by hand in each session. `ROADMAP.md` has no order and no signal.
 
 ## Data it reads
-- `docs/product.md`: the vision, the audience, the objectives and the out-of-scope list.
-- The brief of AgentSI in the registry, with `north_stars: ["docs/product.md"]`.
-- `desk_items` (owner messages by day) and `priorities` (the mark of each priority), for the signals.
+- `docs/product.md`, and the brief of AgentSI with `north_stars: ["docs/product.md"]`.
+- `desk_items` and `priorities`, for the signals.
 
 ## AI level
-Level 0. The owner and Claude write a document and a registry entry. The product has no AI step for this idea.
+Level 0. The owner writes a document and a registry entry.
 
 ## Decisions
 - **Vision:** the owner opens a product, and AgentSI says what to do next and why. The owner approves, and the roles do it. The means is one place for each product.
@@ -38,8 +37,6 @@ Level 0. The owner and Claude write a document and a registry entry. The product
 | Meetings on AgentSI | less than 2 | 2026-12-31 |
 | Share of `accepted` marks | less than 50% | 2026-12-31 |
 | Order from the map | same as the owner's top 3 | 2026-11-23 (done: the order changed) |
-
-The cheapest test was the map of the 12 sections. It ran on 2026-11-23, and the order changed.
 
 ## Open tests
 None.
