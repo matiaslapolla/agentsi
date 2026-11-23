@@ -48,9 +48,9 @@ The owner can drag the width of the two pane columns of the shell. The side colu
 - The shell observes the global and calls `schedule_save`, so a drag saves after its debounce.
 
 ## Acceptance criteria
-- [ ] `cargo test -p agentsi-app columns` passes: `width` clamps to the min and the max, `reset` gives the first width, and `load` drops a bad key and a bad width.
-- [ ] `cargo test -p agentsi-app layout` passes: a `layout.json` without `columns` reads, and a saved width reads back.
-- [ ] A gpui test drags the edge of each of the four screen columns, and the column width changes by the drag distance.
-- [ ] A gpui test double-clicks a dragged edge, and the column gets its first width again.
-- [ ] In the installed app, the owner drags each of the four columns, restarts the app and sees the same widths.
-- [ ] `devflow check` passes.
+- [x] `cargo test -p agentsi-app columns` passes: `width` clamps to the min and the max, `reset` gives the first width, and `load` drops a bad key and a bad width.
+- [x] `cargo test -p agentsi-app layout` passes: a `layout.json` without `columns` reads, and a saved width reads back.
+- [x] A gpui test drags the edge of each of the four screen columns, and the column width changes by the drag distance.
+- [x] A gpui test double-clicks a dragged edge, and the column gets its first width again.
+- [x] In the installed app, the owner drags each of the four columns, restarts the app and sees the same widths.
+- [x] `devflow check` passes.
