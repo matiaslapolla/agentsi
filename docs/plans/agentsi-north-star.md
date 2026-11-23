@@ -1,11 +1,11 @@
 # AgentSI north star plan
 
-Spec: `docs/specs/agentsi-north-star.md`. Docs only, one branch `north-star`. The owner runs U5 on the owner's machine.
+Spec: `docs/specs/agentsi-north-star.md`. Docs only, one branch `north-star`. The owner runs U5 on the owner's machine after the merge to `main`.
 
 ## U1 — The north star
 - **Files:** `docs/product.md`
 - **Steps:**
-  1. Write the ten headings of the spec in their order.
+  1. Write the nine headings and the Stage line of the spec in their order.
   2. Write objective 1 and objective 2 with their roadmap sections, signals, queries and review date.
   3. Write the later sections and the owner override under `## Later`.
   4. Write the monthly check, the conditions to stop and the outside list under `## Review`.
@@ -34,21 +34,33 @@ Spec: `docs/specs/agentsi-north-star.md`. Docs only, one branch `north-star`. Th
 - **Check:** `grep -n "^\*\*North star\*\*" CONTEXT.md` prints one line.
 
 ## U5 — The registration, on the owner's machine
-- **Files:** none in the repo. The core writes `~/.local/share/agentsi/data`.
+- **Files:** none in the repo. The core writes the data root, by default `~/.local/share/agentsi/data`.
 - **Steps:**
-  1. In the root of the AgentSI repo, run the commands below.
-  2. Read the dry run output and the diff. Stop if a line is not expected.
-  3. Run the apply with `--yes` only after the diff looks correct.
-  4. Run `agentsi roles validate --product agentsi`.
-- **Commands:**
+  1. On `main` in the root of the AgentSI repo, stage the brief and the roster:
 
-  ```sh
-  stage=$(mktemp -d)
-  cp docs/plans/agentsi-north-star-brief.json "$stage/brief.json"
-  echo '["pm","dev","qa"]' > "$stage/roster.json"
-  agentsi roles apply "$stage" --register --product agentsi --name "AgentSI" --path "$PWD"
-  agentsi roles apply "$stage" --register --product agentsi --name "AgentSI" --path "$PWD" --yes
-  agentsi roles validate --product agentsi
-  ```
+     ```sh
+     stage=$(mktemp -d)
+     cp docs/plans/agentsi-north-star-brief.json "$stage/brief.json"
+     echo '["pm","dev","qa"]' > "$stage/roster.json"
+     ```
+
+  2. Run the dry run. It writes nothing and prints the roster change and the diff:
+
+     ```sh
+     agentsi roles apply "$stage" --register --product agentsi --name "AgentSI" --path "$PWD"
+     ```
+
+  3. Read the diff. Stop if a line is not expected.
+  4. Only after the diff looks correct, apply it:
+
+     ```sh
+     agentsi roles apply "$stage" --register --product agentsi --name "AgentSI" --path "$PWD" --yes
+     ```
+
+  5. Validate the result:
+
+     ```sh
+     agentsi roles validate --product agentsi
+     ```
 
 - **Check:** `agentsi roles validate` passes, and `agentsi roles --product agentsi` lists `pm`, `dev` and `qa`.
