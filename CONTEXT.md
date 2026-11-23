@@ -101,6 +101,10 @@ _Avoid_: Shared role, template role
 The product as the owner defined it in setup: what it is, for whom, its stage, its objectives, its north-star docs and what is out of scope.
 _Avoid_: Profile, product config
 
+**North star**:
+A doc of a product that the `north_stars` field of its brief names. The PM ranks the priorities against it. For AgentSI it is `docs/product.md`.
+_Avoid_: Vision doc, mission
+
 **Setup screen**:
 The screen of the app that registers a product or updates its brief in four steps: Folder, Forms, Review and Done. It writes only after the owner's Confirm, through `roles.apply`, `registry.update`, `decision.add` and `setup.outcome`, and never into the product repo.
 _Avoid_: Wizard, onboarding
