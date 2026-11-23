@@ -6,14 +6,14 @@
 AgentSI is an agency of role agents for the products of the owner. The roles read a product, meet and rank what to do next. The owner approves each change. AgentSI is a native Linux app, a core daemon, a command line client and a Claude Code plugin.
 
 ## Audience
-- The owner is the first audience. The owner is the only developer and uses AgentSI every day.
+- The owner is the first audience and the only developer.
 - Devs who see AgentSI on X are the second audience. They have no objective.
 
 ## Vision
 The owner opens a product, and AgentSI says what to do next and why. The owner approves, and the roles do the work. The means is one place for each product: terminals, git, tickets, meetings and voice.
 
 ## Objectives
-The `due` of each objective is a review date, not a delivery date. The data is in `~/.local/share/agentsi/data/agentsi.db`. Each query below is for December 2026. For another month, change `2026-12`.
+The `due` of each objective is a review date, not a delivery date. The data is in `agentsi.db` of the data root. The queries use the default data root, `~/.local/share/agentsi/data`. Each query below is for December 2026. For another month, change `2026-12`.
 
 1. **The app is the daily workplace** (`o1`).
    - Sections of `ROADMAP.md`:
@@ -21,7 +21,7 @@ The `due` of each objective is a review date, not a delivery date. The data is i
      - File management and day-to-day tasks,
      - More git,
      - The switch-over.
-   - Signal 1: 20 days or more in each month with an owner message at the front desk of any product. The query gives the number of days:
+   - Signal 1: 20 days or more in each month with an owner message at the front desk of any product. The days are UTC days. The query gives the number of days:
 
      ```sh
      sqlite3 ~/.local/share/agentsi/data/agentsi.db \
@@ -82,7 +82,7 @@ The owner stops this north star and writes a new one in one of these cases:
 - AgentSI has fewer than 2 meetings by 2026-12-31.
 - Less than 50% of the marks are `accepted` at the review of 2026-12-31.
 
-Outside list, on 2026-11-23. The owner corrects it at the first review.
+Outside list, on 2026-11-23. The items are a first guess from `ROADMAP.md`. The owner corrects them at the first review.
 - Push, pull and fetch in a terminal.
 - Make and switch branches, and read the history, in a terminal.
 - Open and review pull requests on GitHub.

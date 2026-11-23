@@ -9,7 +9,7 @@
     {
       "id": "o1",
       "text": "The app is the daily workplace. ROADMAP.md sections: UI polish, File management and day-to-day tasks, More git, and The switch-over.",
-      "signal": "20 days or more each month with an owner message at the front desk (desk_items, kind owner). The outside list in docs/product.md gets shorter at each review.",
+      "signal": "20 days or more each month with an owner message at the front desk of any product (desk_items, kind owner). The outside list in docs/product.md gets shorter at each review.",
       "due": "2026-12-31"
     },
     {
